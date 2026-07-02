@@ -3,6 +3,8 @@ name: Fetch Vosk Spanish Model
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   fetch-model:
