@@ -1,1 +1,2 @@
 Temporary trigger for downloading the Spanish Vosk model used to subtitle local videos.
+Retry using the GitHub mirror.
