@@ -1,0 +1,28 @@
+# Secretos y credenciales — NUNCA commitear
+.env
+.env.*
+!.env.example
+CREDENCIALES.md
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Builds
+frontend/dist/
+backend/dist/
+
+# Uploads y artefactos generados
+backend/uploads/
+backend/generated/
+*.pdf
+!docs/**/*.pdf
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
