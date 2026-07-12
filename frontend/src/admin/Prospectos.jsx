@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
+import { Icon } from '../components/icons.jsx';
 
 const ETAPAS = ['nuevo', 'contactado', 'demo', 'piloto', 'ganado', 'perdido'];
 const VACIO = { nombre_empresa: '', rut: '', contacto: '', etapa: 'nuevo', origen: '', notas: '', proxima_accion: '' };
@@ -39,7 +40,7 @@ export default function Prospectos() {
               <div key={p.id} style={{ background: 'var(--bg)', borderRadius: 8, padding: 8, marginBottom: 6, fontSize: 13 }}>
                 <div style={{ fontWeight: 600 }}>{p.nombre_empresa}</div>
                 <div className="muted" style={{ fontSize: 11 }}>{p.contacto || '—'}</div>
-                {p.proxima_accion && <div className="muted" style={{ fontSize: 11 }}>📅 {fmtFecha(p.proxima_accion)}</div>}
+                {p.proxima_accion && <div className="muted" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Icon.Calendar size={12} /> {fmtFecha(p.proxima_accion)}</div>}
                 <div style={{ marginTop: 4 }}>
                   <span style={{ cursor: 'pointer', fontSize: 11 }} onClick={() => setModal({ ...p, proxima_accion: p.proxima_accion?.slice(0,10) || '' })}>editar</span>
                 </div>

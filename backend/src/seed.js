@@ -46,14 +46,14 @@ async function seed() {
   if (cCount[0].n === 0) {
     await query(
       `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan) VALUES
-       ('76.123.456-7','Minera del Norte SpA','contacto@mineranorte.cl','activo', CURRENT_DATE - INTERVAL '60 days', CURRENT_DATE + INTERVAL '20 days','pro'),
+       ('76.123.456-0','Minera del Norte SpA','contacto@mineranorte.cl','activo', CURRENT_DATE - INTERVAL '60 days', CURRENT_DATE + INTERVAL '20 days','pro'),
        ('77.987.654-3','Áridos Antofagasta Ltda','ops@aridosantof.cl','piloto', CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '80 days','piloto'),
-       ('78.222.333-9','Transportes Atacama SA','gerencia@transatacama.cl','vencido', CURRENT_DATE - INTERVAL '400 days', CURRENT_DATE - INTERVAL '35 days','pro')`
+       ('78.222.333-K','Transportes Atacama SA','gerencia@transatacama.cl','vencido', CURRENT_DATE - INTERVAL '400 days', CURRENT_DATE - INTERVAL '35 days','pro')`
     );
     await query(
       `INSERT INTO prospectos (nombre_empresa, rut, contacto, etapa, origen, notas, proxima_accion) VALUES
-       ('Cobre Andino SpA','79.111.222-3','jefe.sustentabilidad@cobreandino.cl','demo','referido','Interesados en trazabilidad de facturas', CURRENT_DATE + INTERVAL '3 days'),
-       ('Logística Pampa Ltda','80.444.555-6','contacto@logpampa.cl','contactado','web','Pidieron propuesta piloto', CURRENT_DATE + INTERVAL '7 days')`
+       ('Cobre Andino SpA','79.111.222-2','jefe.sustentabilidad@cobreandino.cl','demo','referido','Interesados en trazabilidad de facturas', CURRENT_DATE + INTERVAL '3 days'),
+       ('Logística Pampa Ltda','80.444.555-2','contacto@logpampa.cl','contactado','web','Pidieron propuesta piloto', CURRENT_DATE + INTERVAL '7 days')`
     );
     console.log('[seed] Datos demo (clientes y prospectos) insertados.');
   }

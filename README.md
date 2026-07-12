@@ -78,6 +78,20 @@ En `backend/.env`:
 
 Reinicia el backend. Todo el resto del flujo es idéntico; el motor externo pasa a ser real.
 
+### Nota sobre el mapeo de la API real (importante)
+
+El entorno donde se construyó este proyecto **bloquea `app.itssimple.com`** por política de
+red, por lo que el normalizador de la respuesta real (`normalizeReal()` en
+`backend/src/services/simpleApi.js`) **no pudo verificarse contra la API en vivo**. Está
+escrito de forma **defensiva**: acepta varias variantes de nombre de campo
+(snake_case / camelCase / anidados) y nunca falla si falta un campo.
+
+Al activar `MOCK_SIMPLE=false` en una red **con acceso a itssimple**, verifica una respuesta
+real (por ejemplo `GET /invoices/{id}` y `GET /analysis/totals`) y ajusta las claves en
+`pick(...)` dentro de `normalizeReal()` si los nombres difieren. El mock
+(`MOCK_SIMPLE=true`) replica la forma esperada (t CO2e por ítem, categoría, % del total)
+según la documentación de los endpoints, para desarrollar y demostrar sin consumir la API.
+
 ---
 
 ## Variables de entorno

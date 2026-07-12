@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
+import { Icon } from '../components/icons.jsx';
+import { Donut } from '../components/Charts.jsx';
 
 export default function Dashboard() {
   const [d, setD] = useState(null);
@@ -29,11 +31,15 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>Clientes por estado de contrato</h3>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div><span className="badge badge-green">Activo</span><div className="n" style={{ fontSize: 26, fontWeight: 800 }}>{est.activo || 0}</div></div>
-            <div><span className="badge badge-amber">Piloto</span><div className="n" style={{ fontSize: 26, fontWeight: 800 }}>{est.piloto || 0}</div></div>
-            <div><span className="badge badge-red">Vencido</span><div className="n" style={{ fontSize: 26, fontWeight: 800 }}>{est.vencido || 0}</div></div>
-          </div>
+          <Donut
+            size={150}
+            unit="clientes"
+            data={[
+              { label: 'Activo', value: est.activo || 0 },
+              { label: 'Piloto', value: est.piloto || 0 },
+              { label: 'Vencido', value: est.vencido || 0 },
+            ]}
+          />
         </div>
 
         <div className="card card-pad">
@@ -54,7 +60,7 @@ export default function Dashboard() {
 
       {alertas.length > 0 && (
         <div className="card card-pad" style={{ marginTop: 16 }}>
-          <h3 style={{ marginTop: 0 }}>⚠️ Contratos por vencer / vencidos</h3>
+          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#b45309' }}><Icon.Alert size={18} /> <span style={{ color: 'var(--navy)' }}>Contratos por vencer / vencidos</span></h3>
           <table className="data">
             <thead><tr><th>Empresa</th><th>Estado</th><th>Vence</th><th className="num">Días</th></tr></thead>
             <tbody>

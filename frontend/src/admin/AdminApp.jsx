@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
+import { Icon } from '../components/icons.jsx';
 import { api, auth } from '../api.js';
 import Dashboard from './Dashboard.jsx';
 import Clientes from './Clientes.jsx';
@@ -12,14 +13,14 @@ import Usuarios from './Usuarios.jsx';
 import Actividad from './Actividad.jsx';
 
 const NAV = [
-  { to: '/admin', end: true, ico: '📊', label: 'Dashboard' },
-  { to: '/admin/clientes', ico: '🏢', label: 'Clientes y contratos' },
-  { to: '/admin/sesiones', ico: '🧾', label: 'Sesiones e informes' },
-  { to: '/admin/metricas', ico: '📈', label: 'Métricas' },
-  { to: '/admin/prospectos', ico: '🎯', label: 'Prospectos' },
-  { to: '/admin/simple-api', ico: '🔌', label: 'Motor externo' },
-  { to: '/admin/usuarios', ico: '👥', label: 'Usuarios y roles' },
-  { to: '/admin/actividad', ico: '📋', label: 'Log de actividad' },
+  { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
+  { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
+  { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
+  { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
+  { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
+  { to: '/admin/simple-api', ico: Icon.Plug, label: 'Motor externo' },
+  { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
+  { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
 ];
 
 export default function AdminApp() {
@@ -41,11 +42,14 @@ export default function AdminApp() {
       <aside className="admin-side">
         <div className="brand"><Logo size={26} light tagline /></div>
         <nav>
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
-              <span>{n.ico}</span> {n.label}
-            </NavLink>
-          ))}
+          {NAV.map((n) => {
+            const Ico = n.ico;
+            return (
+              <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
+                <span className="icon-badge"><Ico size={18} /></span> {n.label}
+              </NavLink>
+            );
+          })}
         </nav>
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
+import { Icon } from '../components/icons.jsx';
+import { Donut } from '../components/Charts.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 
 export default function Resultado() {
@@ -22,6 +24,20 @@ export default function Resultado() {
   const categorias = [...new Set(facturas.map((f) => f.categoria).filter(Boolean))];
   const proveedores = new Set(facturas.map((f) => f.rut_emisor).filter(Boolean)).size;
   const factura = facturas[sel] || facturas[0];
+
+  // Agregación de CO2e por categoría para el donut.
+  const porCategoria = Object.entries(
+    facturas.reduce((acc, f) => {
+      const k = f.categoria || 'Sin categoría';
+      acc[k] = (acc[k] || 0) + Number(f.total_co2e || 0);
+      return acc;
+    }, {})
+  ).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+
+  // Descargar todas las etiquetas (abre cada PDF en una pestaña, de forma escalonada).
+  function descargarEtiquetas() {
+    facturas.forEach((f, i) => setTimeout(() => window.open(api.etiquetaUrl(f.id), '_blank'), i * 350));
+  }
 
   return (
     <PublicLayout>
@@ -50,8 +66,16 @@ export default function Resultado() {
             </div>
           </div>
 
+          {/* Donut de CO2e por categoría */}
+          {porCategoria.length > 0 && (
+            <div className="card card-pad" style={{ marginTop: 8 }}>
+              <h3 style={{ margin: '0 0 12px' }}>Distribución por categoría</h3>
+              <Donut data={porCategoria} unit="t CO2e" />
+            </div>
+          )}
+
           {/* Selector de factura */}
-          <div className="card card-pad" style={{ marginTop: 8 }}>
+          <div className="card card-pad" style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
               {facturas.map((f, i) => (
                 <button
@@ -90,24 +114,27 @@ export default function Resultado() {
             </table>
           </div>
 
-          <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-            ℹ️ El análisis utiliza un motor externo para recopilar y estructurar la información. Este resultado no constituye una verificación de tercera parte acreditada.
+          <p className="muted" style={{ fontSize: 13, marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <span style={{ flexShrink: 0, marginTop: 1 }}><Icon.Info size={15} /></span> El análisis utiliza un motor externo para recopilar y estructurar la información. Este resultado no constituye una verificación de tercera parte acreditada.
           </p>
         </div>
 
         {/* Sidebar: resultados generados */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card card-pad">
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>✨ Resultados generados</div>
+            <div style={{ fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--green-600)' }}><Icon.Sparkles size={18} /> <span style={{ color: 'var(--navy)' }}>Resultados generados</span></div>
             <div style={{ borderTop: '1px solid var(--border)', margin: '12px 0', paddingTop: 12 }}>
               <b>PDF de informe</b>
               <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>Informe consolidado con libro mayor de carbono y metodología.</p>
-              <a className="btn btn-primary" style={{ width: '100%' }} href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer">Generar PDF</a>
+              <a className="btn btn-primary" style={{ width: '100%' }} href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"><Icon.Download size={17} /> Generar PDF</a>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
               <b>Etiqueta / adhesivo</b>
               <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>Etiqueta con QR verificable de la factura seleccionada.</p>
-              <a className="btn btn-outline" style={{ width: '100%' }} href={api.etiquetaUrl(factura.id)} target="_blank" rel="noreferrer">Generar etiqueta</a>
+              <a className="btn btn-outline" style={{ width: '100%', marginBottom: 8 }} href={api.etiquetaUrl(factura.id)} target="_blank" rel="noreferrer"><Icon.Tag size={16} /> Etiqueta de {factura.numero_venta}</a>
+              {facturas.length > 1 && (
+                <button className="btn btn-outline" style={{ width: '100%' }} onClick={descargarEtiquetas}><Icon.Download size={16} /> Descargar las {facturas.length} etiquetas</button>
+              )}
             </div>
           </div>
 

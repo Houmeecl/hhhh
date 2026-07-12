@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
+import { Icon } from '../components/icons.jsx';
 import { api, auth } from '../api.js';
 
 export default function Login() {
@@ -35,9 +36,9 @@ export default function Login() {
 
   return (
     <div className="login-wrap">
-      <div style={{ width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Logo size={44} tagline />
+      <div style={{ width: '100%', maxWidth: 430 }} className="fade-up">
+        <div style={{ textAlign: 'center', marginBottom: 24, position: 'relative', zIndex: 2 }}>
+          <Logo size={48} tagline light />
         </div>
         <form className="login-card" onSubmit={submit}>
           <h2>Acceso</h2>
@@ -58,9 +59,11 @@ export default function Login() {
             {loading ? <span className="spinner" /> : 'Iniciar sesión'}
           </button>
         </form>
-        <p className="muted" style={{ textAlign: 'center', fontSize: 13, marginTop: 16 }}>
-          Antofagasta, Chile · Panel de administración sicr3p
-        </p>
+        <div className="login-badges">
+          <span className="b"><Icon.Shield size={14} /> Acceso seguro</span>
+          <span className="b"><Icon.CheckCircle size={14} /> JWT + bcrypt</span>
+          <span className="b"><Icon.Building size={14} /> Antofagasta, Chile</span>
+        </div>
       </div>
     </div>
   );

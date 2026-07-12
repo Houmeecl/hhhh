@@ -174,20 +174,52 @@ export const simpleApi = {
 };
 
 // Normaliza la respuesta real de Simple al formato interno.
+//
+// IMPORTANTE: el entorno de construcción bloquea `app.itssimple.com` por política de
+// egress, así que este mapeo NO pudo verificarse contra la API real. Está escrito de
+// forma DEFENSIVA: acepta varias variantes de nombre de campo (snake_case / camelCase /
+// anidados) para maximizar la probabilidad de funcionar contra la respuesta real, y
+// nunca lanza si falta un campo. Al pasar a producción (`MOCK_SIMPLE=false`) en una red
+// con acceso a itssimple, verificar los nombres reales con una respuesta capturada y
+// ajustar `pick()` si hiciera falta. Ver README → "Modo producción".
+const pick = (obj, ...keys) => {
+  for (const k of keys) {
+    const v = k.split('.').reduce((o, part) => (o == null ? o : o[part]), obj);
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return undefined;
+};
+
 function normalizeReal(created, totals) {
-  const items = (totals.line_items || []).map((li) => ({
-    descripcion: li.description,
-    cantidad: li.quantity ?? 1,
-    co2e: round4(li.co2e ?? 0),
-    porcentaje_total: round4(li.percent ?? 0),
+  const t = totals || {};
+  const c = created || {};
+  // La lista de ítems puede venir en totals o en el propio invoice, con distintos nombres.
+  const rawItems = pick(t, 'line_items', 'lineItems', 'items', 'lines') ||
+    pick(c, 'line_items', 'lineItems', 'items', 'lines') || [];
+  const items = (Array.isArray(rawItems) ? rawItems : []).map((li) => ({
+    descripcion: pick(li, 'description', 'descripcion', 'name', 'article.name', 'title') || 'Ítem',
+    cantidad: Number(pick(li, 'quantity', 'qty', 'cantidad') ?? 1),
+    co2e: round4(Number(pick(li, 'co2e', 'co2', 'total_co2e', 'emissions', 'kgco2e') ?? 0)),
+    porcentaje_total: round4(Number(pick(li, 'percent', 'percentage', 'share', 'porcentaje_total') ?? 0)),
   }));
+
+  let total = Number(pick(t, 'total_co2e', 'totalCo2e', 'co2e', 'total', 'emissions_total') ?? 0);
+  if (!total && items.length) total = items.reduce((a, it) => a + it.co2e, 0);
+  total = round4(total);
+
+  // Si no vino el % por ítem, se calcula a partir del total.
+  for (const it of items) {
+    if (!it.porcentaje_total && total > 0) it.porcentaje_total = round4((it.co2e / total) * 100);
+  }
+
   return {
-    invoice_id_simple: created.id,
-    numero_venta: created.sale_number || created.number,
-    rut_emisor: created.issuer_tax_id || null,
-    rut_receptor: created.receiver_tax_id || null,
-    total_co2e: round4(totals.total_co2e ?? 0),
-    categoria: totals.main_category || 'Sin categoría',
+    invoice_id_simple: pick(c, 'id', 'invoice_id', 'uuid') || null,
+    numero_venta: pick(c, 'sale_number', 'saleNumber', 'number', 'document_number', 'folio') || null,
+    rut_emisor: pick(c, 'issuer_tax_id', 'issuerTaxId', 'issuer.tax_id', 'supplier.tax_id', 'rut_emisor') || null,
+    rut_receptor: pick(c, 'receiver_tax_id', 'receiverTaxId', 'receiver.tax_id', 'customer.tax_id', 'rut_receptor') || null,
+    total_co2e: total,
+    categoria: pick(t, 'main_category', 'mainCategory', 'category', 'categoria') ||
+      pick(items[0] || {}, 'categoria') || 'Sin categoría',
     items,
   };
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import { Icon } from '../components/icons.jsx';
 import { api, fmt, fmtFecha } from '../api.js';
 
 export default function Verificar() {
@@ -17,7 +18,7 @@ export default function Verificar() {
       <div className="container" style={{ padding: '48px 24px', maxWidth: 720 }}>
         {error && (
           <div className="card card-pad" style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 40 }}>⚠️</div>
+            <div style={{ color: '#b45309', display: 'flex', justifyContent: 'center' }}><Icon.Alert size={40} /></div>
             <h2>Documento no encontrado</h2>
             <p className="muted">No pudimos verificar la trazabilidad de este documento.</p>
           </div>

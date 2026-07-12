@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt } from '../api.js';
+import { Donut, Sparkbars } from '../components/Charts.jsx';
 
 // Barra horizontal simple (sin librerías externas).
 function Bar({ value, max, label, right }) {
@@ -37,14 +38,14 @@ export default function Metricas() {
 
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>CO2e por categoría</h3>
-          {m.por_categoria.map((c, i) => (
-            <Bar key={i} value={c.co2e} max={maxCat} label={c.categoria} right={`${fmt(c.co2e, 2)} t · ${c.n} fact.`} />
-          ))}
-          {m.por_categoria.length === 0 && <p className="muted">Sin datos.</p>}
+          <Donut data={m.por_categoria.map((c) => ({ label: c.categoria, value: c.co2e }))} unit="t CO2e" />
         </div>
 
         <div className="card card-pad" style={{ gridColumn: '1 / -1' }}>
-          <h3 style={{ marginTop: 0 }}>Serie mensual (facturas y CO2e)</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>Serie mensual (facturas y CO2e)</h3>
+            <div style={{ width: 220 }}><Sparkbars values={m.serie_mensual.map((s) => s.co2e)} height={40} /></div>
+          </div>
           <table className="data">
             <thead><tr><th>Mes</th><th className="num">Facturas</th><th className="num">t CO2e</th><th>Tendencia</th></tr></thead>
             <tbody>

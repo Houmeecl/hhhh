@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import { Icon } from '../components/icons.jsx';
+import { validarRut, formatearRut } from '../lib/rut.js';
 import { api } from '../api.js';
 
 const MAX = 5;
@@ -36,10 +38,16 @@ export default function Cargar() {
     addFiles(e.dataTransfer.files);
   }
 
+  const rutValido = form.rut === '' || validarRut(form.rut);
+
   async function procesar() {
     setError('');
     if (!form.rut || !form.empresa || !form.email) {
       setError('Completa RUT, empresa y email.');
+      return;
+    }
+    if (!validarRut(form.rut)) {
+      setError('El RUT no es válido. Revisa el dígito verificador.');
       return;
     }
     if (files.length === 0) { setError('Sube al menos una factura.'); return; }
@@ -100,7 +108,7 @@ export default function Cargar() {
             onDrop={onDrop}
             onClick={() => inputRef.current.click()}
           >
-            <div className="cloud">☁️⬆️</div>
+            <div style={{ color: 'var(--green-600)' }}><Icon.Cloud size={44} /></div>
             <div style={{ fontWeight: 700, marginTop: 8 }}>Arrastra y suelta tus archivos aquí</div>
             <div className="muted">o selecciona desde tu dispositivo</div>
             <button className="btn btn-primary" style={{ marginTop: 14 }} type="button">Seleccionar archivos</button>
@@ -118,7 +126,7 @@ export default function Cargar() {
                 const st = estados[i];
                 return (
                   <div className="file-item" key={i}>
-                    <span>📄 {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Icon.Doc size={16} /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
                     {procesando ? (
                       st === 'listo' ? <span className="badge badge-green">✓ Listo</span>
                       : st === 'procesando' ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Procesando…</span>
@@ -136,7 +144,15 @@ export default function Cargar() {
           <div className="form-row">
             <div className="field">
               <label>RUT empresa</label>
-              <input value={form.rut} onChange={(e) => setForm({ ...form, rut: e.target.value })} placeholder="76.123.456-7" />
+              <input
+                value={form.rut}
+                onChange={(e) => setForm({ ...form, rut: e.target.value })}
+                onBlur={() => form.rut && validarRut(form.rut) && setForm((f) => ({ ...f, rut: formatearRut(f.rut) }))}
+                placeholder="76.123.456-7"
+                style={!rutValido ? { borderColor: '#ef4444', outlineColor: '#ef4444' } : {}}
+              />
+              {!rutValido && <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 4 }}>RUT inválido (dígito verificador)</div>}
+              {form.rut && rutValido && <div style={{ color: 'var(--green-600)', fontSize: 12, marginTop: 4 }}>✓ RUT válido</div>}
             </div>
             <div className="field">
               <label>Empresa</label>
@@ -166,8 +182,8 @@ export default function Cargar() {
           )}
         </div>
 
-        <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 16 }}>
-          ℹ️ El análisis utiliza un motor externo para recopilar y estructurar la información de tus documentos.
+        <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          <Icon.Info size={15} /> El análisis utiliza un motor externo para recopilar y estructurar la información de tus documentos.
         </p>
       </div>
     </PublicLayout>
