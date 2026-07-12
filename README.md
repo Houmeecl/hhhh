@@ -92,6 +92,18 @@ real (por ejemplo `GET /invoices/{id}` y `GET /analysis/totals`) y ajusta las cl
 (`MOCK_SIMPLE=true`) replica la forma esperada (t CO2e por ítem, categoría, % del total)
 según la documentación de los endpoints, para desarrollar y demostrar sin consumir la API.
 
+**Script de verificación (correr en el VPS):**
+
+```bash
+cd backend
+node scripts/verificar-simple.js
+```
+
+Hace solo lecturas `GET`, imprime la forma real de las respuestas y **contrasta** cada
+campo con las variantes que espera `normalizeReal()`, marcando ✓/✗ para decirte exactamente
+qué ajustar. Si la red bloquea `app.itssimple.com` (como en algunos entornos de CI), avisa y
+te pide correrlo en el VPS.
+
 ---
 
 ## Variables de entorno

@@ -51,7 +51,7 @@ function mockRut(rand) {
 }
 
 // ---------- Motor mock: analiza una "factura" ----------
-function mockAnalyzeInvoice({ filename, index, rutReceptor }) {
+export function mockAnalyzeInvoice({ filename, index, rutReceptor }) {
   const rand = seededRandom(`${filename}:${index}`);
   const nItems = 2 + Math.floor(rand() * 4); // 2–5 ítems
   const cat = CATEGORIAS[Math.floor(rand() * CATEGORIAS.length)];
@@ -190,7 +190,7 @@ const pick = (obj, ...keys) => {
   return undefined;
 };
 
-function normalizeReal(created, totals) {
+export function normalizeReal(created, totals) {
   const t = totals || {};
   const c = created || {};
   // La lista de ítems puede venir en totals o en el propio invoice, con distintos nombres.

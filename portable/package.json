@@ -5,7 +5,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node --no-warnings server.js"
+    "start": "node --no-warnings server.js",
+    "test": "node --no-warnings --test"
   },
   "engines": { "node": ">=22.5" },
   "dependencies": {

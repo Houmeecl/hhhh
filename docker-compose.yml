@@ -1,0 +1,49 @@
+# sicr3p — edición servidor (Postgres + backend + frontend/nginx)
+# Uso: copia .env.example a .env, completa los valores y `docker compose up -d`.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sicr3p
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sicr3p_dev}
+      POSTGRES_DB: sicr3p
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sicr3p"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://sicr3p:${POSTGRES_PASSWORD:-sicr3p_dev}@db:5432/sicr3p
+      MOCK_SIMPLE: ${MOCK_SIMPLE:-true}
+      SIMPLE_API_KEY: ${SIMPLE_API_KEY:-}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-cambia_esto}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-cambia_esto_2}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:8080}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sicr3p.cl}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    # Aplica migraciones + seed y arranca.
+    command: sh -c "npm run seed && npm start"
+    expose:
+      - "4000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:

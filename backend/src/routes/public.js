@@ -5,6 +5,7 @@ import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
 import { qrBuffer } from '../services/qr.js';
+import { sendMail, reporteEmail } from '../services/mailer.js';
 
 const router = express.Router();
 
@@ -126,6 +127,20 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
     const facturas = await hydrateFacturas(result.id);
     res.status(201).json({ sesion: result, facturas });
+
+    // Envío del informe por correo (no bloqueante: nunca afecta la respuesta).
+    (async () => {
+      try {
+        const pdf = await generateReport({ sesion: result, facturas });
+        await sendMail({
+          to: result.email_cliente,
+          ...reporteEmail({ nombre: result.nombre_cliente, totalCo2e: result.total_co2e, nFacturas: facturas.length }),
+          attachments: [{ filename: `sicr3p-informe-${result.id.slice(0, 8)}.pdf`, content: pdf }],
+        });
+      } catch (e) {
+        console.warn('[correo] no se pudo enviar el informe:', e.message);
+      }
+    })();
   } catch (err) {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ error: 'La demo permite hasta 5 facturas. Contáctanos para más.' });

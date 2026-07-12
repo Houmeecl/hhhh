@@ -28,6 +28,17 @@ desde el SII/RCV y la cuadratura siguen siendo Etapa 2.
 Empaque futuro de la edición portátil (pendiente, opcional): ejecutable único (`.exe` con
 `pkg`/`nexe`) y app de escritorio (Electron). Hoy corre como carpeta portátil con Node.
 
+## Backlog técnico (mejoras diferidas, con justificación)
+
+- **Empaque .exe / binario del portátil** (`pkg`/`nexe`): la edición portátil usa el SQLite
+  integrado `node:sqlite`, que los empaquetadores actuales aún no soportan bien; se prefirió
+  no shippear un binario sin probar. Alternativa futura: Electron o esperar soporte de `pkg`.
+- **Cifrado total de la base del portátil en reposo**: hoy la clave SII está cifrada y el
+  acceso está protegido por el candado; cifrar toda la base requiere ciclo lock/unlock o
+  SQLCipher (módulo nativo), con riesgo de corrupción. Se deja como endurecimiento futuro.
+- **Responsividad móvil fina + accesibilidad (WCAG)**: pase dedicado de a11y (teclado, aria,
+  contraste) y ajustes móviles del panel admin.
+
 ## Notas de preparación ya incluidas en Etapa 1
 
 - Los campos `rut_emisor` y `rut_receptor` **se guardan en cada factura** para habilitar
