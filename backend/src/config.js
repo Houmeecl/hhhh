@@ -1,0 +1,46 @@
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Carga backend/.env
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+const bool = (v, def = false) =>
+  v === undefined ? def : ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
+
+export const config = {
+  env: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '4000', 10),
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  publicAppUrl: process.env.PUBLIC_APP_URL || 'http://localhost:5173',
+
+  databaseUrl: process.env.DATABASE_URL,
+
+  simple: {
+    mock: bool(process.env.MOCK_SIMPLE, true),
+    base: process.env.SIMPLE_API_BASE || 'https://app.itssimple.com/public/v1',
+    key: process.env.SIMPLE_API_KEY || '',
+  },
+
+  jwt: {
+    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me',
+    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me',
+    accessTtl: process.env.JWT_ACCESS_TTL || '15m',
+    refreshTtl: process.env.JWT_REFRESH_TTL || '7d',
+  },
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
+
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicr3p.cl>',
+  },
+
+  admin: {
+    email: process.env.ADMIN_EMAIL || 'admin@sicr3p.cl',
+    password: process.env.ADMIN_PASSWORD || '',
+  },
+
+  // Límite duro de la demo
+  maxFilesPerSession: 5,
+};
