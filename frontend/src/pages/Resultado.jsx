@@ -122,8 +122,9 @@ export default function Resultado() {
                 <div><span className="muted">Cliente:</span> <b>{sesion.nombre_cliente}</b></div>
                 <div><span className="muted">Fecha:</span> <b>{fmtFecha(sesion.fecha)}</b></div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
-                <span style={{ fontSize: 44 }}>▦</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '6px 0' }}>
+                <img src={api.qrUrl(factura.id)} alt="QR de verificación" width={110} height={110} style={{ borderRadius: 8 }} />
+                <span className="muted" style={{ fontSize: 11, marginTop: 4 }}>Verifica la trazabilidad</span>
               </div>
               <div className="green-block">
                 <div className="lbl">RESULTADO INCORPORADO</div>

@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
+import { qrBuffer } from '../services/qr.js';
 
 const router = express.Router();
 
@@ -176,6 +177,20 @@ router.get('/facturas/:id/etiqueta.pdf', async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-etiqueta-${factura.numero_venta || factura.id.slice(0, 8)}.pdf"`);
     res.send(pdf);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/facturas/:id/qr.png — QR de verificación (para previsualizar) ----------
+router.get('/facturas/:id/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id FROM facturas WHERE id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada' });
+    const png = await qrBuffer(req.params.id);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(png);
   } catch (err) {
     next(err);
   }
