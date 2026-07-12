@@ -53,6 +53,7 @@ export const api = {
   verificar: (id) => request(`/verificar/${id}`),
   informeUrl: (id) => `/api/sesiones/${id}/informe.pdf`,
   etiquetaUrl: (id) => `/api/facturas/${id}/etiqueta.pdf`,
+  qrUrl: (id) => `/api/facturas/${id}/qr.png`,
 
   // Auth
   login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),

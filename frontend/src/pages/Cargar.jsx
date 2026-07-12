@@ -15,6 +15,7 @@ export default function Cargar() {
   const [error, setError] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
+  const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'
 
   function addFiles(list) {
     setError('');
@@ -44,9 +45,24 @@ export default function Cargar() {
     if (files.length === 0) { setError('Sube al menos una factura.'); return; }
 
     setProcesando(true);
-    // Progreso simulado por factura mientras el backend procesa.
     setProgreso(0);
-    const timer = setInterval(() => setProgreso((p) => Math.min(p + 100 / (files.length * 4), 92)), 220);
+    setEstados(files.map(() => 'pendiente'));
+
+    // Progreso por factura: marca cada una "procesando" y luego "listo" de forma escalonada
+    // mientras el backend estructura la información.
+    let cursor = 0;
+    setEstados((prev) => prev.map((s, i) => (i === 0 ? 'procesando' : s)));
+    const timer = setInterval(() => {
+      setEstados((prev) => {
+        if (cursor >= prev.length) return prev;
+        const next = [...prev];
+        next[cursor] = 'listo';
+        if (cursor + 1 < next.length) next[cursor + 1] = 'procesando';
+        cursor += 1;
+        return next;
+      });
+      setProgreso((p) => Math.min(p + 90 / files.length, 90));
+    }, 550);
 
     try {
       const fd = new FormData();
@@ -55,9 +71,10 @@ export default function Cargar() {
       fd.append('email', form.email);
       files.forEach((f) => fd.append('archivos', f));
       const { sesion } = await api.crearSesion(fd);
-      setProgreso(100);
       clearInterval(timer);
-      setTimeout(() => nav(`/resultado/${sesion.id}`), 400);
+      setEstados(files.map(() => 'listo'));
+      setProgreso(100);
+      setTimeout(() => nav(`/resultado/${sesion.id}`), 500);
     } catch (e) {
       clearInterval(timer);
       setError(e.message);
@@ -97,14 +114,21 @@ export default function Cargar() {
 
           {files.length > 0 && (
             <div className="file-list">
-              {files.map((f, i) => (
-                <div className="file-item" key={i}>
-                  <span>📄 {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
-                  {!procesando && (
-                    <span className="rm" onClick={() => setFiles(files.filter((_, j) => j !== i))}>Quitar</span>
-                  )}
-                </div>
-              ))}
+              {files.map((f, i) => {
+                const st = estados[i];
+                return (
+                  <div className="file-item" key={i}>
+                    <span>📄 {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
+                    {procesando ? (
+                      st === 'listo' ? <span className="badge badge-green">✓ Listo</span>
+                      : st === 'procesando' ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Procesando…</span>
+                      : <span className="badge badge-gray">En espera</span>
+                    ) : (
+                      <span className="rm" onClick={() => setFiles(files.filter((_, j) => j !== i))}>Quitar</span>
+                    )}
+                  </div>
+                );
+              })}
               <div className="muted" style={{ fontSize: 13 }}>{files.length} de {MAX} facturas</div>
             </div>
           )}
