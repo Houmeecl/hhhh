@@ -8,6 +8,9 @@ CREDENCIALES.md
 node_modules/
 **/node_modules/
 
+# Edición portátil: datos locales del dispositivo (credenciales cifradas, base SQLite)
+portable/data/
+
 # Builds
 frontend/dist/
 backend/dist/

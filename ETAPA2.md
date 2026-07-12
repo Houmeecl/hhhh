@@ -18,6 +18,16 @@ backlog para planificación futura.
 | 10 | API para mineras mandantes | Endpoints para que empresas mandantes consuman datos de sus proveedores. |
 | 11 | Auto-registro de clientes | Alta de cuentas sin intervención de un administrador (hoy sólo el admin crea cuentas). |
 
+## Nota sobre la edición portátil (candado SII)
+
+La **edición portátil** (`portable/`) usa el **RUT + clave SII como candado local** del
+dispositivo: las credenciales se guardan **cifradas** y se **verifican offline**. Esto **no**
+es la integración con el SII del ítem 1 — **no se contacta al SII**. La ingesta automática
+desde el SII/RCV y la cuadratura siguen siendo Etapa 2.
+
+Empaque futuro de la edición portátil (pendiente, opcional): ejecutable único (`.exe` con
+`pkg`/`nexe`) y app de escritorio (Electron). Hoy corre como carpeta portátil con Node.
+
 ## Notas de preparación ya incluidas en Etapa 1
 
 - Los campos `rut_emisor` y `rut_receptor` **se guardan en cada factura** para habilitar

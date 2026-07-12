@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>sicr3p portátil</title>
+<style>
+  :root{--green:#22c55e;--green6:#16a34a;--navy:#1e2a3a;--gray:#64748b;--border:#e2e8f0;--bg:#f8fafc}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:var(--navy);background:var(--bg)}
+  a{color:var(--green6);text-decoration:none}
+  .logo{font-weight:800;letter-spacing:-.02em;display:inline-flex;line-height:1}
+  .logo .i{position:relative;display:inline-block}
+  .logo .i .dot{position:absolute;left:50%;transform:translateX(-50%);border-radius:50%;background:var(--green)}
+  .tag{font-weight:700;color:var(--navy)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none;border-radius:10px;padding:12px 20px;font:inherit;font-weight:600;font-size:15px;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green6)}
+  .btn-primary:disabled{background:#cbd5e1;cursor:not-allowed}
+  .btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border)}.btn-outline:hover{border-color:var(--navy)}
+  .card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.06),0 8px 24px rgba(15,23,42,.05)}
+  .pad{padding:24px}
+  .field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .field input{width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:9px;font:inherit;font-size:14px}
+  .field input:focus{outline:2px solid var(--green);border-color:var(--green)}
+  .muted{color:var(--gray)}.err{color:#b91c1c}.ok{color:var(--green6)}
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:600;background:#ecfdf5;color:var(--green6)}
+  .badge-g{background:#f1f5f9;color:var(--gray)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;color:var(--gray);font-size:12px;text-transform:uppercase;padding:9px 10px;border-bottom:2px solid var(--border)}
+  td{padding:9px 10px;border-bottom:1px solid var(--border)}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  /* pantalla candado */
+  .lock-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;
+    background:radial-gradient(1100px 600px at 80% -10%,rgba(34,197,94,.28),transparent 60%),radial-gradient(900px 700px at 10% 110%,rgba(14,165,233,.18),transparent 55%),linear-gradient(160deg,#0f1720,#1e2a3a 45%,#223247)}
+  .lock-wrap::before{content:'';position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:44px 44px;-webkit-mask-image:radial-gradient(circle at 50% 50%,#000 30%,transparent 75%);mask-image:radial-gradient(circle at 50% 50%,#000 30%,transparent 75%)}
+  .lock-card{position:relative;z-index:2;width:100%;max-width:430px;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.45);padding:32px}
+  .wrap{max-width:900px;margin:0 auto;padding:28px 20px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:#fff;border-bottom:1px solid var(--border)}
+  .drop{border:2px dashed var(--green);border-radius:16px;background:#f0fdf4;padding:36px 20px;text-align:center;cursor:pointer}
+  .drop.drag{background:#dcfce7}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+  .rc{border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center}
+  .rc .b{font-size:24px;font-weight:800;color:var(--green6)}.rc .l{font-size:12px;color:var(--gray);margin-top:3px}
+  .fitem{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:9px;margin-bottom:6px;font-size:14px}
+  .lockbtn{cursor:pointer}
+  @media(max-width:700px){.cards{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $ = (h)=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstChild};
+const app = document.getElementById('app');
+let TOKEN = localStorage.getItem('sicr3p_dev_token') || '';
+const fmt=(n,d=4)=>(Number(n)||0).toLocaleString('es-CL',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtF=(s)=>s?new Date(s).toLocaleDateString('es-CL'):'—';
+
+// RUT módulo 11 (para feedback en el cliente).
+function validarRut(r){r=String(r||'').toUpperCase().replace(/[^0-9K]/g,'');if(r.length<2)return false;const c=r.slice(0,-1),dv=r.slice(-1);if(!/^\d+$/.test(c))return false;let s=0,m=2;for(let i=c.length-1;i>=0;i--){s+=+c[i]*m;m=m===7?2:m+1}const x=11-(s%11);return (x===11?'0':x===10?'K':''+x)===dv}
+
+function logo(size=30,light=false){
+  const dot=Math.round(size*0.15);
+  return `<span class="logo" style="font-size:${size}px;color:${light?'#fff':'var(--navy)'}">s<span class="i">i<span class="dot" style="width:${dot}px;height:${dot}px;top:${-Math.round(size*0.24)}px"></span></span>cr3p</span>`;
+}
+async function api(path,opts={}){
+  const h=opts.headers||{};
+  if(!opts.formData) h['Content-Type']='application/json';
+  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
+  const res=await fetch('/api'+path,{method:opts.method||'GET',headers:h,body:opts.formData?opts.body:(opts.body?JSON.stringify(opts.body):undefined)});
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error||'Error');
+  return data;
+}
+
+// ---------- Router ----------
+async function route(){
+  const m=location.pathname.match(/^\/verificar\/(.+)$/);
+  if(m) return renderVerify(m[1]);
+  let st; try{ st=await api('/status'); }catch(e){ app.innerHTML='<div class="wrap">No se pudo conectar al dispositivo.</div>'; return; }
+  if(!st.enrolled) return renderEnroll();
+  if(!TOKEN) return renderLock(st);
+  try{ await api('/mis-sesiones'); renderApp(st); }
+  catch{ TOKEN=''; localStorage.removeItem('sicr3p_dev_token'); renderLock(st); }
+}
+
+// ---------- Enrolamiento (primer uso) ----------
+function renderEnroll(){
+  app.innerHTML='';
+  const box=$(`<div class="lock-wrap"><div style="width:100%;max-width:430px">
+    <div style="text-align:center;margin-bottom:20px">${logo(46,true)}<div class="tag" style="color:#cbd5e1;margin-top:4px">Tu contabilidad, tu trazabilidad</div></div>
+    <form class="lock-card">
+      <h2 style="margin:0 0 6px">Configura tu dispositivo</h2>
+      <p class="muted" style="margin-top:0;font-size:14px">Primer uso. Vincula este pendrive a tus credenciales SII. Quedan cifradas en el dispositivo y se piden al abrir sesión.</p>
+      <div class="field"><label>RUT (SII)</label><input id="e_rut" placeholder="12.345.678-5"></div>
+      <div class="field"><label>Clave SII</label><input id="e_clave" type="password" placeholder="Tu clave del SII"></div>
+      <div class="field"><label>Nombre del dispositivo</label><input id="e_disp" placeholder="Pendrive de Juan"></div>
+      <div id="e_msg" class="err" style="font-size:13px;min-height:18px"></div>
+      <button class="btn btn-primary" style="width:100%" id="e_go">Vincular dispositivo</button>
+      <p class="muted" style="font-size:12px;margin-top:14px">Verificación local: no nos conectamos al SII. Tus credenciales no salen del dispositivo.</p>
+    </form></div></div>`);
+  app.appendChild(box);
+  const msg=box.querySelector('#e_msg');
+  box.querySelector('#e_go').onclick=async(ev)=>{
+    ev.preventDefault();
+    const rut=box.querySelector('#e_rut').value, clave=box.querySelector('#e_clave').value, dispositivo=box.querySelector('#e_disp').value;
+    if(!validarRut(rut)){msg.textContent='RUT inválido (dígito verificador).';return;}
+    try{ await api('/enroll',{method:'POST',body:{rut,clave,dispositivo}});
+      const r=await api('/login',{method:'POST',body:{rut,clave}});
+      TOKEN=r.token;localStorage.setItem('sicr3p_dev_token',TOKEN);route();
+    }catch(e){msg.textContent=e.message;}
+  };
+}
+
+// ---------- Candado (login) ----------
+function renderLock(st){
+  app.innerHTML='';
+  const box=$(`<div class="lock-wrap"><div style="width:100%;max-width:430px">
+    <div style="text-align:center;margin-bottom:20px">${logo(46,true)}<div class="tag" style="color:#cbd5e1;margin-top:4px">Tu contabilidad, tu trazabilidad</div></div>
+    <form class="lock-card">
+      <h2 style="margin:0 0 4px">🔒 Desbloquear dispositivo</h2>
+      <p class="muted" style="margin-top:0;font-size:14px">${st.dispositivo||'Dispositivo'} · ingresa tus credenciales SII.</p>
+      <div class="field"><label>RUT (SII)</label><input id="l_rut" placeholder="12.345.678-5" value="${st.rut||''}"></div>
+      <div class="field"><label>Clave SII</label><input id="l_clave" type="password" placeholder="Tu clave del SII" autofocus></div>
+      <div id="l_msg" class="err" style="font-size:13px;min-height:18px"></div>
+      <button class="btn btn-primary" style="width:100%" id="l_go">Abrir sesión</button>
+    </form></div></div>`);
+  app.appendChild(box);
+  const msg=box.querySelector('#l_msg');
+  box.querySelector('#l_go').onclick=async(ev)=>{
+    ev.preventDefault();
+    try{ const r=await api('/login',{method:'POST',body:{rut:box.querySelector('#l_rut').value,clave:box.querySelector('#l_clave').value}});
+      TOKEN=r.token;localStorage.setItem('sicr3p_dev_token',TOKEN);route();
+    }catch(e){msg.textContent=e.message;}
+  };
+}
+
+// ---------- App (dueño desbloqueado) ----------
+function renderApp(st){
+  app.innerHTML='';
+  app.appendChild($(`<div class="topbar">${logo(26)}
+    <div style="display:flex;align-items:center;gap:14px">
+      <span class="muted" style="font-size:13px">${st.dispositivo||''} · ${st.rut||''}</span>
+      <button class="btn btn-outline lockbtn" id="lock">Bloquear</button>
+    </div></div>`));
+  const wrap=$(`<div class="wrap"></div>`); app.appendChild(wrap);
+  document.getElementById('lock').onclick=()=>{TOKEN='';localStorage.removeItem('sicr3p_dev_token');route();};
+
+  wrap.innerHTML=`<h1 style="font-size:26px;margin:0 0 4px">Sube tus facturas y genera tu contabilidad de carbono</h1>
+    <p class="muted" style="margin-top:0">Máximo 5 facturas por sesión. Todo se procesa localmente en tu dispositivo.</p>`;
+  const card=$(`<div class="card pad" style="margin-top:14px">
+    <div class="drop" id="drop"><div style="font-weight:700">Arrastra y suelta tus archivos aquí</div>
+      <div class="muted" style="font-size:13px">o selecciona desde tu dispositivo · PDF, XML, JPG, PNG</div>
+      <button class="btn btn-primary" style="margin-top:12px" id="pick" type="button">Seleccionar archivos</button>
+      <input id="file" type="file" multiple accept=".pdf,.xml,.jpg,.jpeg,.png" hidden></div>
+    <div id="list"></div>
+    <div id="msg" class="err" style="font-size:13px;min-height:18px;margin:8px 0"></div>
+    <button class="btn btn-primary" id="go" style="width:100%" disabled>Procesar facturas</button>
+  </div>`);
+  wrap.appendChild(card);
+  const hist=$(`<div style="margin-top:20px"></div>`); wrap.appendChild(hist);
+
+  let files=[];
+  const list=card.querySelector('#list'), msg=card.querySelector('#msg'), go=card.querySelector('#go');
+  const fileInput=card.querySelector('#file'), drop=card.querySelector('#drop');
+  const draw=()=>{ list.innerHTML=files.map((f,i)=>`<div class="fitem"><span>📄 ${f.name} <span class="muted">· ${(f.size/1024|0)} KB</span></span><span class="err" style="cursor:pointer" data-i="${i}">Quitar</span></div>`).join('')+(files.length?`<div class="muted" style="font-size:13px">${files.length} de 5</div>`:'');
+    go.disabled=files.length===0; list.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{files.splice(+el.dataset.i,1);draw();}); };
+  const add=(fl)=>{ for(const f of fl){ if(files.length>=5){msg.textContent='La demo permite hasta 5 facturas.';break;} if(/\.(pdf|xml|jpe?g|png)$/i.test(f.name)) files.push(f);} draw(); };
+  card.querySelector('#pick').onclick=()=>fileInput.click();
+  drop.onclick=(e)=>{if(e.target.id==='drop'||e.target.tagName==='DIV')fileInput.click();};
+  fileInput.onchange=()=>add(fileInput.files);
+  drop.ondragover=(e)=>{e.preventDefault();drop.classList.add('drag');};
+  drop.ondragleave=()=>drop.classList.remove('drag');
+  drop.ondrop=(e)=>{e.preventDefault();drop.classList.remove('drag');add(e.dataTransfer.files);};
+  go.onclick=async()=>{ msg.textContent=''; go.disabled=true; go.textContent='Procesando…';
+    try{ const fd=new FormData(); files.forEach(f=>fd.append('archivos',f));
+      const data=await api('/sesiones',{method:'POST',body:fd,formData:true});
+      renderResult(wrap,data);
+    }catch(e){ msg.textContent=e.message; go.disabled=false; go.textContent='Procesar facturas'; }
+  };
+  // Historial
+  api('/mis-sesiones').then(({sesiones})=>{ if(!sesiones.length)return;
+    hist.innerHTML=`<h3>Mis sesiones</h3>`+`<div class="card"><table><thead><tr><th>Fecha</th><th>Facturas</th><th class="num">t CO2e</th><th></th></tr></thead><tbody>`+
+      sesiones.map(s=>`<tr><td>${fmtF(s.created_at?new Date(s.created_at):s.fecha)}</td><td>${s.n_facturas}</td><td class="num">${fmt(s.total_co2e,3)}</td><td><a href="/api/sesiones/${s.id}/informe.pdf" target="_blank">PDF</a></td></tr>`).join('')+`</tbody></table></div>`;
+  }).catch(()=>{});
+}
+
+function renderResult(wrap,data){
+  const {sesion,facturas}=data;
+  const items=facturas.reduce((a,f)=>a+(f.items?f.items.length:0),0);
+  const cats=[...new Set(facturas.map(f=>f.categoria).filter(Boolean))];
+  wrap.innerHTML=`<h1 style="font-size:24px;margin:0 0 4px">Resultado de tu contabilidad de carbono</h1>
+    <p class="muted" style="margin-top:0">${sesion.rut_cliente} · ${fmtF(sesion.fecha)}</p>
+    <div class="cards">
+      <div class="rc"><div class="b">${fmt(sesion.total_co2e,2)}</div><div class="l">Total incorporado (t CO2e)</div></div>
+      <div class="rc"><div class="b">${items}</div><div class="l">Ítems procesados</div></div>
+      <div class="rc"><div class="b" style="font-size:16px">${cats[0]||'—'}</div><div class="l">${cats.length>1?('+'+(cats.length-1)+' categorías'):'Categoría'}</div></div>
+      <div class="rc"><div class="b">${facturas.length}</div><div class="l">Facturas</div></div>
+    </div>`;
+  const box=$(`<div class="card pad"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="tabs"></div>
+    <div id="det"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+      <a class="btn btn-primary" href="/api/sesiones/${sesion.id}/informe.pdf" target="_blank">Generar PDF</a>
+      <button class="btn btn-outline" id="all">Descargar las ${facturas.length} etiquetas</button>
+    </div></div>`);
+  wrap.appendChild(box);
+  const tabs=box.querySelector('#tabs'), det=box.querySelector('#det');
+  const drawDet=(i)=>{ const f=facturas[i];
+    tabs.innerHTML=facturas.map((f,j)=>`<button class="btn ${j===i?'btn-primary':'btn-outline'}" data-j="${j}" style="padding:8px 14px;font-size:13px">${f.numero_venta}</button>`).join('');
+    tabs.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>drawDet(+b.dataset.j));
+    det.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:6px 0">Detalle por ítem</h3><span class="badge">${f.categoria}</span></div>
+      <table><thead><tr><th>Descripción</th><th class="num">t CO2e</th><th class="num">% total</th></tr></thead><tbody>${f.items.map(it=>`<tr><td>${it.descripcion}</td><td class="num">${fmt(it.co2e,4)}</td><td class="num">${fmt(it.porcentaje_total,1)}%</td></tr>`).join('')}</tbody></table>
+      <div style="margin-top:12px"><a class="btn btn-outline" href="/api/facturas/${f.id}/etiqueta.pdf" target="_blank" style="font-size:13px;padding:8px 14px">Etiqueta ${f.numero_venta}</a>
+      <a href="/verificar/${f.id}" target="_blank" style="margin-left:10px;font-size:13px">Ver verificación →</a></div>`;
+  };
+  drawDet(0);
+  box.querySelector('#all').onclick=()=>facturas.forEach((f,i)=>setTimeout(()=>window.open('/api/facturas/'+f.id+'/etiqueta.pdf','_blank'),i*350));
+  wrap.appendChild($(`<div style="margin-top:16px"><button class="btn btn-outline" onclick="location.reload()">← Procesar otra sesión</button></div>`));
+}
+
+// ---------- Verificación pública (QR) ----------
+async function renderVerify(id){
+  app.innerHTML='';
+  const wrap=$(`<div class="wrap"></div>`); app.appendChild(wrap);
+  wrap.innerHTML=`<div style="margin-bottom:16px">${logo(28)}</div>`;
+  try{ const d=await api('/verificar/'+id);
+    wrap.appendChild($(`<div class="card pad">
+      <span class="badge" style="font-size:14px;padding:6px 14px">✓ Trazabilidad verificada</span>
+      <h1 style="font-size:24px;margin:12px 0 2px">Documento ${d.factura.numero_venta}</h1>
+      <p class="muted" style="margin-top:0">Verificación local · sicr3p portátil</p>
+      <div class="cards" style="grid-template-columns:repeat(3,1fr)">
+        <div class="rc"><div class="b">${fmt(d.factura.total_co2e,3)}</div><div class="l">t CO2e incorporado</div></div>
+        <div class="rc"><div class="b" style="font-size:15px">${d.factura.categoria}</div><div class="l">Categoría</div></div>
+        <div class="rc"><div class="b">${d.items.length}</div><div class="l">Ítems</div></div>
+      </div>
+      <table><thead><tr><th>Descripción</th><th class="num">t CO2e</th><th class="num">% total</th></tr></thead><tbody>${d.items.map(it=>`<tr><td>${it.descripcion}</td><td class="num">${fmt(it.co2e,4)}</td><td class="num">${fmt(it.porcentaje_total,1)}%</td></tr>`).join('')}</tbody></table>
+      <p class="muted" style="font-size:12px;margin-top:14px">Esta verificación es local al dispositivo. No constituye una verificación de tercera parte acreditada.</p>
+    </div>`));
+  }catch(e){ wrap.appendChild($(`<div class="card pad"><h2>Documento no encontrado</h2><p class="muted">No se pudo verificar la trazabilidad.</p></div>`)); }
+}
+
+window.onpopstate=route;
+route();
+</script>
+</body>
+</html>
