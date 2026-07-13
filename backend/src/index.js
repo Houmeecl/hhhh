@@ -46,7 +46,7 @@ async function start() {
     await runMigrations();
     app.listen(config.port, () => {
       console.log(`\n  sicr3p backend escuchando en http://localhost:${config.port}`);
-      console.log(`  Modo Simple: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);
+      console.log(`  Modo motor: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);
       console.log(`  CORS origin: ${config.corsOrigin}\n`);
     });
   } catch (err) {

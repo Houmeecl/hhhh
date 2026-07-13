@@ -20,7 +20,7 @@ const NAV = [
   { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
-  { to: '/admin/simple-api', ico: Icon.Plug, label: 'Motor externo' },
+  { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
   { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
   { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
 ];
@@ -29,6 +29,7 @@ export default function AdminApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!auth.access) { nav('/admin/login'); return; }
@@ -41,13 +42,24 @@ export default function AdminApp() {
 
   return (
     <div className="admin-shell">
-      <aside className="admin-side">
+      {/* Barra superior solo en móvil */}
+      <div className="admin-topbar">
+        <button className="hamburger" aria-label="Abrir menú" onClick={() => setMenuOpen(true)}>
+          <Icon.List size={22} />
+        </button>
+        <Logo size={22} />
+      </div>
+
+      {/* Overlay para cerrar el drawer en móvil */}
+      {menuOpen && <div className="admin-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand"><Logo size={26} light tagline /></div>
         <nav>
           {NAV.map((n) => {
             const Ico = n.ico;
             return (
-              <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
+              <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
                 <span className="icon-badge"><Ico size={18} /></span> {n.label}
               </NavLink>
             );
@@ -68,7 +80,7 @@ export default function AdminApp() {
           <Route path="corredor" element={<Corredor />} />
           <Route path="metricas" element={<Metricas />} />
           <Route path="prospectos" element={<Prospectos />} />
-          <Route path="simple-api" element={<SimpleApi />} />
+          <Route path="motor" element={<SimpleApi />} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="actividad" element={<Actividad />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />

@@ -8,7 +8,7 @@ export default function SimpleApi() {
 
   return (
     <div>
-      <div className="admin-head"><h1>Motor externo (Simple)</h1></div>
+      <div className="admin-head"><h1>Motor externo</h1></div>
 
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat">

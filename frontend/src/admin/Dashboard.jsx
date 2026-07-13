@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { Donut } from '../components/Charts.jsx';
+import { SkeletonCards } from '../components/Skeleton.jsx';
 
 export default function Dashboard() {
   const [d, setD] = useState(null);
@@ -14,7 +15,7 @@ export default function Dashboard() {
   }, []);
 
   if (err) return <div className="badge badge-red" style={{ padding: 14 }}>{err}</div>;
-  if (!d) return <div><span className="spinner dark" /> Cargando…</div>;
+  if (!d) return <div><div className="admin-head"><h1>Dashboard</h1></div><SkeletonCards n={4} /></div>;
 
   const est = d.clientes_por_estado;
   return (
@@ -43,7 +44,7 @@ export default function Dashboard() {
         </div>
 
         <div className="card card-pad">
-          <h3 style={{ marginTop: 0 }}>Motor externo (Simple)</h3>
+          <h3 style={{ marginTop: 0 }}>Motor externo</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className={`badge ${d.simple_api.ok ? 'badge-green' : 'badge-red'}`}>
               {d.simple_api.ok ? '● Operativo' : '● Sin conexión'}

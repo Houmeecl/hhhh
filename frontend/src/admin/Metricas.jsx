@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt } from '../api.js';
 import { Donut, Sparkbars } from '../components/Charts.jsx';
+import { SkeletonCards } from '../components/Skeleton.jsx';
 
 // Barra horizontal simple (sin librerías externas).
 function Bar({ value, max, label, right }) {
@@ -18,7 +19,7 @@ function Bar({ value, max, label, right }) {
 export default function Metricas() {
   const [m, setM] = useState(null);
   useEffect(() => { api.metricas().then(setM).catch(() => {}); }, []);
-  if (!m) return <div><span className="spinner dark" /> Cargando…</div>;
+  if (!m) return <div><div className="admin-head"><h1>Métricas</h1></div><SkeletonCards n={3} /></div>;
 
   const maxCliente = Math.max(...m.co2e_por_cliente.map((c) => c.co2e), 1);
   const maxCat = Math.max(...m.por_categoria.map((c) => c.co2e), 1);

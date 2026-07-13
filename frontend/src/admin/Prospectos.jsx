@@ -8,19 +8,28 @@ const VACIO = { nombre_empresa: '', rut: '', contacto: '', etapa: 'nuevo', orige
 export default function Prospectos() {
   const [items, setItems] = useState([]);
   const [modal, setModal] = useState(null);
+  const [toast, setToast] = useState(null);
+  const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
-  const cargar = () => api.prospectos().then((r) => setItems(r.prospectos)).catch(() => {});
+  const cargar = () => api.prospectos().then((r) => setItems(r.prospectos)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
 
   async function guardar() {
     try {
       if (modal.id) await api.editarProspecto(modal.id, modal);
       else await api.crearProspecto(modal);
-      setModal(null); cargar();
-    } catch (e) { alert(e.message); }
+      setModal(null); cargar(); flash('Prospecto guardado.');
+    } catch (e) { flash(e.message, true); }
   }
-  async function mover(p, etapa) { await api.editarProspecto(p.id, { ...p, etapa }); cargar(); }
-  async function eliminar(id) { if (confirm('¿Eliminar prospecto?')) { await api.eliminarProspecto(id); cargar(); } }
+  async function mover(p, etapa) {
+    try { await api.editarProspecto(p.id, { ...p, etapa }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar prospecto?')) return;
+    try { await api.eliminarProspecto(id); cargar(); flash('Prospecto eliminado.'); }
+    catch (e) { flash(e.message, true); }
+  }
 
   const badge = (e) => e === 'ganado' ? 'badge-green' : e === 'perdido' ? 'badge-red' : e === 'piloto' || e === 'demo' ? 'badge-amber' : 'badge-gray';
 
@@ -93,6 +102,8 @@ export default function Prospectos() {
           </div>
         </div>
       )}
+
+      {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
 }
