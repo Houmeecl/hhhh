@@ -81,6 +81,12 @@ export const api = {
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   actividad: () => request('/admin/actividad', { authed: true }),
+
+  // Corredor Bioceánico
+  corredorMetodologias: () => request('/admin/corredor/metodologias', { authed: true }),
+  guardarMetodologia: (pais, b) => request(`/admin/corredor/metodologias/${pais}`, { method: 'PUT', body: b, authed: true }),
+  corredorDocumentos: () => request('/admin/corredor/documentos', { authed: true }),
+  subirDocumentoCorredor: (formData) => request('/admin/corredor/documentos', { method: 'POST', body: formData, formData: true, authed: true }),
 };
 
 // Formato chileno de números.

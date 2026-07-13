@@ -7,6 +7,7 @@ import { apiLimiter } from './middleware/rateLimit.js';
 import publicRoutes from './routes/public.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
+import corredorRoutes from './routes/corredor.js';
 
 const app = express();
 
@@ -27,6 +28,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, mock: config.simple.mo
 app.use('/api', apiLimiter, publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/corredor', corredorRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

@@ -11,11 +11,13 @@ import Prospectos from './Prospectos.jsx';
 import SimpleApi from './SimpleApi.jsx';
 import Usuarios from './Usuarios.jsx';
 import Actividad from './Actividad.jsx';
+import Corredor from './Corredor.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
   { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
   { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
+  { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
   { to: '/admin/simple-api', ico: Icon.Plug, label: 'Motor externo' },
@@ -63,6 +65,7 @@ export default function AdminApp() {
           <Route index element={<Dashboard />} />
           <Route path="clientes" element={<Clientes rol={user?.rol} />} />
           <Route path="sesiones" element={<Sesiones />} />
+          <Route path="corredor" element={<Corredor />} />
           <Route path="metricas" element={<Metricas />} />
           <Route path="prospectos" element={<Prospectos />} />
           <Route path="simple-api" element={<SimpleApi />} />

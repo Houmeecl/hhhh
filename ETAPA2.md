@@ -28,6 +28,18 @@ desde el SII/RCV y la cuadratura siguen siendo Etapa 2.
 Empaque futuro de la edición portátil (pendiente, opcional): ejecutable único (`.exe` con
 `pkg`/`nexe`) y app de escritorio (Electron). Hoy corre como carpeta portátil con Node.
 
+## Módulo Corredor Bioceánico (evolución futura)
+
+El módulo "Corredor Bioceánico" (panel admin) hoy usa **Simple + traza documental** y
+**metodología por país editable** (CL/AR/PY/BR con toggle de activación). Queda para
+Etapa 2, sobre esta base:
+
+- **OCR propio** de documentos que Simple no lee (guías, manifiestos, contratos) — hoy se
+  guardan como traza; el carbono queda "pendiente de motor".
+- **Verificador XML DTE** (facturas electrónicas chilenas) y equivalentes AR/PY/BR.
+- **Conexión a fuentes oficiales** de factores por país (validar los borradores AR/PY/BR).
+- **Cadena transfronteriza comprador-vendedor** real usando `rut_emisor`/`rut_receptor`.
+
 ## Backlog técnico (mejoras diferidas, con justificación)
 
 - **Empaque .exe / binario del portátil** (`pkg`/`nexe`): la edición portátil usa el SQLite

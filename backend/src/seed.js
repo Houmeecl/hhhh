@@ -58,6 +58,26 @@ async function seed() {
     console.log('[seed] Datos demo (clientes y prospectos) insertados.');
   }
 
+  // Metodología por país del Corredor Bioceánico (editable por admin).
+  const { rows: mCount } = await query(`SELECT count(*)::int AS n FROM metodologias_pais`);
+  if (mCount[0].n === 0) {
+    // Chile: factor real HuellaChile (SEN 2023). Resto: borrador a validar por admin.
+    await query(
+      `INSERT INTO metodologias_pais (pais, nombre, factores, referencia, fuente, vigencia, activo, notas) VALUES
+       ('CL','Chile — HuellaChile', $1, 'GHG Protocol Scope 3 · ISO 14064-1', 'HuellaChile (MMA) — SEN 2023', '2023', true,  'Electricidad SEN 2023: 0,2421 kgCO2e/kWh.'),
+       ('AR','Argentina',          $2, 'GHG Protocol Scope 3',                'Borrador — validar (SEsco/AR)',   '2023', false, 'Factores borrador. Validar fuente oficial antes de activar.'),
+       ('PY','Paraguay',           $3, 'GHG Protocol Scope 3',                'Borrador — validar',              '2023', false, 'Matriz muy hídrica; factor eléctrico bajo. Validar.'),
+       ('BR','Brasil',             $4, 'GHG Protocol Scope 3',                'Borrador — validar (SIRENE/BR)',  '2023', false, 'Factores borrador. Validar fuente oficial antes de activar.')`,
+      [
+        JSON.stringify({ electricidad_kgco2e_kwh: 0.2421, diesel_kgco2e_l: 2.68 }),
+        JSON.stringify({ electricidad_kgco2e_kwh: 0.35, diesel_kgco2e_l: 2.68 }),
+        JSON.stringify({ electricidad_kgco2e_kwh: 0.05, diesel_kgco2e_l: 2.68 }),
+        JSON.stringify({ electricidad_kgco2e_kwh: 0.10, diesel_kgco2e_l: 2.68 }),
+      ]
+    );
+    console.log('[seed] Metodologías por país del corredor insertadas (CL activo; AR/PY/BR borrador).');
+  }
+
   console.log('\n============================================================');
   console.log('  CREDENCIALES ADMIN sicr3p');
   console.log('============================================================');
