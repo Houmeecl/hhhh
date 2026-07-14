@@ -8,7 +8,7 @@ export default function PublicLayout({ children }) {
         <Link to="/" style={{ textDecoration: 'none' }}>
           <Logo size={28} tagline />
         </Link>
-        <nav style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
+        <nav>
           <Link to="/cargar" className="muted" style={{ color: 'var(--navy)', fontWeight: 600 }}>
             Comienza ahora
           </Link>

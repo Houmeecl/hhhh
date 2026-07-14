@@ -22,7 +22,7 @@ export default function Ingresar() {
 
   return (
     <PublicLayout>
-      <div style={{ maxWidth: 460, margin: '60px auto', padding: '0 20px' }}>
+      <div className="narrow-page">
         <div className="card card-pad">
           {!enviado ? (
             <>

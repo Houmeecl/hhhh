@@ -1,24 +1,26 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import Dropzone from '../components/Dropzone.jsx';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
 import { api } from '../api.js';
 
 const MAX = 5;
-const OK_EXT = /\.(pdf|xml|jpe?g|png)$/i;
+const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
 
 export default function Cargar() {
   const nav = useNavigate();
-  const inputRef = useRef();
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ rut: '', empresa: '', email: '' });
-  const [drag, setDrag] = useState(false);
   const [error, setError] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'
   const [codigoInfo, setCodigoInfo] = useState(null); // código de acceso con créditos (mini sitio)
+  const [bump, setBump] = useState(false); // pulso del contador al completar un documento
+
+  const listos = estados.filter((s) => s === 'listo').length;
 
   useEffect(() => {
     const c = sessionStorage.getItem('sicr3p_codigo');
@@ -27,6 +29,14 @@ export default function Cargar() {
       .then(setCodigoInfo)
       .catch(() => sessionStorage.removeItem('sicr3p_codigo'));
   }, []);
+
+  // Pulso breve del contador cada vez que se completa un documento.
+  useEffect(() => {
+    if (listos === 0) return;
+    setBump(true);
+    const t = setTimeout(() => setBump(false), 350);
+    return () => clearTimeout(t);
+  }, [listos]);
 
   // Con código, el tope es el menor entre 5 y los créditos restantes.
   const maxEfectivo = codigoInfo ? Math.min(MAX, codigoInfo.creditos_restantes) : MAX;
@@ -45,11 +55,6 @@ export default function Cargar() {
     } else {
       setFiles(combined);
     }
-  }
-
-  function onDrop(e) {
-    e.preventDefault(); setDrag(false);
-    addFiles(e.dataTransfer.files);
   }
 
   const rutValido = form.rut === '' || validarRut(form.rut);
@@ -97,7 +102,7 @@ export default function Cargar() {
       clearInterval(timer);
       setEstados(files.map(() => 'listo'));
       setProgreso(100);
-      setTimeout(() => nav(`/resultado/${sesion.id}`), 500);
+      setTimeout(() => nav(`/resultado/${sesion.id}`), 900);
     } catch (e) {
       clearInterval(timer);
       setError(e.message);
@@ -121,24 +126,7 @@ export default function Cargar() {
         )}
 
         <div className="card card-pad" style={{ marginTop: 20 }}>
-          <div
-            className={`dropzone ${drag ? 'drag' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={onDrop}
-            onClick={() => inputRef.current.click()}
-          >
-            <div style={{ color: 'var(--green-600)' }}><Icon.Cloud size={44} /></div>
-            <div style={{ fontWeight: 700, marginTop: 8 }}>Arrastra y suelta tus archivos aquí</div>
-            <div className="muted">o selecciona desde tu dispositivo</div>
-            <button className="btn btn-primary" style={{ marginTop: 14 }} type="button">Seleccionar archivos</button>
-            <div className="muted" style={{ fontSize: 13, marginTop: 12 }}>Formatos permitidos: PDF, XML, JPG, PNG</div>
-            <input
-              ref={inputRef} type="file" multiple hidden
-              accept=".pdf,.xml,.jpg,.jpeg,.png"
-              onChange={(e) => addFiles(e.target.files)}
-            />
-          </div>
+          {!procesando && <Dropzone onFiles={addFiles} />}
 
           {files.length > 0 && (
             <div className="file-list">
@@ -148,7 +136,7 @@ export default function Cargar() {
                   <div className="file-item" key={i}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Icon.Doc size={16} /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
                     {procesando ? (
-                      st === 'listo' ? <span className="badge badge-green">✓ Listo</span>
+                      st === 'listo' ? <span className="badge badge-green send-check-pop"><Icon.Check size={12} /> Listo</span>
                       : st === 'procesando' ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Procesando…</span>
                       : <span className="badge badge-gray">En espera</span>
                     ) : (
@@ -157,7 +145,7 @@ export default function Cargar() {
                   </div>
                 );
               })}
-              <div className="muted" style={{ fontSize: 13 }}>{files.length} de {MAX} facturas</div>
+              {!procesando && <div className="muted" style={{ fontSize: 13 }}>{files.length} de {MAX} facturas</div>}
             </div>
           )}
 
@@ -187,13 +175,23 @@ export default function Cargar() {
           {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{error}</div>}
 
           {procesando ? (
-            <div>
-              <div className="progress-row">
-                <span className="spinner dark" />
-                <div className="progress-bar"><div style={{ width: `${progreso}%` }} /></div>
-                <span className="muted" style={{ fontSize: 13, width: 42, textAlign: 'right' }}>{Math.round(progreso)}%</span>
-              </div>
-              <p className="muted" style={{ fontSize: 13 }}>Procesando tus facturas… estructurando la información.</p>
+            <div className="send-sequence">
+              {progreso < 100 ? (
+                <>
+                  <div className={`send-counter${bump ? ' bump' : ''}`}>{listos}/{files.length}</div>
+                  <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>documentos procesados</div>
+                  <div className="progress-bar" style={{ maxWidth: 320, margin: '0 auto' }}>
+                    <div style={{ width: `${progreso}%` }} />
+                  </div>
+                  <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Estructurando la información…</p>
+                </>
+              ) : (
+                <div className="send-done">
+                  <div style={{ color: 'var(--green-600)' }}><Icon.Sparkles size={36} /></div>
+                  <div style={{ fontWeight: 800, fontSize: 20, marginTop: 6 }}>¡Todo listo!</div>
+                  <p className="muted" style={{ fontSize: 13 }}>Preparando tu resultado…</p>
+                </div>
+              )}
             </div>
           ) : (
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={procesar} disabled={files.length === 0}>

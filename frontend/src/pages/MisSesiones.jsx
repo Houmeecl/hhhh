@@ -25,7 +25,7 @@ export default function MisSesiones() {
   if (error) {
     return (
       <PublicLayout>
-        <div style={{ maxWidth: 460, margin: '60px auto', textAlign: 'center' }}>
+        <div className="narrow-page" style={{ textAlign: 'center' }}>
           <div className="card card-pad">
             <p className="muted">{error}</p>
             <Link to="/ingresar" className="btn btn-primary">Ingresar de nuevo</Link>

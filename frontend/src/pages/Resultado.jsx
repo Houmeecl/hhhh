@@ -41,7 +41,7 @@ export default function Resultado() {
 
   return (
     <PublicLayout>
-      <div className="container" style={{ padding: '32px 24px', display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+      <div className="container resultado-grid" style={{ padding: '32px 24px' }}>
         {/* Columna principal */}
         <div>
           <h1 style={{ fontSize: 28, margin: '0 0 4px' }}>Resultado de tu contabilidad de carbono</h1>
@@ -92,26 +92,28 @@ export default function Resultado() {
               <h3 style={{ margin: '0 0 10px' }}>Detalle por ítem</h3>
               <span className="badge badge-green">{factura.categoria}</span>
             </div>
-            <table className="data">
-              <thead>
-                <tr><th>Descripción</th><th className="num">Cantidad</th><th className="num">t CO2e</th><th className="num">% del total</th></tr>
-              </thead>
-              <tbody>
-                {factura.items.map((it, i) => (
-                  <tr key={i}>
-                    <td>{it.descripcion}</td>
-                    <td className="num">{fmt(it.cantidad, 2)}</td>
-                    <td className="num">{fmt(it.co2e, 4)}</td>
-                    <td className="num">{fmt(it.porcentaje_total, 1)}%</td>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data">
+                <thead>
+                  <tr><th>Descripción</th><th className="num">Cantidad</th><th className="num">t CO2e</th><th className="num">% del total</th></tr>
+                </thead>
+                <tbody>
+                  {factura.items.map((it, i) => (
+                    <tr key={i}>
+                      <td>{it.descripcion}</td>
+                      <td className="num">{fmt(it.cantidad, 2)}</td>
+                      <td className="num">{fmt(it.co2e, 4)}</td>
+                      <td className="num">{fmt(it.porcentaje_total, 1)}%</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td colSpan={2}><b>Total factura</b></td>
+                    <td className="num"><b>{fmt(factura.total_co2e, 4)}</b></td>
+                    <td className="num"><b>100,0%</b></td>
                   </tr>
-                ))}
-                <tr>
-                  <td colSpan={2}><b>Total factura</b></td>
-                  <td className="num"><b>{fmt(factura.total_co2e, 4)}</b></td>
-                  <td className="num"><b>100,0%</b></td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <p className="muted" style={{ fontSize: 13, marginTop: 14, display: 'flex', alignItems: 'flex-start', gap: 6 }}>

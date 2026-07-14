@@ -91,12 +91,16 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 22px 40px; border-bottom: 1px solid var(--border); background: #fff;
 }
+.pub-header nav { display: flex; gap: 18px; align-items: center; }
 .pub-footer {
   background: var(--navy); color: #cbd5e1;
   padding: 28px 40px; display: flex; align-items: center; justify-content: space-between;
   font-size: 13px; flex-wrap: wrap; gap: 12px;
 }
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+/* Tarjeta angosta centrada (Prueba, Ingresar, Acceso, Mis sesiones…) */
+.narrow-page { max-width: 460px; margin: 60px auto; padding: 0 20px; }
 
 /* ---------- Hero landing ---------- */
 .hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; padding: 64px 0; }
@@ -147,6 +151,8 @@ a:hover { text-decoration: underline; }
 .flow .node span { font-size: 11px; color: var(--gray); }
 
 /* ---------- Resultado cards ---------- */
+.resultado-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+.resultado-grid > * { min-width: 0; }
 .result-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
 .result-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
 .result-card .big { font-size: 28px; font-weight: 800; color: var(--green-600); }
@@ -240,10 +246,29 @@ table.data tr:hover td { background: var(--bg); }
 .progress-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .progress-bar > div { height: 100%; background: var(--green); transition: width 0.4s; }
 
+/* ---------- Captura por cámara (Dropzone) ---------- */
+.capture-actions { display: none; gap: 10px; justify-content: center; margin-top: 14px; }
+.capture-actions .btn { flex: 1; max-width: 220px; }
+
+/* ---------- Secuencia de envío (carga con energía) ---------- */
+.send-sequence { text-align: center; padding: 6px 0; }
+.send-counter {
+  font-size: 40px; font-weight: 800; color: var(--green-600);
+  font-variant-numeric: tabular-nums; transition: transform 0.2s ease;
+}
+.send-counter.bump { animation: counterBump 0.35s ease; }
+@keyframes counterBump { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.send-check-pop { animation: checkPop 0.3s ease; }
+@keyframes checkPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.send-done { animation: fadeUp 0.4s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .send-counter.bump, .send-check-pop, .send-done { animation: none; }
+}
+
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { font-size: 44px; }
-  .pasos-grid, .form-row, .result-cards { grid-template-columns: 1fr; }
+  .pasos-grid, .form-row, .result-cards, .resultado-grid { grid-template-columns: 1fr; }
 
   /* Admin: barra superior + menú lateral deslizante (drawer) */
   .admin-topbar {
@@ -256,4 +281,21 @@ table.data tr:hover td { background: var(--bg); }
   .admin-side.open { transform: translateX(0); }
   .admin-overlay { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50; }
   .admin-main { margin-left: 0; padding: 18px; }
+}
+
+@media (max-width: 640px) {
+  .pub-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+  .pub-header nav { gap: 10px; }
+  .pub-footer { padding: 20px 16px; flex-direction: column; align-items: flex-start; text-align: left; }
+  .narrow-page { margin: 28px auto; padding: 0 14px; }
+  .dropzone { padding: 28px 16px; }
+  .capture-actions { display: flex; flex-direction: column; }
+  .capture-actions .btn { max-width: none; }
+  .file-item { flex-wrap: wrap; gap: 6px; padding: 9px 12px; font-size: 13px; }
+  .send-counter { font-size: 32px; }
+}
+
+/* En dispositivos táctiles (aunque el viewport sea ancho) también se ofrece "Tomar foto". */
+@media (pointer: coarse) {
+  .capture-actions { display: flex; }
 }

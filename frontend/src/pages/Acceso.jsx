@@ -20,7 +20,7 @@ export default function Acceso() {
 
   return (
     <PublicLayout>
-      <div style={{ maxWidth: 460, margin: '60px auto', padding: '0 20px', textAlign: 'center' }}>
+      <div className="narrow-page" style={{ textAlign: 'center' }}>
         <div className="card card-pad">
           {!error ? (
             <><span className="spinner dark" /> Verificando tu enlace…</>

@@ -17,7 +17,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: config.maxFilesPerSession },
   fileFilter: (req, file, cb) => {
-    const ok = /\.(pdf|xml|jpe?g|png)$/i.test(file.originalname);
+    const ok = /\.(pdf|xml|jpe?g|png|heic)$/i.test(file.originalname);
     cb(ok ? null : new Error('Formato no permitido'), ok);
   },
 });

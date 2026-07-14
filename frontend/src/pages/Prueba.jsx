@@ -34,7 +34,7 @@ export default function Prueba() {
 
   return (
     <PublicLayout>
-      <div style={{ maxWidth: 460, margin: '60px auto', padding: '0 20px' }}>
+      <div className="narrow-page">
         <div className="card card-pad">
           <h1 style={{ marginTop: 0, fontSize: 26 }}>Prueba sicr3p</h1>
           <p className="muted" style={{ fontSize: 14 }}>
