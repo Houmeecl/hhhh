@@ -14,9 +14,24 @@ Usa el **SQLite integrado de Node 22** (`node:sqlite`, sin dependencias nativas)
 siembra `CUPOS` códigos de piloto (por defecto 100) en `data/prelanzamiento.db`.
 
 ## Endpoints
-- `POST /api/waitlist` — lista de espera (empresa o persona).
+- `POST /api/waitlist` — lista de espera (empresa o persona). Envía un correo de
+  confirmación con **1 PDF de muestra adjunto** (`public/muestra-informe.pdf`, datos
+  de ejemplo — no es un informe real de cliente). No bloqueante: si el correo falla,
+  la respuesta al usuario ya se envió igual.
 - `POST /api/piloto/validar` — valida un código de piloto (uso único).
 - `GET /api/piloto/cupos` — cupos restantes (contador del hero).
+
+## Correo de confirmación (Resend)
+Variables de entorno (mismas que el backend principal):
+```bash
+RESEND_API_KEY=   # vacío = modo dev, el correo se imprime en consola
+MAIL_FROM="sicr3p <no-responder@sicr3p.cl>"
+```
+El PDF de muestra ya está generado y committeado (`public/muestra-informe.pdf`).
+Para regenerarlo (p. ej. si cambia el estilo del informe en `backend/src/services/pdf.js`):
+```bash
+cd backend && node scripts/generar-muestra-informe.mjs
+```
 
 ## Ver los inscritos / códigos
 ```bash

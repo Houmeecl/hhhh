@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { get, all, run, uuid, seedCodigos } from './lib/db.js';
+import { enviarConfirmacionWaitlist } from './lib/mailer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '4200', 10);
@@ -32,6 +33,10 @@ app.post('/api/waitlist', (req, res) => {
       rubro || null, tamano || null, origen || null, Date.now()
     );
     res.status(201).json({ ok: true, mensaje: '¡Listo! Te avisaremos cuando abramos tu cupo.' });
+
+    // Confirmación con el informe de muestra adjunto (no bloqueante: nunca afecta la respuesta).
+    enviarConfirmacionWaitlist({ email: String(email).toLowerCase().trim(), empresa })
+      .catch((e) => console.warn('[waitlist] no se pudo enviar el correo de confirmación:', e.message));
   } catch (e) {
     res.status(500).json({ error: 'No se pudo registrar. Intenta nuevamente.' });
   }

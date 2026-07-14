@@ -23,6 +23,7 @@ backend/uploads/
 backend/generated/
 *.pdf
 !docs/**/*.pdf
+!prelanzamiento-empresas/public/muestra-informe.pdf
 
 # Logs
 *.log

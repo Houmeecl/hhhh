@@ -13,6 +13,7 @@ antes del push.
 | **operaciones** | Producción en el VPS (sicr3p.cl): despliegue, nginx/certbot/pm2, actualizaciones, respaldos, paso a motor real | `deploy/instalar-vps.sh`, `scripts/verificar-simple.js` |
 | **marketing** | Pre-lanzamiento (códigos de piloto), copy LinkedIn/email/clips, KPIs, keywords | `prelanzamiento-empresas/MARKETING.md` |
 | **revisor** | Auditoría de cierre: copy prohibido, secretos, alcance, localización, docs coherentes, tests verdes | todo el repo (solo lectura) |
+| **decisor** | Política de decisiones autónomas: qué se resuelve con un default declarado cuando el usuario no responde, y qué siempre espera confirmación | no construye código — se consulta |
 
 ## Reglas transversales (aplican a TODOS)
 1. **Prohibido "huella"** de cara al cliente (única excepción: "HuellaChile").
@@ -23,6 +24,13 @@ antes del push.
 5. Disclaimer en informes: "no constituye una verificación de tercera parte acreditada".
 6. **"Aduana verde" está fuera del alcance en todas las etapas** (decisión de negocio).
 7. Todo cierre pasa por el **revisor** + `npm test` verde + build sin errores.
+
+## Cuando el usuario no responde (bloqueo por pregunta fallida)
+Consultar **decisor** antes de detenerse o de improvisar sin criterio. En una
+frase: se reintenta preguntar una vez; si sigue sin respuesta, se avanza con el
+default más razonable **declarado explícitamente**, salvo que sea una decisión
+de negocio nueva, algo destructivo/irreversible, algo que toque el VPS real, o
+un secreto — ahí sí se espera.
 
 ## Flujos típicos (quién entra en cada uno)
 - **Feature nueva de producto** → backend → diseno (UI) → informes (si hay PDF) →
