@@ -12,10 +12,24 @@ export const auth = {
   clear() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false } = {}) {
+// Sesión del cliente (magic link) — storage separado del admin.
+const CLIENTE_KEY = 'sicr3p_cliente';
+const CLIENTE_EMAIL_KEY = 'sicr3p_cliente_email';
+export const clienteAuth = {
+  get token() { return localStorage.getItem(CLIENTE_KEY); },
+  get email() { return localStorage.getItem(CLIENTE_EMAIL_KEY); },
+  set(token, email) {
+    localStorage.setItem(CLIENTE_KEY, token);
+    if (email) localStorage.setItem(CLIENTE_EMAIL_KEY, email);
+  },
+  clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
+};
+
+async function request(path, { method = 'GET', body, formData, authed = false, cliente = false } = {}) {
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
   if (authed && auth.access) headers['Authorization'] = `Bearer ${auth.access}`;
+  if (cliente && clienteAuth.token) headers['Authorization'] = `Bearer ${clienteAuth.token}`;
 
   let res = await fetch(`/api${path}`, {
     method,
@@ -78,6 +92,7 @@ export const api = {
   eliminarProspecto: (id) => request(`/admin/prospectos/${id}`, { method: 'DELETE', authed: true }),
   simpleApi: () => request('/admin/simple-api', { authed: true }),
   usuarios: () => request('/admin/usuarios', { authed: true }),
+  cambiarPassword: (actual, nueva) => request('/admin/perfil/password', { method: 'PUT', body: { actual, nueva }, authed: true }),
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   actividad: () => request('/admin/actividad', { authed: true }),
@@ -109,6 +124,11 @@ export const api = {
 
   // Búsqueda unificada con cruces
   buscar: (q) => request(`/admin/buscar?q=${encodeURIComponent(q)}`, { authed: true }),
+
+  // Acceso de clientes (magic link)
+  solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
+  verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
+  misSesiones: () => request('/mis-sesiones', { cliente: true }),
 };
 
 async function abrirPdfAuth(url) {

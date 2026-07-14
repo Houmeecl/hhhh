@@ -222,6 +222,15 @@ sudo certbot --nginx -d app.sicr3p.cl
 # certbot configura el 443 y la renovación automática
 ```
 
+### 4b. Respaldos y limpieza de datos demo
+
+- **Respaldo automático**: `deploy/instalar-vps.sh` deja un cron diario (03:00) que ejecuta
+  `deploy/respaldo.sh` → `/root/backups/sicr3p-AAAA-MM-DD.sql.gz` (conserva 14 días).
+  Restaurar: `gunzip -c archivo.sql.gz | sudo -u postgres psql -d sicr3p`.
+- **Datos de demostración**: el seed solo inserta clientes/prospectos ficticios con
+  `SEED_DEMO=true` (nunca en producción). Si tu VPS se sembró con la versión anterior,
+  límpialos una vez: `sudo -u postgres psql -d sicr3p -f deploy/limpiar-demo.sql`.
+
 ### 5. Actualizaciones
 
 ```bash

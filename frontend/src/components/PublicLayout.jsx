@@ -12,7 +12,7 @@ export default function PublicLayout({ children }) {
           <Link to="/cargar" className="muted" style={{ color: 'var(--navy)', fontWeight: 600 }}>
             Comienza ahora
           </Link>
-          <Link to="/admin/login" className="btn btn-outline btn-sm">Acceso clientes</Link>
+          <Link to="/ingresar" className="btn btn-outline btn-sm">Ingresar</Link>
         </nav>
       </header>
 

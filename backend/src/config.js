@@ -51,6 +51,10 @@ export const config = {
     keyFile: process.env.BQ_KEY_FILE || process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
   },
 
-  // Límite duro de la demo
+  // Límite duro de facturas por envío en el flujo público
   maxFilesPerSession: 5,
+
+  // Sembrar datos de demostración (clientes/prospectos ficticios).
+  // SOLO para entornos de prueba; en producción debe quedar en false.
+  seedDemo: bool(process.env.SEED_DEMO, false),
 };

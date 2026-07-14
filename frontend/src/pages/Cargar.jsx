@@ -26,7 +26,7 @@ export default function Cargar() {
     if (rejected > 0) setError('Algunos archivos no tienen un formato permitido (PDF, XML, JPG, PNG).');
     const combined = [...files, ...incoming];
     if (combined.length > MAX) {
-      setError('La demo permite hasta 5 facturas. Contáctanos para más.');
+      setError('Puedes cargar hasta 5 facturas por envío. Contáctanos para más.');
       setFiles(combined.slice(0, MAX));
     } else {
       setFiles(combined);

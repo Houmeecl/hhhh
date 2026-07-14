@@ -36,6 +36,7 @@ export default function AdminApp() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pwd, setPwd] = useState(null); // {actual, nueva, confirmar, msg, err, ok}
 
   useEffect(() => {
     if (!auth.access) { nav('/admin/login'); return; }
@@ -84,9 +85,42 @@ export default function AdminApp() {
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>
           <div className="muted" style={{ fontSize: 12, color: '#94a3b8' }}>{user?.email} · {user?.rol}</div>
-          <button className="btn btn-outline btn-sm" style={{ marginTop: 10, width: '100%' }} onClick={salir}>Cerrar sesión</button>
+          <button className="btn btn-outline btn-sm" style={{ marginTop: 10, width: '100%' }}
+            onClick={() => { setMenuOpen(false); setPwd({ actual: '', nueva: '', confirmar: '' }); }}>
+            Cambiar contraseña
+          </button>
+          <button className="btn btn-outline btn-sm" style={{ marginTop: 8, width: '100%' }} onClick={salir}>Cerrar sesión</button>
         </div>
       </aside>
+
+      {pwd && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setPwd(null)}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <h2 style={{ marginTop: 0 }}>Cambiar contraseña</h2>
+            <div className="field"><label>Contraseña actual</label>
+              <input type="password" value={pwd.actual} onChange={(e) => setPwd({ ...pwd, actual: e.target.value })} /></div>
+            <div className="field"><label>Nueva contraseña (mín. 10 caracteres)</label>
+              <input type="password" value={pwd.nueva} onChange={(e) => setPwd({ ...pwd, nueva: e.target.value })} /></div>
+            <div className="field"><label>Confirmar nueva contraseña</label>
+              <input type="password" value={pwd.confirmar} onChange={(e) => setPwd({ ...pwd, confirmar: e.target.value })} /></div>
+            {pwd.err && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>{pwd.err}</div>}
+            {pwd.ok && <div className="badge badge-green" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>Contraseña actualizada.</div>}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setPwd(null)}>Cerrar</button>
+              <button className="btn btn-primary" disabled={!pwd.actual || !pwd.nueva || pwd.ok}
+                onClick={async () => {
+                  if (pwd.nueva !== pwd.confirmar) { setPwd({ ...pwd, err: 'Las contraseñas no coinciden.' }); return; }
+                  if (pwd.nueva.length < 10) { setPwd({ ...pwd, err: 'Mínimo 10 caracteres.' }); return; }
+                  try {
+                    await api.cambiarPassword(pwd.actual, pwd.nueva);
+                    setPwd({ ...pwd, err: null, ok: true });
+                    setTimeout(() => setPwd(null), 1600);
+                  } catch (e) { setPwd({ ...pwd, err: e.message, ok: false }); }
+                }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="admin-main">
         <Routes>

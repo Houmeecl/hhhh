@@ -126,6 +126,13 @@ ufw allow 443/tcp >/dev/null
 ufw --force enable >/dev/null
 echo "==> ufw activo (SSH ${SSH_PORT:-22}, 80, 443)."
 
+# ---------- 7b. Respaldo diario de la BD (cron 03:00) ----------
+chmod +x "$DIR/deploy/respaldo.sh"
+if ! crontab -l 2>/dev/null | grep -q 'deploy/respaldo.sh'; then
+  (crontab -l 2>/dev/null; echo "0 3 * * * bash $DIR/deploy/respaldo.sh >> /var/log/sicr3p-respaldo.log 2>&1") | crontab -
+  echo "==> Respaldo diario instalado (03:00 → /root/backups, 14 días)."
+fi
+
 # ---------- 8. HTTPS con certbot (solo con dominio) ----------
 if [ -n "$DOMINIO" ]; then
   apt-get install -y certbot python3-certbot-nginx

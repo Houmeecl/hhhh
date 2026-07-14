@@ -43,7 +43,7 @@ function uploadArchivos(req, res, next) {
   upload.array('archivos', config.maxFilesPerSession)(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(400).json({ error: 'La demo permite hasta 5 facturas. Contáctanos para más.' });
+        return res.status(400).json({ error: 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.' });
       }
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(400).json({ error: 'Cada archivo debe pesar menos de 15 MB.' });
@@ -67,10 +67,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
     if (files.length === 0) {
       return res.status(400).json({ error: 'Debes subir al menos una factura.' });
     }
-    // Límite duro de la demo.
+    // Límite duro por envío.
     if (files.length > config.maxFilesPerSession) {
       return res.status(400).json({
-        error: 'La demo permite hasta 5 facturas. Contáctanos para más.',
+        error: 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.',
       });
     }
 
@@ -164,7 +164,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
     })();
   } catch (err) {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ error: 'La demo permite hasta 5 facturas. Contáctanos para más.' });
+      return res.status(400).json({ error: 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.' });
     }
     next(err);
   }

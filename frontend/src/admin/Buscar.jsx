@@ -37,7 +37,7 @@ export default function Buscar() {
       <form onSubmit={buscar} className="card card-pad" style={{ marginBottom: 18 }}>
         <div style={{ display: 'flex', gap: 10 }}>
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="76.123.456-0 · V-166092 · MIC-BR-77812 · Minera del Norte…" style={{ flex: 1 }} />
+            placeholder="RUT · N° de venta · N° DIN / MIC-DTA · nombre de empresa…" style={{ flex: 1 }} />
           <button className="btn btn-primary" type="submit" disabled={cargando}>
             {cargando ? <span className="spinner" /> : 'Buscar'}
           </button>

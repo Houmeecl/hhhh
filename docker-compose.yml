@@ -33,6 +33,8 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sicr3p.cl}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # La edición docker es para demo local: siembra datos ficticios por defecto.
+      SEED_DEMO: ${SEED_DEMO:-true}
     # Aplica migraciones + seed y arranca.
     command: sh -c "npm run seed && npm start"
     expose:

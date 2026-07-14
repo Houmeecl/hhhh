@@ -44,6 +44,28 @@ router.get('/dashboard', async (req, res, next) => {
 });
 
 // ============================================================
+// PERFIL — cambio de contraseña del usuario logueado
+// ============================================================
+router.put('/perfil/password', async (req, res, next) => {
+  try {
+    const { actual, nueva } = req.body;
+    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son obligatorias.' });
+    if (String(nueva).length < 10) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 10 caracteres.' });
+
+    const { rows } = await query(`SELECT * FROM usuarios WHERE id = $1`, [req.user.sub]);
+    const user = rows[0];
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    const ok = await bcrypt.compare(actual, user.password_hash || '');
+    if (!ok) return res.status(401).json({ error: 'La contraseña actual no es correcta.' });
+
+    const hash = await bcrypt.hash(nueva, config.bcryptRounds);
+    await query(`UPDATE usuarios SET password_hash = $1, must_reset_password = false WHERE id = $2`, [hash, user.id]);
+    await logActividad({ usuarioId: user.id, accion: 'cambio_password', entidad: 'usuario', entidadId: user.id, ip: req.ip });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
 // CLIENTES (CRUD + contratos)
 // ============================================================
 router.get('/clientes', async (req, res, next) => {

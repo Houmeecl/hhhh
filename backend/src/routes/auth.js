@@ -6,7 +6,7 @@ import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { signAccess, signRefresh, requireAuth, logActividad } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
-import { sendMail, resetEmail } from '../services/mailer.js';
+import { sendMail, resetEmail, magicEmail } from '../services/mailer.js';
 
 const router = express.Router();
 
@@ -126,6 +126,56 @@ router.post('/solicitar-reset', loginLimiter, async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ============================================================
+// MAGIC LINK — acceso de clientes sin contraseña.
+// El cliente ingresa su email y recibe un enlace de un solo uso
+// que le da acceso a SU historial (filtrado por email).
+// ============================================================
+
+// ---------- POST /api/auth/magic — solicita el enlace ----------
+router.post('/magic', loginLimiter, async (req, res, next) => {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Ingresa un correo válido.' });
+    }
+    const raw = crypto.randomBytes(32).toString('hex');
+    const expira = new Date(Date.now() + 15 * 60 * 1000); // 15 min, un solo uso
+    await query(
+      `INSERT INTO tokens_magic (email, token_hash, expira_at) VALUES ($1,$2,$3)`,
+      [email, hashToken(raw), expira]
+    );
+    const link = `${config.publicAppUrl}/acceso?token=${raw}`;
+    await sendMail({ to: email, ...magicEmail({ link }) });
+    // Respuesta genérica: no revela si el correo tiene historial.
+    res.json({ ok: true, mensaje: 'Te enviamos un enlace de acceso. Revisa tu correo.' });
+  } catch (err) { next(err); }
+});
+
+// ---------- POST /api/auth/magic/verificar — canjea el token ----------
+router.post('/magic/verificar', async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Falta el token.' });
+    const { rows } = await query(
+      `SELECT * FROM tokens_magic WHERE token_hash = $1 AND usado = false AND expira_at > now()`,
+      [hashToken(token)]
+    );
+    const tok = rows[0];
+    if (!tok) return res.status(401).json({ error: 'Enlace inválido o expirado. Solicita uno nuevo.' });
+    await query(`UPDATE tokens_magic SET usado = true WHERE id = $1`, [tok.id]);
+    await logActividad({ accion: 'magic_login', entidad: 'cliente', entidadId: tok.email, ip: req.ip });
+
+    // JWT de rol cliente (no es cuenta de usuarios; solo ve su propio historial).
+    const clienteToken = jwt.sign(
+      { sub: `cliente:${tok.email}`, rol: 'cliente', email: tok.email },
+      config.jwt.accessSecret,
+      { expiresIn: '7d' }
+    );
+    res.json({ token: clienteToken, email: tok.email });
+  } catch (err) { next(err); }
 });
 
 export default router;

@@ -18,7 +18,8 @@ PDFs y correos.
 - Implementaciones de referencia: `frontend/src/components/Logo.jsx` (React) y el patrón
   CSS `.logo .i .dot` del landing (`prelanzamiento-empresas/public/index.html`).
 - Tagline oficial bajo el logo cuando hay espacio: **"Tu contabilidad, tu trazabilidad"**.
-- Favicon: cuadro navy redondeado + punto verde + "s3p" blanco (SVG inline data-URI).
+- Favicon: **isotipo "3"** — cuadro navy redondeado + "3" blanco bold + punto verde en la
+  esquina superior derecha (SVG inline data-URI, igual en app, landing y portable).
 - No estirar, no recolorear el punto, no usar mayúsculas ("SICR3P" solo en razón social
   "SICR3P SpA" del footer legal).
 

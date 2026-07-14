@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="es-CL">
 <head>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1f2e'/%3E%3Ctext x='15' y='25' font-family='Arial' font-size='22' font-weight='bold' fill='white' text-anchor='middle'%3E3%3C/text%3E%3Ccircle cx='25' cy='8' r='3.4' fill='%2328a745'/%3E%3C/svg%3E" />
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>sicr3p portátil</title>
@@ -164,7 +165,7 @@ function renderApp(st){
   const fileInput=card.querySelector('#file'), drop=card.querySelector('#drop');
   const draw=()=>{ list.innerHTML=files.map((f,i)=>`<div class="fitem"><span>📄 ${f.name} <span class="muted">· ${(f.size/1024|0)} KB</span></span><span class="err" style="cursor:pointer" data-i="${i}">Quitar</span></div>`).join('')+(files.length?`<div class="muted" style="font-size:13px">${files.length} de 5</div>`:'');
     go.disabled=files.length===0; list.querySelectorAll('[data-i]').forEach(el=>el.onclick=()=>{files.splice(+el.dataset.i,1);draw();}); };
-  const add=(fl)=>{ for(const f of fl){ if(files.length>=5){msg.textContent='La demo permite hasta 5 facturas.';break;} if(/\.(pdf|xml|jpe?g|png)$/i.test(f.name)) files.push(f);} draw(); };
+  const add=(fl)=>{ for(const f of fl){ if(files.length>=5){msg.textContent='Puedes cargar hasta 5 facturas por envío.';break;} if(/\.(pdf|xml|jpe?g|png)$/i.test(f.name)) files.push(f);} draw(); };
   card.querySelector('#pick').onclick=()=>fileInput.click();
   drop.onclick=(e)=>{if(e.target.id==='drop'||e.target.tagName==='DIV')fileInput.click();};
   fileInput.onchange=()=>add(fileInput.files);

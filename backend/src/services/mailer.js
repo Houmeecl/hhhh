@@ -11,6 +11,9 @@ export async function sendMail({ to, subject, html, attachments }) {
     console.log('Para:', to);
     console.log('Asunto:', subject);
     console.log(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+    // Los enlaces viven en atributos href (se pierden al quitar las etiquetas): se listan aparte.
+    const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+    if (links.length) console.log('Enlaces:', links.join(' '));
     if (attachments?.length) console.log('Adjuntos:', attachments.map((a) => a.filename).join(', '));
     console.log('=========================================\n');
     return { dev: true };
@@ -54,6 +57,19 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas }) {
           <div style="font-size:13px;color:#64748b">${nFacturas} factura${nFacturas === 1 ? '' : 's'} procesada${nFacturas === 1 ? '' : 's'}</div>
         </div>
         <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad. Este informe no constituye una verificación de tercera parte acreditada.</p>
+      </div>`,
+  };
+}
+
+export function magicEmail({ link }) {
+  return {
+    subject: 'Tu enlace de acceso · sicr3p',
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Ingresa a <b>sicr3p</b></h2>
+        <p>Usa este enlace para entrar a tu historial de contabilidad de carbono. No necesitas contraseña.</p>
+        <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Ingresar a mi cuenta</a></p>
+        <p style="color:#64748b;font-size:13px">El enlace expira en 15 minutos y sirve una sola vez. Si no lo solicitaste, ignora este correo.</p>
       </div>`,
   };
 }

@@ -11,6 +11,7 @@ import corredorRoutes from './routes/corredor.js';
 import capitalRoutes from './routes/capital.js';
 import informesRoutes from './routes/informes.js';
 import buscarRoutes from './routes/buscar.js';
+import clienteRoutes from './routes/cliente.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/admin/corredor', corredorRoutes);
 app.use('/api/admin/capital', capitalRoutes);
 app.use('/api/admin/informes', informesRoutes);
 app.use('/api/admin/buscar', buscarRoutes);
+app.use('/api', clienteRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

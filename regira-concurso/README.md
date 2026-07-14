@@ -47,7 +47,7 @@ import AdminConcursos from "@/pages/AdminConcursos";
 ```bash
 npm run db:push
 ```
-(Opcional: `APP_URL=https://tudominio.cl` en el entorno para que el QR apunte al dominio público.)
+(Opcional: `APP_URL=https://juego.sicr3p.cl` en el entorno para que el QR apunte al dominio público.)
 
 ## Flujo del concurso
 1. **Admin** crea el concurso en `/admin/concursos`: título, quiénes compiten

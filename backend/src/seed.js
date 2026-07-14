@@ -41,9 +41,10 @@ async function seed() {
     console.log(`\n[seed] Usuario admin creado.`);
   }
 
-  // Datos demo para el panel (clientes, prospectos) — solo si están vacíos.
+  // Datos de demostración (clientes/prospectos ficticios) — SOLO con SEED_DEMO=true
+  // y si las tablas están vacías. En producción no se siembran.
   const { rows: cCount } = await query(`SELECT count(*)::int AS n FROM clientes`);
-  if (cCount[0].n === 0) {
+  if (config.seedDemo && cCount[0].n === 0) {
     await query(
       `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan) VALUES
        ('76.123.456-0','Minera del Norte SpA','contacto@mineranorte.cl','activo', CURRENT_DATE - INTERVAL '60 days', CURRENT_DATE + INTERVAL '20 days','pro'),
