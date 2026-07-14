@@ -60,6 +60,11 @@ PDFs y correos.
 - App: dropzone drag&drop (máx 5), cards de resultado, donut por categoría
   (`components/Charts.jsx`), etiqueta con QR real, skeletons de carga (`Skeleton.jsx`).
 - Admin: sidebar navy con drawer móvil (hamburguesa + overlay), toasts unificados.
+- Patrón de páginas admin con pestañas (botones `btn-sm` primary/outline): `Corredor.jsx`,
+  `CapitalNatural.jsx` (Cuentas/Activos/Libro y balance), `Trazabilidad.jsx`
+  (Informe mensual/Cadena/Verificador DTE) y `Buscar.jsx` (cruces por RUT).
+  Toda página admin nueva sigue ese mismo patrón: `admin-head` con ícono verde +
+  subtítulo muted, cards de resumen y tablas `.data` con badges.
 
 ## Accesibilidad y responsive
 - Mobile-first. Targets táctiles ≥44px (botones 48px en landing).

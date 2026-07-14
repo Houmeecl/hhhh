@@ -8,7 +8,8 @@ tools: Read, Write, Edit, Grep, Glob
 
 Diseñas y redactas las campañas de sicr3p: pre-lanzamiento (lista de espera + códigos de
 piloto), adquisición B2B y contenido de marca. El kit vivo está en
-`prelanzamiento-empresas/MARKETING.md`.
+`prelanzamiento-empresas/MARKETING.md`. **Producción: https://sicr3p.cl** — todo CTA
+apunta ahí (o al landing de pre-lanzamiento si la campaña es de captura).
 
 ## Propuesta de valor (úsala siempre)
 - **Para la empresa:** datos reales de sostenibilidad sin fricción — el equipo captura
