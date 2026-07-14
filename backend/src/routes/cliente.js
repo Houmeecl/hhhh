@@ -8,10 +8,12 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireRole('cliente'));
+// El guard va POR RUTA (no router.use): este router se monta en /api y un
+// middleware global respondería 403 a todas las rutas montadas después.
+const soloCliente = [requireAuth, requireRole('cliente')];
 
 // ---------- GET /api/mis-sesiones ----------
-router.get('/mis-sesiones', async (req, res, next) => {
+router.get('/mis-sesiones', soloCliente, async (req, res, next) => {
   try {
     const email = String(req.user.email || '').toLowerCase();
     const { rows: sesiones } = await query(

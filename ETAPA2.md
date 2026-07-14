@@ -9,14 +9,14 @@ servicios externos pasa a **ETAPA3.md**.
 | 1 | Conexión SII / RCV | ⏭ Etapa 3 (requiere credenciales/scraping SII). |
 | 2 | Informes mensuales acumulativos | ✅ **Implementado** — panel admin → Trazabilidad → "Informe mensual" (`GET /api/admin/informes/mensual[.pdf]`). |
 | 3 | Trazabilidad en cadena comprador–vendedor | ✅ **Implementado** — panel admin → Trazabilidad → "Cadena de valor" (aguas arriba/abajo por `rut_emisor`/`rut_receptor`). |
-| 4 | Valorización de inventario con carbono (FIFO/PMP) | ⏭ Etapa 3. |
-| 5 | Módulo transporte de personal minero (Cat. 7) | ⏭ Etapa 3. |
+| 4 | Valorización de inventario con carbono (FIFO/PMP) | ✅ **Implementado** — panel admin → Trazabilidad → "Valorización". Entradas automáticas desde DTE XML (precio real por ítem, CO2e repartido por monto); FIFO y PMP en CLP + CO2e. |
+| 5 | Módulo transporte de personal minero (Cat. 7) | ✅ **Implementado** — panel admin → "Transporte Cat. 7": modos con factor editable (kgCO2e/pasajero-km) y viajes que cargan la cuenta de carbono del Capital Natural. |
 | 6 | Verificador de XML DTE | ✅ **Implementado (verificación local)** — parser sin dependencias (`services/dte.js`): estructura, módulo 11, consistencia de totales y presencia de firma. La validación criptográfica de la firma y el estado en el SII quedan para Etapa 3. Además, los XML subidos al flujo público usan folio y RUT **reales** del DTE. |
 | 7 | Integración BigQuery | ⏭ Etapa 3. |
 | 8 | Motor de cálculo propio | ⏭ Etapa 3. |
-| 9 | Benchmarking sectorial | ⏭ Etapa 3. |
-| 10 | API para mineras mandantes | ⏭ Etapa 3. |
-| 11 | Auto-registro de clientes | ⏭ Etapa 3 (decisión comercial). |
+| 9 | Benchmarking sectorial | ⏭ Etapa 3 (requiere masa de datos de clientes reales). |
+| 10 | API para mineras mandantes | ✅ **Implementado** — `/api/mandante/*` con API key (`X-Api-Key`, hash SHA-256, se muestra una sola vez); el mandante consulta sus proveedores y el resumen CO2e de cada uno. Administración en panel → "Accesos externos". |
+| 11 | Auto-registro de clientes | ⏭ Etapa 3 (decisión comercial). El acceso de clientes ya existe vía **magic link** y el ingreso de prueba vía **códigos con créditos** (`/prueba`, 1 crédito = 1 factura). |
 
 ## Módulo Capital Natural (agregado sobre la Etapa 1)
 

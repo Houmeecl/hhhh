@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
@@ -18,6 +18,18 @@ export default function Cargar() {
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'
+  const [codigoInfo, setCodigoInfo] = useState(null); // código de acceso con créditos (mini sitio)
+
+  useEffect(() => {
+    const c = sessionStorage.getItem('sicr3p_codigo');
+    if (!c) return;
+    api.codigoEstado(c)
+      .then(setCodigoInfo)
+      .catch(() => sessionStorage.removeItem('sicr3p_codigo'));
+  }, []);
+
+  // Con código, el tope es el menor entre 5 y los créditos restantes.
+  const maxEfectivo = codigoInfo ? Math.min(MAX, codigoInfo.creditos_restantes) : MAX;
 
   function addFiles(list) {
     setError('');
@@ -25,9 +37,11 @@ export default function Cargar() {
     const rejected = Array.from(list).length - incoming.length;
     if (rejected > 0) setError('Algunos archivos no tienen un formato permitido (PDF, XML, JPG, PNG).');
     const combined = [...files, ...incoming];
-    if (combined.length > MAX) {
-      setError('Puedes cargar hasta 5 facturas por envío. Contáctanos para más.');
-      setFiles(combined.slice(0, MAX));
+    if (combined.length > maxEfectivo) {
+      setError(codigoInfo && maxEfectivo < MAX
+        ? `Tu código tiene ${maxEfectivo} crédito${maxEfectivo === 1 ? '' : 's'} disponibles.`
+        : 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.');
+      setFiles(combined.slice(0, maxEfectivo));
     } else {
       setFiles(combined);
     }
@@ -77,6 +91,7 @@ export default function Cargar() {
       fd.append('rut', form.rut);
       fd.append('empresa', form.empresa);
       fd.append('email', form.email);
+      if (codigoInfo) fd.append('codigo', codigoInfo.codigo);
       files.forEach((f) => fd.append('archivos', f));
       const { sesion } = await api.crearSesion(fd);
       clearInterval(timer);
@@ -97,8 +112,13 @@ export default function Cargar() {
           Sube los documentos de tu venta y genera tu informe.
         </h1>
         <p className="muted" style={{ marginTop: 0 }}>
-          <b style={{ color: 'var(--green-600)' }}>Etapa 1:</b> carga simple para generar tu PDF y tus etiquetas. Máximo {MAX} facturas por sesión.
+          Carga tus documentos y genera tu PDF y tus etiquetas. Máximo {MAX} facturas por envío.
         </p>
+        {codigoInfo && (
+          <div className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 14 }}>
+            🎟️ Código {codigoInfo.codigo} · {codigoInfo.creditos_restantes} crédito{codigoInfo.creditos_restantes === 1 ? '' : 's'} disponible{codigoInfo.creditos_restantes === 1 ? '' : 's'}
+          </div>
+        )}
 
         <div className="card card-pad" style={{ marginTop: 20 }}>
           <div

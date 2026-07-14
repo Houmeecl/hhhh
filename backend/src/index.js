@@ -12,6 +12,10 @@ import capitalRoutes from './routes/capital.js';
 import informesRoutes from './routes/informes.js';
 import buscarRoutes from './routes/buscar.js';
 import clienteRoutes from './routes/cliente.js';
+import valorizacionRoutes from './routes/valorizacion.js';
+import transporteRoutes from './routes/transporte.js';
+import mandanteRoutes from './routes/mandante.js';
+import accesosRoutes from './routes/accesos.js';
 
 const app = express();
 
@@ -37,6 +41,10 @@ app.use('/api/admin/capital', capitalRoutes);
 app.use('/api/admin/informes', informesRoutes);
 app.use('/api/admin/buscar', buscarRoutes);
 app.use('/api', clienteRoutes);
+app.use('/api/admin/valorizacion', valorizacionRoutes);
+app.use('/api/admin/transporte', transporteRoutes);
+app.use('/api/admin/accesos', accesosRoutes);
+app.use('/api/mandante', apiLimiter, mandanteRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

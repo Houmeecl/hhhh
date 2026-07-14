@@ -55,10 +55,29 @@ function uploadArchivos(req, res, next) {
   });
 }
 
+// ---------- GET /api/codigos/:codigo — estado de un código de acceso ----------
+router.get('/codigos/:codigo', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT codigo, creditos, creditos_usados, activo, empresa FROM codigos_acceso
+       WHERE upper(codigo) = upper($1)`,
+      [String(req.params.codigo).trim()]
+    );
+    const c = rows[0];
+    if (!c || !c.activo) return res.status(404).json({ error: 'Código inválido o inactivo.' });
+    res.json({
+      valido: true,
+      codigo: c.codigo,
+      empresa: c.empresa,
+      creditos_restantes: Math.max(0, c.creditos - c.creditos_usados),
+    });
+  } catch (err) { next(err); }
+});
+
 // ---------- POST /api/sesiones — procesa hasta 5 facturas ----------
 router.post('/sesiones', uploadArchivos, async (req, res, next) => {
   try {
-    const { rut, empresa, email } = req.body;
+    const { rut, empresa, email, codigo } = req.body;
     const files = req.files || [];
 
     if (!rut || !empresa || !email) {
@@ -75,6 +94,28 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
     }
 
     const result = await withTx(async (client) => {
+      // Código de acceso con créditos (1 crédito = 1 factura procesada).
+      // Se valida y consume DENTRO de la transacción (con lock de fila).
+      if (codigo) {
+        const { rows: cRows } = await client.query(
+          `SELECT * FROM codigos_acceso WHERE upper(codigo) = upper($1) FOR UPDATE`,
+          [String(codigo).trim()]
+        );
+        const c = cRows[0];
+        if (!c || !c.activo) {
+          const e = new Error('Código inválido o inactivo.'); e.status = 400; throw e;
+        }
+        const restantes = c.creditos - c.creditos_usados;
+        if (restantes < files.length) {
+          const e = new Error(`Tu código tiene ${restantes} crédito${restantes === 1 ? '' : 's'} y estás subiendo ${files.length} facturas.`);
+          e.status = 400; throw e;
+        }
+        await client.query(
+          `UPDATE codigos_acceso SET creditos_usados = creditos_usados + $2, ultimo_uso = now() WHERE id = $1`,
+          [c.id, files.length]
+        );
+      }
+
       const { rows: sRows } = await client.query(
         `INSERT INTO sesiones (rut_cliente, nombre_cliente, email_cliente)
          VALUES ($1,$2,$3) RETURNING *`,
@@ -97,8 +138,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         });
         // Si el archivo es un DTE XML, la trazabilidad usa los datos reales
         // del documento (folio y RUT) en vez de los estimados por el motor.
+        let dte = null;
         if (/\.xml$/i.test(file.originalname)) {
-          const dte = parseDte(file.buffer.toString('utf8'));
+          dte = parseDte(file.buffer.toString('utf8'));
           if (dte) {
             if (dte.folio) analysis.numero_venta = `F-${dte.folio}`;
             if (dte.rut_emisor) analysis.rut_emisor = dte.rut_emisor;
@@ -133,6 +175,26 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         }
         // Capital Natural: cargos automáticos en las cuentas ambientales activas.
         await registrarMovimientos({ client, factura, fecha: sesion.fecha, cuentas: cuentasNaturales });
+
+        // Valorización: los DTE traen precio real por ítem → entradas de inventario.
+        // El CO2e de la factura se reparte entre ítems según su monto.
+        if (dte && dte.items?.length) {
+          const totalMonto = dte.items.reduce((a, it) => a + (Number(it.monto) || 0), 0);
+          for (const it of dte.items) {
+            const cant = Number(it.cantidad) || 0;
+            if (cant <= 0) continue;
+            const monto = Number(it.monto) || 0;
+            const co2eItem = totalMonto > 0 ? Number(analysis.total_co2e || 0) * (monto / totalMonto) : 0;
+            await client.query(
+              `INSERT INTO inventario_movimientos
+                 (rut_cliente_norm, descripcion, fecha, tipo, cantidad, precio_unitario, co2e_unitario, factura_id, origen)
+               VALUES ($1,$2,COALESCE($3::date, CURRENT_DATE),'entrada',$4,$5,$6,$7,'documento')`,
+              [String(rut).replace(/[^0-9kK]/g, '').toUpperCase(), it.nombre, dte.fecha_emision || null,
+               cant, Number(it.precio) || (cant > 0 ? monto / cant : 0),
+               cant > 0 ? co2eItem / cant : 0, factura.id]
+            );
+          }
+        }
       }
 
       await client.query(`UPDATE sesiones SET total_co2e = $1 WHERE id = $2`, [

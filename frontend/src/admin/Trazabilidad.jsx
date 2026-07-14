@@ -29,11 +29,13 @@ export default function Trazabilidad() {
         <button className={`btn btn-sm ${tab === 'mensual' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mensual')}>Informe mensual</button>
         <button className={`btn btn-sm ${tab === 'cadena' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('cadena')}>Cadena de valor</button>
         <button className={`btn btn-sm ${tab === 'dte' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('dte')}>Verificador DTE</button>
+        <button className={`btn btn-sm ${tab === 'valorizacion' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('valorizacion')}>Valorización</button>
       </div>
 
       {tab === 'mensual' && <InformeMensual flash={flash} />}
       {tab === 'cadena' && <Cadena flash={flash} />}
       {tab === 'dte' && <VerificadorDte flash={flash} />}
+      {tab === 'valorizacion' && <Valorizacion flash={flash} />}
 
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
@@ -199,6 +201,124 @@ function Cadena({ flash }) {
             <TablaRel titulo="⬇ Aguas abajo — compradores (reciben de este RUT)" filas={data.compradores} dir="de venta" />
           </div>
         </>
+      )}
+    </>
+  );
+}
+
+// ---------- Valorización de inventario FIFO / PMP ----------
+const MOV_INV_VACIO = { descripcion: '', tipo: 'salida', cantidad: '', precio_unitario: '', co2e_unitario: '', fecha: '' };
+
+function Valorizacion({ flash }) {
+  const [rut, setRut] = useState('');
+  const [metodo, setMetodo] = useState('fifo');
+  const [data, setData] = useState(null);
+  const [cargando, setCargando] = useState(false);
+  const [nuevo, setNuevo] = useState(null);
+
+  async function consultar(m = metodo) {
+    if (!validarRut(rut)) { flash('RUT inválido.', true); return; }
+    setCargando(true);
+    try { setData(await api.inventario(`?rut=${encodeURIComponent(rut)}&metodo=${m}`)); }
+    catch (e) { flash(e.message, true); }
+    finally { setCargando(false); }
+  }
+
+  async function guardarMovimiento() {
+    try {
+      await api.crearMovInventario({ ...nuevo, rut });
+      setNuevo(null); consultar(); flash('Movimiento registrado.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <>
+      <div className="card card-pad" style={{ marginBottom: 16 }}>
+        <div className="form-row" style={{ gridTemplateColumns: '1fr 170px auto auto', alignItems: 'end', margin: 0 }}>
+          <div className="field"><label>RUT del cliente</label>
+            <input value={rut} onChange={(e) => setRut(e.target.value)} onBlur={() => setRut(formatearRut(rut))} placeholder="11.111.111-1" />
+          </div>
+          <div className="field"><label>Método</label>
+            <select value={metodo} onChange={(e) => { setMetodo(e.target.value); if (data) consultar(e.target.value); }}>
+              <option value="fifo">FIFO</option>
+              <option value="pmp">PMP (promedio)</option>
+            </select>
+          </div>
+          <button className="btn btn-primary" style={{ marginBottom: 4 }} onClick={() => consultar()} disabled={cargando}>
+            {cargando ? <span className="spinner" /> : 'Valorizar'}
+          </button>
+          {data && <button className="btn btn-outline btn-sm" style={{ marginBottom: 4 }} onClick={() => setNuevo({ ...MOV_INV_VACIO })}>+ Movimiento</button>}
+        </div>
+        <p className="muted" style={{ fontSize: 12, margin: '10px 0 0' }}>
+          Las entradas llegan solas desde los <b>DTE XML</b> (precio real por ítem, CO2e repartido por monto). Registra salidas para valorizar el consumo.
+        </p>
+      </div>
+
+      {data && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 16 }}>
+            {[
+              { label: `Inventario (${data.metodo.toUpperCase()})`, value: `$ ${fmtInt(data.totales.valor_clp)}` },
+              { label: 'CO2e del stock (t)', value: fmt(data.totales.co2e_stock, 3) },
+              { label: 'Costo salidas (CLP)', value: `$ ${fmtInt(data.totales.costo_salidas_clp)}` },
+              { label: 'CO2e salidas (t)', value: fmt(data.totales.costo_salidas_co2e, 3) },
+            ].map((c) => (
+              <div className="card card-pad" key={c.label}>
+                <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase' }}>{c.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{c.value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <table className="data">
+              <thead><tr><th>Ítem</th><th className="num">Stock</th><th className="num">$ unitario</th><th className="num">Valor (CLP)</th><th className="num">t CO2e stock</th><th className="num">Costo salidas</th></tr></thead>
+              <tbody>
+                {data.items.map((it) => (
+                  <tr key={it.descripcion}>
+                    <td><b>{it.descripcion}</b>
+                      {it.salidas_sin_stock && <div className="badge badge-amber" style={{ fontSize: 11, marginTop: 4 }}>△ {fmt(it.salidas_sin_stock, 1)} sin stock</div>}
+                    </td>
+                    <td className="num">{fmt(it.stock, 1)}</td>
+                    <td className="num">$ {fmtInt(it.precio_unitario)}</td>
+                    <td className="num">$ {fmtInt(it.valor_clp)}</td>
+                    <td className="num">{fmt(it.co2e_stock, 4)}</td>
+                    <td className="num">$ {fmtInt(it.costo_salidas_clp)}</td>
+                  </tr>
+                ))}
+                {data.items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin inventario para este RUT. Sube DTE XML en el flujo público o registra entradas manuales.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {nuevo && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setNuevo(null)}>
+          <div className="modal">
+            <h2 style={{ marginTop: 0 }}>Movimiento de inventario</h2>
+            <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+              <div className="field"><label>Ítem</label><input value={nuevo.descripcion} onChange={(e) => setNuevo({ ...nuevo, descripcion: e.target.value })} placeholder="Suministro eléctrico" /></div>
+              <div className="field"><label>Tipo</label>
+                <select value={nuevo.tipo} onChange={(e) => setNuevo({ ...nuevo, tipo: e.target.value })}>
+                  <option value="salida">Salida (consumo)</option>
+                  <option value="entrada">Entrada</option>
+                </select>
+              </div>
+              <div className="field"><label>Cantidad</label><input value={nuevo.cantidad} onChange={(e) => setNuevo({ ...nuevo, cantidad: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} /></div>
+              <div className="field"><label>Fecha</label><input type="date" value={nuevo.fecha} onChange={(e) => setNuevo({ ...nuevo, fecha: e.target.value })} /></div>
+              {nuevo.tipo === 'entrada' && (
+                <>
+                  <div className="field"><label>Precio unitario (CLP)</label><input value={nuevo.precio_unitario} onChange={(e) => setNuevo({ ...nuevo, precio_unitario: e.target.value.replace(/\D/g, '') })} /></div>
+                  <div className="field"><label>t CO2e por unidad (opcional)</label><input value={nuevo.co2e_unitario} onChange={(e) => setNuevo({ ...nuevo, co2e_unitario: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} /></div>
+                </>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setNuevo(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={guardarMovimiento} disabled={!nuevo.descripcion || !nuevo.cantidad}>Registrar</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

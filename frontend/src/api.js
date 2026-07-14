@@ -125,6 +125,28 @@ export const api = {
   // Búsqueda unificada con cruces
   buscar: (q) => request(`/admin/buscar?q=${encodeURIComponent(q)}`, { authed: true }),
 
+  // Código de acceso con créditos (mini sitio de prueba)
+  codigoEstado: (codigo) => request(`/codigos/${encodeURIComponent(codigo)}`),
+
+  // Valorización FIFO/PMP
+  inventario: (qs) => request(`/admin/valorizacion/inventario${qs}`, { authed: true }),
+  crearMovInventario: (b) => request('/admin/valorizacion/movimientos', { method: 'POST', body: b, authed: true }),
+
+  // Transporte Cat. 7
+  transporteModos: () => request('/admin/transporte/modos', { authed: true }),
+  guardarModoTransporte: (codigo, b) => request(`/admin/transporte/modos/${codigo}`, { method: 'PUT', body: b, authed: true }),
+  transporteViajes: (qs = '') => request(`/admin/transporte/viajes${qs}`, { authed: true }),
+  crearViaje: (b) => request('/admin/transporte/viajes', { method: 'POST', body: b, authed: true }),
+  eliminarViaje: (id) => request(`/admin/transporte/viajes/${id}`, { method: 'DELETE', authed: true }),
+
+  // Accesos externos: mandantes + códigos
+  mandantes: () => request('/admin/accesos/mandantes', { authed: true }),
+  crearMandante: (b) => request('/admin/accesos/mandantes', { method: 'POST', body: b, authed: true }),
+  editarMandante: (id, b) => request(`/admin/accesos/mandantes/${id}`, { method: 'PUT', body: b, authed: true }),
+  codigos: () => request('/admin/accesos/codigos', { authed: true }),
+  crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
+  editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
+
   // Acceso de clientes (magic link)
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),

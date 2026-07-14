@@ -99,6 +99,20 @@ async function seed() {
     console.log('[seed] Plan de cuentas de Capital Natural insertado (AGUA/ENER/CO2E/MATR activas).');
   }
 
+  // Modos de transporte de personal (GHG Cat. 7) — factores editables.
+  const { rows: tmCount } = await query(`SELECT count(*)::int AS n FROM transporte_modos`);
+  if (tmCount[0].n === 0) {
+    await query(
+      `INSERT INTO transporte_modos (codigo, nombre, factor_kgco2e_pkm, fuente) VALUES
+       ('bus','Bus de acercamiento', 0.027, 'Referencial (DEFRA coach) — validar'),
+       ('camioneta','Camioneta compartida', 0.130, 'Referencial — validar'),
+       ('auto','Auto particular', 0.170, 'Referencial — validar'),
+       ('tren','Tren', 0.035, 'Referencial — validar'),
+       ('avion','Avión (doméstico)', 0.245, 'Referencial (DEFRA domestic) — validar')`
+    );
+    console.log('[seed] Modos de transporte Cat. 7 insertados (factores referenciales).');
+  }
+
   console.log('\n============================================================');
   console.log('  CREDENCIALES ADMIN sicr3p');
   console.log('============================================================');

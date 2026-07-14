@@ -309,6 +309,35 @@ Sin dependencias nuevas: autenticación JWT RS256 + streaming `insertAll` vía R
   consistencia de totales/detalle y presencia de firma — sin conexión al SII. Los XML de
   DTE subidos al flujo público usan el **folio y RUT reales** del documento.
 
+### Valorización de inventario (FIFO/PMP) y Transporte Cat. 7
+
+- **Valorización** (Trazabilidad → "Valorización"): los DTE XML alimentan el inventario con
+  el precio real por ítem (el CO2e de la factura se reparte por monto). Métodos FIFO y
+  precio medio ponderado, en CLP + CO2e, con salidas manuales para valorizar el consumo.
+- **Transporte de personal** (GHG Protocol Categoría 7): modos con factor editable
+  (kgCO2e/pasajero-km, referenciales — validar fuente antes de reportar) y registro de
+  traslados; cada viaje carga la cuenta de carbono del Capital Natural.
+
+### Acceso de prueba con códigos (créditos)
+
+Los invitados entran en **`/prueba`** con un código (`SICR3P-XXXXXX`) generado desde el
+panel → "Accesos externos". Cada código trae **créditos** (por defecto 5; 1 crédito =
+1 factura procesada): generan **informes reales** con tope de envío, controlando el costo
+del motor. Al agotarse, el flujo pide contactarnos.
+
+### API para mandantes
+
+Una empresa mandante consulta la trazabilidad de sus proveedores con su API key
+(se genera en el panel → "Accesos externos" y se muestra **una sola vez**):
+
+```bash
+# Proveedores del mandante (aguas arriba) con totales CO2e
+curl -H "X-Api-Key: smk_..." https://sicr3p.cl/api/mandante/proveedores
+
+# Resumen de un proveedor (opcional: ?anio=2026&mes=7)
+curl -H "X-Api-Key: smk_..." https://sicr3p.cl/api/mandante/proveedor/76.123.456-0/resumen
+```
+
 ---
 
 ## Alcance
