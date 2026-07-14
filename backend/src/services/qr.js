@@ -12,7 +12,7 @@ export async function qrDataUrl(facturaId) {
     errorCorrectionLevel: 'M',
     margin: 1,
     width: 320,
-    color: { dark: '#1e2a3a', light: '#ffffff' },
+    color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }
 
@@ -22,6 +22,6 @@ export async function qrBuffer(facturaId) {
     errorCorrectionLevel: 'M',
     margin: 1,
     width: 320,
-    color: { dark: '#1e2a3a', light: '#ffffff' },
+    color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }

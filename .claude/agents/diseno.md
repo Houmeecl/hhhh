@@ -29,16 +29,25 @@ PDFs y correos.
   la webapp, sube boletas/facturas ganando puntos y ranking; la empresa recibe trazabilidad y
   CO2e (en la empresa el flujo se integra a la contabilidad).
 
-## Paleta (tokens)
-- Verde primario `#22c55e` · verde oscuro `#16a34a` · verde claro `#ecfdf5`
-- Navy `#1e2a3a` · texto secundario `#64748b` · borde `#e2e8f0` · fondo `#f8fafc`
+## Paleta OFICIAL (manual de marca)
+- **Azul Profundo** `#0F1F2E` (navy) · **Verde Vivo** `#28A745` (primario, hover `#218838`)
+- **Gris Suave** `#E6E9ED` (bordes) · **Verde Claro** `#EAF6EF` (fondos suaves) · **Blanco** `#FFFFFF`
+- Texto secundario `#64748b` · fondo de página `#f8fafc`
 - Estados: ámbar `#fffbeb/#b45309`, rojo `#fef2f2/#b91c1c`
 - Radios 12–16px, sombras suaves (`--shadow`), hover-lift en cards.
 
-## Tipografía
-- **Inter** (400–800). En la app va self-hosted vía `@fontsource/inter`; en el landing
-  estático, Google Fonts con `display=swap`. Cifras tabulares (`font-variant-numeric`).
-- En PDFs (pdfkit): Helvetica para texto y **Courier para cifras contables** (libro mayor).
+## Tipografía OFICIAL (manual de marca)
+- **Títulos y logotipo: Poppins SemiBold** (`@fontsource/poppins` 600/700 en la app;
+  Google Fonts en el landing). Regla global: `h1,h2,h3,.logo { font-family: Poppins }`.
+- **Cuerpo: Inter Regular** (400–800 disponibles). Cifras tabulares (`font-variant-numeric`).
+- En PDFs (pdfkit): Helvetica para texto y **Courier para cifras contables** (libro mayor)
+  — Poppins no está en las fuentes core de pdfkit; se acepta Helvetica-Bold como equivalente.
+
+## Concepto de marca (del manual)
+- "El número 3 reemplaza la e para representar evolución, conexión y eficiencia."
+- Isotipo reducido: el **"3" con el punto verde**. Versión monocromática permitida.
+- Valores/íconos: Contabilidad · Trazabilidad · Respaldo/Confianza · Cercanía · Presencial.
+- Modalidad comercial: **presencial + apoyo adicional** (Antofagasta — "norte, historia y mar").
 
 ## Íconos
 - En producto (app/admin): **solo SVG de trazo** desde `frontend/src/components/icons.jsx`

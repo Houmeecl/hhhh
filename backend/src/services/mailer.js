@@ -30,11 +30,11 @@ export function activationEmail({ nombre, link }) {
   return {
     subject: 'Activa tu cuenta en sicr3p',
     html: `
-      <div style="font-family:system-ui,Arial,sans-serif;color:#1e2a3a;max-width:520px">
-        <h2 style="color:#1e2a3a">Bienvenido/a a <b>sicr3p</b></h2>
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Bienvenido/a a <b>sicr3p</b></h2>
         <p>Hola ${nombre}, se creó una cuenta para ti en la plataforma de contabilidad de carbono trazable.</p>
         <p>Activa tu cuenta y define tu contraseña con este enlace:</p>
-        <p><a href="${link}" style="background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Activar mi cuenta</a></p>
+        <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Activar mi cuenta</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 48 horas. Si no reconoces esta invitación, ignora este correo.</p>
       </div>`,
   };
@@ -45,11 +45,11 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas }) {
   return {
     subject: 'Tu contabilidad de carbono · sicr3p',
     html: `
-      <div style="font-family:system-ui,Arial,sans-serif;color:#1e2a3a;max-width:520px">
-        <h2 style="color:#1e2a3a">Tu informe está listo</h2>
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Tu informe está listo</h2>
         <p>Hola ${nombre || ''}, adjuntamos tu informe consolidado de contabilidad de carbono.</p>
-        <div style="background:#ecfdf5;border:1px solid #22c55e;border-radius:10px;padding:14px 18px;margin:12px 0">
-          <div style="font-size:12px;color:#16a34a;font-weight:700">RESULTADO INCORPORADO</div>
+        <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:12px 0">
+          <div style="font-size:12px;color:#218838;font-weight:700">RESULTADO INCORPORADO</div>
           <div style="font-size:22px;font-weight:800">${total} t CO₂e</div>
           <div style="font-size:13px;color:#64748b">${nFacturas} factura${nFacturas === 1 ? '' : 's'} procesada${nFacturas === 1 ? '' : 's'}</div>
         </div>
@@ -62,10 +62,10 @@ export function resetEmail({ nombre, link }) {
   return {
     subject: 'Restablece tu contraseña · sicr3p',
     html: `
-      <div style="font-family:system-ui,Arial,sans-serif;color:#1e2a3a;max-width:520px">
-        <h2 style="color:#1e2a3a">Restablecer contraseña</h2>
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Restablecer contraseña</h2>
         <p>Hola ${nombre}, recibimos una solicitud para restablecer tu contraseña.</p>
-        <p><a href="${link}" style="background:#22c55e;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Definir nueva contraseña</a></p>
+        <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Definir nueva contraseña</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 2 horas.</p>
       </div>`,
   };

@@ -1,5 +1,5 @@
 // Gráficos SVG propios, sin librerías externas. Paleta coherente con la marca.
-export const PALETTE = ['#22c55e', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b'];
+export const PALETTE = ['#28a745', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b'];
 
 // Donut con leyenda. data = [{ label, value }]
 export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }) {
@@ -25,7 +25,7 @@ export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }
           offset += len;
           return seg;
         })}
-        <text x={cx} y={cx - 4} textAnchor="middle" fontSize="24" fontWeight="800" fill="#1e2a3a">
+        <text x={cx} y={cx - 4} textAnchor="middle" fontSize="24" fontWeight="800" fill="#0f1f2e">
           {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}
         </text>
         <text x={cx} y={cx + 16} textAnchor="middle" fontSize="11" fill="#64748b">{unit}</text>
@@ -45,7 +45,7 @@ export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }
 }
 
 // Sparkline / mini barras. values = [numbers]
-export function Sparkbars({ values = [], height = 48, color = '#22c55e' }) {
+export function Sparkbars({ values = [], height = 48, color = '#28a745' }) {
   const max = Math.max(...values, 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height }}>

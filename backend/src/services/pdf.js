@@ -3,15 +3,15 @@ import { qrBuffer } from './qr.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
-// Marca sicr3p · verde #22c55e · navy #1e2a3a.
+// Marca sicr3p · verde #28a745 · navy #0f1f2e.
 // Prohibida la palabra "huella" en todo el texto.
 // ============================================================
 
-const GREEN = '#22c55e';
-const NAVY = '#1e2a3a';
+const GREEN = '#28a745';
+const NAVY = '#0f1f2e';
 const GRAY = '#64748b';
 const LIGHT = '#f1f5f9';
-const BORDER = '#e2e8f0';
+const BORDER = '#e6e9ed';
 
 const MESES = [
   'ene', 'feb', 'mar', 'abr', 'may', 'jun',
@@ -143,7 +143,7 @@ export async function generateReport({ sesion, facturas }) {
   }
 
   // Saldo del período
-  doc.rect(48, y, 499, 22).fillAndStroke('#ecfdf5', GREEN);
+  doc.rect(48, y, 499, 22).fillAndStroke('#eaf6ef', GREEN);
   doc.font('Courier-Bold').fontSize(10).fillColor(NAVY);
   doc.text('SALDO DEL PERÍODO', cols.glosa - 90, y + 6, { lineBreak: false });
   doc.fillColor(GREEN).text(`${nf(saldo, 4)} tCO2e`, cols.cargo - 60, y + 6, { width: 137, align: 'right' });
@@ -223,7 +223,7 @@ export async function generateLabel({ sesion, factura }) {
 
   // Bloque verde: resultado incorporado
   const nItems = factura.items?.length || 0;
-  doc.roundedRect(24, 196, 372, 44, 8).fill('#ecfdf5');
+  doc.roundedRect(24, 196, 372, 44, 8).fill('#eaf6ef');
   doc.roundedRect(24, 196, 372, 44, 8).lineWidth(1).stroke(GREEN);
   doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN).text('RESULTADO INCORPORADO', 36, 206);
   doc.font('Helvetica-Bold').fontSize(14).fillColor(NAVY)
