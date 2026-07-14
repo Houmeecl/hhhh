@@ -78,6 +78,26 @@ async function seed() {
     console.log('[seed] Metodologías por país del corredor insertadas (CL activo; AR/PY/BR borrador).');
   }
 
+  // Plan de cuentas de Capital Natural (SEEA simplificado).
+  const { rows: cnCount } = await query(`SELECT count(*)::int AS n FROM cuentas_naturales`);
+  if (cnCount[0].n === 0) {
+    await query(
+      `INSERT INTO cuentas_naturales (codigo, nombre, unidad, tipo, activo, factores, marco, fuente, notas) VALUES
+       ('AGUA','Agua','m3','flujo', true,  $1,'SEEA Marco Central (ONU)','Factor referencial agua potable — editable','Consumo hídrico derivado de documentos.'),
+       ('ENER','Energía','kWh','flujo', true, $2,'SEEA Marco Central (ONU)','HuellaChile — SEN 2023','Energía eléctrica estimada desde facturas.'),
+       ('CO2E','Carbono','tCO2e','flujo', true, '{}'::jsonb,'GHG Protocol · ISO 14064-1','HuellaChile (MMA)','Cuenta espejo del Libro Mayor de Carbono.'),
+       ('MATR','Materiales y residuos','t','flujo', true, $3,'SEEA / Ley REP','Factor genérico de insumos — editable','Conecta con trazabilidad Ley REP.'),
+       ('SUEL','Suelo y ecosistemas','ha','stock', false, '{}'::jsonb,'SEEA Cuentas de Ecosistemas','—','Solo activos (stock); sin flujo automático en v1.'),
+       ('BIOD','Biodiversidad','índice','stock', false, '{}'::jsonb,'TNFD / SEEA EA','—','Índice de condición 0–100 por activo; sin flujo automático en v1.')`,
+      [
+        JSON.stringify({ agua_kgco2e_m3: 0.344 }),
+        JSON.stringify({ electricidad_kgco2e_kwh: 0.2421 }),
+        JSON.stringify({ materiales_kgco2e_kg: 1.5 }),
+      ]
+    );
+    console.log('[seed] Plan de cuentas de Capital Natural insertado (AGUA/ENER/CO2E/MATR activas).');
+  }
+
   console.log('\n============================================================');
   console.log('  CREDENCIALES ADMIN sicr3p');
   console.log('============================================================');

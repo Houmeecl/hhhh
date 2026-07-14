@@ -88,7 +88,7 @@ export async function generateReport({ sesion, facturas }) {
   doc.font('Helvetica').fontSize(11).fillColor(NAVY);
   doc.text(sesion.nombre_cliente || '—', 64, y + 28, { width: 190 });
   doc.text(sesion.rut_cliente || '—', 260, y + 28, { width: 130 });
-  doc.text(fechaCorta(sesion.fecha), 400, y + 28, { width: 130 });
+  doc.text(sesion.periodo_texto || fechaCorta(sesion.fecha), 400, y + 28, { width: 130 });
 
   // --- Tarjetas de resumen ---
   y += 78;
@@ -134,7 +134,7 @@ export async function generateReport({ sesion, facturas }) {
       if (zebra) { doc.rect(48, y, 499, 16).fill(LIGHT); doc.fillColor(NAVY); }
       zebra = !zebra;
       doc.font('Courier').fontSize(8.5).fillColor(NAVY);
-      doc.text(fechaCorta(sesion.fecha), cols.fecha + 6, y + 4, { lineBreak: false });
+      doc.text(fechaCorta(f.fecha || sesion.fecha), cols.fecha + 6, y + 4, { lineBreak: false });
       doc.text(String(f.numero_venta || '—').slice(0, 16), cols.doc, y + 4, { lineBreak: false });
       doc.text(String(it.descripcion || '').slice(0, 34), cols.glosa, y + 4, { lineBreak: false });
       doc.text(nf(it.co2e, 4), cols.cargo - 20, y + 4, { width: 97, align: 'right' });
@@ -183,6 +183,158 @@ export async function generateReport({ sesion, facturas }) {
     doc.page.margins.bottom = 0;
     doc.font('Helvetica').fontSize(8).fillColor(GRAY)
       .text(`sicr3p · Contabilidad de carbono trazable · Folio ${folio(sesion)}`, 48, 808, { width: 400, lineBreak: false });
+    doc.text(`Página ${i + 1} de ${range.count}`, 400, 808, { width: 147, align: 'right', lineBreak: false });
+    doc.page.margins.bottom = oldBottom;
+  }
+
+  return bufferDoc(doc);
+}
+
+// ---------- ESTADO DE CAPITAL NATURAL ----------
+// Balance por cuenta ambiental (flujos del período + activos naturales).
+export async function generateBalanceNatural({ balance, movimientos, activos, periodo = {} }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const year = new Date().getFullYear();
+  const folioN = `N-${year}-${String(((movimientos?.length || 0) + (activos?.length || 0) + 1) % 10000).padStart(4, '0')}`;
+  const rango = periodo.desde || periodo.hasta
+    ? `${periodo.desde ? fechaCorta(periodo.desde) : 'inicio'} a ${periodo.hasta ? fechaCorta(periodo.hasta) : 'hoy'}`
+    : 'todo el período registrado';
+
+  // --- Encabezado ---
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Contabilidad de capital natural', 48, 74);
+  doc.fontSize(9).fillColor(GRAY)
+    .text(`Folio ${folioN}`, 400, 46, { width: 147, align: 'right' })
+    .text(`Emitido: ${fechaCorta(new Date())}`, 400, 60, { width: 147, align: 'right' });
+  doc.moveTo(48, 92).lineTo(547, 92).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text('Estado de Capital Natural', 48, 106);
+  doc.font('Helvetica').fontSize(10).fillColor(GRAY)
+    .text(`Período: ${rango} · Cuentas ambientales según SEEA (ONU)`, 48, 130);
+
+  // --- Resumen por cuenta (tarjetas) ---
+  let y = 156;
+  const activasFlujo = (balance || []).filter((b) => b.activo && b.tipo !== 'stock');
+  const cw = 118, gap = 9;
+  activasFlujo.slice(0, 4).forEach((b, i) => {
+    const cx = 48 + i * (cw + gap);
+    doc.roundedRect(cx, y, cw, 62, 8).fillAndStroke('#ffffff', BORDER);
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`${b.codigo} · ${b.nombre}`.toUpperCase(), cx + 10, y + 10, { width: cw - 20 });
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(GREEN).text(nf(b.saldo, 2), cx + 10, y + 26, { width: cw - 20 });
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`${b.unidad} · ${b.n_movimientos} mov.`, cx + 10, y + 46, { width: cw - 20 });
+  });
+  y += 84;
+
+  // --- Libro por cuenta (movimientos del período) ---
+  const porCuenta = new Map();
+  for (const m of movimientos || []) {
+    if (!porCuenta.has(m.cuenta_codigo)) porCuenta.set(m.cuenta_codigo, []);
+    porCuenta.get(m.cuenta_codigo).push(m);
+  }
+
+  for (const b of balance || []) {
+    const movs = porCuenta.get(b.codigo) || [];
+    if (!movs.length) continue;
+    if (y > 660) { doc.addPage(); y = 48; }
+
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+      .text(`${b.codigo} — ${b.nombre} (${b.unidad})`, 48, y);
+    y += 18;
+
+    const cols = { fecha: 48, glosa: 130, tipo: 400, cant: 460 };
+    doc.rect(48, y, 499, 18).fill(NAVY);
+    doc.font('Courier-Bold').fontSize(8.5).fillColor('#ffffff');
+    doc.text('Fecha', cols.fecha + 6, y + 5);
+    doc.text('Glosa', cols.glosa, y + 5);
+    doc.text('Tipo', cols.tipo, y + 5);
+    doc.text(`Cantidad (${b.unidad})`, cols.cant - 40, y + 5, { width: 127, align: 'right' });
+    y += 18;
+
+    let zebra = false;
+    for (const m of movs) {
+      if (y > 760) { doc.addPage(); y = 48; }
+      if (zebra) { doc.rect(48, y, 499, 15).fill(LIGHT); }
+      zebra = !zebra;
+      doc.font('Courier').fontSize(8).fillColor(NAVY);
+      doc.text(fechaCorta(m.fecha), cols.fecha + 6, y + 4, { lineBreak: false });
+      doc.text(String(m.glosa || '').slice(0, 44), cols.glosa, y + 4, { lineBreak: false });
+      doc.text(m.tipo === 'abono' ? 'Abono' : 'Cargo', cols.tipo, y + 4, { lineBreak: false });
+      doc.text(nf(m.cantidad, 2), cols.cant - 40, y + 4, { width: 127, align: 'right' });
+      y += 15;
+    }
+
+    // Saldo del período por cuenta
+    if (y > 745) { doc.addPage(); y = 48; }
+    doc.rect(48, y, 499, 20).fillAndStroke('#eaf6ef', GREEN);
+    doc.font('Courier-Bold').fontSize(9).fillColor(NAVY)
+      .text('SALDO DEL PERÍODO', cols.glosa, y + 6, { lineBreak: false });
+    doc.fillColor(GREEN).text(`${nf(b.saldo, 2)} ${b.unidad}`, cols.cant - 60, y + 6, { width: 147, align: 'right' });
+    y += 32;
+  }
+
+  // --- Activos naturales (stocks) ---
+  if ((activos || []).length) {
+    if (y > 620) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text('Activos naturales (stocks)', 48, y);
+    y += 20;
+    const cols = { nombre: 48, cuenta: 220, ext: 300, cond: 390, clp: 450 };
+    doc.rect(48, y, 499, 18).fill(NAVY);
+    doc.font('Courier-Bold').fontSize(8.5).fillColor('#ffffff');
+    doc.text('Activo', cols.nombre + 6, y + 5);
+    doc.text('Cuenta', cols.cuenta, y + 5);
+    doc.text('Extensión', cols.ext, y + 5);
+    doc.text('Cond.', cols.cond, y + 5);
+    doc.text('Valor (CLP)', cols.clp - 20, y + 5, { width: 117, align: 'right' });
+    y += 18;
+    let zebra = false;
+    for (const a of activos) {
+      if (y > 760) { doc.addPage(); y = 48; }
+      if (zebra) { doc.rect(48, y, 499, 15).fill(LIGHT); }
+      zebra = !zebra;
+      doc.font('Courier').fontSize(8).fillColor(NAVY);
+      doc.text(String(a.nombre || '').slice(0, 26), cols.nombre + 6, y + 4, { lineBreak: false });
+      doc.text(a.cuenta_codigo, cols.cuenta, y + 4, { lineBreak: false });
+      doc.text(`${nf(a.extension, 1)} ${a.unidad || ''}`.trim(), cols.ext, y + 4, { lineBreak: false });
+      doc.text(a.condicion != null ? `${a.condicion}` : '—', cols.cond, y + 4, { lineBreak: false });
+      doc.text(a.valor_clp != null ? nf(a.valor_clp, 0) : '—', cols.clp - 20, y + 4, { width: 117, align: 'right' });
+      y += 15;
+    }
+    y += 10;
+  }
+
+  // --- Metodología ---
+  if (y > 610) { doc.addPage(); y = 48; }
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metodología', 48, y);
+  y += 18;
+  const metod = [
+    'Marco de referencia: SEEA — Sistema de Contabilidad Ambiental y Económica (ONU), Marco Central y Cuentas de Ecosistemas; Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
+    'Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Electricidad SEN 2023: 0,2421 kgCO2e/kWh.',
+    'Flujos: derivados de documentos tributarios capturados, con traza al documento de origen. Cantidades físicas estimadas mediante factores de conversión editables por cuenta.',
+    'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP manual cuando existe.',
+  ];
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY);
+  for (const m of metod) {
+    doc.text('•  ' + m, 48, y, { width: 499 });
+    y = doc.y + 6;
+  }
+
+  // --- Disclaimer ---
+  y += 6;
+  if (y > 720) { doc.addPage(); y = 48; }
+  doc.roundedRect(48, y, 499, 40, 6).fillAndStroke('#fffbeb', '#fde68a');
+  doc.font('Helvetica-Oblique').fontSize(9).fillColor('#92400e')
+    .text('Este informe no constituye una verificación de tercera parte acreditada.', 60, y + 8, { width: 475 });
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text('Documento generado por sicr3p como contabilidad de capital natural trazable, base para su gestión y decisiones.', 60, y + 24, { width: 475 });
+
+  // --- Pie de página ---
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const oldBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text(`sicr3p · Estado de Capital Natural · Folio ${folioN}`, 48, 808, { width: 400, lineBreak: false });
     doc.text(`Página ${i + 1} de ${range.count}`, 400, 808, { width: 147, align: 'right', lineBreak: false });
     doc.page.margins.bottom = oldBottom;
   }

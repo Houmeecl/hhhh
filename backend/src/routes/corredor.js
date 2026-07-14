@@ -3,6 +3,7 @@ import multer from 'multer';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
+import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -133,6 +134,16 @@ router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res,
            VALUES ($1,$2,$3,$4,$5)`,
           [doc.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total]
         );
+      }
+      if (estado === 'procesado') {
+        // Capital Natural: los documentos del corredor también cargan las
+        // cuentas ambientales (sin FK a facturas: la traza queda en la glosa).
+        const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+        await registrarMovimientos({
+          client,
+          factura: { id: null, categoria, total_co2e: total, numero_venta: `corredor ${paisMet}`, archivo_original: file.originalname },
+          cuentas: cuentasNaturales,
+        });
       }
       return doc;
     });

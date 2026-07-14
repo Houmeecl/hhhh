@@ -87,7 +87,37 @@ export const api = {
   guardarMetodologia: (pais, b) => request(`/admin/corredor/metodologias/${pais}`, { method: 'PUT', body: b, authed: true }),
   corredorDocumentos: () => request('/admin/corredor/documentos', { authed: true }),
   subirDocumentoCorredor: (formData) => request('/admin/corredor/documentos', { method: 'POST', body: formData, formData: true, authed: true }),
+
+  // Capital Natural
+  capitalCuentas: () => request('/admin/capital/cuentas', { authed: true }),
+  guardarCuentaNatural: (codigo, b) => request(`/admin/capital/cuentas/${codigo}`, { method: 'PUT', body: b, authed: true }),
+  capitalActivos: () => request('/admin/capital/activos', { authed: true }),
+  crearActivoNatural: (b) => request('/admin/capital/activos', { method: 'POST', body: b, authed: true }),
+  editarActivoNatural: (id, b) => request(`/admin/capital/activos/${id}`, { method: 'PUT', body: b, authed: true }),
+  eliminarActivoNatural: (id) => request(`/admin/capital/activos/${id}`, { method: 'DELETE', authed: true }),
+  capitalLibro: (qs = '') => request(`/admin/capital/libro${qs}`, { authed: true }),
+  crearMovimientoNatural: (b) => request('/admin/capital/movimientos', { method: 'POST', body: b, authed: true }),
+  capitalBalance: (qs = '') => request(`/admin/capital/balance${qs}`, { authed: true }),
+  // Los PDF de admin requieren Authorization: se bajan como blob y se abren en una pestaña.
+  abrirBalanceNaturalPdf: (qs = '') => abrirPdfAuth(`/api/admin/capital/balance.pdf${qs}`),
+
+  // Trazabilidad (Etapa 2)
+  informeMensual: (qs) => request(`/admin/informes/mensual${qs}`, { authed: true }),
+  abrirInformeMensualPdf: (qs) => abrirPdfAuth(`/api/admin/informes/mensual.pdf${qs}`),
+  cadena: (qs) => request(`/admin/informes/cadena${qs}`, { authed: true }),
+  verificarDte: (formData) => request('/admin/informes/dte/verificar', { method: 'POST', body: formData, formData: true, authed: true }),
 };
+
+async function abrirPdfAuth(url) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${auth.access}` } });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'No se pudo generar el PDF');
+  }
+  const blobUrl = URL.createObjectURL(await res.blob());
+  window.open(blobUrl, '_blank');
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
 
 // Formato chileno de números.
 export const fmt = (n, dec = 4) =>

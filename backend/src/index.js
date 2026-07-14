@@ -8,6 +8,8 @@ import publicRoutes from './routes/public.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import corredorRoutes from './routes/corredor.js';
+import capitalRoutes from './routes/capital.js';
+import informesRoutes from './routes/informes.js';
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use('/api', apiLimiter, publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/corredor', corredorRoutes);
+app.use('/api/admin/capital', capitalRoutes);
+app.use('/api/admin/informes', informesRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

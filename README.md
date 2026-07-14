@@ -236,22 +236,51 @@ cd ../frontend && npm ci && npm run build
 
 `backend/migrations/001_init.sql` crea: `clientes`, `usuarios`, `tokens_password`,
 `sesiones`, `facturas`, `line_items`, `actividad_log`, `prospectos`, `simple_api_uso`.
-Cada factura guarda `rut_emisor` y `rut_receptor` (preparación de trazabilidad futura,
-ver `ETAPA2.md`).
+`002_corredor.sql` agrega las tablas del Corredor Bioceánico y `003_capital_natural.sql`
+las del Capital Natural (`cuentas_naturales`, `activos_naturales`, `movimientos_naturales`).
+Cada factura guarda `rut_emisor` y `rut_receptor`, que alimentan la cadena
+comprador-vendedor del panel.
 
 ---
 
 ## Panel de administración (`/admin`)
 
 Login con JWT. Secciones: Dashboard, Clientes y contratos (CRUD + crear cuenta con envío de
-link de activación), Sesiones e informes (ver / re-descargar PDF y etiquetas), Métricas,
-Prospectos (pipeline comercial), Motor externo (consumo/latencia/errores), Usuarios y roles,
-Log de actividad.
+link de activación), Sesiones e informes (ver / re-descargar PDF y etiquetas), Corredor
+Bioceánico, **Capital Natural**, **Trazabilidad**, Métricas, Prospectos (pipeline comercial),
+Motor externo (consumo/latencia/errores), Usuarios y roles, Log de actividad.
+
+### Capital Natural
+
+Contabilidad de capital natural con modelo **SEEA simplificado** (el mismo marco de las
+cuentas ambientales del Banco Central/MMA), citando además Natural Capital Protocol y TNFD:
+
+- **Plan de cuentas ambiental**: AGUA (m3), ENER (kWh), CO2E (tCO2e), MATR (t) como flujo;
+  SUEL (ha) y BIOD (índice) como stock. Toggle de activación y factores de conversión
+  editables por cuenta.
+- **Movimientos automáticos**: cada documento procesado (flujo público o Corredor) genera
+  cargos en las cuentas activas, con traza a la factura de origen. También hay movimientos
+  manuales (cargo/abono).
+- **Activos naturales**: derechos de agua, predios, bosques u otros stocks, con extensión,
+  condición (0–100) y valorización CLP manual.
+- **Informe "Estado de Capital Natural"** (PDF, folio `N-AAAA-NNNN`): balance por cuenta con
+  libro de movimientos, activos y metodología citada.
+
+### Trazabilidad (Etapa 2)
+
+- **Informe mensual por cliente**: consolidado calendario por RUT
+  (`GET /api/admin/informes/mensual[.pdf]?rut=&anio=&mes=`), con el mismo libro mayor.
+- **Cadena comprador-vendedor**: proveedores (aguas arriba) y compradores (aguas abajo)
+  de cualquier RUT, enlazando `rut_emisor`/`rut_receptor` de los documentos procesados.
+- **Verificador local de DTE**: sube el XML y valida estructura, RUT (módulo 11),
+  consistencia de totales/detalle y presencia de firma — sin conexión al SII. Los XML de
+  DTE subidos al flujo público usan el **folio y RUT reales** del documento.
 
 ---
 
 ## Alcance
 
-La Etapa 1 termina aquí. El backlog de funcionalidades futuras (SII/RCV, informes
-mensuales, cadena comprador–vendedor, etc.) está en **`ETAPA2.md`** y **no** está
-implementado en este código.
+Este código cubre la **Etapa 1 completa** más los ítems de **Etapa 2** que no requieren
+servicios externos (informes mensuales, cadena comprador-vendedor, verificador DTE local,
+módulo Capital Natural). El estado del backlog está en **`ETAPA2.md`** y la hoja de ruta
+restante (SII/RCV, motor propio, BigQuery, API mandantes, etc.) en **`ETAPA3.md`**.

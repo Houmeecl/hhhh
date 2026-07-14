@@ -12,12 +12,16 @@ import SimpleApi from './SimpleApi.jsx';
 import Usuarios from './Usuarios.jsx';
 import Actividad from './Actividad.jsx';
 import Corredor from './Corredor.jsx';
+import CapitalNatural from './CapitalNatural.jsx';
+import Trazabilidad from './Trazabilidad.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
   { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
   { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
   { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
+  { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
+  { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
   { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
@@ -33,7 +37,17 @@ export default function AdminApp() {
 
   useEffect(() => {
     if (!auth.access) { nav('/admin/login'); return; }
-    api.me().then((d) => { setUser(d.user); setChecking(false); }).catch(() => { auth.clear(); nav('/admin/login'); });
+    let vigente = true;
+    const verificar = (reintento = false) => api.me()
+      .then((d) => { if (vigente) { setUser(d.user); setChecking(false); } })
+      .catch((e) => {
+        if (!vigente) return;
+        // Un error de red (TypeError) no invalida la sesión: se reintenta una vez.
+        if (e instanceof TypeError && !reintento) { setTimeout(() => verificar(true), 400); return; }
+        auth.clear(); nav('/admin/login');
+      });
+    verificar();
+    return () => { vigente = false; };
   }, []);
 
   function salir() { auth.clear(); nav('/admin/login'); }
@@ -78,6 +92,8 @@ export default function AdminApp() {
           <Route path="clientes" element={<Clientes rol={user?.rol} />} />
           <Route path="sesiones" element={<Sesiones />} />
           <Route path="corredor" element={<Corredor />} />
+          <Route path="capital" element={<CapitalNatural />} />
+          <Route path="trazabilidad" element={<Trazabilidad />} />
           <Route path="metricas" element={<Metricas />} />
           <Route path="prospectos" element={<Prospectos />} />
           <Route path="motor" element={<SimpleApi />} />

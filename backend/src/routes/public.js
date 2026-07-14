@@ -6,6 +6,8 @@ import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
 import { qrBuffer } from '../services/qr.js';
 import { sendMail, reporteEmail } from '../services/mailer.js';
+import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
+import { parseDte } from '../services/dte.js';
 
 const router = express.Router();
 
@@ -79,6 +81,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       );
       const sesion = sRows[0];
 
+      // Plan de cuentas de Capital Natural (una sola carga por sesión).
+      const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+
       let totalSesion = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -89,6 +94,16 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           rutReceptor: rut,
           client,
         });
+        // Si el archivo es un DTE XML, la trazabilidad usa los datos reales
+        // del documento (folio y RUT) en vez de los estimados por el motor.
+        if (/\.xml$/i.test(file.originalname)) {
+          const dte = parseDte(file.buffer.toString('utf8'));
+          if (dte) {
+            if (dte.folio) analysis.numero_venta = `F-${dte.folio}`;
+            if (dte.rut_emisor) analysis.rut_emisor = dte.rut_emisor;
+            if (dte.rut_receptor) analysis.rut_receptor = dte.rut_receptor;
+          }
+        }
         totalSesion += Number(analysis.total_co2e || 0);
 
         const { rows: fRows } = await client.query(
@@ -115,6 +130,8 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total]
           );
         }
+        // Capital Natural: cargos automáticos en las cuentas ambientales activas.
+        await registrarMovimientos({ client, factura, fecha: sesion.fecha, cuentas: cuentasNaturales });
       }
 
       await client.query(`UPDATE sesiones SET total_co2e = $1 WHERE id = $2`, [
