@@ -11,6 +11,9 @@ node_modules/
 # Edición portátil: datos locales del dispositivo (credenciales cifradas, base SQLite)
 portable/data/
 
+# Pre-lanzamiento: base local de lista de espera / códigos
+prelanzamiento-empresas/data/
+
 # Builds
 frontend/dist/
 backend/dist/

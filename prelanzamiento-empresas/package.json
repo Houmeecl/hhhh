@@ -1,0 +1,10 @@
+{
+  "name": "prelanzamiento-empresas",
+  "version": "1.0.0",
+  "description": "Landing de pre-lanzamiento: juego de captura de documentos para empresas (SEO + lista de espera + códigos de piloto).",
+  "type": "module",
+  "main": "server.js",
+  "scripts": { "start": "node --no-warnings server.js" },
+  "engines": { "node": ">=22.5" },
+  "dependencies": { "express": "^4.19.2" }
+}
