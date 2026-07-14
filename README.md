@@ -266,6 +266,30 @@ cuentas ambientales del Banco Central/MMA), citando además Natural Capital Prot
 - **Informe "Estado de Capital Natural"** (PDF, folio `N-AAAA-NNNN`): balance por cuenta con
   libro de movimientos, activos y metodología citada.
 
+### Búsqueda con cruces
+
+Buscador unificado (`/admin/buscar`): un RUT, un N° de documento (DIN, MIC/DTA, N° de
+venta), un archivo o una empresa devuelve **todas sus apariciones** (clientes, sesiones,
+documentos procesados, Corredor) y los **cruces del RUT**: como cliente de sicr3p, sus
+proveedores (recibe de) y sus clientes (emite a), con documentos y tCO2e por relación.
+Implementado sobre PostgreSQL con `pg_trgm` (migración 005); cuando el volumen lo exija,
+la misma API se puede respaldar con Elasticsearch/OpenSearch sin cambiar el frontend.
+
+### Export a BigQuery (data warehouse)
+
+Todo lo que se escanea (facturas + ítems del flujo público y documentos del Corredor) se
+puede replicar a **BigQuery** para análisis y cruces a gran escala:
+
+1. Crea el dataset con `backend/bigquery/schema.sql` (región `southamerica-west1`,
+   RUT normalizados, particionado por fecha y clusterizado por RUT).
+2. Crea una cuenta de servicio GCP con rol **BigQuery Data Editor** y guarda su JSON
+   en el servidor (fuera del repo).
+3. En `backend/.env`: `BIGQUERY_EXPORT=true`, `BQ_PROJECT_ID=…`, `BQ_KEY_FILE=/ruta/sa.json`.
+
+El export es **no bloqueante**: si BigQuery no responde, el flujo del cliente no se
+afecta (solo queda un aviso en el log). Apagado por defecto (`BIGQUERY_EXPORT=false`).
+Sin dependencias nuevas: autenticación JWT RS256 + streaming `insertAll` vía REST.
+
 ### Trazabilidad (Etapa 2)
 
 - **Informe mensual por cliente**: consolidado calendario por RUT

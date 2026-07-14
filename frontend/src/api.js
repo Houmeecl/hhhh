@@ -106,6 +106,9 @@ export const api = {
   abrirInformeMensualPdf: (qs) => abrirPdfAuth(`/api/admin/informes/mensual.pdf${qs}`),
   cadena: (qs) => request(`/admin/informes/cadena${qs}`, { authed: true }),
   verificarDte: (formData) => request('/admin/informes/dte/verificar', { method: 'POST', body: formData, formData: true, authed: true }),
+
+  // Búsqueda unificada con cruces
+  buscar: (q) => request(`/admin/buscar?q=${encodeURIComponent(q)}`, { authed: true }),
 };
 
 async function abrirPdfAuth(url) {

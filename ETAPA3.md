@@ -28,7 +28,8 @@ por eso quedan documentados y no implementados.
 | Ítem | Qué falta | Prerrequisito |
 |------|-----------|---------------|
 | Motor de cálculo propio | Reemplazar el motor externo por cálculo propio de emisiones. | `simple_api_uso` ya mide consumo/costo para el caso de negocio. |
-| Integración BigQuery | Data warehouse para análisis a gran escala. | Proyecto GCP + volumen de datos que lo justifique. |
+| Integración BigQuery | **Conector implementado** (`services/bigquery.js` + `backend/bigquery/schema.sql`): todo lo escaneado se exporta al activar `BIGQUERY_EXPORT=true`. Falta: crear el proyecto GCP, el dataset y la cuenta de servicio, y validar en producción. | Proyecto GCP con facturación. |
+| Búsqueda a gran escala (Elasticsearch) | La búsqueda por RUT con cruces ya funciona sobre PostgreSQL (`pg_trgm`, endpoint `/api/admin/buscar`). Migrar el backend de búsqueda a Elasticsearch/OpenSearch recién cuando el volumen lo exija — la API y el frontend no cambian. | Volumen de datos que lo justifique. |
 | API para mineras mandantes | Endpoints para que mandantes consuman datos de sus proveedores. | Modelo de permisos entre empresas (la cadena comprador-vendedor ya enlaza los RUT). |
 | Auto-registro de clientes | Alta de cuentas sin admin. | Decisión comercial + flujo de pago. |
 | TNFD LEAP completo | Evaluación de dependencias e impactos en naturaleza (Locate-Evaluate-Assess-Prepare). | Módulo Capital Natural como fuente de datos. |

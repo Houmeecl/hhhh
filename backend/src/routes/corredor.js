@@ -4,6 +4,7 @@ import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
+import { bigquery } from '../services/bigquery.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -151,6 +152,9 @@ router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res,
 
     await logActividad({ usuarioId: req.user.sub, accion: 'cargar_documento_corredor', entidad: 'documento_corredor', entidadId: result.id, detalle: { tipo, paisMet }, ip: req.ip });
     res.status(201).json({ documento: result });
+
+    // Export al data warehouse (no bloqueante; apagado por defecto).
+    bigquery.exportDocumentoCorredor(result);
   } catch (err) { next(err); }
 });
 

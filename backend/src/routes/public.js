@@ -8,6 +8,7 @@ import { qrBuffer } from '../services/qr.js';
 import { sendMail, reporteEmail } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { parseDte } from '../services/dte.js';
+import { bigquery } from '../services/bigquery.js';
 
 const router = express.Router();
 
@@ -144,6 +145,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
     const facturas = await hydrateFacturas(result.id);
     res.status(201).json({ sesion: result, facturas });
+
+    // Export al data warehouse (no bloqueante; apagado por defecto).
+    bigquery.exportSesion({ sesion: result, facturas });
 
     // Envío del informe por correo (no bloqueante: nunca afecta la respuesta).
     (async () => {

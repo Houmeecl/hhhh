@@ -14,6 +14,7 @@ import Actividad from './Actividad.jsx';
 import Corredor from './Corredor.jsx';
 import CapitalNatural from './CapitalNatural.jsx';
 import Trazabilidad from './Trazabilidad.jsx';
+import Buscar from './Buscar.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -22,6 +23,7 @@ const NAV = [
   { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
   { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
   { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
+  { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
   { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
@@ -94,6 +96,7 @@ export default function AdminApp() {
           <Route path="corredor" element={<Corredor />} />
           <Route path="capital" element={<CapitalNatural />} />
           <Route path="trazabilidad" element={<Trazabilidad />} />
+          <Route path="buscar" element={<Buscar />} />
           <Route path="metricas" element={<Metricas />} />
           <Route path="prospectos" element={<Prospectos />} />
           <Route path="motor" element={<SimpleApi />} />

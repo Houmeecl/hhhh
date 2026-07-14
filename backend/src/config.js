@@ -41,6 +41,16 @@ export const config = {
     password: process.env.ADMIN_PASSWORD || '',
   },
 
+  // Export de datos escaneados a BigQuery (apagado por defecto).
+  // Se activa con BIGQUERY_EXPORT=true + una cuenta de servicio de GCP.
+  bigquery: {
+    enabled: bool(process.env.BIGQUERY_EXPORT, false),
+    projectId: process.env.BQ_PROJECT_ID || '',
+    dataset: process.env.BQ_DATASET || 'sicr3p',
+    // Ruta al JSON de la cuenta de servicio (rol: BigQuery Data Editor).
+    keyFile: process.env.BQ_KEY_FILE || process.env.GOOGLE_APPLICATION_CREDENTIALS || '',
+  },
+
   // Límite duro de la demo
   maxFilesPerSession: 5,
 };
