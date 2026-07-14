@@ -3,7 +3,24 @@ import { api, fmt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 
 const PAISES = { CL: 'Chile', AR: 'Argentina', PY: 'Paraguay', BR: 'Brasil' };
-const TIPOS = ['factura', 'energia', 'combustible', 'guia', 'manifiesto', 'contrato', 'otro'];
+const TIPOS = [
+  { value: 'factura', label: 'Factura' },
+  { value: 'energia', label: 'Energía' },
+  { value: 'combustible', label: 'Combustible' },
+  { value: 'guia', label: 'Guía de despacho' },
+  { value: 'manifiesto', label: 'Manifiesto de carga' },
+  { value: 'aduana', label: 'Declaración aduanera' },
+  { value: 'mic_dta', label: 'MIC/DTA (tránsito ATIT)' },
+  { value: 'contrato', label: 'Contrato' },
+  { value: 'otro', label: 'Otro' },
+];
+// Nombre real del documento aduanero según el país cuya aduana interviene.
+const ADUANA_PAIS = {
+  CL: 'DIN / DUS (Aduana de Chile)',
+  AR: 'Declaración SIM (Aduana Argentina)',
+  PY: 'Despacho SOFIA (DNA Paraguay)',
+  BR: 'DU-E / DI — Siscomex (Receita Federal Brasil)',
+};
 
 export default function Corredor() {
   const [tab, setTab] = useState('metodologias');
@@ -120,7 +137,7 @@ function Metodologias({ flash }) {
 
 function Documentos({ flash }) {
   const [docs, setDocs] = useState([]);
-  const [form, setForm] = useState({ pais_origen: 'BR', pais_destino: 'CL', tramo: '', tipo_documento: 'factura', rut_emisor: '', rut_receptor: '' });
+  const [form, setForm] = useState({ pais_origen: 'BR', pais_destino: 'CL', tramo: '', tipo_documento: 'factura', rut_emisor: '', rut_receptor: '', numero_documento: '' });
   const [file, setFile] = useState(null);
   const [subiendo, setSubiendo] = useState(false);
   const fileRef = useRef();
@@ -157,11 +174,22 @@ function Documentos({ flash }) {
           </div>
           <div className="field"><label>Tramo</label><input value={form.tramo} onChange={(e) => setForm({ ...form, tramo: e.target.value })} placeholder="Campo Grande → Antofagasta" /></div>
           <div className="field"><label>Tipo</label>
-            <select value={form.tipo_documento} onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}>{TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+            <select value={form.tipo_documento} onChange={(e) => setForm({ ...form, tipo_documento: e.target.value })}>{TIPOS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
           </div>
+          <div className="field"><label>N° documento</label><input value={form.numero_documento} onChange={(e) => setForm({ ...form, numero_documento: e.target.value })} placeholder="N° DIN / MIC-DTA / DU-E" /></div>
           <div className="field"><label>RUT emisor</label><input value={form.rut_emisor} onChange={(e) => setForm({ ...form, rut_emisor: e.target.value })} /></div>
           <div className="field"><label>RUT receptor</label><input value={form.rut_receptor} onChange={(e) => setForm({ ...form, rut_receptor: e.target.value })} /></div>
         </div>
+        {form.tipo_documento === 'aduana' && (
+          <div className="muted" style={{ fontSize: 12, margin: '0 0 10px' }}>
+            Documento aduanero del país destino: <b>{ADUANA_PAIS[form.pais_destino]}</b>. Se guarda como traza documental del tránsito (sin cálculo de carbono).
+          </div>
+        )}
+        {form.tipo_documento === 'mic_dta' && (
+          <div className="muted" style={{ fontSize: 12, margin: '0 0 10px' }}>
+            Manifiesto Internacional de Carga / Declaración de Tránsito Aduanero (Acuerdo ATIT). Traza el tránsito terrestre entre los cuatro países.
+          </div>
+        )}
         {/* Carga por archivo o cámara del teléfono */}
         <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" capture="environment" onChange={(e) => setFile(e.target.files[0])} style={{ fontSize: 13, marginBottom: 10, width: '100%' }} />
         {file && <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>📎 {file.name}</div>}
@@ -181,7 +209,10 @@ function Documentos({ flash }) {
               <tr key={d.id}>
                 <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
                 <td>{d.pais_origen} → {d.pais_destino}{d.tramo ? <div className="muted" style={{ fontSize: 12 }}>{d.tramo}</div> : null}</td>
-                <td><span className="badge badge-gray">{d.tipo_documento}</span></td>
+                <td>
+                  <span className="badge badge-gray">{(TIPOS.find((t) => t.value === d.tipo_documento) || {}).label || d.tipo_documento}</span>
+                  {d.numero_documento && <div className="muted" style={{ fontSize: 12 }}>N° {d.numero_documento}</div>}
+                </td>
                 <td>{d.metodologia_pais}</td>
                 <td><span className={`badge ${badge(d.estado)}`}>{d.estado}</span></td>
                 <td className="num">{d.estado === 'procesado' ? fmt(d.total_co2e, 3) : '—'}</td>

@@ -79,7 +79,7 @@ router.get('/documentos/:id', async (req, res, next) => {
 
 router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res, next) => {
   try {
-    const { pais_origen, pais_destino, tramo, tipo_documento, rut_emisor, rut_receptor } = req.body;
+    const { pais_origen, pais_destino, tramo, tipo_documento, rut_emisor, rut_receptor, numero_documento } = req.body;
     const file = req.file;
     if (!file) return res.status(400).json({ error: 'Debes adjuntar un documento.' });
     const tipo = tipo_documento || 'otro';
@@ -122,10 +122,11 @@ router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res,
       const { rows: dRows } = await client.query(
         `INSERT INTO documentos_corredor
            (pais_origen, pais_destino, tramo, tipo_documento, rut_emisor, rut_receptor,
-            archivo_original, metodologia_pais, estado, total_co2e, categoria)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+            archivo_original, metodologia_pais, estado, total_co2e, categoria, numero_documento)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         [pais_origen || null, pais_destino || null, tramo || null, tipo, rut_emisor || null,
-         rut_receptor || null, file.originalname, paisMet, estado, total, categoria]
+         rut_receptor || null, file.originalname, paisMet, estado, total, categoria,
+         numero_documento || null]
       );
       const doc = dRows[0];
       for (const it of items) {

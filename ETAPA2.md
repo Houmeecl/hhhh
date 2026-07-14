@@ -36,6 +36,17 @@ desde el SII/RCV y la cuadratura siguen siendo Etapa 2.
 Empaque futuro de la edición portátil (pendiente, opcional): ejecutable único (`.exe` con
 `pkg`/`nexe`) y app de escritorio (Electron). Hoy corre como carpeta portátil con Node.
 
+## Documentos aduaneros del Corredor (decisión de alcance)
+
+- **Aduana real de cada país: SÍ** — las declaraciones aduaneras (DIN/DUS Chile, SIM
+  Argentina, SOFIA Paraguay, DU-E/DI Siscomex Brasil) y el **MIC/DTA** (tránsito terrestre
+  del Acuerdo ATIT) se cargan al Corredor como **traza documental** con su número de
+  documento. No calculan carbono: documentan el tránsito.
+- **"Aduana verde" (certificación ambiental aduanera): NO** — explícitamente excluida
+  del alcance por decisión del negocio. No se construye en ninguna etapa planificada.
+- La **conexión en línea** a los sistemas aduaneros (validar una DIN contra la Aduana,
+  estados de despacho) queda para Etapa 3, junto con SII/RCV.
+
 ## Módulo Corredor Bioceánico (evolución futura)
 
 El módulo "Corredor Bioceánico" (panel admin) hoy usa **Simple + traza documental** y

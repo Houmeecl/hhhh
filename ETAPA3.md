@@ -11,6 +11,7 @@ por eso quedan documentados y no implementados.
 | Conexión SII / RCV | Ingesta automática del Registro de Compras y Ventas y cuadratura al contratar. | Credenciales SII del cliente + decisión de método (scraping vs. facturador autorizado). La edición portátil ya guarda RUT+clave SII cifrados como candado local: es la semilla de esta integración. |
 | Validación de firma DTE | Verificación criptográfica de la firma y consulta de estado en el SII. | El verificador local (estructura, módulo 11, totales) ya está en `services/dte.js`; falta la parte en línea. |
 | Factores oficiales AR/PY/BR | Reemplazar los borradores del Corredor Bioceánico por fuentes oficiales por país. | Convenios/fuentes (SIRENE-BR, etc.). Las metodologías por país con toggle ya existen. |
+| Conexión a aduanas | Validar en línea declaraciones (DIN/SIM/SOFIA/Siscomex) y estados de despacho. | La carga de documentos aduaneros reales + MIC/DTA como traza ya existe en el Corredor. **"Aduana verde" queda excluida del alcance en todas las etapas** (decisión de negocio). |
 
 ## 2. Producto y datos
 
