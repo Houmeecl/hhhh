@@ -197,8 +197,8 @@ function Cadena({ flash }) {
             ))}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
-            <TablaRel titulo="⬆ Aguas arriba — proveedores (le emiten a este RUT)" filas={data.proveedores} dir="de compra" />
-            <TablaRel titulo="⬇ Aguas abajo — compradores (reciben de este RUT)" filas={data.compradores} dir="de venta" />
+            <TablaRel titulo="Aguas arriba — proveedores (le emiten a este RUT)" filas={data.proveedores} dir="de compra" />
+            <TablaRel titulo="Aguas abajo — compradores (reciben de este RUT)" filas={data.compradores} dir="de venta" />
           </div>
         </>
       )}

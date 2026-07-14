@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import PublicLayout from '../components/PublicLayout.jsx';
+import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 
 // Acceso de clientes sin contraseña: pide el enlace mágico por correo.
@@ -44,7 +45,7 @@ export default function Ingresar() {
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '10px 0' }}>
-              <div style={{ fontSize: 40 }}>📬</div>
+              <div style={{ color: 'var(--green-600)' }}><Icon.CheckCircle size={40} /></div>
               <h2 style={{ margin: '10px 0 6px' }}>Revisa tu correo</h2>
               <p className="muted" style={{ fontSize: 14 }}>
                 Si <b>{email}</b> tiene historial en sicr3p, te llegará un enlace de acceso.

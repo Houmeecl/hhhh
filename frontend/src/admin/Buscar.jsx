@@ -74,7 +74,7 @@ export default function Buscar() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16, marginBottom: 20 }}>
             {data.cruces.recibe_de.length > 0 && (
               <div className="card">
-                <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>⬆ Recibe documentos de (proveedores)</div>
+                <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Recibe documentos de (proveedores)</div>
                 <table className="data">
                   <thead><tr><th>RUT emisor</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
                   <tbody>
@@ -87,7 +87,7 @@ export default function Buscar() {
             )}
             {data.cruces.emite_a.length > 0 && (
               <div className="card">
-                <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>⬇ Emite documentos a (clientes)</div>
+                <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Emite documentos a (clientes)</div>
                 <table className="data">
                   <thead><tr><th>RUT receptor</th><th>Empresa</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
                   <tbody>

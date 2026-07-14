@@ -42,7 +42,7 @@ export default function SimpleApi() {
       </div>
 
       <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-        La clave del motor externo vive solo en el backend. Para pasar a producción: <code>MOCK_SIMPLE=false</code> + una <code>SIMPLE_API_KEY</code> real.
+        La clave del motor externo vive solo en el backend. Para pasar a producción, actívala y desactiva el modo simulado en la configuración del servidor.
       </p>
     </div>
   );

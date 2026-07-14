@@ -116,7 +116,7 @@ export default function Cargar() {
         </p>
         {codigoInfo && (
           <div className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 14 }}>
-            🎟️ Código {codigoInfo.codigo} · {codigoInfo.creditos_restantes} crédito{codigoInfo.creditos_restantes === 1 ? '' : 's'} disponible{codigoInfo.creditos_restantes === 1 ? '' : 's'}
+            <Icon.Tag size={15} /> Código {codigoInfo.codigo} · {codigoInfo.creditos_restantes} crédito{codigoInfo.creditos_restantes === 1 ? '' : 's'} disponible{codigoInfo.creditos_restantes === 1 ? '' : 's'}
           </div>
         )}
 

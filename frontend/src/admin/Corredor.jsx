@@ -108,7 +108,7 @@ function Metodologias({ flash }) {
         ))}
       </div>
       <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-        Cada país aplica su propia metodología. Solo los países <b>activos</b> calculan CO₂e; los inactivos guardan los documentos como traza hasta validar sus factores.
+        Cada país aplica su propia metodología. Solo los países <b>activos</b> calculan CO2e; los inactivos guardan los documentos como traza hasta validar sus factores.
       </p>
 
       {edit && (
@@ -192,12 +192,12 @@ function Documentos({ flash }) {
         )}
         {/* Carga por archivo o cámara del teléfono */}
         <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" capture="environment" onChange={(e) => setFile(e.target.files[0])} style={{ fontSize: 13, marginBottom: 10, width: '100%' }} />
-        {file && <div className="muted" style={{ fontSize: 13, marginBottom: 8 }}>📎 {file.name}</div>}
+        {file && <div className="muted" style={{ fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Icon.Doc size={14} /> {file.name}</div>}
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={subir} disabled={subiendo}>
           {subiendo ? <span className="spinner" /> : 'Cargar y trazar'}
         </button>
         <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-          Facturas, energía y combustible calculan CO₂e con la metodología del país destino (si está activo). El resto se guarda como traza documental.
+          Facturas, energía y combustible calculan CO2e con la metodología del país destino (si está activo). El resto se guarda como traza documental.
         </p>
       </div>
 

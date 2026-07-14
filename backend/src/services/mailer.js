@@ -53,7 +53,7 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas }) {
         <p>Hola ${nombre || ''}, adjuntamos tu informe consolidado de contabilidad de carbono.</p>
         <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:12px 0">
           <div style="font-size:12px;color:#218838;font-weight:700">RESULTADO INCORPORADO</div>
-          <div style="font-size:22px;font-weight:800">${total} t CO₂e</div>
+          <div style="font-size:22px;font-weight:800">${total} t CO2e</div>
           <div style="font-size:13px;color:#64748b">${nFacturas} factura${nFacturas === 1 ? '' : 's'} procesada${nFacturas === 1 ? '' : 's'}</div>
         </div>
         <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad. Este informe no constituye una verificación de tercera parte acreditada.</p>

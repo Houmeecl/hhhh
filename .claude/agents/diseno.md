@@ -11,9 +11,9 @@ sus superficies: app pública, panel admin, edición portátil, landing de pre-l
 PDFs y correos.
 
 ## Logo (especificación exacta)
-- Wordmark **sicr3p** siempre en minúsculas, peso 800, letter-spacing −0.02em, color navy
-  `#1e2a3a` (o blanco sobre fondos oscuros).
-- **Punto verde** `#22c55e` flotando sobre la "i": círculo de ~15% del tamaño de fuente,
+- Wordmark **sicr3p** siempre en minúsculas, peso 700–800, letter-spacing −0.02em, color navy
+  `#0F1F2E` (o blanco sobre fondos oscuros).
+- **Punto verde** `#28A745` flotando sobre la "i": círculo de ~15% del tamaño de fuente,
   centrado horizontalmente sobre la "i", elevado ~24% del tamaño por encima.
 - Implementaciones de referencia: `frontend/src/components/Logo.jsx` (React) y el patrón
   CSS `.logo .i .dot` del landing (`prelanzamiento-empresas/public/index.html`).
