@@ -188,6 +188,7 @@ function Activos({ flash }) {
         <button className="btn btn-primary btn-sm" onClick={() => setForm({ ...ACTIVO_VACIO })}>+ Nuevo activo</button>
       </div>
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Activo</th><th>Cuenta</th><th className="num">Extensión</th><th className="num">Condición</th><th className="num">Valor (CLP)</th><th>Ubicación</th><th></th></tr></thead>
           <tbody>
@@ -215,6 +216,7 @@ function Activos({ flash }) {
             {items.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin activos registrados. Registra derechos de agua, predios, bosques u otros stocks naturales.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {form && (
@@ -307,7 +309,7 @@ function Libro({ flash }) {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="form-content-grid">
         <div style={{ display: 'grid', gap: 16 }}>
           <div className="card card-pad">
             <h3 style={{ marginTop: 0 }}>Movimientos por cuenta</h3>
@@ -341,6 +343,7 @@ function Libro({ flash }) {
           </div>
 
           <div className="card">
+            <div className="table-scroll">
             <table className="data">
               <thead><tr><th>Fecha</th><th>Cuenta</th><th>Glosa</th><th>Tipo</th><th className="num">Cantidad</th><th>Origen</th></tr></thead>
               <tbody>
@@ -357,6 +360,7 @@ function Libro({ flash }) {
                 {movs.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin movimientos en el período. Procesa documentos o registra un movimiento manual.</td></tr>}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>

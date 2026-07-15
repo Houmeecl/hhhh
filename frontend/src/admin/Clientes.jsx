@@ -44,6 +44,7 @@ export default function Clientes({ rol }) {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead>
             <tr><th>Empresa</th><th>RUT</th><th>Contacto</th><th>Contrato</th><th>Plan</th><th>Vigencia</th><th></th></tr>
@@ -69,6 +70,7 @@ export default function Clientes({ rol }) {
             {clientes.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin clientes aún.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Modal crear/editar */}

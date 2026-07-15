@@ -131,6 +131,16 @@ a:hover { text-decoration: underline; }
 .dropzone.drag { background: #d8ecdf; border-color: var(--green-600); }
 .dropzone .cloud { font-size: 40px; }
 .form-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+/* Variante de form-row con columnas de ancho fijo para un campo + selects +
+   botón (Trazabilidad → Informe mensual). El colapso a 1fr bajo 900px de
+   .form-row igual aplica (gana por orden en la cascada, misma especificidad). */
+.informe-cols { grid-template-columns: 1fr 130px 150px auto; }
+.trazar-cols { grid-template-columns: 1fr auto; }
+.inventario-cols { grid-template-columns: 1fr 170px auto auto; }
+/* Sin esto, un <input> conserva su ancho mínimo intrínseco del navegador y no
+   se encoge aunque el grid ya haya colapsado a 1 columna en pantallas chicas
+   (mismo problema de fondo que resultado-grid, aplicado a los campos de formulario). */
+.form-row > * { min-width: 0; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
 .field input, .field select, .field textarea {
   width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
@@ -160,6 +170,9 @@ a:hover { text-decoration: underline; }
 .result-card .lbl { font-size: 12px; color: var(--gray); margin-top: 4px; }
 
 /* ---------- Tablas ---------- */
+/* Envolver toda table.data en .table-scroll: en pantallas angostas la tabla
+   se desplaza horizontalmente en vez de forzar scroll en toda la página. */
+.table-scroll { width: 100%; overflow-x: auto; }
 table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.data th { text-align: left; color: var(--gray); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 10px 12px; border-bottom: 2px solid var(--border); }
 table.data td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -197,7 +210,16 @@ table.data tr:hover td { background: var(--bg); }
 .admin-head h1 { margin: 0; font-size: 26px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
-.dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+.two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Columna de formulario/lateral + contenido — usado en varias páginas admin
+   (Accesos, Transporte, Trazabilidad, Capital Natural). Sin esto colapsaba
+   a un desborde horizontal bajo ~900px porque la columna angosta exige un
+   mínimo de 280px+ que no cabe junto al contenido en pantallas chicas. */
+.form-content-grid { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 20px; align-items: start; }
+/* Los propios hijos del grid (ítem 1: form, ítem 2: tabla/contenido) también
+   necesitan min-width:0 — si no, cada uno conserva el ancho de su contenido
+   interno y sigue desbordando aunque el grid ya haya colapsado a 1 columna. */
+.two-col-grid > *, .form-content-grid > * { min-width: 0; }
 .stat { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
 .stat .n { font-size: 30px; font-weight: 800; color: var(--navy); }
 .stat .n.green { color: var(--green-600); }
@@ -269,7 +291,8 @@ table.data tr:hover td { background: var(--bg); }
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { font-size: 44px; }
-  .pasos-grid, .form-row, .result-cards, .resultado-grid, .dash-two-col { grid-template-columns: 1fr; }
+  .pasos-grid, .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
+  .admin-head { flex-wrap: wrap; gap: 10px; }
 
   /* Admin: barra superior + menú lateral deslizante (drawer).
      admin-shell pasa a columna: admin-topbar (sticky, en flujo) queda arriba

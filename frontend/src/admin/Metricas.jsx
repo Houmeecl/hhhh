@@ -28,7 +28,7 @@ export default function Metricas() {
   return (
     <div>
       <div className="admin-head"><h1>Métricas</h1></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="two-col-grid">
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>CO2e por cliente</h3>
           {m.co2e_por_cliente.map((c, i) => (
@@ -43,10 +43,11 @@ export default function Metricas() {
         </div>
 
         <div className="card card-pad" style={{ gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <h3 style={{ margin: 0 }}>Serie mensual (facturas y CO2e)</h3>
-            <div style={{ width: 220 }}><Sparkbars values={m.serie_mensual.map((s) => s.co2e)} height={40} /></div>
+            <div style={{ width: 220, maxWidth: '100%' }}><Sparkbars values={m.serie_mensual.map((s) => s.co2e)} height={40} /></div>
           </div>
+          <div className="table-scroll">
           <table className="data">
             <thead><tr><th>Mes</th><th className="num">Facturas</th><th className="num">t CO2e</th><th>Tendencia</th></tr></thead>
             <tbody>
@@ -61,6 +62,7 @@ export default function Metricas() {
               {m.serie_mensual.length === 0 && <tr><td colSpan={4} className="muted">Sin datos.</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

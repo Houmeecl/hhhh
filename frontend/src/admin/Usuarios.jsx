@@ -34,6 +34,7 @@ export default function Usuarios() {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Cliente</th><th>Último acceso</th></tr></thead>
           <tbody>
@@ -57,6 +58,7 @@ export default function Usuarios() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {modal && (

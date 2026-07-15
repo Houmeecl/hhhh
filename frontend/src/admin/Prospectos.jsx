@@ -40,8 +40,9 @@ export default function Prospectos() {
         <button className="btn btn-primary" onClick={() => setModal({ ...VACIO })}>+ Nuevo prospecto</button>
       </div>
 
-      {/* Pipeline por columnas */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${ETAPAS.length}, 1fr)`, gap: 10, marginBottom: 20 }}>
+      {/* Pipeline por columnas — se desplaza horizontal en pantallas angostas en vez de apretar las columnas */}
+      <div style={{ overflowX: 'auto', marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${ETAPAS.length}, minmax(140px, 1fr))`, gap: 10, minWidth: 720 }}>
         {ETAPAS.map((et) => (
           <div key={et} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: 10, minHeight: 120 }}>
             <div style={{ fontWeight: 700, fontSize: 12, textTransform: 'uppercase', color: 'var(--gray)', marginBottom: 8 }}>{et} · {items.filter((p) => p.etapa === et).length}</div>
@@ -58,8 +59,10 @@ export default function Prospectos() {
           </div>
         ))}
       </div>
+      </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Empresa</th><th>Contacto</th><th>Etapa</th><th>Origen</th><th>Próxima acción</th><th></th></tr></thead>
           <tbody>
@@ -80,6 +83,7 @@ export default function Prospectos() {
             {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin prospectos.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {modal && (

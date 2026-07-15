@@ -120,7 +120,7 @@ function Viajes({ flash }) {
   const donutData = totales.map((t) => ({ label: modos.find((m) => m.codigo === t.modo)?.nombre || t.modo, value: t.co2e }));
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 380px) 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="form-content-grid">
       <div style={{ display: 'grid', gap: 16 }}>
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>Registrar traslado</h3>
@@ -155,6 +155,7 @@ function Viajes({ flash }) {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Fecha</th><th>Trayecto</th><th>Modo</th><th className="num">Km</th><th className="num">Pax</th><th className="num">t CO2e</th><th></th></tr></thead>
           <tbody>
@@ -173,6 +174,7 @@ function Viajes({ flash }) {
             {viajes.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin traslados registrados.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

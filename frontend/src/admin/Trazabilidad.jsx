@@ -66,7 +66,7 @@ function InformeMensual({ flash }) {
   return (
     <>
       <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div className="form-row" style={{ gridTemplateColumns: '1fr 130px 150px auto', alignItems: 'end', margin: 0 }}>
+        <div className="form-row informe-cols" style={{ alignItems: 'end', margin: 0 }}>
           <div className="field"><label>RUT del cliente</label>
             <input value={rut} onChange={(e) => setRut(e.target.value)} onBlur={() => setRut(formatearRut(rut))} placeholder="76.123.456-0" />
           </div>
@@ -87,7 +87,7 @@ function InformeMensual({ flash }) {
       </div>
 
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, alignItems: 'start' }}>
+        <div className="form-content-grid">
           <div style={{ display: 'grid', gap: 16 }}>
             <div className="card card-pad">
               <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase' }}>Período</div>
@@ -108,6 +108,7 @@ function InformeMensual({ flash }) {
             )}
           </div>
           <div className="card">
+            <div className="table-scroll">
             <table className="data">
               <thead><tr><th>Fecha</th><th>Documento</th><th>RUT emisor</th><th>Categoría</th><th className="num">t CO2e</th></tr></thead>
               <tbody>
@@ -123,6 +124,7 @@ function InformeMensual({ flash }) {
                 {data.facturas.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin documentos del cliente en {data.periodo.nombre}.</td></tr>}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -147,6 +149,7 @@ function Cadena({ flash }) {
   const TablaRel = ({ titulo, filas, dir }) => (
     <div className="card">
       <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>{titulo}</div>
+      <div className="table-scroll">
       <table className="data">
         <thead><tr><th>RUT</th><th className="num">Documentos</th><th className="num">t CO2e</th><th>Categorías</th><th>Último</th></tr></thead>
         <tbody>
@@ -162,13 +165,14 @@ function Cadena({ flash }) {
           {filas.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 24 }}>Sin relaciones {dir} registradas.</td></tr>}
         </tbody>
       </table>
+      </div>
     </div>
   );
 
   return (
     <>
       <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div className="form-row" style={{ gridTemplateColumns: '1fr auto', alignItems: 'end', margin: 0 }}>
+        <div className="form-row trazar-cols" style={{ alignItems: 'end', margin: 0 }}>
           <div className="field"><label>RUT (empresa a trazar)</label>
             <input value={rut} onChange={(e) => setRut(e.target.value)} onBlur={() => setRut(formatearRut(rut))} placeholder="11.111.111-1" />
           </div>
@@ -234,7 +238,7 @@ function Valorizacion({ flash }) {
   return (
     <>
       <div className="card card-pad" style={{ marginBottom: 16 }}>
-        <div className="form-row" style={{ gridTemplateColumns: '1fr 170px auto auto', alignItems: 'end', margin: 0 }}>
+        <div className="form-row inventario-cols" style={{ alignItems: 'end', margin: 0 }}>
           <div className="field"><label>RUT del cliente</label>
             <input value={rut} onChange={(e) => setRut(e.target.value)} onBlur={() => setRut(formatearRut(rut))} placeholder="11.111.111-1" />
           </div>
@@ -270,6 +274,7 @@ function Valorizacion({ flash }) {
             ))}
           </div>
           <div className="card">
+            <div className="table-scroll">
             <table className="data">
               <thead><tr><th>Ítem</th><th className="num">Stock</th><th className="num">$ unitario</th><th className="num">Valor (CLP)</th><th className="num">t CO2e stock</th><th className="num">Costo salidas</th></tr></thead>
               <tbody>
@@ -288,6 +293,7 @@ function Valorizacion({ flash }) {
                 {data.items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin inventario para este RUT. Sube DTE XML en el flujo público o registra entradas manuales.</td></tr>}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}
@@ -353,7 +359,7 @@ function VerificadorDte({ flash }) {
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 360px) 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="form-content-grid">
       <div className="card card-pad">
         <h3 style={{ marginTop: 0 }}>Verificar DTE (XML)</h3>
         <p className="muted" style={{ fontSize: 13 }}>
@@ -375,7 +381,7 @@ function VerificadorDte({ flash }) {
                 {dte.verificacion_ok ? '✓ Estructura verificada' : '△ Con observaciones'}
               </span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+            <div className="two-col-grid" style={{ marginTop: 14 }}>
               <div>
                 <div className="muted" style={{ fontSize: 12, textTransform: 'uppercase' }}>Emisor</div>
                 <div><b>{dte.razon_social_emisor || '—'}</b></div>
@@ -387,6 +393,7 @@ function VerificadorDte({ flash }) {
                 <div className="muted" style={{ fontSize: 13 }}>{dte.rut_receptor}</div>
               </div>
             </div>
+            <div className="table-scroll">
             <table className="data" style={{ marginTop: 14 }}>
               <tbody>
                 <tr><td className="muted">Neto</td><td className="num">$ {fmtInt(dte.monto_neto)}</td></tr>
@@ -394,6 +401,7 @@ function VerificadorDte({ flash }) {
                 <tr><td><b>Total</b></td><td className="num"><b>$ {fmtInt(dte.monto_total)}</b></td></tr>
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className="card card-pad">
@@ -412,6 +420,7 @@ function VerificadorDte({ flash }) {
 
           {dte.items.length > 0 && (
             <div className="card">
+              <div className="table-scroll">
               <table className="data">
                 <thead><tr><th>Ítem</th><th className="num">Cantidad</th><th className="num">Precio</th><th className="num">Monto</th></tr></thead>
                 <tbody>
@@ -425,6 +434,7 @@ function VerificadorDte({ flash }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>

@@ -60,7 +60,7 @@ function Codigos({ flash }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 340px) 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="form-content-grid">
       <div style={{ display: 'grid', gap: 16 }}>
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>Generar códigos</h3>
@@ -86,6 +86,7 @@ function Codigos({ flash }) {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Código</th><th>Empresa</th><th className="num">Créditos</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
           <tbody>
@@ -102,6 +103,7 @@ function Codigos({ flash }) {
             {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin códigos generados.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -134,7 +136,7 @@ function Mandantes({ flash }) {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 340px) 1fr', gap: 20, alignItems: 'start' }}>
+    <div className="form-content-grid">
       <div style={{ display: 'grid', gap: 16 }}>
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>Nuevo mandante</h3>
@@ -158,6 +160,7 @@ function Mandantes({ flash }) {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
           <tbody>
@@ -176,6 +179,7 @@ function Mandantes({ flash }) {
             {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin mandantes registrados.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {gestion && <GestionMandante mandante={gestion} flash={flash} onClose={() => { setGestion(null); cargar(); }} />}

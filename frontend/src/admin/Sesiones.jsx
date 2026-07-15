@@ -29,6 +29,7 @@ export default function Sesiones() {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Fecha</th><th>Empresa</th><th>RUT</th><th className="num">Facturas</th><th className="num">t CO2e</th><th></th></tr></thead>
           <tbody>
@@ -48,6 +49,7 @@ export default function Sesiones() {
             {sesiones.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin sesiones.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {detalle && (
@@ -58,6 +60,7 @@ export default function Sesiones() {
               <a className="btn btn-primary btn-sm" href={api.informeUrl(detalle.sesion.id)} target="_blank" rel="noreferrer">Descargar informe</a>
             </div>
             <p className="muted">{detalle.sesion.rut_cliente} · {fmtFecha(detalle.sesion.created_at)} · Total {fmt(detalle.sesion.total_co2e, 3)} t CO2e</p>
+            <div className="table-scroll">
             <table className="data">
               <thead><tr><th>N° venta</th><th>Categoría</th><th>Emisor</th><th className="num">t CO2e</th><th>Motor</th><th></th></tr></thead>
               <tbody>
@@ -73,6 +76,7 @@ export default function Sesiones() {
                 ))}
               </tbody>
             </table>
+            </div>
             <div style={{ textAlign: 'right', marginTop: 12 }}><button className="btn btn-outline" onClick={() => setDetalle(null)}>Cerrar</button></div>
           </div>
         </div>

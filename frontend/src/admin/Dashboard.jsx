@@ -38,7 +38,7 @@ export default function Dashboard() {
         <div className="stat"><div className="n">{fmtInt((est.piloto || 0) + (est.activo || 0) + (est.vencido || 0))}</div><div className="l">Clientes totales</div></div>
       </div>
 
-      <div className="dash-two-col">
+      <div className="two-col-grid" style={{ marginTop: 20 }}>
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>Clientes por estado de contrato</h3>
           <Donut
