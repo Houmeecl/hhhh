@@ -34,3 +34,15 @@ export function generarClave() {
 export function serialValido(s) {
   return typeof s === 'string' && /^AV-[0-9A-F]{4}$/.test(s);
 }
+
+// Un trámite del POS puede procesar hasta 5 documentos (mismo tope que
+// POST /api/sesiones). El terminal reporta cuántos fueron; cualquier
+// valor inválido o fuera de rango cuenta como 1 — el contador jamás
+// retrocede ni salta por un body malicioso.
+export const MAX_DOCS_TRAMITE = 5;
+
+export function clampDocumentos(valor) {
+  const n = Number(valor);
+  if (!Number.isInteger(n) || n < 1) return 1;
+  return Math.min(n, MAX_DOCS_TRAMITE);
+}

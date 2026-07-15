@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { signAccess, requireAuth, requireRole, logActividad } from '../middleware/auth.js';
-import { generarSerial, generarClave } from '../services/posTerminal.js';
+import { generarSerial, generarClave, clampDocumentos } from '../services/posTerminal.js';
 
 // ============================================================
 // Terminales POS "Aduana Verde" — patrón pos_devices de NotaryPro:
@@ -58,12 +58,15 @@ router.post('/auth', async (req, res, next) => {
 // ---------- POST /api/pos/actividad — el terminal reporta un documento ----------
 router.post('/actividad', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
+    // El terminal reporta cuántos documentos tuvo el trámite (1..5);
+    // antes se sumaba siempre 1 y un trámite de 5 facturas contaba como 1.
+    const n = clampDocumentos(req.body?.documentos_procesados);
     const { rows } = await query(
       `UPDATE pos_terminales
-       SET documentos_procesados = documentos_procesados + 1, ultima_actividad = now()
+       SET documentos_procesados = documentos_procesados + $2, ultima_actividad = now()
        WHERE id = $1
        RETURNING documentos_procesados`,
-      [req.user.sub]
+      [req.user.sub, n]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Terminal no encontrado' });
     res.json({ ok: true, documentos_procesados: rows[0].documentos_procesados });
