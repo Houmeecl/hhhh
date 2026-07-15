@@ -37,6 +37,10 @@ const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
 
 // Quita tildes y baja a minúsculas para detectar "envase/embalaje" en las
 // descripciones sin importar cómo vengan escritas.
+// Color del badge según nivel de reciclabilidad REP (compartido entre la
+// declaración en el resultado y la verificación en recepción).
+const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
+
 const sinTildes = (s) =>
   String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const esItemRep = (descripcion) => /envase|embalaje/.test(sinTildes(descripcion));
@@ -75,6 +79,11 @@ export default function PosTerminal() {
   const [files, setFiles] = useState([]);
   const [resultado, setResultado] = useState(null); // { sesion, facturas }
   const [pago, setPago] = useState(null); // { monto, metodo, tarifa } | 'omitido'
+  // Declaración de embalaje REP: los componentes en edición y la declaración
+  // ya guardada en el backend viven en el padre para sobrevivir al cambio de
+  // paso (resultado → cobro → comprobante y de vuelta).
+  const [embComponentes, setEmbComponentes] = useState([]);
+  const [embalajeGuardado, setEmbalajeGuardado] = useState(null); // declaracion del servidor | null
 
   // Al montar: si hay una sesión de terminal guardada, se reutiliza.
   useEffect(() => {
@@ -96,6 +105,8 @@ export default function PosTerminal() {
     setFiles([]);
     setResultado(null);
     setPago(null);
+    setEmbComponentes([]);
+    setEmbalajeGuardado(null);
   }
 
   function desconectar() {
@@ -159,6 +170,8 @@ export default function PosTerminal() {
           {paso === 'resultado' && resultado && (
             <Resultado
               resultado={resultado}
+              embComponentes={embComponentes} setEmbComponentes={setEmbComponentes}
+              embalajeGuardado={embalajeGuardado} setEmbalajeGuardado={setEmbalajeGuardado}
               onCancelar={() => { limpiarTramite(); setPaso('cliente'); }}
               onCobrar={() => setPaso('cobro')}
             />
@@ -175,7 +188,7 @@ export default function PosTerminal() {
 
           {paso === 'comprobante' && resultado && (
             <Comprobante
-              pos={pos} cliente={cliente} resultado={resultado} pago={pago}
+              pos={pos} cliente={cliente} resultado={resultado} pago={pago} embalaje={embalajeGuardado}
               onNuevo={() => { limpiarTramite(); setPaso('cliente'); }}
             />
           )}
@@ -542,7 +555,7 @@ function Procesando({ cliente, codigo, files, onListo, onError }) {
 }
 
 // ---------- Paso resultado: cálculo del servidor + bloque REP Ley 20.920 ----------
-function Resultado({ resultado, onCancelar, onCobrar }) {
+function Resultado({ resultado, embComponentes, setEmbComponentes, embalajeGuardado, setEmbalajeGuardado, onCancelar, onCobrar }) {
   const { sesion, facturas = [] } = resultado;
   const items = useMemo(() => facturas.flatMap((f) => f.items || []), [facturas]);
   const categorias = useMemo(
@@ -604,7 +617,13 @@ function Resultado({ resultado, onCancelar, onCobrar }) {
           </p>
         )}
 
-        <DeclaracionEmbalaje />
+        <DeclaracionEmbalaje
+          sesionId={sesion?.id}
+          componentes={embComponentes} setComponentes={setEmbComponentes}
+          guardada={embalajeGuardado}
+          onGuardada={setEmbalajeGuardado}
+          onModificar={() => setEmbalajeGuardado(null)}
+        />
 
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 18, padding: '14px 0', fontSize: 16 }} onClick={onCobrar}>
           Continuar a compensación
@@ -614,14 +633,39 @@ function Resultado({ resultado, onCancelar, onCobrar }) {
   );
 }
 
-// Sección plegable: pre-declaración de embalaje por componentes (SICREP,
-// Ley 20.920) con % de reciclabilidad en vivo.
-function DeclaracionEmbalaje() {
-  const [abierta, setAbierta] = useState(false);
-  const [componentes, setComponentes] = useState([]);
+// Sección plegable: pre-declaración de embalaje por componentes (Ley 20.920)
+// con % de reciclabilidad en vivo (preview local) y guardado real en el
+// backend (POST /api/sesiones/:id/embalaje — el servidor recalcula todo).
+function DeclaracionEmbalaje({ sesionId, componentes, setComponentes, guardada, onGuardada, onModificar }) {
+  const [abierta, setAbierta] = useState(() => !!guardada);
+  const [guardando, setGuardando] = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState('');
   const calculo = calcularReciclabilidad(componentes);
 
-  const nivelBadge = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
+  const nivelBadge = NIVEL_BADGE;
+
+  async function guardar() {
+    setErrorGuardar('');
+    setGuardando(true);
+    try {
+      // Solo componentes con peso efectivo; el servidor recalcula porcentaje,
+      // nivel y pesos (no se le mandan resultados locales).
+      const payload = componentes
+        .map((c) => ({
+          material: c.material,
+          peso_gr: Number(c.peso_gr) || 0,
+          cantidad: c.cantidad === '' ? 1 : Number(c.cantidad) || 0,
+          reciclable: !!c.reciclable,
+        }))
+        .filter((c) => c.peso_gr > 0 && c.cantidad > 0);
+      const { declaracion } = await api.guardarEmbalaje(sesionId, payload);
+      onGuardada(declaracion);
+    } catch (e) {
+      setErrorGuardar(e.message || 'No se pudo guardar la declaración. Intenta de nuevo.');
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   function agregar() {
     setComponentes((cs) => [...cs, { material: MATERIALES_REP[0].codigo, peso_gr: '', cantidad: '1', reciclable: true }]);
@@ -646,10 +690,32 @@ function DeclaracionEmbalaje() {
           <span style={{ fontWeight: 700, fontSize: 14 }}>Declaración de embalaje (opcional)</span>
           <span className="muted" style={{ display: 'block', fontSize: 12 }}>Ley 20.920 · composición por componentes y reciclabilidad</span>
         </span>
+        {guardada && <span className="badge badge-green" style={{ flexShrink: 0 }}>Guardada</span>}
         <span className="muted" style={{ flexShrink: 0 }}>{abierta ? '▴' : '▾'}</span>
       </button>
 
-      {abierta && (
+      {/* Declaración ya guardada en el backend: resumen bloqueado + Modificar. */}
+      {abierta && guardada && (
+        <div style={{ padding: 16 }}>
+          <div className="badge badge-green" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>
+            ✓ Declaración guardada — quedará en la verificación pública
+          </div>
+          <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(guardada.porcentaje, 1)}%</div>
+            <div style={{ minWidth: 0 }}>
+              <span className={`badge ${nivelBadge[guardada.nivel] || 'badge-gray'}`}>Reciclabilidad: {guardada.nivel}</span>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {fmtInt(guardada.peso_reciclable_gr)} gr reciclables de {fmtInt(guardada.peso_total_gr)} gr totales
+              </div>
+            </div>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={onModificar}>
+            Modificar
+          </button>
+        </div>
+      )}
+
+      {abierta && !guardada && (
         <div style={{ padding: 16 }}>
           {componentes.length === 0 && (
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
@@ -698,11 +764,22 @@ function DeclaracionEmbalaje() {
               <div style={{ minWidth: 0 }}>
                 <span className={`badge ${nivelBadge[calculo.nivel]}`}>Reciclabilidad: {calculo.nivel}</span>
                 <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {fmtInt(calculo.peso_reciclable_gr)} gr reciclables de {fmtInt(calculo.peso_total_gr)} gr totales
+                  {fmtInt(calculo.peso_reciclable_gr)} gr reciclables de {fmtInt(calculo.peso_total_gr)} gr totales · preview local, el servidor recalcula al guardar
                 </div>
               </div>
             </div>
           )}
+
+          {errorGuardar && (
+            <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginTop: 12 }}>
+              {errorGuardar}
+            </div>
+          )}
+
+          <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 14 }}
+            onClick={guardar} disabled={!calculo.nivel || guardando || !sesionId}>
+            {guardando ? <span className="spinner" /> : 'Guardar declaración'}
+          </button>
 
           <p className="muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
             <b>Exención &lt;{UMBRAL_EXENCION_REP_KG} kg/año:</b> {EXENCION_REP_NOTA}
@@ -794,7 +871,7 @@ function Cobro({ totalCo2e, onVolver, onPagado, onOmitir }) {
 }
 
 // ---------- Paso comprobante: QR real, verificación pública y actividad POS ----------
-function Comprobante({ pos, cliente, resultado, pago, onNuevo }) {
+function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const { sesion, facturas = [] } = resultado;
   const f0 = facturas[0];
   const notificado = useRef(false);
@@ -828,6 +905,12 @@ function Comprobante({ pos, cliente, resultado, pago, onNuevo }) {
               : <span className="badge badge-gray">Sin cobro</span>}
           </div>
           <div><span className="muted">Documentos</span><br /><b>{fmtInt(facturas.length)}</b></div>
+          {embalaje && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <span className="muted">Embalaje REP</span><br />
+              <b>{fmt(embalaje.porcentaje, 1)}% reciclabilidad · nivel {embalaje.nivel}</b>
+            </div>
+          )}
         </div>
       </div>
 
@@ -926,6 +1009,11 @@ function Verificacion({ onVolver }) {
               {data.cadena && (
                 <span className={`badge ${data.cadena.intacto ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
                   {data.cadena.intacto ? '✓ Cadena intacta' : '⚠ Cadena alterada'}
+                </span>
+              )}
+              {data.embalaje && (
+                <span className={`badge ${NIVEL_BADGE[data.embalaje.nivel] || 'badge-gray'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
+                  Embalaje REP: {data.embalaje.nivel} · {fmt(data.embalaje.porcentaje, 1)}%
                 </span>
               )}
             </div>

@@ -65,6 +65,7 @@ export const api = {
   crearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true }),
   getSesion: (id) => request(`/sesiones/${id}`),
   verificar: (id) => request(`/verificar/${id}`),
+  guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   informeUrl: (id) => `/api/sesiones/${id}/informe.pdf`,
   etiquetaUrl: (id) => `/api/facturas/${id}/etiqueta.pdf`,
   qrUrl: (id) => `/api/facturas/${id}/qr.png`,

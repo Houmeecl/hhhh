@@ -12,6 +12,7 @@ import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { hashDocumento, hashCadena, eslabonValido } from '../services/cadenaHash.js';
+import { validarComponentes, calcularReciclabilidad } from '../services/rep.js';
 
 const router = express.Router();
 
@@ -323,13 +324,67 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
   }
 });
 
+// ---------- POST /api/sesiones/:id/embalaje — declaración REP (Ley 20.920) ----------
+// Persiste la pre-declaración de envases y embalajes del POS. El porcentaje
+// y el nivel se recalculan SIEMPRE en el servidor (fórmula SICREP); nunca se
+// aceptan valores calculados por el cliente. Una declaración por sesión:
+// un nuevo POST reemplaza la anterior.
+router.post('/sesiones/:id/embalaje', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(`SELECT id FROM sesiones WHERE id = $1`, [req.params.id]);
+    if (!sRows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    const componentes = req.body?.componentes;
+    const val = validarComponentes(componentes);
+    if (!val.ok) return res.status(400).json({ error: val.error });
+
+    // Solo se persisten los campos declarados (nada extra del cliente).
+    const limpios = componentes.map((c) => ({
+      material: c.material,
+      peso_gr: Number(c.peso_gr),
+      cantidad: Number(c.cantidad),
+      reciclable: c.reciclable,
+    }));
+    const calc = calcularReciclabilidad(limpios);
+
+    const { rows } = await query(
+      `INSERT INTO declaraciones_embalaje
+         (sesion_id, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel)
+       VALUES ($1, $2::jsonb, $3, $4, $5, $6)
+       ON CONFLICT (sesion_id) DO UPDATE SET
+         componentes        = EXCLUDED.componentes,
+         peso_total_gr      = EXCLUDED.peso_total_gr,
+         peso_reciclable_gr = EXCLUDED.peso_reciclable_gr,
+         porcentaje         = EXCLUDED.porcentaje,
+         nivel              = EXCLUDED.nivel,
+         created_at         = now()
+       RETURNING *`,
+      [
+        req.params.id,
+        JSON.stringify(limpios),
+        calc.peso_total_gr,
+        calc.peso_reciclable_gr,
+        calc.porcentaje,
+        calc.nivel,
+      ]
+    );
+    res.status(201).json({ declaracion: rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ---------- GET /api/sesiones/:id — resultados ----------
 router.get('/sesiones/:id', async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
     const facturas = await hydrateFacturas(req.params.id);
-    res.json({ sesion: rows[0], facturas });
+    const { rows: dRows } = await query(
+      `SELECT * FROM declaraciones_embalaje WHERE sesion_id = $1`,
+      [req.params.id]
+    );
+    res.json({ sesion: rows[0], facturas, declaracion_embalaje: dRows[0] || null });
   } catch (err) {
     next(err);
   }
@@ -399,6 +454,13 @@ router.get('/verificar/:id', async (req, res, next) => {
       `SELECT nombre_cliente, rut_cliente, fecha FROM sesiones WHERE id = $1`,
       [factura.sesion_id]
     );
+    // Declaración de embalaje REP (Ley 20.920) de la sesión, si existe.
+    const { rows: eRows } = await query(
+      `SELECT porcentaje, nivel, peso_total_gr,
+              jsonb_array_length(componentes) AS n_componentes
+       FROM declaraciones_embalaje WHERE sesion_id = $1`,
+      [factura.sesion_id]
+    );
     res.json({
       valido: true,
       factura: {
@@ -418,6 +480,12 @@ router.get('/verificar/:id', async (req, res, next) => {
         hash_documento: factura.hash_documento,
         hash_cadena: factura.hash_cadena,
         intacto: eslabonValido(factura),
+      } : null,
+      embalaje: eRows[0] ? {
+        porcentaje: eRows[0].porcentaje,
+        nivel: eRows[0].nivel,
+        peso_total_gr: eRows[0].peso_total_gr,
+        n_componentes: eRows[0].n_componentes,
       } : null,
       items,
     });

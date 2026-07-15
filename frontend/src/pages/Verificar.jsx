@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
-import { api, fmt, fmtFecha } from '../api.js';
+import { api, fmt, fmtInt, fmtFecha } from '../api.js';
+
+// Color del badge según nivel de reciclabilidad de la declaración REP.
+const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
 
 export default function Verificar() {
   const { id } = useParams();
@@ -65,6 +68,22 @@ export default function Verificar() {
               <div style={{ margin: '0 0 18px', padding: '12px 16px', background: 'var(--bg)', borderRadius: 12, fontSize: 12 }}>
                 <span className="muted">Eslabón #{data.cadena.eslabon} · hash de la cadena</span>
                 <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', marginTop: 4 }}>{data.cadena.hash_cadena}</div>
+              </div>
+            )}
+
+            {data.embalaje && (
+              <div style={{ margin: '0 0 18px', padding: '12px 16px', background: 'var(--bg)', borderRadius: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <b style={{ fontSize: 14 }}>Declaración de embalaje REP (Ley 20.920)</b>
+                  <span className={`badge ${NIVEL_BADGE[data.embalaje.nivel] || 'badge-gray'}`}>
+                    Reciclabilidad: {data.embalaje.nivel}
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                  {fmt(data.embalaje.porcentaje, 1)}% de reciclabilidad ·{' '}
+                  {fmtInt(data.embalaje.n_componentes)} componente{Number(data.embalaje.n_componentes) === 1 ? '' : 's'} ·{' '}
+                  {fmtInt(data.embalaje.peso_total_gr)} gr totales
+                </div>
               </div>
             )}
 
