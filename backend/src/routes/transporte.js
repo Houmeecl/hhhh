@@ -1,17 +1,17 @@
 import express from 'express';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { calcularCo2eViaje } from '../services/transporte.js';
 
 // ============================================================
 // Transporte de personal — GHG Protocol Categoría 7.
-// co2e (t) = km × (ida_vuelta ? 2 : 1) × pasajeros × factor / 1000
+// Fórmula en services/transporte.js (calcularCo2eViaje, con tests).
 // Cada viaje también carga la cuenta CO2E del Capital Natural.
 // ============================================================
 
 const router = express.Router();
 router.use(requireAuth);
 const adminOnly = requireRole('admin', 'operador');
-const round4 = (n) => Math.round(n * 10000) / 10000;
 
 // ---------- Modos y factores ----------
 router.get('/modos', async (req, res, next) => {
@@ -72,8 +72,7 @@ router.post('/viajes', adminOnly, async (req, res, next) => {
     if (!mRows[0]) return res.status(400).json({ error: 'Modo de transporte desconocido.' });
 
     const pax = Math.max(1, Number(pasajeros) || 1);
-    const tramos = ida_vuelta ? 2 : 1;
-    const co2e = round4((Number(km) * tramos * pax * Number(mRows[0].factor_kgco2e_pkm)) / 1000);
+    const co2e = calcularCo2eViaje({ km, pasajeros, ida_vuelta, factor_kgco2e_pkm: mRows[0].factor_kgco2e_pkm });
 
     const { rows } = await query(
       `INSERT INTO transporte_viajes (rut_cliente, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas)

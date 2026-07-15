@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { hashApiKey } from '../services/mandante.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -12,7 +13,7 @@ import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 const router = express.Router();
 router.use(requireAuth);
 const adminOnly = requireRole('admin');
-const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+const hashToken = hashApiKey; // misma función que verifica routes/mandante.js — no pueden desincronizarse
 
 // ---------- MANDANTES ----------
 router.get('/mandantes', async (req, res, next) => {

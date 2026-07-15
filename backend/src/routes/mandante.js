@@ -1,6 +1,6 @@
 import express from 'express';
-import crypto from 'crypto';
 import { query } from '../lib/db.js';
+import { hashApiKey, normalizarRut } from '../services/mandante.js';
 
 // ============================================================
 // API pública para MANDANTES (auth por header X-Api-Key).
@@ -10,8 +10,7 @@ import { query } from '../lib/db.js';
 // ============================================================
 
 const router = express.Router();
-const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
-const rutNorm = (r) => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
+const rutNorm = normalizarRut;
 const NORM = (col) => `regexp_replace(COALESCE(${col},''), '[^0-9kK]', '', 'g')`;
 
 // Autenticación por API key.
@@ -19,7 +18,7 @@ async function requireMandante(req, res, next) {
   try {
     const key = req.headers['x-api-key'];
     if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key.' });
-    const { rows } = await query(`SELECT * FROM mandantes WHERE token_hash = $1`, [hashToken(key)]);
+    const { rows } = await query(`SELECT * FROM mandantes WHERE token_hash = $1`, [hashApiKey(key)]);
     const m = rows[0];
     if (!m || !m.activo) return res.status(401).json({ error: 'API key inválida o inactiva.' });
     await query(`UPDATE mandantes SET ultimo_uso = now() WHERE id = $1`, [m.id]);
