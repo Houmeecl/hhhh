@@ -16,6 +16,7 @@ import valorizacionRoutes from './routes/valorizacion.js';
 import transporteRoutes from './routes/transporte.js';
 import mandanteRoutes from './routes/mandante.js';
 import accesosRoutes from './routes/accesos.js';
+import motorRoutes from './routes/motor.js';
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/admin/valorizacion', valorizacionRoutes);
 app.use('/api/admin/transporte', transporteRoutes);
 app.use('/api/admin/accesos', accesosRoutes);
 app.use('/api/mandante', apiLimiter, mandanteRoutes);
+app.use('/api/admin/motor-propio', motorRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

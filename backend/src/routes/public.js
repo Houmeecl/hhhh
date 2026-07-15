@@ -9,6 +9,7 @@ import { sendMail, reporteEmail } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
+import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 
 const router = express.Router();
 
@@ -125,35 +126,59 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
       // Plan de cuentas de Capital Natural (una sola carga por sesión).
       const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+      // Categorías del motor propio (una sola carga por sesión).
+      const categoriasMotor = await cargarCategorias((sql) => client.query(sql));
 
       let totalSesion = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const analysis = await simpleApi.analyzeInvoice({
-          sesionId: sesion.id,
-          filename: file.originalname,
-          index: i,
-          rutReceptor: rut,
-          client,
-        });
-        // Si el archivo es un DTE XML, la trazabilidad usa los datos reales
-        // del documento (folio y RUT) en vez de los estimados por el motor.
+
+        // Si el archivo es un DTE XML, se extraen los datos reales del
+        // documento (folio, RUT, ítems con cantidad/unidad/monto reales).
         let dte = null;
         if (/\.xml$/i.test(file.originalname)) {
           dte = parseDte(file.buffer.toString('utf8'));
+        }
+
+        let analysis;
+        let motor;
+        if (dte && dte.items?.length) {
+          // Motor propio: cálculo real a partir de los datos del DTE, sin
+          // depender del motor externo.
+          const calc = calcularFactura(dte.items, categoriasMotor);
+          analysis = {
+            invoice_id_simple: null,
+            numero_venta: dte.folio ? `F-${dte.folio}` : null,
+            rut_emisor: dte.rut_emisor || null,
+            rut_receptor: dte.rut_receptor || rut,
+            total_co2e: calc.total_co2e,
+            categoria: calc.categoria,
+            items: calc.items,
+          };
+          motor = 'propio';
+        } else {
+          // Sin datos reales extraíbles (PDF/JPG/PNG/HEIC o XML no parseable): motor externo.
+          analysis = await simpleApi.analyzeInvoice({
+            sesionId: sesion.id,
+            filename: file.originalname,
+            index: i,
+            rutReceptor: rut,
+            client,
+          });
           if (dte) {
             if (dte.folio) analysis.numero_venta = `F-${dte.folio}`;
             if (dte.rut_emisor) analysis.rut_emisor = dte.rut_emisor;
             if (dte.rut_receptor) analysis.rut_receptor = dte.rut_receptor;
           }
+          motor = 'externo';
         }
         totalSesion += Number(analysis.total_co2e || 0);
 
         const { rows: fRows } = await client.query(
           `INSERT INTO facturas
              (sesion_id, invoice_id_simple, numero_venta, archivo_original,
-              rut_emisor, rut_receptor, total_co2e, categoria, status)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'procesada') RETURNING *`,
+              rut_emisor, rut_receptor, total_co2e, categoria, status, motor)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'procesada',$9) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -163,6 +188,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             analysis.rut_receptor,
             analysis.total_co2e,
             analysis.categoria,
+            motor,
           ]
         );
         const factura = fRows[0];

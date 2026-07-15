@@ -17,6 +17,7 @@ import Trazabilidad from './Trazabilidad.jsx';
 import Buscar from './Buscar.jsx';
 import Transporte from './Transporte.jsx';
 import Accesos from './Accesos.jsx';
+import MotorPropio from './MotorPropio.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -30,6 +31,7 @@ const NAV = [
   { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
+  { to: '/admin/motor-propio', ico: Icon.Cog, label: 'Motor propio' },
   { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
   { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
   { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
@@ -139,6 +141,7 @@ export default function AdminApp() {
           <Route path="accesos" element={<Accesos />} />
           <Route path="metricas" element={<Metricas />} />
           <Route path="prospectos" element={<Prospectos />} />
+          <Route path="motor-propio" element={<MotorPropio />} />
           <Route path="motor" element={<SimpleApi />} />
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="actividad" element={<Actividad />} />

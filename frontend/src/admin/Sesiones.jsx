@@ -59,7 +59,7 @@ export default function Sesiones() {
             </div>
             <p className="muted">{detalle.sesion.rut_cliente} · {fmtFecha(detalle.sesion.created_at)} · Total {fmt(detalle.sesion.total_co2e, 3)} t CO2e</p>
             <table className="data">
-              <thead><tr><th>N° venta</th><th>Categoría</th><th>Emisor</th><th className="num">t CO2e</th><th></th></tr></thead>
+              <thead><tr><th>N° venta</th><th>Categoría</th><th>Emisor</th><th className="num">t CO2e</th><th>Motor</th><th></th></tr></thead>
               <tbody>
                 {detalle.facturas.map((f) => (
                   <tr key={f.id}>
@@ -67,6 +67,7 @@ export default function Sesiones() {
                     <td><span className="badge badge-green">{f.categoria}</span></td>
                     <td className="muted">{f.rut_emisor}</td>
                     <td className="num">{fmt(f.total_co2e, 3)}</td>
+                    <td><span className={`badge ${f.motor === 'propio' ? 'badge-green' : 'badge-gray'}`}>{f.motor === 'propio' ? 'Propio' : 'Externo'}</span></td>
                     <td><a className="btn btn-ghost btn-sm" href={api.etiquetaUrl(f.id)} target="_blank" rel="noreferrer">Etiqueta</a></td>
                   </tr>
                 ))}

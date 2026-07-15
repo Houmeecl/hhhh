@@ -147,6 +147,11 @@ export const api = {
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
 
+  // Motor propio de cálculo
+  motorCategorias: () => request('/admin/motor-propio/categorias', { authed: true }),
+  guardarCategoriaMotor: (codigo, b) => request(`/admin/motor-propio/categorias/${codigo}`, { method: 'PUT', body: b, authed: true }),
+  motorEstadisticas: () => request('/admin/motor-propio/estadisticas', { authed: true }),
+
   // Acceso de clientes (magic link)
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
