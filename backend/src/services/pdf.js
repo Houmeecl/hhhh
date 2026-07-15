@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { qrBuffer } from './qr.js';
+import { query } from '../lib/db.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -22,6 +23,55 @@ const MESES = [
 function nf(n, dec = 4) {
   const num = Number(n) || 0;
   return num.toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+// Formato es-CL "compacto": hasta 1 decimal, sin ceros de relleno (82,5 · 70).
+function nfp(n) {
+  const num = Number(n) || 0;
+  return num.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+}
+
+// ---------- Declaración de embalaje — REP Ley 20.920 ----------
+// Nombres legibles de los materiales declarables (envases y embalajes).
+const MATERIALES_EMBALAJE = {
+  papel_carton: 'Papel y cartón',
+  plasticos: 'Plásticos',
+  vidrio: 'Vidrio',
+  metales: 'Metales',
+  madera: 'Madera',
+  compuestos: 'Compuestos',
+  otros: 'Otros',
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Trae la declaración de embalaje de una sesión (una fila por sesión) o null.
+// Tolerante: si la tabla aún no existe o el id no es UUID (informe mensual con
+// sesión sintética), devuelve null y los PDF salen exactamente como hoy.
+export async function fetchDeclaracionEmbalaje(sesionId) {
+  if (!sesionId || !UUID_RE.test(String(sesionId))) return null;
+  try {
+    const { rows } = await query(
+      `SELECT componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel, created_at
+         FROM declaraciones_embalaje
+        WHERE sesion_id = $1`,
+      [sesionId]
+    );
+    return rows[0] || null;
+  } catch (e) {
+    console.warn('[pdf] declaración de embalaje no disponible:', e.message);
+    return null;
+  }
+}
+
+// Normaliza el JSONB de componentes (puede llegar como string).
+function componentesDe(declaracion) {
+  const c = declaracion?.componentes;
+  if (Array.isArray(c)) return c;
+  if (typeof c === 'string') {
+    try { return JSON.parse(c) || []; } catch { return []; }
+  }
+  return [];
 }
 
 function fechaCorta(d) {
@@ -56,7 +106,10 @@ function folio(sesion) {
 }
 
 // ---------- INFORME CONSOLIDADO ----------
-export async function generateReport({ sesion, facturas }) {
+// `declaracion` (opcional): fila de declaraciones_embalaje ya consultada por la
+// ruta. Si viene undefined, el servicio la busca por sesion.id; con null se omite.
+export async function generateReport({ sesion, facturas, declaracion }) {
+  const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const totalCo2e = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
@@ -148,6 +201,59 @@ export async function generateReport({ sesion, facturas }) {
   doc.text('SALDO DEL PERÍODO', cols.glosa - 90, y + 6, { lineBreak: false });
   doc.fillColor(GREEN).text(`${nf(saldo, 4)} tCO2e`, cols.cargo - 60, y + 6, { width: 137, align: 'right' });
   y += 34;
+
+  // --- Declaración de embalaje — REP Ley 20.920 ---
+  if (decl && decl.nivel) {
+    const comps = componentesDe(decl);
+    if (y > 580) { doc.addPage(); y = 48; }
+
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY)
+      .text('Declaración de embalaje — REP Ley 20.920', 48, y);
+    y += 22;
+
+    // Tabla de componentes (mismo formato contable del libro).
+    const rc = { mat: 48, peso: 260, cant: 380, rec: 450 };
+    doc.rect(48, y, 499, 18).fill(NAVY);
+    doc.font('Courier-Bold').fontSize(8.5).fillColor('#ffffff');
+    doc.text('Material', rc.mat + 6, y + 5);
+    doc.text('Peso unit. (gr)', rc.peso - 60, y + 5, { width: 120, align: 'right' });
+    doc.text('Cantidad', rc.cant - 40, y + 5, { width: 60, align: 'right' });
+    doc.text('Reciclable', rc.rec, y + 5, { width: 91, align: 'right' });
+    y += 18;
+
+    let zebraE = false;
+    for (const c of comps) {
+      if (y > 760) { doc.addPage(); y = 48; }
+      if (zebraE) { doc.rect(48, y, 499, 15).fill(LIGHT); }
+      zebraE = !zebraE;
+      doc.font('Courier').fontSize(8.5).fillColor(NAVY);
+      doc.text(MATERIALES_EMBALAJE[c.material] || String(c.material || '—'), rc.mat + 6, y + 4, { lineBreak: false });
+      doc.text(nfp(c.peso_gr), rc.peso - 60, y + 4, { width: 120, align: 'right' });
+      doc.text(nfp(c.cantidad ?? 1), rc.cant - 40, y + 4, { width: 60, align: 'right' });
+      doc.text(c.reciclable ? 'Sí' : 'No', rc.rec, y + 4, { width: 91, align: 'right' });
+      y += 15;
+    }
+
+    // Totales declarados.
+    if (y > 730) { doc.addPage(); y = 48; }
+    doc.font('Courier-Bold').fontSize(8.5).fillColor(NAVY);
+    doc.text(`Peso total: ${nfp(decl.peso_total_gr)} gr`, 54, y + 4, { lineBreak: false });
+    doc.text(`Peso reciclable: ${nfp(decl.peso_reciclable_gr)} gr`, rc.peso - 60, y + 4, { width: 332, align: 'right' });
+    y += 20;
+
+    // Línea destacada: % de reciclabilidad y nivel.
+    doc.rect(48, y, 499, 22).fillAndStroke('#eaf6ef', GREEN);
+    doc.font('Courier-Bold').fontSize(10).fillColor(NAVY);
+    doc.text('% de reciclabilidad:', 58, y + 6, { lineBreak: false });
+    doc.fillColor(GREEN).text(`${nfp(decl.porcentaje)}% — nivel ${decl.nivel}`, 300, y + 6, { width: 237, align: 'right' });
+    y += 28;
+
+    // Nota al pie de la sección.
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
+      // Nota: las fuentes core de pdfkit (WinAnsi) no tienen el glifo "≥"; se usa ">=".
+      .text('Clasificación referencial según composición declarada (umbrales: Alto >= 70%, Medio >= 50%, Bajo < 50%). No constituye una verificación de tercera parte acreditada.', 48, y, { width: 499 });
+    y = doc.y + 12;
+  }
 
   // --- Metodología ---
   if (y > 620) { doc.addPage(); y = 48; }
@@ -346,7 +452,12 @@ export async function generateBalanceNatural({ balance, movimientos, activos, pe
 }
 
 // ---------- ETIQUETA POR FACTURA (con QR) ----------
-export async function generateLabel({ sesion, factura }) {
+// `declaracion` (opcional): fila de declaraciones_embalaje ya consultada por la
+// ruta. Si viene undefined, se busca por factura.sesion_id; con null se omite.
+export async function generateLabel({ sesion, factura, declaracion }) {
+  const decl = declaracion !== undefined
+    ? declaracion
+    : await fetchDeclaracionEmbalaje(factura?.sesion_id || sesion?.id);
   // Etiqueta compacta tipo tarjeta (media carta apaisada).
   const doc = new PDFDocument({ size: [420, 260], margin: 0 });
   const qr = await qrBuffer(factura.id);
@@ -370,6 +481,12 @@ export async function generateLabel({ sesion, factura }) {
   row('N° de venta', factura.numero_venta);
   row('Cliente', sesion.nombre_cliente);
   row('Fecha', fechaCorta(sesion.fecha));
+
+  // Declaración de embalaje (REP): una sola línea, solo si existe.
+  if (decl && decl.nivel) {
+    doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+      .text(`Embalaje REP: ${nfp(decl.porcentaje)}% reciclabilidad · nivel ${decl.nivel}`, 24, y + 2, { width: 250, lineBreak: false });
+  }
 
   // QR
   doc.image(qr, 290, 70, { width: 110, height: 110 });
