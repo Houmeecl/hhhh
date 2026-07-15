@@ -197,6 +197,7 @@ table.data tr:hover td { background: var(--bg); }
 .admin-head h1 { margin: 0; font-size: 26px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+.dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
 .stat { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
 .stat .n { font-size: 30px; font-weight: 800; color: var(--navy); }
 .stat .n.green { color: var(--green-600); }
@@ -268,9 +269,13 @@ table.data tr:hover td { background: var(--bg); }
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
   .hero h1 { font-size: 44px; }
-  .pasos-grid, .form-row, .result-cards, .resultado-grid { grid-template-columns: 1fr; }
+  .pasos-grid, .form-row, .result-cards, .resultado-grid, .dash-two-col { grid-template-columns: 1fr; }
 
-  /* Admin: barra superior + menú lateral deslizante (drawer) */
+  /* Admin: barra superior + menú lateral deslizante (drawer).
+     admin-shell pasa a columna: admin-topbar (sticky, en flujo) queda arriba
+     y admin-main abajo a ancho completo, en vez de quedar lado a lado como
+     ítems de una fila flex (bug: forzaba scroll horizontal en el panel). */
+  .admin-shell { flex-direction: column; }
   .admin-topbar {
     display: flex; align-items: center; gap: 14px;
     position: sticky; top: 0; z-index: 40;
@@ -280,7 +285,7 @@ table.data tr:hover td { background: var(--bg); }
   .admin-side { transform: translateX(-100%); box-shadow: var(--shadow-lg); }
   .admin-side.open { transform: translateX(0); }
   .admin-overlay { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50; }
-  .admin-main { margin-left: 0; padding: 18px; }
+  .admin-main { margin-left: 0; padding: 18px; min-width: 0; }
 }
 
 @media (max-width: 640px) {
