@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { derivarMovimientos } from '../src/services/capitalNatural.js';
+import { derivarMovimientos, valorizarActivo } from '../src/services/capitalNatural.js';
 
 function cuentas(overrides = {}) {
   const base = {
@@ -71,4 +71,51 @@ test('total cero o entrada inválida no genera movimientos', () => {
   assert.deepEqual(derivarMovimientos({ categoria: 'Agua', total_co2e: 0 }, cuentas()), []);
   assert.deepEqual(derivarMovimientos(null, cuentas()), []);
   assert.deepEqual(derivarMovimientos({ categoria: 'Agua', total_co2e: 1 }, null), []);
+});
+
+test('valorizarActivo: el valor manual manda sobre el precio automático', () => {
+  const r = valorizarActivo({ valor_clp: 5_000_000, extension: 10, precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: 5000000, valor_origen: 'manual' });
+});
+
+test('valorizarActivo: sin valor manual, calcula automático con el precio de la cuenta', () => {
+  // 1.000 m3 × $344/m3 = $344.000
+  const r = valorizarActivo({ valor_clp: null, extension: 1000, precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: 344000, valor_origen: 'automatico' });
+});
+
+test('valorizarActivo: sin valor manual ni precio de cuenta, no hay dato (no se inventa)', () => {
+  const r = valorizarActivo({ valor_clp: null, extension: 1000, precio_clp_unidad: null });
+  assert.deepEqual(r, { valor_clp_efectivo: null, valor_origen: null });
+});
+
+test('valorizarActivo: precio cero o negativo se trata como "sin precio"', () => {
+  assert.equal(valorizarActivo({ extension: 10, precio_clp_unidad: 0 }).valor_origen, null);
+  assert.equal(valorizarActivo({ extension: 10, precio_clp_unidad: -5 }).valor_origen, null);
+});
+
+test('valorizarActivo: valor manual igual a 0 sigue siendo manual (no cae al automático)', () => {
+  const r = valorizarActivo({ valor_clp: 0, extension: 10, precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: 0, valor_origen: 'manual' });
+});
+
+test('valorizarActivo: redondea a entero (CLP no usa decimales)', () => {
+  const r = valorizarActivo({ valor_clp: null, extension: 3, precio_clp_unidad: 333.333 });
+  assert.equal(Number.isInteger(r.valor_clp_efectivo), true);
+});
+
+test('valorizarActivo: unidad del activo distinta a la de la cuenta NO se mezcla (sin dato, no un número incorrecto)', () => {
+  // Derecho de agua en l/s (caudal) vs. cuenta AGUA en m3 (volumen) — no son comparables.
+  const r = valorizarActivo({ valor_clp: null, extension: 12, unidad: 'l/s', cuenta_unidad: 'm3', precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: null, valor_origen: null });
+});
+
+test('valorizarActivo: unidad del activo igual a la de la cuenta sí calcula (case-insensitive)', () => {
+  const r = valorizarActivo({ valor_clp: null, extension: 1000, unidad: 'M3', cuenta_unidad: 'm3', precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: 344000, valor_origen: 'automatico' });
+});
+
+test('valorizarActivo: sin unidad propia en el activo, se asume compatible con la cuenta', () => {
+  const r = valorizarActivo({ valor_clp: null, extension: 1000, unidad: null, cuenta_unidad: 'm3', precio_clp_unidad: 344 });
+  assert.deepEqual(r, { valor_clp_efectivo: 344000, valor_origen: 'automatico' });
 });

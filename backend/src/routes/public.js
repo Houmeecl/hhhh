@@ -10,6 +10,7 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 
 const router = express.Router();
 
@@ -248,6 +249,36 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         });
       } catch (e) {
         console.warn('[correo] no se pudo enviar el informe:', e.message);
+      }
+    })();
+
+    // Webhook al mandante cuyo RUT coincide con esta sesión (no bloqueante).
+    (async () => {
+      try {
+        const rn = normalizarRut(result.rut_cliente);
+        const { rows: mandantes } = await query(
+          `SELECT id, webhook_url FROM mandantes
+           WHERE activo = true AND webhook_url IS NOT NULL
+             AND regexp_replace(rut, '[^0-9kK]', '', 'g') = $1`,
+          [rn]
+        );
+        for (const m of mandantes) {
+          const r = await dispararWebhook({
+            url: m.webhook_url,
+            payload: {
+              evento: 'sesion.creada',
+              sesion_id: result.id,
+              rut_cliente: result.rut_cliente,
+              nombre_cliente: result.nombre_cliente,
+              total_co2e: result.total_co2e,
+              n_facturas: facturas.length,
+              fecha: result.fecha,
+            },
+          });
+          if (!r.ok) console.warn(`[webhook] mandante ${m.id} no respondió ok:`, r.error || r.status);
+        }
+      } catch (e) {
+        console.warn('[webhook] error al notificar mandantes:', e.message);
       }
     })();
   } catch (err) {

@@ -79,6 +79,28 @@ export function derivarMovimientos(factura, cuentas) {
   return movs;
 }
 
+const round0 = (n) => Math.round(n);
+
+/**
+ * Valoriza un activo natural: si tiene valor_clp cargado a mano, ese manda
+ * (trazable, "manual"). Si no, y la cuenta tiene un precio unitario citado
+ * Y la unidad del activo coincide con la unidad de esa cuenta (o el activo
+ * no especifica unidad propia), se calcula automático (extension × precio).
+ * Un activo en otra unidad (ej. "l/s" de un derecho de agua vs. "m3" de la
+ * cuenta) no se mezcla — mejor sin dato que un número incorrecto.
+ * @returns {{valor_clp_efectivo: number|null, valor_origen: 'manual'|'automatico'|null}}
+ */
+export function valorizarActivo({ valor_clp, extension, unidad, cuenta_unidad, precio_clp_unidad }) {
+  if (valor_clp != null) return { valor_clp_efectivo: Number(valor_clp), valor_origen: 'manual' };
+  const precio = Number(precio_clp_unidad);
+  const unidadCompatible = !unidad || !cuenta_unidad
+    || String(unidad).trim().toLowerCase() === String(cuenta_unidad).trim().toLowerCase();
+  if (precio > 0 && unidadCompatible) {
+    return { valor_clp_efectivo: round0(Number(extension || 0) * precio), valor_origen: 'automatico' };
+  }
+  return { valor_clp_efectivo: null, valor_origen: null };
+}
+
 /** Carga el plan de cuentas como Map (usable dentro de una transacción). */
 export async function cargarCuentas(run) {
   const { rows } = await run(`SELECT codigo, activo, factores, unidad FROM cuentas_naturales`);

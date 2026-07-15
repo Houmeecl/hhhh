@@ -112,6 +112,7 @@ function Mandantes({ flash }) {
   const [form, setForm] = useState({ nombre_empresa: '', rut: '', email: '' });
   const [tokenNuevo, setTokenNuevo] = useState(null);
   const [creando, setCreando] = useState(false);
+  const [gestion, setGestion] = useState(null); // mandante siendo gestionado (webhook + proveedores)
 
   const cargar = () => api.mandantes().then((r) => setItems(r.mandantes)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -166,12 +167,89 @@ function Mandantes({ flash }) {
                 <td>{m.rut}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{m.ultimo_uso ? fmtFecha(m.ultimo_uso) : 'Nunca'}</td>
                 <td><span className={`badge ${m.activo ? 'badge-green' : 'badge-gray'}`}>{m.activo ? 'Activa' : 'Inactiva'}</span></td>
-                <td><button className="btn btn-outline btn-sm" onClick={() => toggle(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setGestion(m)}>Gestionar</button>{' '}
+                  <button className="btn btn-outline btn-sm" onClick={() => toggle(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
+                </td>
               </tr>
             ))}
             {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin mandantes registrados.</td></tr>}
           </tbody>
         </table>
+      </div>
+
+      {gestion && <GestionMandante mandante={gestion} flash={flash} onClose={() => { setGestion(null); cargar(); }} />}
+    </div>
+  );
+}
+
+// ---------- Modal: gestión de un mandante (webhook + permisos finos) ----------
+function GestionMandante({ mandante, flash, onClose }) {
+  const [webhook, setWebhook] = useState(mandante.webhook_url || '');
+  const [proveedores, setProveedores] = useState([]);
+  const [nuevoRut, setNuevoRut] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => api.proveedoresMandante(mandante.id).then((r) => setProveedores(r.proveedores)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function guardarWebhook() {
+    setGuardando(true);
+    try {
+      await api.editarMandante(mandante.id, { webhook_url: webhook });
+      flash('Webhook actualizado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setGuardando(false); }
+  }
+
+  async function agregar() {
+    try {
+      await api.agregarProveedorMandante(mandante.id, nuevoRut);
+      setNuevoRut(''); cargar(); flash('Proveedor agregado a la lista.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  async function quitar(p) {
+    try { await api.quitarProveedorMandante(mandante.id, p.id); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && onClose()}>
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <h2 style={{ marginTop: 0 }}>{mandante.nombre_empresa}</h2>
+
+        <h3 style={{ fontSize: 15, marginBottom: 6 }}>Webhook</h3>
+        <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+          Notifica esta URL (POST) cada vez que se procesa una sesión nueva de este mandante.
+        </p>
+        <div className="field"><input value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://tu-sistema.cl/hooks/sicr3p" /></div>
+        <button className="btn btn-outline btn-sm" onClick={guardarWebhook} disabled={guardando}>
+          {guardando ? <span className="spinner" /> : 'Guardar webhook'}
+        </button>
+
+        <h3 style={{ fontSize: 15, margin: '20px 0 6px' }}>Proveedores permitidos</h3>
+        <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+          Sin ninguno agregado, el mandante ve a todos los proveedores que le facturaron (comportamiento por defecto).
+          Agrega al menos uno para restringir el acceso solo a esos RUT.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input value={nuevoRut} onChange={(e) => setNuevoRut(e.target.value)} placeholder="76.123.456-0" style={{ flex: 1 }} />
+          <button className="btn btn-primary btn-sm" onClick={agregar} disabled={!nuevoRut}>Agregar</button>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {proveedores.map((p) => (
+            <span key={p.id} className="badge badge-gray" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {p.rut_proveedor}
+              <button onClick={() => quitar(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>×</button>
+            </span>
+          ))}
+          {proveedores.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Sin restricción (ve todos).</span>}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
+        </div>
       </div>
     </div>
   );

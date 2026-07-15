@@ -28,11 +28,28 @@ async function requireMandante(req, res, next) {
 }
 router.use(requireMandante);
 
+// Lista blanca opcional de RUT proveedor para este mandante (vacía = sin restricción).
+async function proveedoresPermitidos(mandanteId) {
+  const { rows } = await query(
+    `SELECT rut_proveedor FROM mandante_proveedores WHERE mandante_id = $1 AND activo = true`,
+    [mandanteId]
+  );
+  return rows.map((r) => r.rut_proveedor);
+}
+
 // ---------- GET /api/mandante/proveedores ----------
 // Proveedores que emiten documentos al RUT del mandante, con totales.
+// Si el mandante tiene permisos finos configurados, se filtra a esa lista.
 router.get('/proveedores', async (req, res, next) => {
   try {
     const rn = rutNorm(req.mandante.rut);
+    const permitidos = await proveedoresPermitidos(req.mandante.id);
+    const params = [rn];
+    let filtroPermitidos = '';
+    if (permitidos.length) {
+      params.push(permitidos);
+      filtroPermitidos = ` AND ${NORM('f.rut_emisor')} = ANY($${params.length})`;
+    }
     const { rows } = await query(
       `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
               COUNT(*)::int AS n_documentos,
@@ -40,8 +57,8 @@ router.get('/proveedores', async (req, res, next) => {
               MAX(f.created_at) AS ultimo_documento,
               array_agg(DISTINCT f.categoria) AS categorias
        FROM facturas f
-       WHERE ${NORM('f.rut_receptor')} = $1 AND f.rut_emisor IS NOT NULL
-       GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 200`, [rn]
+       WHERE ${NORM('f.rut_receptor')} = $1 AND f.rut_emisor IS NOT NULL${filtroPermitidos}
+       GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 200`, params
     );
     res.json({ mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa }, proveedores: rows });
   } catch (err) { next(err); }
@@ -52,6 +69,10 @@ router.get('/proveedor/:rut/resumen', async (req, res, next) => {
   try {
     const rnMandante = rutNorm(req.mandante.rut);
     const rnProv = rutNorm(req.params.rut);
+    const permitidos = await proveedoresPermitidos(req.mandante.id);
+    if (permitidos.length && !permitidos.includes(rnProv)) {
+      return res.status(403).json({ error: 'No tienes acceso a este proveedor.' });
+    }
     const cond = [`${NORM('f.rut_receptor')} = $1`, `${NORM('f.rut_emisor')} = $2`];
     const params = [rnMandante, rnProv];
     if (req.query.anio) { params.push(Number(req.query.anio)); cond.push(`EXTRACT(YEAR FROM f.created_at) = $${params.length}`); }

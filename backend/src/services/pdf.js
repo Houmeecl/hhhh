@@ -296,7 +296,10 @@ export async function generateBalanceNatural({ balance, movimientos, activos, pe
       doc.text(a.cuenta_codigo, cols.cuenta, y + 4, { lineBreak: false });
       doc.text(`${nf(a.extension, 1)} ${a.unidad || ''}`.trim(), cols.ext, y + 4, { lineBreak: false });
       doc.text(a.condicion != null ? `${a.condicion}` : '—', cols.cond, y + 4, { lineBreak: false });
-      doc.text(a.valor_clp != null ? nf(a.valor_clp, 0) : '—', cols.clp - 20, y + 4, { width: 117, align: 'right' });
+      const valorTxt = a.valor_clp_efectivo != null
+        ? `${nf(a.valor_clp_efectivo, 0)}${a.valor_origen === 'automatico' ? ' (auto)' : ''}`
+        : '—';
+      doc.text(valorTxt, cols.clp - 20, y + 4, { width: 117, align: 'right' });
       y += 15;
     }
     y += 10;
@@ -310,7 +313,7 @@ export async function generateBalanceNatural({ balance, movimientos, activos, pe
     'Marco de referencia: SEEA — Sistema de Contabilidad Ambiental y Económica (ONU), Marco Central y Cuentas de Ecosistemas; Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
     'Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Electricidad SEN 2023: 0,2421 kgCO2e/kWh.',
     'Flujos: derivados de documentos tributarios capturados, con traza al documento de origen. Cantidades físicas estimadas mediante factores de conversión editables por cuenta.',
-    'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP manual cuando existe.',
+    'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP — manual cuando se ingresa directamente, o automática (extensión × precio unitario citado por cuenta, marcada "auto") cuando la cuenta define un precio de referencia.',
   ];
   doc.font('Helvetica').fontSize(9).fillColor(GRAY);
   for (const m of metod) {

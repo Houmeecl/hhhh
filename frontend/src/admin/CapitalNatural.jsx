@@ -65,7 +65,10 @@ function Cuentas({ flash }) {
         const n = parseFloat(v);
         if (n > 0) factores[k] = n;
       }
-      await api.guardarCuentaNatural(edit.codigo, { factores, fuente: edit.fuente, notas: edit.notas });
+      await api.guardarCuentaNatural(edit.codigo, {
+        factores, fuente: edit.fuente, notas: edit.notas,
+        precio_clp_unidad: edit.precio_clp_unidad, precio_fuente: edit.precio_fuente,
+      });
       setEdit(null); cargar(); flash('Cuenta guardada.');
     } catch (e) { flash(e.message, true); }
   }
@@ -93,10 +96,18 @@ function Cuentas({ flash }) {
             )}
             {c.fuente && <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Fuente: {c.fuente}</div>}
             {c.notas && <div className="muted" style={{ fontSize: 12, marginTop: 4, fontStyle: 'italic' }}>{c.notas}</div>}
+            {c.precio_clp_unidad != null && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 8, borderTop: '1px dashed var(--border)', paddingTop: 8 }}>
+                Precio: $ {fmtInt(c.precio_clp_unidad)} / {c.unidad} — valoriza activos automáticamente sin monto manual.
+                {c.precio_fuente && <div>Fuente: {c.precio_fuente}</div>}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
               <button className="btn btn-outline btn-sm" onClick={() => setEdit({
                 codigo: c.codigo, nombre: c.nombre, fuente: c.fuente || '', notas: c.notas || '',
                 factores: Object.fromEntries(Object.entries(c.factores || {}).map(([k, v]) => [k, String(v)])),
+                precio_clp_unidad: c.precio_clp_unidad != null ? String(c.precio_clp_unidad) : '',
+                precio_fuente: c.precio_fuente || '',
               })}>Editar</button>
               <button className={`btn btn-sm ${c.activo ? 'btn-danger' : 'btn-primary'}`} onClick={() => toggle(c)}>
                 {c.activo ? 'Desactivar' : 'Activar'}
@@ -124,7 +135,16 @@ function Cuentas({ flash }) {
               </div>
             )}
             <div className="field"><label>Fuente</label><input value={edit.fuente} onChange={(e) => setEdit({ ...edit, fuente: e.target.value })} /></div>
-            <div className="field" style={{ marginBottom: 14 }}><label>Notas</label><textarea rows={2} value={edit.notas} onChange={(e) => setEdit({ ...edit, notas: e.target.value })} /></div>
+            <div className="field"><label>Notas</label><textarea rows={2} value={edit.notas} onChange={(e) => setEdit({ ...edit, notas: e.target.value })} /></div>
+            <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', margin: '10px 0 0' }}>
+              <div className="field"><label>Precio unitario CLP (opcional)</label>
+                <input value={edit.precio_clp_unidad} onChange={(e) => setEdit({ ...edit, precio_clp_unidad: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} placeholder="Vacío = sin valorización automática" /></div>
+              <div className="field"><label>Fuente del precio</label>
+                <input value={edit.precio_fuente} onChange={(e) => setEdit({ ...edit, precio_fuente: e.target.value })} placeholder="Ej. ESVD, tasación propia…" /></div>
+            </div>
+            <p className="muted" style={{ fontSize: 12, margin: '6px 0 14px' }}>
+              Si defines un precio, los activos de esta cuenta sin "Valor CLP" manual se valorizan solos (extensión × precio) y se marcan "auto" en el informe.
+            </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setEdit(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar}>Guardar</button>
@@ -177,7 +197,10 @@ function Activos({ flash }) {
                 <td><span className="badge badge-gray">{a.cuenta_codigo}</span></td>
                 <td className="num">{fmt(a.extension, 1)} {a.unidad || a.cuenta_unidad}</td>
                 <td className="num">{a.condicion != null ? `${a.condicion}/100` : '—'}</td>
-                <td className="num">{a.valor_clp != null ? `$ ${fmtInt(a.valor_clp)}` : '—'}</td>
+                <td className="num">
+                  {a.valor_clp_efectivo != null ? `$ ${fmtInt(a.valor_clp_efectivo)}` : '—'}
+                  {a.valor_origen === 'automatico' && <span className="badge badge-gray" style={{ marginLeft: 6, fontSize: 10 }}>auto</span>}
+                </td>
                 <td className="muted" style={{ fontSize: 13 }}>{a.ubicacion || '—'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="btn btn-outline btn-sm" onClick={() => setForm({
@@ -210,7 +233,7 @@ function Activos({ flash }) {
               <div className="field"><label>Condición (0–100, opcional)</label><input type="range" min="0" max="100" value={form.condicion || 0} onChange={(e) => setForm({ ...form, condicion: e.target.value })} />
                 <div className="muted" style={{ fontSize: 12 }}>{form.condicion !== '' ? `${form.condicion}/100` : 'sin evaluar'}</div>
               </div>
-              <div className="field"><label>Valor CLP (opcional)</label><input value={form.valor_clp} onChange={(e) => setForm({ ...form, valor_clp: e.target.value.replace(/\D/g, '') })} placeholder="25000000" /></div>
+              <div className="field"><label>Valor CLP manual (opcional)</label><input value={form.valor_clp} onChange={(e) => setForm({ ...form, valor_clp: e.target.value.replace(/\D/g, '') })} placeholder="Vacío = automático si la cuenta tiene precio" /></div>
               <div className="field"><label>Ubicación</label><input value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Antofagasta" /></div>
               <div className="field"><label>Vigencia</label><input value={form.vigencia} onChange={(e) => setForm({ ...form, vigencia: e.target.value })} placeholder="Indefinida / 2030" /></div>
             </div>

@@ -2,7 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
-import { hashApiKey } from '../services/mandante.js';
+import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -19,7 +19,7 @@ const hashToken = hashApiKey; // misma función que verifica routes/mandante.js 
 router.get('/mandantes', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, nombre_empresa, rut, email, activo, ultimo_uso, created_at
+      `SELECT id, nombre_empresa, rut, email, activo, webhook_url, ultimo_uso, created_at
        FROM mandantes ORDER BY created_at DESC`
     );
     res.json({ mandantes: rows });
@@ -44,14 +44,60 @@ router.post('/mandantes', adminOnly, async (req, res, next) => {
 
 router.put('/mandantes/:id', adminOnly, async (req, res, next) => {
   try {
-    const { activo } = req.body;
+    const { activo, webhook_url } = req.body;
+    if (webhook_url && !webhookUrlValida(webhook_url)) {
+      return res.status(400).json({ error: 'URL de webhook inválida (debe ser http/https pública).' });
+    }
     const { rows } = await query(
-      `UPDATE mandantes SET activo = COALESCE($2, activo) WHERE id = $1
-       RETURNING id, nombre_empresa, rut, activo`,
-      [req.params.id, typeof activo === 'boolean' ? activo : null]
+      `UPDATE mandantes SET
+         activo = COALESCE($2, activo),
+         webhook_url = CASE WHEN $3::text IS NULL THEN webhook_url WHEN $3::text = '' THEN NULL ELSE $3 END
+       WHERE id = $1
+       RETURNING id, nombre_empresa, rut, activo, webhook_url`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null, webhook_url !== undefined ? webhook_url : null]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Mandante no encontrado' });
     res.json({ mandante: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Permisos finos: proveedores permitidos por mandante ----------
+// Lista blanca opcional: sin filas = el mandante ve todos los proveedores
+// que le facturaron (comportamiento actual, sin cambios).
+router.get('/mandantes/:id/proveedores', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM mandante_proveedores WHERE mandante_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ proveedores: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/mandantes/:id/proveedores', adminOnly, async (req, res, next) => {
+  try {
+    const rut = normalizarRut(req.body.rut_proveedor);
+    if (!rut) return res.status(400).json({ error: 'RUT de proveedor obligatorio.' });
+    const { rows } = await query(
+      `INSERT INTO mandante_proveedores (mandante_id, rut_proveedor)
+       VALUES ($1,$2)
+       ON CONFLICT (mandante_id, rut_proveedor) DO UPDATE SET activo = true
+       RETURNING *`,
+      [req.params.id, rut]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'agregar_proveedor_mandante', entidad: 'mandante_proveedor', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ proveedor: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.delete('/mandantes/:id/proveedores/:proveedorId', adminOnly, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `DELETE FROM mandante_proveedores WHERE id = $1 AND mandante_id = $2`,
+      [req.params.proveedorId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Proveedor no encontrado' });
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 
