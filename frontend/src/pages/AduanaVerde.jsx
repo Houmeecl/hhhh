@@ -26,7 +26,7 @@ export default function AduanaVerde() {
               con QR verificable.
             </p>
             <div className="hero-actions">
-              <Link to="/pos-demo" className="btn btn-primary">Conocer el terminal</Link>
+              <Link to="/pos" className="btn btn-primary">Conocer el terminal</Link>
               <a href="mailto:contacto@sicr3p.cl" className="btn btn-outline">Escríbenos</a>
             </div>
             <p className="muted" style={{ marginTop: 22, fontSize: 14 }}>
