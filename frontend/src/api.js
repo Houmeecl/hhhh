@@ -152,6 +152,11 @@ export const api = {
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
 
+  // Terminales POS "Aduana Verde"
+  posTerminales: () => request('/admin/pos/terminales', { authed: true }),
+  crearPosTerminal: (b) => request('/admin/pos/terminales', { method: 'POST', body: b, authed: true }),
+  editarPosTerminal: (id, b) => request(`/admin/pos/terminales/${id}`, { method: 'PUT', body: b, authed: true }),
+
   // Motor propio de cálculo
   motorCategorias: () => request('/admin/motor-propio/categorias', { authed: true }),
   guardarCategoriaMotor: (codigo, b) => request(`/admin/motor-propio/categorias/${codigo}`, { method: 'PUT', body: b, authed: true }),

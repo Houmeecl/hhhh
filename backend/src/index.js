@@ -18,6 +18,7 @@ import mandanteRoutes from './routes/mandante.js';
 import accesosRoutes from './routes/accesos.js';
 import motorRoutes from './routes/motor.js';
 import cadenaRoutes from './routes/cadena.js';
+import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
 
 const app = express();
 
@@ -49,6 +50,8 @@ app.use('/api/admin/accesos', accesosRoutes);
 app.use('/api/mandante', apiLimiter, mandanteRoutes);
 app.use('/api/admin/motor-propio', motorRoutes);
 app.use('/api/admin/cadena', cadenaRoutes);
+app.use('/api/pos', apiLimiter, posRoutes);
+app.use('/api/admin/pos', posAdminRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

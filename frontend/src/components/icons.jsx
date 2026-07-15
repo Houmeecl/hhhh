@@ -98,6 +98,15 @@ export const Icon = {
     <rect x="2" y="5" width="20" height="14" rx="2" />
     <path d="M2 10h20M6 15h4" />
   </>),
+  Tablet: ({ size = 22 }) => base(size, <>
+    <rect x="4" y="2" width="16" height="20" rx="2" />
+    <path d="M11 18h2" />
+  </>),
+  Package: ({ size = 22 }) => base(size, <>
+    <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
+    <path d="M3 8l9 5 9-5M12 13v8" />
+    <path d="M7.5 5.5l9 5" />
+  </>),
 };
 
 export default Icon;

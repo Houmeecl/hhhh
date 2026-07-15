@@ -16,7 +16,7 @@ export default function Accesos() {
             <span style={{ color: 'var(--green-600)' }}><Icon.Qr size={24} /></span> Accesos externos
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Códigos de prueba con créditos (1 crédito = 1 factura) y API keys para empresas mandantes.
+            Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes y terminales POS Aduana Verde.
           </p>
         </div>
       </div>
@@ -24,9 +24,12 @@ export default function Accesos() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         <button className={`btn btn-sm ${tab === 'codigos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('codigos')}>Códigos de prueba</button>
         <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
+        <button className={`btn btn-sm ${tab === 'terminales' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('terminales')}>Terminales</button>
       </div>
 
-      {tab === 'codigos' ? <Codigos flash={flash} /> : <Mandantes flash={flash} />}
+      {tab === 'codigos' && <Codigos flash={flash} />}
+      {tab === 'mandantes' && <Mandantes flash={flash} />}
+      {tab === 'terminales' && <Terminales flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -183,6 +186,97 @@ function Mandantes({ flash }) {
       </div>
 
       {gestion && <GestionMandante mandante={gestion} flash={flash} onClose={() => { setGestion(null); cargar(); }} />}
+    </div>
+  );
+}
+
+// ---------- Terminales POS "Aduana Verde" ----------
+function Terminales({ flash }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ nombre: '', ubicacion: '' });
+  const [creando, setCreando] = useState(false);
+  const [claveNueva, setClaveNueva] = useState(null); // { nombre, serial, clave }
+
+  const cargar = () => api.posTerminales().then((r) => setItems(r.terminales)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const { terminal, clave } = await api.crearPosTerminal(form);
+      setClaveNueva({ nombre: terminal.nombre, serial: terminal.serial, clave });
+      setForm({ nombre: '', ubicacion: '' });
+      cargar(); flash('Terminal registrado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(t) {
+    try { await api.editarPosTerminal(t.id, { activo: !t.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  async function regenerar(t) {
+    if (!window.confirm(`¿Regenerar la clave de "${t.nombre}"? La clave actual dejará de funcionar de inmediato.`)) return;
+    try {
+      const { terminal, clave } = await api.editarPosTerminal(t.id, { regenerar_clave: true });
+      setClaveNueva({ nombre: terminal.nombre, serial: terminal.serial, clave });
+      cargar(); flash('Clave regenerada.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div className="card card-pad">
+          <h3 style={{ marginTop: 0 }}>Nuevo terminal</h3>
+          <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Terminales físicos de la red Aduana Verde. Cada equipo se conecta en <b>/pos</b> con su serial y clave (login de dispositivo).
+          </p>
+          <div className="field"><label>Nombre</label><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="POS Paso Sico 1" /></div>
+          <div className="field" style={{ marginBottom: 14 }}><label>Ubicación (opcional)</label><input value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} placeholder="Complejo fronterizo Sico" /></div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre}>
+            {creando ? <span className="spinner" /> : 'Registrar y generar clave'}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            La clave del terminal se muestra <b>una sola vez</b>. Si se pierde, hay que regenerarla.
+          </p>
+        </div>
+        {claveNueva && (
+          <div className="card card-pad" style={{ borderColor: 'var(--green)' }}>
+            <h3 style={{ marginTop: 0 }}>Credenciales de {claveNueva.nombre}</h3>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+              <div><span style={{ opacity: 0.6 }}>Serial:</span> <b>{claveNueva.serial}</b></div>
+              <div style={{ marginTop: 6 }}><span style={{ opacity: 0.6 }}>Clave:</span> <b>{claveNueva.clave}</b></div>
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Guárdala ahora: no se puede volver a ver.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Terminal</th><th>Serial</th><th>Estado</th><th>Última actividad</th><th className="num">Docs. procesados</th><th></th></tr></thead>
+          <tbody>
+            {items.map((t) => (
+              <tr key={t.id}>
+                <td><b>{t.nombre}</b>{t.ubicacion && <div className="muted" style={{ fontSize: 12 }}>{t.ubicacion}</div>}</td>
+                <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{t.serial}</td>
+                <td><span className={`badge ${t.activo ? 'badge-green' : 'badge-gray'}`}>{t.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td className="muted" style={{ fontSize: 13 }}>{t.ultima_actividad ? fmtFecha(t.ultima_actividad) : 'Nunca'}</td>
+                <td className="num"><b>{fmtInt(t.documentos_procesados)}</b></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => toggle(t)}>{t.activo ? 'Desactivar' : 'Activar'}</button>{' '}
+                  <button className="btn btn-outline btn-sm" onClick={() => regenerar(t)}>Regenerar clave</button>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin terminales registrados.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
     </div>
   );
 }
