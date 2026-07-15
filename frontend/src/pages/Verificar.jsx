@@ -86,6 +86,11 @@ export default function Verificar() {
               Esta página confirma la trazabilidad del documento registrado en sicr3p.
               No constituye una verificación de tercera parte acreditada.
             </p>
+
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="badge badge-gray" style={{ fontSize: 11 }}>Próximamente</span>
+              <span className="muted" style={{ fontSize: 12 }}>Compensación de carbono vía un socio ambiental acreditado.</span>
+            </div>
           </div>
         )}
       </div>
