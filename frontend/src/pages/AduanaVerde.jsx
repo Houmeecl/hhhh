@@ -10,6 +10,78 @@ import { Icon } from '../components/icons.jsx';
 // Copy: técnicas de PNL honestas (presuposiciones, lenguaje sensorial,
 // anclaje problema→alivio, reencuadre del pago, cierre de compromiso pequeño)
 // sin inventar cifras, testimonios ni direcciones. Tarifa siempre referencial.
+// Ilustración plana del stand/oficina física (SVG propio, paleta de marca):
+// letrero con la marca, toldo verde, vitrina con el mesón y el tótem del
+// terminal mostrando un cálculo, sticker QR y colgante "Pronto" (pre-lanzamiento).
+function StandAduanaVerde() {
+  return (
+    <svg viewBox="0 0 560 430" role="img" aria-label="Ilustración de una oficina Aduana Verde: letrero, toldo y vitrina con el terminal de cálculo" style={{ width: '100%', height: 'auto', display: 'block' }}>
+      {/* Fondo */}
+      <ellipse cx="280" cy="392" rx="252" ry="26" fill="#eaf6ef" />
+      {/* Estructura del local */}
+      <rect x="70" y="96" width="420" height="292" rx="10" fill="#ffffff" stroke="#e6e9ed" strokeWidth="2" />
+      {/* Letrero superior */}
+      <rect x="52" y="58" width="456" height="58" rx="12" fill="#0f1f2e" />
+      <circle cx="96" cy="87" r="15" fill="#28a745" />
+      <path d="M96 79c-5 3-7 8-6 13 5 1 10-1 12-6 1.6-3.6.4-6-6-7z" fill="#eaf6ef" />
+      <text x="124" y="95" fontFamily="Poppins, Inter, sans-serif" fontSize="27" fontWeight="700" fill="#ffffff">Aduana Verde<tspan fill="#28a745">.</tspan></text>
+      <text x="380" y="93" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="600" fill="#94a3b8" letterSpacing="1.5">BY SICR3P</text>
+      {/* Toldo */}
+      <g>
+        <rect x="62" y="116" width="436" height="16" fill="#218838" />
+        {Array.from({ length: 8 }).map((_, i) => (
+          <path key={i} d={`M${62 + i * 54.5} 132 h54.5 a27 16 0 0 1 -54.5 0z`} fill={i % 2 ? '#28a745' : '#eaf6ef'} />
+        ))}
+      </g>
+      {/* Vitrina */}
+      <rect x="96" y="170" width="256" height="180" rx="8" fill="#f2f9ff" stroke="#e6e9ed" strokeWidth="2" />
+      <line x1="118" y1="330" x2="196" y2="188" stroke="#ffffff" strokeWidth="10" opacity="0.55" />
+      <line x1="150" y1="334" x2="232" y2="186" stroke="#ffffff" strokeWidth="4" opacity="0.55" />
+      {/* Mesón dentro de la vitrina */}
+      <rect x="118" y="286" width="212" height="14" rx="4" fill="#0f1f2e" />
+      <rect x="126" y="300" width="196" height="42" rx="4" fill="#334155" />
+      {/* Tótem con el terminal sobre el mesón */}
+      <rect x="204" y="216" width="6" height="70" rx="3" fill="#64748b" />
+      <g transform="rotate(-4 207 216)">
+        <rect x="164" y="196" width="88" height="58" rx="8" fill="#0f1f2e" />
+        <rect x="170" y="202" width="76" height="46" rx="5" fill="#ffffff" />
+        <text x="208" y="224" textAnchor="middle" fontFamily="Poppins, Inter, sans-serif" fontSize="15" fontWeight="800" fill="#218838">0,623</text>
+        <text x="208" y="238" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="600" fill="#64748b">t CO2e calculadas</text>
+      </g>
+      {/* Documentos sobre el mesón */}
+      <g transform="rotate(6 292 268)">
+        <rect x="276" y="258" width="34" height="26" rx="3" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+        <line x1="282" y1="266" x2="304" y2="266" stroke="#cbd5e1" strokeWidth="2" />
+        <line x1="282" y1="272" x2="300" y2="272" stroke="#cbd5e1" strokeWidth="2" />
+        <line x1="282" y1="278" x2="296" y2="278" stroke="#28a745" strokeWidth="2" />
+      </g>
+      {/* Sticker QR en la vitrina */}
+      <g>
+        <rect x="118" y="188" width="44" height="44" rx="6" fill="#ffffff" stroke="#28a745" strokeWidth="2" />
+        <g fill="#0f1f2e">
+          <rect x="124" y="194" width="12" height="12" rx="2" /><rect x="144" y="194" width="12" height="12" rx="2" />
+          <rect x="124" y="214" width="12" height="12" rx="2" />
+          <rect x="144" y="214" width="5" height="5" /><rect x="151" y="221" width="5" height="5" /><rect x="144" y="221" width="4" height="4" />
+        </g>
+      </g>
+      {/* Puerta */}
+      <rect x="376" y="170" width="90" height="180" rx="8" fill="#eaf6ef" stroke="#e6e9ed" strokeWidth="2" />
+      <rect x="384" y="180" width="74" height="120" rx="6" fill="#d8ecdf" />
+      <circle cx="452" cy="268" r="4" fill="#0f1f2e" />
+      {/* Colgante "Pronto" en la puerta */}
+      <line x1="421" y1="180" x2="421" y2="196" stroke="#64748b" strokeWidth="2" />
+      <rect x="393" y="196" width="56" height="24" rx="6" fill="#28a745" />
+      <text x="421" y="212" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="700" fill="#ffffff">PRONTO</text>
+      {/* Planta */}
+      <rect x="486" y="330" width="26" height="24" rx="4" fill="#218838" />
+      <path d="M499 330c-2-14-10-20-16-22 8-2 14 2 16 6 2-4 8-8 16-6-6 2-14 8-16 22z" fill="#28a745" />
+      <line x1="499" y1="330" x2="499" y2="312" stroke="#218838" strokeWidth="3" />
+      {/* Vereda */}
+      <rect x="56" y="384" width="448" height="8" rx="4" fill="#e6e9ed" />
+    </svg>
+  );
+}
+
 export default function AduanaVerde() {
   return (
     <PublicLayout>
@@ -49,32 +121,17 @@ export default function AduanaVerde() {
               </div>
             </div>
 
-            {/* Vista previa: lo que pasa dentro de la oficina */}
-            <div className="preview-card fade-up d2">
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                Así se ve tu primera visita.
-              </div>
-              <div className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
-                El mesón recibe tus documentos; el cálculo ocurre en la
-                plataforma <b style={{ color: 'var(--green-600)' }}>sicr3p</b>.
-              </div>
-              <div className="flow">
-                <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Doc size={22} /></div><b>1. Documentos</b><span>Facturas y guías</span></div>
-                <div className="arrow"><Icon.ArrowRight size={18} /></div>
-                <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Cog size={22} /></div><b>2. Cálculo</b><span>Emisiones en t CO2e</span></div>
-                <div className="arrow"><Icon.ArrowRight size={18} /></div>
-                <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Tag size={22} /></div><b>3. Informe y etiqueta</b><span>Con QR verificable</span></div>
-              </div>
-              <div className="card card-pad" style={{ boxShadow: 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
-                  <b style={{ fontSize: 14 }}>Compensas exactamente lo que calculaste</b>
-                </div>
-                <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-                  No pagas un trámite: pagas compensar el CO2 de tus propios
-                  documentos, con tarifa referencial por t CO2e. Ni un peso
-                  más, sin cobros por adelantado ni suscripciones.
-                </p>
+            {/* La oficina: ilustración del stand físico Aduana Verde */}
+            <div className="av-stand-wrap fade-up d2">
+              <StandAduanaVerde />
+              <div className="av-stand-note">
+                <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
+                <span>
+                  <b>Compensas exactamente lo que calculaste.</b>{' '}
+                  <span className="muted">No pagas un trámite: pagas compensar el CO2 de tus propios
+                  documentos, con tarifa referencial por t CO2e. Sin cobros por
+                  adelantado ni suscripciones.</span>
+                </span>
               </div>
             </div>
           </section>
