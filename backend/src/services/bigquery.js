@@ -90,6 +90,10 @@ export function rowFactura(factura, sesion) {
     categoria: factura.categoria || null,
     total_co2e: Number(factura.total_co2e || 0),
     origen: 'flujo_publico',
+    hash_documento: factura.hash_documento || null,
+    hash_anterior: factura.hash_anterior || null,
+    hash_cadena: factura.hash_cadena || null,
+    eslabon: factura.eslabon != null ? Number(factura.eslabon) : null,
     created_at: new Date(factura.created_at || Date.now()).toISOString(),
   };
 }

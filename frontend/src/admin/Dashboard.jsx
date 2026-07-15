@@ -7,12 +7,21 @@ import { SkeletonCards } from '../components/Skeleton.jsx';
 export default function Dashboard() {
   const [d, setD] = useState(null);
   const [alertas, setAlertas] = useState([]);
+  const [cadena, setCadena] = useState(null);
+  const [verificacion, setVerificacion] = useState(null); // null | 'cargando' | resultado
   const [err, setErr] = useState('');
 
   useEffect(() => {
     api.dashboard().then(setD).catch((e) => setErr(e.message));
     api.alertasContratos().then((r) => setAlertas(r.alertas)).catch(() => {});
+    api.cadenaEstado().then((r) => setCadena(r.estado)).catch(() => {});
   }, []);
+
+  async function verificarCadena() {
+    setVerificacion('cargando');
+    try { setVerificacion(await api.cadenaVerificar()); }
+    catch (e) { setVerificacion({ valido: false, motivo: e.message }); }
+  }
 
   if (err) return <div className="badge badge-red" style={{ padding: 14 }}>{err}</div>;
   if (!d) return <div><div className="admin-head"><h1>Dashboard</h1></div><SkeletonCards n={4} /></div>;
@@ -58,6 +67,29 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {cadena && (
+        <div className="card card-pad" style={{ marginTop: 16 }}>
+          <h3 style={{ marginTop: 0 }}>Cadena de integridad</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span className="badge badge-green">● {fmtInt(cadena.n_eslabones)} eslabón{cadena.n_eslabones === 1 ? '' : 'es'}</span>
+            <span className="muted" style={{ fontSize: 13 }}>hash SHA-256 encadenado por documento, interno</span>
+            <button className="btn btn-outline btn-sm" onClick={verificarCadena} disabled={verificacion === 'cargando'}>
+              {verificacion === 'cargando' ? <span className="spinner" /> : 'Verificar cadena completa'}
+            </button>
+          </div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 10, fontFamily: 'monospace', wordBreak: 'break-all' }}>
+            Último hash: {cadena.ultimo_hash}
+          </div>
+          {verificacion && verificacion !== 'cargando' && (
+            <div className={`badge ${verificacion.valido ? 'badge-green' : 'badge-red'}`} style={{ display: 'inline-block', marginTop: 10 }}>
+              {verificacion.valido
+                ? `✓ Cadena íntegra — ${fmtInt(verificacion.total_eslabones)} eslabones verificados`
+                : `⚠ Cadena rota en factura ${verificacion.rompe_en || '?'} (${verificacion.motivo || 'error'})`}
+            </div>
+          )}
+        </div>
+      )}
 
       {alertas.length > 0 && (
         <div className="card card-pad" style={{ marginTop: 16 }}>

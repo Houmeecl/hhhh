@@ -26,8 +26,13 @@ export default function Verificar() {
 
         {data && (
           <div className="card card-pad">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
               <span className="badge badge-green" style={{ fontSize: 14, padding: '6px 14px' }}>✓ Trazabilidad verificada</span>
+              {data.cadena && (
+                <span className={`badge ${data.cadena.intacto ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 14, padding: '6px 14px' }}>
+                  {data.cadena.intacto ? '✓ Cadena de hash intacta' : '⚠ Cadena de hash alterada'}
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: 26, margin: '10px 0 4px' }}>Documento {data.factura.numero_venta}</h1>
             <p className="muted" style={{ marginTop: 0 }}>Verificación pública de trazabilidad · sicr3p</p>
@@ -55,6 +60,13 @@ export default function Verificar() {
                 <div><span className="muted">Estado</span><br /><span className="badge badge-green">{data.factura.status}</span></div>
               </div>
             </div>
+
+            {data.cadena && (
+              <div style={{ margin: '0 0 18px', padding: '12px 16px', background: 'var(--bg)', borderRadius: 12, fontSize: 12 }}>
+                <span className="muted">Eslabón #{data.cadena.eslabon} · hash de la cadena</span>
+                <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', marginTop: 4 }}>{data.cadena.hash_cadena}</div>
+              </div>
+            )}
 
             <h3 style={{ margin: '0 0 8px' }}>Detalle por ítem</h3>
             <table className="data">

@@ -11,6 +11,7 @@ import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
+import { hashDocumento, hashCadena, eslabonValido } from '../services/cadenaHash.js';
 
 const router = express.Router();
 
@@ -130,6 +131,15 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       // Categorías del motor propio (una sola carga por sesión).
       const categoriasMotor = await cargarCategorias((sql) => client.query(sql));
 
+      // Cadena de hash: se bloquea la fila de estado (FOR UPDATE) para toda
+      // la transacción, serializando sesiones concurrentes — cada factura
+      // se encadena a la anterior, incluidas las de esta misma sesión.
+      const { rows: cadenaRows } = await client.query(
+        `SELECT ultimo_hash, n_eslabones FROM cadena_estado WHERE id = 1 FOR UPDATE`
+      );
+      let hashAnterior = cadenaRows[0].ultimo_hash;
+      let eslabon = Number(cadenaRows[0].n_eslabones);
+
       let totalSesion = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -175,11 +185,23 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         }
         totalSesion += Number(analysis.total_co2e || 0);
 
+        const hDoc = hashDocumento({
+          numero_venta: analysis.numero_venta,
+          rut_emisor: analysis.rut_emisor,
+          rut_receptor: analysis.rut_receptor,
+          total_co2e: analysis.total_co2e,
+          categoria: analysis.categoria,
+          archivo_original: file.originalname,
+        });
+        const hCad = hashCadena(hashAnterior, hDoc);
+        eslabon += 1;
+
         const { rows: fRows } = await client.query(
           `INSERT INTO facturas
              (sesion_id, invoice_id_simple, numero_venta, archivo_original,
-              rut_emisor, rut_receptor, total_co2e, categoria, status, motor)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'procesada',$9) RETURNING *`,
+              rut_emisor, rut_receptor, total_co2e, categoria, status, motor,
+              hash_documento, hash_anterior, hash_cadena, eslabon)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'procesada',$9,$10,$11,$12,$13) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -190,8 +212,13 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             analysis.total_co2e,
             analysis.categoria,
             motor,
+            hDoc,
+            hashAnterior,
+            hCad,
+            eslabon,
           ]
         );
+        hashAnterior = hCad;
         const factura = fRows[0];
         for (const it of analysis.items) {
           await client.query(
@@ -229,6 +256,13 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         sesion.id,
       ]);
       sesion.total_co2e = Math.round(totalSesion * 10000) / 10000;
+
+      // Cierra el avance de la cadena de hash con el último eslabón de esta sesión.
+      await client.query(
+        `UPDATE cadena_estado SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1`,
+        [hashAnterior, eslabon]
+      );
+
       return sesion;
     });
 
@@ -379,6 +413,12 @@ router.get('/verificar/:id', async (req, res, next) => {
         nombre: sRows[0]?.nombre_cliente,
         rut: sRows[0]?.rut_cliente,
       },
+      cadena: factura.hash_cadena ? {
+        eslabon: factura.eslabon,
+        hash_documento: factura.hash_documento,
+        hash_cadena: factura.hash_cadena,
+        intacto: eslabonValido(factura),
+      } : null,
       items,
     });
   } catch (err) {

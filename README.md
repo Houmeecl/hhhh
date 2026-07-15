@@ -338,6 +338,33 @@ curl -H "X-Api-Key: smk_..." https://sicr3p.cl/api/mandante/proveedores
 curl -H "X-Api-Key: smk_..." https://sicr3p.cl/api/mandante/proveedor/76.123.456-0/resumen
 ```
 
+Desde "Accesos externos → Gestionar" se puede además: restringir un mandante a un
+subconjunto de RUT proveedor (lista blanca opcional; sin ninguno agregado ve a todos,
+como hoy) y configurar un **webhook** que notifica (POST) cada sesión nueva del mandante.
+
+### Cadena de hash (integridad, interna — sin red externa)
+
+Cada factura procesada queda hasheada (SHA-256) y **encadenada a la anterior**
+(`hash_cadena = SHA256(hash_anterior + hash_documento)`), en el orden real de
+procesamiento y con lock de fila para que sesiones concurrentes no generen una
+bifurcación. Es una cadena tipo blockchain **interna** (sin publicar en ninguna red
+pública) — sirve para detectar si un registro pasado fue alterado después de creado.
+
+- Panel → Dashboard → "Cadena de integridad": estado y botón para recalcular toda la
+  cadena desde el génesis (`GET /api/admin/cadena/verificar`).
+- La verificación pública de un documento (`/verificar/:id`) muestra si su eslabón es
+  internamente consistente.
+- Se exporta a BigQuery (`hash_documento`, `hash_anterior`, `hash_cadena`, `eslabon`)
+  para trazar la cadena ahí cuando el export está activo.
+
+### Valorización automática del Capital Natural
+
+Cada cuenta ambiental puede tener un precio unitario citado (panel → Capital Natural →
+"Plan de cuentas"). Un activo sin `valor_clp` manual se valoriza solo (extensión ×
+precio) y queda marcado **"auto"** — el manual siempre manda cuando existe, y solo se
+calcula si la unidad del activo coincide con la de la cuenta (para no mezclar, por
+ejemplo, un derecho de agua en l/s con un precio cotizado por m3).
+
 ---
 
 ## Alcance

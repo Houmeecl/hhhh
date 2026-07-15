@@ -17,6 +17,24 @@ test('rowFactura normaliza RUT y tipos para el warehouse', () => {
   assert.ok(r.created_at.endsWith('Z'));
 });
 
+test('rowFactura incluye la cadena de hash cuando la factura la trae', () => {
+  const r = rowFactura(
+    { id: 'f1', sesion_id: 's1', hash_documento: 'abc', hash_anterior: '0'.repeat(64), hash_cadena: 'def', eslabon: '3' },
+    {}
+  );
+  assert.equal(r.hash_documento, 'abc');
+  assert.equal(r.hash_anterior, '0'.repeat(64));
+  assert.equal(r.hash_cadena, 'def');
+  assert.equal(r.eslabon, 3);
+});
+
+test('rowFactura sin cadena de hash usa null (no revienta con facturas antiguas)', () => {
+  const r = rowFactura({ id: 'f1', sesion_id: 's1' }, {});
+  assert.equal(r.hash_documento, null);
+  assert.equal(r.hash_cadena, null);
+  assert.equal(r.eslabon, null);
+});
+
 test('rowLineItem y rowDocumentoCorredor son numéricos y completos', () => {
   const li = rowLineItem({ descripcion: 'kWh', cantidad: '2', co2e: '1.5', porcentaje_total: '50' }, 'f1');
   assert.deepEqual(li, { factura_id: 'f1', descripcion: 'kWh', cantidad: 2, co2e: 1.5, porcentaje_total: 50 });

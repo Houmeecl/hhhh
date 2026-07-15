@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.facturas` (
   categoria STRING,
   total_co2e FLOAT64,
   origen STRING,            -- flujo_publico | corredor
+  hash_documento STRING,    -- cadena de hash interna (tipo blockchain, sin red externa)
+  hash_anterior STRING,
+  hash_cadena STRING,
+  eslabon INT64,
   created_at TIMESTAMP
 )
 PARTITION BY DATE(created_at)

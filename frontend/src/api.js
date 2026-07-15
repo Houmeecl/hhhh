@@ -77,6 +77,8 @@ export const api = {
 
   // Admin
   dashboard: () => request('/admin/dashboard', { authed: true }),
+  cadenaEstado: () => request('/admin/cadena/estado', { authed: true }),
+  cadenaVerificar: () => request('/admin/cadena/verificar', { authed: true }),
   clientes: () => request('/admin/clientes', { authed: true }),
   crearCliente: (b) => request('/admin/clientes', { method: 'POST', body: b, authed: true }),
   editarCliente: (id, b) => request(`/admin/clientes/${id}`, { method: 'PUT', body: b, authed: true }),
