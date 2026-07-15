@@ -7,6 +7,7 @@ import Ingresar from './pages/Ingresar.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
+import PosDemo from './pages/PosDemo.jsx';
 import Login from './admin/Login.jsx';
 import Activar from './admin/Activar.jsx';
 import AdminApp from './admin/AdminApp.jsx';
@@ -23,6 +24,7 @@ export default function App() {
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />
       <Route path="/mis-sesiones" element={<MisSesiones />} />
+      <Route path="/pos-demo" element={<PosDemo />} />
 
       {/* Admin */}
       <Route path="/admin/login" element={<Login />} />

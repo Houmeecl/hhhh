@@ -86,6 +86,18 @@ export const Icon = {
     <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
   </>),
   ArrowRight: ({ size = 22 }) => base(size, <path d="M5 12h14M13 6l6 6-6 6" />),
+  Camera: ({ size = 22 }) => base(size, <>
+    <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </>),
+  Nfc: ({ size = 22 }) => base(size, <>
+    <rect x="2" y="6" width="13" height="12" rx="2" />
+    <path d="M18 9a3 3 0 0 1 0 6M21 7a6 6 0 0 1 0 10" />
+  </>),
+  CreditCard: ({ size = 22 }) => base(size, <>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20M6 15h4" />
+  </>),
 };
 
 export default Icon;
