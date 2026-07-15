@@ -91,6 +91,19 @@ export default function Dashboard() {
         </div>
       )}
 
+      <div className="card card-pad" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Icon.Leaf size={18} /> Compensación de carbono
+          <span className="badge badge-gray" style={{ fontSize: 11 }}>Próximamente</span>
+        </h3>
+        <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          Estamos evaluando un convenio con un socio de compensación ambiental acreditado
+          para que las emisiones medidas por sicr3p puedan derivarse a proyectos reales de
+          reducción o captura. Todavía no hay una integración activa — esta sección es solo
+          informativa para el equipo mientras se define el acuerdo.
+        </p>
+      </div>
+
       {alertas.length > 0 && (
         <div className="card card-pad" style={{ marginTop: 16 }}>
           <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#b45309' }}><Icon.Alert size={18} /> <span style={{ color: 'var(--navy)' }}>Contratos por vencer / vencidos</span></h3>
