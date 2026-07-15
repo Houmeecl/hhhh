@@ -327,3 +327,111 @@ table.data tr:hover td { background: var(--bg); }
 @media (pointer: coarse) {
   .capture-actions { display: flex; }
 }
+
+/* ============================================================
+   Aduana Verde — landing de oficinas físicas (clases .av-*)
+   Solo aditivo: no modifica clases existentes.
+   ============================================================ */
+
+/* Hero con gradiente radial verde sutil (misma técnica que .login-wrap, en claro) */
+.av-hero {
+  background:
+    radial-gradient(860px 480px at 82% -12%, rgba(40, 167, 69, 0.13), transparent 62%),
+    radial-gradient(640px 440px at -8% 106%, rgba(40, 167, 69, 0.07), transparent 58%);
+}
+
+/* "by sicr3p" elegante bajo el título */
+.av-kicker {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--gray); margin: 0 0 18px;
+}
+.av-kicker .av-brand {
+  font-family: var(--font-head); font-weight: 700; font-size: 15px;
+  letter-spacing: -0.02em; text-transform: none; color: var(--navy);
+}
+.av-kicker .av-brand:hover { text-decoration: none; color: var(--green-600); }
+.av-kicker .av-dot { color: var(--green); }
+
+/* Franja "terminal físico": diagrama del flujo sobre fondo navy con grilla */
+.av-terminal {
+  position: relative; overflow: hidden; padding: 60px 0; color: #e2e8f0;
+  background:
+    radial-gradient(900px 500px at 78% -18%, rgba(40, 167, 69, 0.26), transparent 60%),
+    linear-gradient(160deg, #0f1720 0%, #0f1f2e 55%, #17293b 100%);
+}
+.av-terminal::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.45;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 25%, transparent 78%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 25%, transparent 78%);
+}
+.av-terminal .container { position: relative; z-index: 1; }
+.av-term-label {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9); margin: 0 0 10px;
+}
+.av-term-label .av-led {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.9); flex: none;
+}
+.av-terminal h2 { color: #fff; text-align: center; font-size: 28px; margin: 0 0 8px; }
+.av-term-sub { text-align: center; color: #94a3b8; font-size: 14px; max-width: 520px; margin: 0 auto 36px; line-height: 1.6; }
+
+.av-flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; }
+.av-flow > * { min-width: 0; }
+.av-flow-node {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 14px; padding: 20px 14px; text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.av-flow-node:hover { transform: translateY(-3px); border-color: rgba(40,167,69,0.65); background: rgba(40,167,69,0.09); }
+.av-flow-node .av-ico {
+  width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(40, 167, 69, 0.16); border: 1px solid rgba(40, 167, 69, 0.35); color: #6ee7a0;
+}
+.av-flow-node b { display: block; color: #fff; font-size: 14px; margin-bottom: 5px; font-family: var(--font-head); }
+.av-flow-node span { display: block; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+.av-flow-arrow { display: flex; align-items: center; justify-content: center; color: rgba(110, 231, 160, 0.75); }
+
+/* "La cuenta es corta": tarifa con número grande + mini stats (patrón stat-card) */
+.av-cuenta-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; align-items: stretch; }
+.av-cuenta-grid > * { min-width: 0; }
+.av-stat {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px 20px; text-align: center;
+  display: flex; flex-direction: column; justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.av-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--green); }
+.av-stat .n { font-family: var(--font-head); font-size: 40px; font-weight: 700; line-height: 1; color: var(--green-600); font-variant-numeric: tabular-nums; }
+.av-stat .l { color: var(--gray); font-size: 13px; line-height: 1.5; margin-top: 8px; }
+.av-tarifa {
+  background: linear-gradient(160deg, var(--green-50) 0%, #fff 70%);
+  border-color: rgba(40, 167, 69, 0.35); text-align: left; align-items: flex-start;
+}
+.av-tarifa .n { font-size: 54px; letter-spacing: -0.02em; }
+.av-tarifa .l { font-size: 14px; color: var(--navy-700); max-width: 340px; }
+.av-tarifa .av-nota { font-size: 12px; color: var(--gray); margin-top: 10px; }
+
+/* Hover suave para cards de contenido (REP, cierre) */
+.av-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+.av-card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--green); }
+
+/* Responsive .av-* (colapsos bajo 900px; verificado a 375px sin desborde) */
+@media (max-width: 900px) {
+  .av-flow { grid-template-columns: 1fr; gap: 6px; }
+  .av-flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+  .av-cuenta-grid { grid-template-columns: 1fr 1fr; }
+  .av-tarifa { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .av-stat .n { font-size: 32px; }
+  .av-tarifa .n { font-size: 44px; }
+  .av-terminal { padding: 44px 0; }
+}
