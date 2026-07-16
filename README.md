@@ -245,10 +245,16 @@ cd ../frontend && npm ci && npm run build
 
 `backend/migrations/001_init.sql` crea: `clientes`, `usuarios`, `tokens_password`,
 `sesiones`, `facturas`, `line_items`, `actividad_log`, `prospectos`, `simple_api_uso`.
-`002_corredor.sql` agrega las tablas del Corredor Bioceánico y `003_capital_natural.sql`
-las del Capital Natural (`cuentas_naturales`, `activos_naturales`, `movimientos_naturales`).
-Cada factura guarda `rut_emisor` y `rut_receptor`, que alimentan la cadena
-comprador-vendedor del panel.
+Las migraciones siguientes (idempotentes, corren solas al arrancar) agregan:
+`002` Corredor Bioceánico · `003` Capital Natural (`cuentas_naturales`,
+`activos_naturales`, `movimientos_naturales`) · `004` documentos aduaneros ·
+`005` búsqueda (pg_trgm) · `006` magic link · `007` inventario FIFO/PMP ·
+`008` transporte Cat. 7 · `009`/`012` mandantes (API keys, lista blanca, webhook) ·
+`010` motor propio (`motor_categorias`, `facturas.motor`) · `011` precios del
+Capital Natural · `013` cadena de hash (`cadena_estado` + hashes en `facturas`) ·
+`014` terminales POS (`pos_terminales`) · `015` declaración de embalaje REP
+(`declaraciones_embalaje`). Cada factura guarda `rut_emisor` y `rut_receptor`,
+que alimentan la cadena comprador-vendedor del panel.
 
 ---
 
