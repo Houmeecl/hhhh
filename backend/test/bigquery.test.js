@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rowFactura, rowLineItem, rowDocumentoCorredor, bigquery } from '../src/services/bigquery.js';
+import { rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, bigquery } from '../src/services/bigquery.js';
 
 test('rowFactura normaliza RUT y tipos para el warehouse', () => {
   const r = rowFactura(
@@ -51,4 +51,39 @@ test('con BIGQUERY_EXPORT apagado el export es un no-op silencioso', async () =>
   assert.equal(bigquery.enabled, false);
   const res = await bigquery.exportSesion({ sesion: {}, facturas: [{ id: 'x', items: [] }] });
   assert.deepEqual(res, [false, false]); // no exporta, no lanza
+});
+
+// ---------- rowDeclaracionEmbalaje ----------
+
+test('rowDeclaracionEmbalaje mapea la declaración completa', () => {
+  const decl = {
+    id: 'd1', sesion_id: 's1',
+    componentes: [{ material: 'plasticos', peso_gr: 500, cantidad: 2, reciclable: true }],
+    peso_total_gr: '1000', peso_reciclable_gr: '1000', porcentaje: '100.0', nivel: 'Alto',
+    created_at: '2026-07-15T00:00:00Z',
+  };
+  const row = rowDeclaracionEmbalaje(decl, { rut_cliente: '11.111.111-1' });
+  assert.equal(row.id, 'd1');
+  assert.equal(row.sesion_id, 's1');
+  assert.equal(row.rut_cliente, '111111111'); // normalizado sin puntos ni guión
+  assert.equal(row.n_componentes, 1);
+  assert.equal(JSON.parse(row.componentes)[0].material, 'plasticos');
+  assert.equal(row.peso_total_gr, 1000);
+  assert.equal(row.porcentaje, 100);
+  assert.equal(row.nivel, 'Alto');
+  assert.equal(row.created_at, '2026-07-15T00:00:00.000Z');
+});
+
+test('rowDeclaracionEmbalaje tolera campos ausentes sin lanzar', () => {
+  const row = rowDeclaracionEmbalaje({ id: 'd2', sesion_id: 's2' }, null);
+  assert.equal(row.rut_cliente, null);
+  assert.equal(row.n_componentes, 0);
+  assert.equal(row.componentes, '[]');
+  assert.equal(row.peso_total_gr, 0);
+  assert.equal(row.nivel, null);
+});
+
+test('exportDeclaracionEmbalaje apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportDeclaracionEmbalaje({ id: 'd3', sesion_id: 's3' }, {});
+  assert.equal(res, false);
 });

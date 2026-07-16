@@ -61,3 +61,18 @@ CLUSTER BY rut_receptor, rut_emisor;
 --   FROM `PROYECTO.sicr3p.facturas`
 --   WHERE rut_receptor = '111111111'
 --   GROUP BY rut_emisor ORDER BY tco2e DESC;
+
+-- Declaraciones de embalaje REP (Ley 20.920) — una fila por VERSIÓN de la
+-- declaración (en Postgres solo vive la vigente; acá queda el historial).
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.declaraciones_embalaje` (
+  id                 STRING NOT NULL,
+  sesion_id          STRING NOT NULL,
+  rut_cliente        STRING,
+  componentes        STRING,           -- JSON [{material, peso_gr, cantidad, reciclable}]
+  n_componentes      INT64,
+  peso_total_gr      NUMERIC,
+  peso_reciclable_gr NUMERIC,
+  porcentaje         NUMERIC,          -- % reciclabilidad (recalculado en servidor)
+  nivel              STRING,           -- Alto | Medio | Bajo
+  created_at         TIMESTAMP NOT NULL
+);

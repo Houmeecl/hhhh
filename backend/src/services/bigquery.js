@@ -108,6 +108,26 @@ export function rowLineItem(item, facturaId) {
   };
 }
 
+// Declaración de embalaje REP (Ley 20.920) — una por sesión; un re-POST
+// que reemplaza la declaración genera una fila nueva en el warehouse
+// (misma id de declaración, insertId distinto por created_at), así el
+// historial de cambios queda trazable en BigQuery aunque en Postgres
+// solo viva la versión vigente.
+export function rowDeclaracionEmbalaje(decl, sesion) {
+  return {
+    id: decl.id,
+    sesion_id: decl.sesion_id,
+    rut_cliente: rutNorm(sesion?.rut_cliente),
+    componentes: JSON.stringify(decl.componentes || []),
+    n_componentes: Array.isArray(decl.componentes) ? decl.componentes.length : 0,
+    peso_total_gr: Number(decl.peso_total_gr || 0),
+    peso_reciclable_gr: Number(decl.peso_reciclable_gr || 0),
+    porcentaje: Number(decl.porcentaje || 0),
+    nivel: decl.nivel || null,
+    created_at: new Date(decl.created_at || Date.now()).toISOString(),
+  };
+}
+
 export function rowDocumentoCorredor(doc) {
   return {
     id: doc.id,
@@ -151,5 +171,13 @@ export const bigquery = {
 
   exportDocumentoCorredor(doc) {
     return exportar('documentos_corredor', [rowDocumentoCorredor(doc)]);
+  },
+
+  // La declaración REP se exporta al guardarse/reemplazarse (el insertId
+  // usa id+created_at para que cada versión quede como fila propia).
+  exportDeclaracionEmbalaje(decl, sesion) {
+    const row = rowDeclaracionEmbalaje(decl, sesion);
+    row.insertId = `${row.id}-${row.created_at}`;
+    return exportar('declaraciones_embalaje', [row]);
   },
 };

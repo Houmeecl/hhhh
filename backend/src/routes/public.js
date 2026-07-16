@@ -331,7 +331,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 // un nuevo POST reemplaza la anterior.
 router.post('/sesiones/:id/embalaje', async (req, res, next) => {
   try {
-    const { rows: sRows } = await query(`SELECT id FROM sesiones WHERE id = $1`, [req.params.id]);
+    const { rows: sRows } = await query(`SELECT id, rut_cliente FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!sRows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
 
     const componentes = req.body?.componentes;
@@ -369,6 +369,8 @@ router.post('/sesiones/:id/embalaje', async (req, res, next) => {
       ]
     );
     res.status(201).json({ declaracion: rows[0] });
+    // Export al warehouse (no bloqueante; cada versión queda como fila propia).
+    bigquery.exportDeclaracionEmbalaje(rows[0], sRows[0]);
   } catch (err) {
     next(err);
   }
