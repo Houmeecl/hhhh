@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { signAccess, requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { generarSerial, generarClave, clampDocumentos } from '../services/posTerminal.js';
+import { loginLimiter } from '../middleware/rateLimit.js';
 
 // ============================================================
 // Terminales POS "Aduana Verde" — patrón pos_devices de NotaryPro:
@@ -24,7 +25,8 @@ const CAMPOS_TERMINAL =
   'id, nombre, ubicacion, serial, activo, ultima_actividad, documentos_procesados, created_at';
 
 // ---------- POST /api/pos/auth — login del dispositivo ----------
-router.post('/auth', async (req, res, next) => {
+// Mismo límite anti fuerza bruta que el login de personas (backend.md).
+router.post('/auth', loginLimiter, async (req, res, next) => {
   try {
     const { serial, clave } = req.body;
     if (!serial || !clave) return res.status(401).json({ error: MENSAJE_GENERICO });
