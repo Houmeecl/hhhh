@@ -24,12 +24,26 @@
 
 <!-- DECISIÓN -->
 <div class="pagina">
-  <h2>1. La decisión: servidor propio o servicio hosted</h2>
+  <h2>1. Estado real verificado (19-07-2026) y la decisión</h2>
 
-  <p>Todo el material técnico ya está construido en el repositorio (script
-  <code>deploy/instalar-webmail.sh</code> y guía completa <code>deploy/WEBMAIL.md</code>).
-  Lo que falta son pasos que solo una persona puede dar: registros DNS, un ticket al
-  proveedor del VPS y elegir el camino. Hay dos:</p>
+  <div class="caja">
+    <strong>Chequeo en vivo del DNS de sicr3p.cl</strong> — esto es lo que ya existe y lo que falta:
+    <table style="margin-bottom:0;">
+      <tr><th>Registro</th><th>Estado hoy</th></tr>
+      <tr><td>A &nbsp;mail.sicr3p.cl → 138.36.237.61</td><td class="ok">✓ Ya creado</td></tr>
+      <tr><td>MX &nbsp;sicr3p.cl → mail.sicr3p.cl</td><td class="ok">✓ Ya creado</td></tr>
+      <tr><td>TXT SPF</td><td><strong style="color:#d97706;">⚠ Conflicto</strong> — hoy dice <code>v=spf1 include:spf.hostmar.com -all</code>: el <code>-all</code> duro hará <strong>rechazar</strong> el correo enviado desde el propio VPS. Corregir según 2.2.</td></tr>
+      <tr><td>TXT _dmarc</td><td class="no">✗ Falta</td></tr>
+      <tr><td>rDNS/PTR de la IP</td><td class="no">✗ Falta — sigue el genérico de DonWeb (vps-6165621-x.dattaweb.com); el ticket de la sección 2.1 aún no se hace</td></tr>
+      <tr><td>TXT DKIM</td><td class="no">✗ Falta — se genera al instalar Poste.io (sección 2.4)</td></tr>
+    </table>
+  </div>
+
+  <p>Con el A y el MX ya creados, el dominio quedó jugado por el <strong>Camino A (servidor
+  propio)</strong>: el correo del dominio ya apunta al VPS. Todo el material técnico está en el
+  repositorio (script <code>deploy/instalar-webmail.sh</code> y guía <code>deploy/WEBMAIL.md</code>).
+  Lo que falta son tres pasos de persona: corregir el SPF, el ticket a DonWeb y correr el
+  instalador. El Camino B (Zoho) sigue disponible como plan B si DonWeb no cumple:</p>
 
   <table>
     <tr><th></th><th>Camino A — Servidor propio (Poste.io en el VPS)</th><th>Camino B — Hosted (Zoho Mail, plan gratuito)</th></tr>
@@ -63,13 +77,23 @@
 
   <h3>2.2 Registros DNS (panel del dominio sicr3p.cl)</h3>
   <table>
-    <tr><th>Tipo</th><th>Nombre</th><th>Valor</th><th>Prioridad</th></tr>
-    <tr><td>A</td><td>mail</td><td>138.36.237.61</td><td>—</td></tr>
-    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mail.sicr3p.cl</td><td>10</td></tr>
-    <tr><td>TXT</td><td>@ (sicr3p.cl)</td><td>v=spf1 mx ~all</td><td>—</td></tr>
-    <tr><td>TXT</td><td>_dmarc</td><td>v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl</td><td>—</td></tr>
-    <tr><td>TXT</td><td>(selector DKIM)</td><td>Se genera después de instalar — el panel de Poste.io lo muestra para copiarlo tal cual</td><td>—</td></tr>
+    <tr><th>Tipo</th><th>Nombre</th><th>Valor</th><th>Estado</th></tr>
+    <tr><td>A</td><td>mail</td><td>138.36.237.61</td><td class="ok">✓ ya creado</td></tr>
+    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mail.sicr3p.cl (prioridad 10)</td><td class="ok">✓ ya creado</td></tr>
+    <tr><td>TXT</td><td>@ (sicr3p.cl)</td><td><strong>REEMPLAZAR el actual por:</strong><br><code>v=spf1 mx include:spf.hostmar.com ~all</code></td><td><strong style="color:#d97706;">⚠ corregir</strong></td></tr>
+    <tr><td>TXT</td><td>_dmarc</td><td>v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl</td><td class="no">✗ crear</td></tr>
+    <tr><td>TXT</td><td>(selector DKIM)</td><td>Se genera después de instalar — el panel de Poste.io lo muestra para copiarlo tal cual</td><td class="no">✗ después de instalar</td></tr>
   </table>
+
+  <div class="caja-alerta">
+    <strong>Por qué se reemplaza el SPF y no se agrega otro:</strong> solo puede existir UN registro
+    TXT SPF. El actual (<code>include:spf.hostmar.com -all</code>) autoriza únicamente a los
+    servidores de Hostmar y ordena rechazo duro de todo lo demás — incluido tu propio VPS. La
+    versión corregida <code>v=spf1 mx include:spf.hostmar.com ~all</code> autoriza al VPS (vía el
+    MX) <em>y</em> conserva a Hostmar por si algo del hosting antiguo aún envía correo con el
+    dominio; el <code>~all</code> suave evita rechazos duros mientras se estabiliza. Cuando esté
+    claro que nada envía por Hostmar, se puede simplificar a <code>v=spf1 mx ~all</code>.
+  </div>
 
   <h3>2.3 Instalación (una línea, en el VPS)</h3>
   <div class="caja">
@@ -138,11 +162,15 @@
   </ul>
 
   <div class="caja-navy" style="margin-top:6mm;">
-    <h4>Resumen ejecutivo de esta guía</h4>
-    <p style="margin:0; text-align:left;">1) Elegir camino: <strong>Zoho si quieres cero mantención
-    (recomendado para partir)</strong>, Poste.io si quieres soberanía total y DonWeb cumple rDNS +
-    puerto 25. · 2) Crear los registros DNS de la tabla del camino elegido. · 3) Crear
-    contacto@ y postmaster@. · 4) Probar en mail-tester hasta lograr ≥9/10.</p>
+    <h4>Resumen ejecutivo — lo que queda por hacer, en orden</h4>
+    <p style="margin:0; text-align:left;">El A y el MX ya están creados (verificado 19-07-2026).
+    Falta: · 1) <strong>Corregir el TXT SPF</strong> (reemplazar por
+    <code>v=spf1 mx include:spf.hostmar.com ~all</code>) y crear el TXT _dmarc. ·
+    2) <strong>Ticket a DonWeb</strong>: rDNS de 138.36.237.61 → mail.sicr3p.cl + confirmar puerto
+    25 saliente (texto exacto en 2.1). · 3) En el VPS: <code>cd /opt/sicr3p && git pull && bash
+    deploy/instalar-webmail.sh</code>. · 4) Asistente en mail.sicr3p.cl/admin/install, generar
+    DKIM (copiar el TXT al DNS) y crear contacto@ y postmaster@. · 5) Probar en mail-tester
+    hasta ≥9/10. Si DonWeb no cumple el paso 2, cambiar al Camino B (Zoho).</p>
   </div>
 
   <p class="pie-doc">sicr3p — Guía interna de activación del correo corporativo · Versión 1.0 · Julio 2026 ·

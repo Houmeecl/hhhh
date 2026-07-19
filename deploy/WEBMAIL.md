@@ -57,20 +57,28 @@ Si creas el DNS **antes** de correr el script, el HTTPS queda listo de una.
 
 ## 3. Registros DNS exactos (panel del dominio sicr3p.cl)
 
-| Tipo | Nombre / Host          | Valor                                                        | Prioridad |
-|------|------------------------|--------------------------------------------------------------|-----------|
-| A    | `mail`                 | `138.36.237.61`                                              | —         |
-| MX   | `@` (sicr3p.cl)        | `mail.sicr3p.cl`                                             | 10        |
-| TXT  | `@` (sicr3p.cl)        | `v=spf1 mx ~all`                                             | —         |
-| TXT  | `_dmarc`               | `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`    | —         |
-| TXT  | `<selector>._domainkey`| *(DKIM: se genera después de instalar — ver sección 4)*      | —         |
+> **Estado verificado el 19-07-2026** (consulta DNS en vivo): el **A** y el **MX**
+> ya existen y apuntan bien. El **SPF actual es un problema**: dice
+> `v=spf1 include:spf.hostmar.com -all`, o sea autoriza SOLO a Hostmar con rechazo
+> duro — el correo enviado desde el propio VPS **fallaría SPF**. Hay que
+> REEMPLAZARLO (no agregar un segundo TXT) por la versión fusionada de la tabla.
+> `_dmarc` no existe todavía. El PTR sigue siendo el genérico de DonWeb
+> (`vps-6165621-x.dattaweb.com`), así que el ticket de la sección de rDNS sigue pendiente.
 
-> **Ojo con SPF**: si el backend sigue enviando por Resend (ver sección 6),
-> el registro SPF debe incluir a ambos. Resend usa su propio subdominio de
-> envío con SPF aparte (los registros que Resend ya te hizo crear no cambian),
-> así que `v=spf1 mx ~all` en el dominio raíz no choca con Resend. Si en algún
-> momento configuraste SPF en `@` para Resend, fusiónalos en UN solo registro
-> TXT SPF (nunca dos).
+| Tipo | Nombre / Host          | Valor                                                        | Estado 19-07-2026 |
+|------|------------------------|--------------------------------------------------------------|-------------------|
+| A    | `mail`                 | `138.36.237.61`                                              | ✅ ya creado |
+| MX   | `@` (sicr3p.cl)        | `mail.sicr3p.cl` (prioridad 10)                              | ✅ ya creado |
+| TXT  | `@` (sicr3p.cl)        | `v=spf1 mx include:spf.hostmar.com ~all` (**reemplaza** al actual `v=spf1 include:spf.hostmar.com -all`) | ⚠️ corregir |
+| TXT  | `_dmarc`               | `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`    | ❌ crear |
+| TXT  | `<selector>._domainkey`| *(DKIM: se genera después de instalar — ver sección 4)*      | ❌ después de instalar |
+
+> **Por qué esa fusión de SPF**: solo puede existir UN TXT SPF por nombre. La
+> versión fusionada autoriza al VPS (vía `mx`) y conserva a Hostmar por si algo
+> del hosting antiguo aún envía con el dominio; `~all` (softfail) evita rechazos
+> duros mientras se estabiliza. Cuando esté claro que nada envía por Hostmar,
+> simplificar a `v=spf1 mx ~all`. Resend no se toca: usa su propio subdominio
+> de envío con SPF aparte.
 
 ### El paso CRÍTICO: rDNS/PTR
 
