@@ -98,6 +98,28 @@ Sin estos binarios el sistema no falla: cada camino se detecta solo
 (`ocrDisponible()`, `rasterPdfDisponible()`, `heicDisponible()`) y el
 documento sigue el camino siguiente.
 
+## Smoke test E2E post-deploy
+
+Después de cada deploy exitoso (health OK), `actualizar.sh` corre
+`deploy/smoke-e2e.mjs`: un recorrido REAL contra producción que exige
+backend sano, calculadora con tarifa y categorías vivas, **cadena de
+integridad intacta**, frontend sirviendo la portada y la verificación
+pública del último documento respondiendo. Si cualquiera falla, el
+deploy **se revierte** con el rollback normal (el rollback en sí solo se
+evalúa con el health, para no entrar en bucles).
+
+- El detalle de cada check queda en el log (`/var/log/sicr3p-actualizar.log`),
+  una línea ✓/✗ por check.
+- `SICR3P_SKIP_SMOKE=1` lo omite (solo para ensayos).
+- **Nivel de escritura (opcional)**: con `SICR3P_SMOKE_ESCRITURA=1` el smoke
+  además sube una factura de prueba por el flujo público real y exige
+  motor propio + QR + sello. Costo honesto: cada corrida deja una sesión
+  real marcada "SMOKE TEST — sicr3p" **encadenada para siempre** (la cadena
+  de hash no permite borrar sin romperse). Por eso viene apagado; actívalo
+  solo si aceptas ese registro por deploy.
+- Correrlo a mano en cualquier momento:
+  `node /opt/sicr3p/deploy/smoke-e2e.mjs`
+
 ## Apagar el motor externo (independencia total)
 
 Cuando el panel "Motor propio" muestre ~100% de independencia sostenida,

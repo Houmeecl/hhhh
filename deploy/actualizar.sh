@@ -116,6 +116,26 @@ health_ok() {
   return 1
 }
 
+smoke_ok() {
+  # Smoke test E2E profundo (deploy/smoke-e2e.mjs): calculadora viva,
+  # cadena de integridad INTACTA, frontend y verificación pública reales.
+  # Solo gatea deploys NUEVOS (el rollback se evalúa con health_ok, para
+  # no entrar en bucles por un check profundo). SICR3P_SKIP_SMOKE=1 lo
+  # omite (ensayos). Las URLs se derivan de las del health.
+  if [ "${SICR3P_SKIP_SMOKE:-0}" = "1" ]; then
+    log "SICR3P_SKIP_SMOKE=1 → se omite el smoke E2E (modo ensayo)."
+    return 0
+  fi
+  local api_base="${SICR3P_SMOKE_API:-${HEALTH_URL%/health}}"
+  if SICR3P_SMOKE_API="$api_base" SICR3P_SMOKE_FRONT="$FRONT_URL" \
+     node "$SCRIPT_DIR/smoke-e2e.mjs" >> "$LOG" 2>&1; then
+    log "smoke E2E post-deploy: OK."
+    return 0
+  fi
+  log "smoke E2E post-deploy: FALLÓ (detalle arriba en $LOG)."
+  return 1
+}
+
 # ---------- 8. Rollback al commit previo ----------
 rollback() {
   log "FALLO en el deploy de ${COMMIT_REMOTO:0:7}; iniciando ROLLBACK a ${COMMIT_PREVIO:0:7}."
@@ -168,8 +188,12 @@ if ! reiniciar; then
   rollback
 fi
 if health_ok; then
-  log "actualizado ${COMMIT_PREVIO:0:7} → $(git rev-parse --short HEAD)."
-  exit 0
+  if smoke_ok; then
+    log "actualizado ${COMMIT_PREVIO:0:7} → $(git rev-parse --short HEAD)."
+    exit 0
+  fi
+  log "ERROR: el smoke E2E post-deploy falló aunque el health estaba OK — el deploy se revierte."
+  rollback
 fi
 log "ERROR: el health no respondió \"ok\":true en 30 s ($HEALTH_URL) o el frontend no carga ($FRONT_URL)."
 rollback
