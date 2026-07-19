@@ -78,3 +78,16 @@ que no levantan, pero no contra bugs lógicos que pasan el health check.
 
 Enviar el diagnóstico por correo al fallar (Resend o el webmail del VPS), para
 no depender de entrar por SSH a leer `/root/sicr3p-diagnostico-*.txt`.
+
+
+## Requisito del motor propio para fotos (OCR)
+
+El cálculo de facturas fotografiadas usa tesseract en el propio servidor
+(nada sale a terceros). Instalarlo UNA vez en el VPS:
+
+```bash
+apt install -y tesseract-ocr tesseract-ocr-spa
+```
+
+Sin tesseract el sistema no falla: las fotos simplemente siguen el camino
+del motor externo (hoy en mock), y `ocrDisponible()` lo detecta solo.

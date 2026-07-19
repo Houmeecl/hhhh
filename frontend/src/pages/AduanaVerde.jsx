@@ -46,8 +46,12 @@ function StandAduanaVerde() {
       <g transform="rotate(-4 207 216)">
         <rect x="164" y="196" width="88" height="58" rx="8" fill="#0f1f2e" />
         <rect x="170" y="202" width="76" height="46" rx="5" fill="#ffffff" />
-        <text x="208" y="224" textAnchor="middle" fontFamily="Poppins, Inter, sans-serif" fontSize="15" fontWeight="800" fill="#218838">0,623</text>
-        <text x="208" y="238" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="600" fill="#64748b">t CO2e calculadas</text>
+        {/* El número "aparece" en pantalla como recién calculado (solo opacidad,
+            para no pisar el transform del grupo; respeta prefers-reduced-motion) */}
+        <g className="av-fade-slow">
+          <text x="208" y="224" textAnchor="middle" fontFamily="Poppins, Inter, sans-serif" fontSize="15" fontWeight="800" fill="#218838">0,623</text>
+          <text x="208" y="238" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="600" fill="#64748b">t CO2e calculadas</text>
+        </g>
       </g>
       {/* Documentos sobre el mesón */}
       <g transform="rotate(6 292 268)">
@@ -69,10 +73,13 @@ function StandAduanaVerde() {
       <rect x="376" y="170" width="90" height="180" rx="8" fill="#eaf6ef" stroke="#e6e9ed" strokeWidth="2" />
       <rect x="384" y="180" width="74" height="120" rx="6" fill="#d8ecdf" />
       <circle cx="452" cy="268" r="4" fill="#0f1f2e" />
-      {/* Colgante "Pronto" en la puerta */}
-      <line x1="421" y1="180" x2="421" y2="196" stroke="#64748b" strokeWidth="2" />
-      <rect x="393" y="196" width="56" height="24" rx="6" fill="#28a745" />
-      <text x="421" y="212" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="700" fill="#ffffff">PRONTO</text>
+      {/* Colgante "Pronto" en la puerta, con balanceo sutil desde su bisagra
+          (animación CSS .av-swing, desactivada con prefers-reduced-motion) */}
+      <g className="av-swing">
+        <line x1="421" y1="180" x2="421" y2="196" stroke="#64748b" strokeWidth="2" />
+        <rect x="393" y="196" width="56" height="24" rx="6" fill="#28a745" />
+        <text x="421" y="212" textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="700" fill="#ffffff">PRONTO</text>
+      </g>
       {/* Planta */}
       <rect x="486" y="330" width="26" height="24" rx="4" fill="#218838" />
       <path d="M499 330c-2-14-10-20-16-22 8-2 14 2 16 6 2-4 8-8 16-6-6 2-14 8-16 22z" fill="#28a745" />
@@ -180,74 +187,82 @@ export default function AduanaVerde() {
         <div className="container">
           <h2>Tu visita, paso a paso</h2>
           <div className="two-col-grid" style={{ gap: 28 }}>
-            <div className="paso">
+            <div className="paso fade-up d1">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Doc size={28} /></div>
               <h3>1. Llegas con lo que ya tienes</h3>
               <p>Facturas y guías de despacho de tu operación, en papel o digitales. Sin preparación previa ni planillas.</p>
             </div>
-            <div className="paso">
+            <div className="paso fade-up d2">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Cog size={28} /></div>
               <h3>2. Miras el cálculo en pantalla</h3>
               <p>Los documentos se escanean en el terminal y la plataforma sicr3p calcula tus emisiones frente a ti. Ves el número exacto antes de decidir.</p>
             </div>
-            <div className="paso">
+            <div className="paso fade-up d3">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.CreditCard size={28} /></div>
               <h3>3. Compensas ese número, no otro</h3>
               <p>No pagas un trámite: pagas compensar el CO2 que acabas de ver calculado, con tarifa referencial por t CO2e. Ese es todo el modelo.</p>
             </div>
-            <div className="paso">
-              <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Qr size={28} /></div><h3>4. Te llevas el respaldo en la mano</h3>
+            <div className="paso fade-up d4">
+              <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Qr size={28} /></div>
+              <h3>4. Te llevas el respaldo en la mano</h3>
               <p>Informe de tu contabilidad de carbono y etiqueta con QR verificable. Cuando tu mandante lo escanee, verá lo mismo que tú.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* La cuenta es corta: tarifa/compensación con número grande + mini stats */}
-      <div className="container" style={{ padding: '56px 0 0' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>La cuenta es corta</h2>
-        <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
-          Sin letra chica: el modelo completo de Aduana Verde cabe en cuatro números.
-        </p>
-        <div className="av-cuenta-grid">
-          <div className="av-stat av-tarifa">
-            <div className="n">1 = 1</div>
-            <div className="l">
-              Una tonelada calculada es una tonelada compensada. Pagas según
-              los documentos escaneados en tu visita, con tarifa referencial
-              por t CO2e.
+      {/* La cuenta es corta: tarifa/compensación con número grande + mini stats.
+          Desde aquí los bloques alternan fondo blanco / var(--bg) con padding
+          consistente (.sec-pad) para dar ritmo vertical a la página. */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>La cuenta es corta</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
+            Sin letra chica: el modelo completo de Aduana Verde cabe en cuatro números.
+          </p>
+          <div className="av-cuenta-grid">
+            <div className="av-stat av-tarifa fade-up d1">
+              <div className="n">1 = 1</div>
+              <div className="l">
+                Una tonelada calculada es una tonelada compensada. Pagas según
+                los documentos escaneados en tu visita, con tarifa referencial
+                por t CO2e.
+              </div>
+              <div className="av-nota">Tarifa referencial — se confirma en la oficina antes de pagar.</div>
             </div>
-            <div className="av-nota">Tarifa referencial — se confirma en la oficina antes de pagar.</div>
-          </div>
-          <div className="av-stat">
-            <div className="n">1</div>
-            <div className="l">visita basta para salir con informe y etiqueta QR</div>
-          </div>
-          <div className="av-stat">
-            <div className="n">2</div>
-            <div className="l">declaraciones en la misma pasada: emisiones y REP</div>
-          </div>
-          <div className="av-stat">
-            <div className="n">0</div>
-            <div className="l">suscripciones y cero cobros por adelantado</div>
+            <div className="av-stat fade-up d2">
+              <div className="n">1</div>
+              <div className="l">visita basta para salir con informe y etiqueta QR</div>
+            </div>
+            <div className="av-stat fade-up d3">
+              <div className="n">2</div>
+              <div className="l">declaraciones en la misma pasada: emisiones y REP</div>
+            </div>
+            <div className="av-stat fade-up d4">
+              <div className="n">0</div>
+              <div className="l">suscripciones y cero cobros por adelantado</div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Calculadora pública: el mismo motor del terminal, para sacar la
           cuenta antes de pisar la oficina. */}
-      <div className="container" style={{ padding: '56px 0 0' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>Saca la cuenta antes de venir</h2>
-        <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
-          ¿Cuánto compensarías? Ingresa tu operación mensual aproximada y mira
-          el número que verías en el mesón — estimación referencial con los
-          mismos factores del terminal.
-        </p>
-        <CalculadoraCompensacion contexto="aduana" />
-      </div>
+      <section className="sec-alt sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>Saca la cuenta antes de venir</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
+            ¿Cuánto compensarías? Ingresa tu operación mensual aproximada y mira
+            el número que verías en el mesón — estimación referencial con los
+            mismos factores del terminal.
+          </p>
+          <CalculadoraCompensacion contexto="aduana" />
+        </div>
+      </section>
 
       {/* Bloque REP — Ley 20.920 */}
-      <div className="container" style={{ padding: '56px 0' }}>
+      <section className="sec-pad">
+        <div className="container">
         <div className="two-col-grid" style={{ gap: 28, alignItems: 'stretch' }}>
           <div className="card card-pad av-card-hover">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -281,7 +296,8 @@ export default function AduanaVerde() {
             <a href="mailto:contacto@sicr3p.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">Quiero saber más</a>
           </div>
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Estado honesto: pre-lanzamiento */}
       <section className="pasos">

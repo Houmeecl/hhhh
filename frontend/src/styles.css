@@ -449,3 +449,69 @@ table.data tr:hover td { background: var(--bg); }
   .av-tarifa .n { font-size: 44px; }
   .av-terminal { padding: 44px 0; }
 }
+
+/* ============================================================
+   Pulido de landings públicos (solo aditivo: clases nuevas)
+   ============================================================ */
+
+/* Ritmo vertical consistente entre secciones (56–72px). Usar en un <section>
+   envolvente, NUNCA junto a .container en el mismo elemento (ambas fijan el
+   shorthand padding y esta ganaría, borrando los 24px laterales). */
+.sec-pad { padding: 64px 0; }
+.sec-alt { background: var(--bg); }
+
+/* Franja de números vivos de la plataforma (landing principal). Solo datos
+   reales de GET /api/publico/cadena; si el fetch falla no se renderiza. */
+.live-strip {
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--green-50) 0%, #fff 62%);
+}
+.live-strip-inner {
+  display: flex; align-items: center; justify-content: center; gap: 10px 30px;
+  flex-wrap: wrap; padding: 15px 0; font-size: 13px; font-weight: 600; color: var(--gray);
+}
+.live-strip-inner .item { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.live-strip-inner .item svg { color: var(--green-600); flex: none; }
+.live-strip-inner .n {
+  font-family: var(--font-head); font-weight: 700; font-size: 19px; line-height: 1;
+  color: var(--green-600); font-variant-numeric: tabular-nums;
+}
+.live-strip-inner .hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 500;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+}
+
+/* CTA flotante móvil del landing principal: oculta por defecto; solo existe
+   visualmente bajo 640px y entra cuando el hero salió de pantalla. */
+.mobile-cta { display: none; }
+
+/* Stand Aduana Verde: colgante "PRONTO" con balanceo leve desde su bisagra
+   (transform-box: view-box → el origin se expresa en coordenadas del viewBox)
+   y número del tótem con fade-in de solo opacidad (no pisa el rotate del grupo). */
+@keyframes avSwing { from { transform: rotate(2.4deg); } to { transform: rotate(-2.4deg); } }
+.av-swing {
+  transform-box: view-box; transform-origin: 421px 181px;
+  animation: avSwing 2.4s ease-in-out infinite alternate;
+}
+.av-fade-slow { animation: fadeIn 0.9s ease 0.5s both; }
+
+@media (max-width: 640px) {
+  .sec-pad { padding: 44px 0; }
+  .mobile-cta {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.08);
+    transform: translateY(110%); transition: transform 0.25s ease;
+  }
+  .mobile-cta.show { transform: translateY(0); }
+  .mobile-cta .btn { width: 100%; }
+}
+
+/* Accesibilidad: sin animación de balanceo/aparición ni deslizamiento del CTA */
+@media (prefers-reduced-motion: reduce) {
+  .av-swing, .av-fade-slow { animation: none; }
+  .mobile-cta { transition: none; }
+}

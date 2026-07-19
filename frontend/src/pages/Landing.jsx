@@ -1,12 +1,82 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 
+// Franja de "números vivos" de la plataforma: prueba social honesta sin
+// testimonios ni cifras inventadas — muestra el estado real de la cadena de
+// integridad (GET /api/publico/cadena, endpoint público y anonimizado).
+// Fetch tolerante: si el backend no responde, o la cadena está vacía o no
+// verificada, la franja simplemente no se muestra.
+function FranjaCadena() {
+  const [estado, setEstado] = useState(null);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch('/api/publico/cadena')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (vivo && d?.estado?.intacta === true && Number(d.estado.n_eslabones) > 0) {
+          setEstado(d.estado);
+        }
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  if (!estado) return null;
+
+  return (
+    <section className="live-strip fade-in" aria-label="Números vivos de la plataforma">
+      <div className="container live-strip-inner">
+        <span className="item">
+          <span className="n">{Number(estado.n_eslabones).toLocaleString('es-CL')}</span>
+          documentos encadenados por hash
+        </span>
+        <span className="item">
+          <Icon.CheckCircle size={16} /> Cadena verificada e intacta
+        </span>
+        {estado.ultimo_hash_corto && (
+          <span className="item">
+            último eslabón <span className="hash">{estado.ultimo_hash_corto}</span>
+          </span>
+        )}
+        <Link to="/cadena" className="item">Ver la cadena en vivo</Link>
+      </div>
+    </section>
+  );
+}
+
 export default function Landing() {
+  const heroRef = useRef(null);
+  const [pasoHero, setPasoHero] = useState(false);
+  const [footerVisible, setFooterVisible] = useState(false);
+
+  // CTA flotante móvil: aparece tras scrollear pasado el hero y se oculta
+  // cuando el footer entra en pantalla (así nunca lo tapa).
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const obsHero = new IntersectionObserver(
+      ([e]) => setPasoHero(!e.isIntersecting),
+      { rootMargin: '-80px 0px 0px 0px' }
+    );
+    if (heroRef.current) obsHero.observe(heroRef.current);
+
+    const footer = document.querySelector('.pub-footer');
+    let obsFooter;
+    if (footer) {
+      obsFooter = new IntersectionObserver(([e]) => setFooterVisible(e.isIntersecting));
+      obsFooter.observe(footer);
+    }
+    return () => { obsHero.disconnect(); obsFooter?.disconnect(); };
+  }, []);
+
+  const mostrarCta = pasoHero && !footerVisible;
+
   return (
     <PublicLayout>
-      <div className="container">
+      <div className="container" ref={heroRef}>
         <section className="hero">
           <div className="fade-up">
             <h1>
@@ -57,21 +127,24 @@ export default function Landing() {
         </section>
       </div>
 
+      {/* Números vivos de la plataforma (solo si el backend responde) */}
+      <FranjaCadena />
+
       <section className="pasos">
         <div className="container">
           <h2>En 3 simples pasos</h2>
           <div className="pasos-grid">
-            <div className="paso">
+            <div className="paso fade-up d1">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Cloud size={28} /></div>
               <h3>1. Sube tus documentos</h3>
               <p>Facturas, guías, órdenes de compra y más, en los formatos admitidos.</p>
             </div>
-            <div className="paso">
+            <div className="paso fade-up d2">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Chart size={28} /></div>
               <h3>2. Generamos tu informe</h3>
               <p>Organizamos tu información y estructuramos los datos clave de tu contabilidad de carbono.</p>
             </div>
-            <div className="paso">
+            <div className="paso fade-up d3">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.CheckCircle size={28} /></div>
               <h3>3. Obtén trazabilidad</h3>
               <p>Visualiza y descarga tu informe PDF y tus etiquetas con QR verificable.</p>
@@ -84,14 +157,43 @@ export default function Landing() {
       </section>
 
       {/* Calculadora pública: estimación en vivo con los factores reales del motor */}
-      <div className="container" style={{ padding: '56px 0' }}>
-        <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>¿Cuánto compensarías?</h2>
-        <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
-          Mueve los números de tu operación mensual y mira una estimación
-          referencial de tus emisiones y su compensación, con los mismos
-          factores que usa la plataforma.
-        </p>
-        <CalculadoraCompensacion contexto="sicr3p" />
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>¿Cuánto compensarías?</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
+            Mueve los números de tu operación mensual y mira una estimación
+            referencial de tus emisiones y su compensación, con los mismos
+            factores que usa la plataforma.
+          </p>
+          <CalculadoraCompensacion contexto="sicr3p" />
+        </div>
+      </section>
+
+      {/* Cierre: mismo par de CTAs del hero, para no terminar en seco */}
+      <section className="pasos">
+        <div className="container" style={{ textAlign: 'center' }}>
+          <h2 style={{ margin: '0 0 10px' }}>Tu contabilidad, tu trazabilidad</h2>
+          <p className="muted" style={{ fontSize: 15, maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
+            Sube tus documentos y descarga tu informe con etiqueta QR
+            verificable. Sin instalaciones ni planillas.
+          </p>
+          <div className="hero-actions" style={{ justifyContent: 'center' }}>
+            <Link to="/cargar" className="btn btn-primary">Comienza ahora</Link>
+            <a href="mailto:contacto@sicr3p.cl" className="btn btn-outline">Contáctanos</a>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA flotante móvil (≤640px): visible solo pasado el hero y lejos del footer */}
+      <div className={mostrarCta ? 'mobile-cta show' : 'mobile-cta'} aria-hidden={!mostrarCta}>
+        <Link
+          to="/cargar"
+          className="btn btn-primary"
+          tabIndex={mostrarCta ? 0 : -1}
+          aria-label="Genera tu informe"
+        >
+          Genera tu informe <Icon.ArrowRight size={18} />
+        </Link>
       </div>
     </PublicLayout>
   );

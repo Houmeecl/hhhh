@@ -64,6 +64,25 @@ export async function fetchDeclaracionEmbalaje(sesionId) {
   }
 }
 
+// ---------- Alcances GHG por categoría ----------
+// Trae las categorías activas con alcance GHG declarado (columna nueva
+// motor_categorias.alcance_ghg). Tolerante: si la columna aún no existe o la
+// consulta falla, devuelve [] y el informe sale exactamente como hoy.
+async function fetchAlcancesGHG() {
+  try {
+    const { rows } = await query(
+      `SELECT nombre, alcance_ghg
+         FROM motor_categorias
+        WHERE activo = true AND alcance_ghg IS NOT NULL
+        ORDER BY nombre`
+    );
+    return rows;
+  } catch (e) {
+    console.warn('[pdf] alcances GHG no disponibles:', e.message);
+    return [];
+  }
+}
+
 // Normaliza el JSONB de componentes (puede llegar como string).
 function componentesDe(declaracion) {
   const c = declaracion?.componentes;
@@ -108,8 +127,11 @@ function folio(sesion) {
 // ---------- INFORME CONSOLIDADO ----------
 // `declaracion` (opcional): fila de declaraciones_embalaje ya consultada por la
 // ruta. Si viene undefined, el servicio la busca por sesion.id; con null se omite.
-export async function generateReport({ sesion, facturas, declaracion }) {
+// `alcances` (opcional): filas {nombre, alcance_ghg} ya consultadas. Si viene
+// undefined, el servicio las busca en motor_categorias; con [] se omiten.
+export async function generateReport({ sesion, facturas, declaracion, alcances }) {
   const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
+  const alcancesGhg = Array.isArray(alcances) ? alcances : await fetchAlcancesGHG();
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const totalCo2e = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
@@ -202,6 +224,17 @@ export async function generateReport({ sesion, facturas, declaracion }) {
   doc.fillColor(GREEN).text(`${nf(saldo, 4)} tCO2e`, cols.cargo - 60, y + 6, { width: 137, align: 'right' });
   y += 34;
 
+  // Alcances GHG de las categorías presentes en el período (nota bajo la tabla,
+  // solo si hay categorías con alcance declarado).
+  const alcancePorCategoria = new Map(alcancesGhg.map((a) => [a.nombre, a.alcance_ghg]));
+  const alcancesPeriodo = [...new Set(categorias.map((c) => alcancePorCategoria.get(c)).filter(Boolean))];
+  if (alcancesPeriodo.length) {
+    if (y > 760) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
+      .text(`Alcances del período: ${alcancesPeriodo.join('; ')}`, 48, y, { width: 499 });
+    y = doc.y + 10;
+  }
+
   // --- Declaración de embalaje — REP Ley 20.920 ---
   if (decl && decl.nivel) {
     const comps = componentesDe(decl);
@@ -259,20 +292,38 @@ export async function generateReport({ sesion, facturas, declaracion }) {
   if (y > 620) { doc.addPage(); y = 48; }
   doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metodología', 48, y);
   y += 18;
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY);
+  // Marco de referencia: con alcances declarados por categoría se citan los
+  // alcances GHG reales; sin datos se mantiene la línea genérica de siempre.
+  if (alcancesGhg.length) {
+    doc.text('•  Marco de referencia: GHG Protocol Corporate Standard e ISO 14064-1. Clasificación por alcance según categoría:', 48, y, { width: 499 });
+    y = doc.y + 4;
+    for (const a of alcancesGhg) {
+      if (y > 760) { doc.addPage(); y = 48; }
+      doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+        .text(`· ${a.nombre}: ${a.alcance_ghg}`, 64, y, { width: 483 });
+      y = doc.y + 3;
+    }
+    y += 3;
+  } else {
+    doc.text('•  Marco de referencia: GHG Protocol (Scope 3 — emisiones indirectas de la cadena de valor) e ISO 14064-1.', 48, y, { width: 499 });
+    y = doc.y + 6;
+  }
   const metod = [
-    'Marco de referencia: GHG Protocol (Scope 3 — emisiones indirectas de la cadena de valor) e ISO 14064-1.',
     'Factores de emisión: HuellaChile (Ministerio del Medio Ambiente). Electricidad — Sistema Eléctrico Nacional (SEN) 2023: 0,2421 kgCO2e/kWh.',
     'Jerarquía de calidad del dato (4 niveles): (1) dato primario medido; (2) dato del proveedor; (3) factor nacional/sectorial; (4) factor por defecto / proxy.',
     'La asignación por ítem se realiza a partir del documento tributario cargado y su glosa, clasificada por categoría de actividad.',
   ];
   doc.font('Helvetica').fontSize(9).fillColor(GRAY);
   for (const m of metod) {
+    if (y > 750) { doc.addPage(); y = 48; doc.font('Helvetica').fontSize(9).fillColor(GRAY); }
     doc.text('•  ' + m, 48, y, { width: 499 });
     y = doc.y + 6;
   }
 
   // --- Disclaimer ---
   y += 6;
+  if (y > 720) { doc.addPage(); y = 48; }
   doc.roundedRect(48, y, 499, 40, 6).fillAndStroke('#fffbeb', '#fde68a');
   doc.font('Helvetica-Oblique').fontSize(9).fillColor('#92400e')
     .text('Este informe no constituye una verificación de tercera parte acreditada.', 60, y + 8, { width: 475 });

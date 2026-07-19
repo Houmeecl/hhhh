@@ -11,6 +11,8 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { extraerTextoPdf, extraerTextoImagenBuffer, ocrDisponible } from '../services/extractorTexto.js';
+import { parsearFacturaTexto } from '../services/facturaTexto.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta } from '../services/cadenaHash.js';
 import { validarComponentes, calcularReciclabilidad } from '../services/rep.js';
@@ -226,6 +228,31 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           dte = parseDte(file.buffer.toString('utf8'));
         }
 
+        // Orden de decisión por archivo — cada camino cae al siguiente si
+        // no logra señal real; el último es siempre el motor externo:
+        //  1) XML con ítems reales      → motor propio   (motor='propio')
+        //  2) PDF con capa de texto     → parser propio  (motor='propio_texto')
+        //  3) JPG/PNG con OCR local     → parser propio  (motor='propio_ocr')
+        //  4) resto (HEIC) o sin señal  → motor externo  (motor='externo')
+        let textoParseado = null;
+        let motorTexto = null;
+        if (!(dte && dte.items?.length)) {
+          try {
+            if (/\.pdf$/i.test(file.originalname)) {
+              const texto = await extraerTextoPdf(file.buffer);
+              const p = parsearFacturaTexto(texto);
+              if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_texto'; }
+            } else if (/\.(jpe?g|png)$/i.test(file.originalname) && ocrDisponible()) {
+              const ext = file.originalname.split('.').pop();
+              const texto = await extraerTextoImagenBuffer(file.buffer, ext);
+              const p = parsearFacturaTexto(texto);
+              if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
+            }
+          } catch {
+            textoParseado = null; // cualquier falla → motor externo, sin romper la sesión
+          }
+        }
+
         let analysis;
         let motor;
         if (dte && dte.items?.length) {
@@ -242,8 +269,23 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             items: calc.items,
           };
           motor = 'propio';
+        } else if (textoParseado) {
+          // Motor propio sobre texto extraído (PDF con capa de texto u OCR):
+          // los montos reales del documento alimentan el método por gasto.
+          const calc = calcularFactura(textoParseado.items, categoriasMotor);
+          analysis = {
+            invoice_id_simple: null,
+            numero_venta: textoParseado.folio ? `F-${textoParseado.folio}` : null,
+            rut_emisor: textoParseado.rut_emisor || null,
+            rut_receptor: textoParseado.rut_receptor || rut,
+            total_co2e: calc.total_co2e,
+            categoria: calc.categoria,
+            items: calc.items,
+          };
+          motor = motorTexto;
         } else {
-          // Sin datos reales extraíbles (PDF/JPG/PNG/HEIC o XML no parseable): motor externo.
+          // Sin datos reales extraíbles (HEIC, PDF sin texto, imagen sin OCR
+          // o sin señal suficiente): motor externo.
           analysis = await simpleApi.analyzeInvoice({
             sesionId: sesion.id,
             filename: file.originalname,

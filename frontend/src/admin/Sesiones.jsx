@@ -1,6 +1,24 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtFecha } from '../api.js';
 
+// Etiquetas humanas por motor de cálculo. Los tres variantes "propio" van en verde;
+// 'externo' (o cualquier valor desconocido, mostrado tal cual) va en gris.
+const MOTOR_LABELS = {
+  propio: 'Propio · XML',
+  propio_texto: 'Propio · PDF texto',
+  propio_ocr: 'Propio · OCR',
+  externo: 'Externo',
+};
+
+function BadgeMotor({ motor }) {
+  const esPropio = motor === 'propio' || motor === 'propio_texto' || motor === 'propio_ocr';
+  return (
+    <span className={`badge ${esPropio ? 'badge-green' : 'badge-gray'}`}>
+      {MOTOR_LABELS[motor] || motor || '—'}
+    </span>
+  );
+}
+
 export default function Sesiones() {
   const [sesiones, setSesiones] = useState([]);
   const [q, setQ] = useState('');
@@ -70,7 +88,7 @@ export default function Sesiones() {
                     <td><span className="badge badge-green">{f.categoria}</span></td>
                     <td className="muted">{f.rut_emisor}</td>
                     <td className="num">{fmt(f.total_co2e, 3)}</td>
-                    <td><span className={`badge ${f.motor === 'propio' ? 'badge-green' : 'badge-gray'}`}>{f.motor === 'propio' ? 'Propio' : 'Externo'}</span></td>
+                    <td><BadgeMotor motor={f.motor} /></td>
                     <td><a className="btn btn-ghost btn-sm" href={api.etiquetaUrl(f.id)} target="_blank" rel="noreferrer">Etiqueta</a></td>
                   </tr>
                 ))}
