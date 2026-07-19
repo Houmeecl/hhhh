@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
+import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 
 export default function Landing() {
   return (
@@ -81,6 +82,17 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* Calculadora pública: estimación en vivo con los factores reales del motor */}
+      <div className="container" style={{ padding: '56px 0' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>¿Cuánto compensarías?</h2>
+        <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
+          Mueve los números de tu operación mensual y mira una estimación
+          referencial de tus emisiones y su compensación, con los mismos
+          factores que usa la plataforma.
+        </p>
+        <CalculadoraCompensacion contexto="sicr3p" />
+      </div>
     </PublicLayout>
   );
 }

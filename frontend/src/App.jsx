@@ -9,6 +9,7 @@ import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import PosTerminal from './pages/PosTerminal.jsx';
 import AduanaVerde from './pages/AduanaVerde.jsx';
+import Cadena from './pages/Cadena.jsx';
 import Login from './admin/Login.jsx';
 import Activar from './admin/Activar.jsx';
 import AdminApp from './admin/AdminApp.jsx';
@@ -28,6 +29,7 @@ export default function App() {
       <Route path="/pos" element={<PosTerminal />} />
       <Route path="/pos-demo" element={<Navigate to="/pos" replace />} />
       <Route path="/aduana-verde" element={<AduanaVerde />} />
+      <Route path="/cadena" element={<Cadena />} />
 
       {/* Admin */}
       <Route path="/admin/login" element={<Login />} />

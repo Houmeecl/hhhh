@@ -50,6 +50,38 @@ const sinTildes = (s) =>
   String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const esItemRep = (descripcion) => /envase|embalaje/.test(sinTildes(descripcion));
 
+// ---------- Sello compartible (mismo helper que en Resultado.jsx) ----------
+// Duplicado a propósito: no va en api.js (se edita en paralelo). El sello SVG
+// lo sirve GET /api/sesiones/:id/sello.svg y el snippet enlaza a la
+// verificación pública de la primera factura de la sesión.
+function selloSnippet(sesionId, facturaId) {
+  const origin = window.location.origin;
+  return `<a href="${origin}/verificar/${facturaId}"><img src="${origin}/api/sesiones/${sesionId}/sello.svg" alt="Contabilidad de carbono trazable — sicr3p" width="340"></a>`;
+}
+
+// Copia al portapapeles con fallback de <textarea> (navegadores sin Clipboard API).
+async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
 // Los endpoints POS son nuevos y no están en api.js: fetch directo local.
 async function posAuth(serial, clave) {
   const res = await fetch('/api/pos/auth', {
@@ -817,6 +849,14 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const notificado = useRef(false);
   // Envío del comprobante por correo: null | 'enviando' | 'ok' | 'error'
   const [envio, setEnvio] = useState(null);
+  // Feedback del botón "Copiar código del sello": null | 'ok' | 'error'
+  const [selloCopia, setSelloCopia] = useState(null);
+
+  async function copiarSello() {
+    const ok = await copiarTexto(selloSnippet(sesion.id, f0.id));
+    setSelloCopia(ok ? 'ok' : 'error');
+    if (ok) setTimeout(() => setSelloCopia(null), 2500);
+  }
 
   // Registrar actividad del terminal (solo si hay terminal real conectado).
   useEffect(() => {
@@ -906,6 +946,22 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
               <span style={{ fontFamily: 'monospace' }}>{hashCorto}</span>
             </div>
           )}
+
+          {/* Sello compartible en miniatura, con el snippet para el sitio del cliente. */}
+          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <img
+              src={`/api/sesiones/${sesion.id}/sello.svg`}
+              alt="Sello verificable de contabilidad de carbono trazable — sicr3p"
+              width={260}
+              style={{ maxWidth: '100%', height: 'auto' }}
+            />
+            <button type="button" className="btn btn-outline btn-sm" onClick={copiarSello}>
+              {selloCopia === 'ok' ? '✓ Copiado' : 'Copiar código del sello'}
+            </button>
+            {selloCopia === 'error' && (
+              <span className="badge badge-red">No se pudo copiar en este navegador.</span>
+            )}
+          </div>
         </>
       )}
 

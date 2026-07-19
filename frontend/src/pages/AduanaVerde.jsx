@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
+import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 
 // Landing pública de Aduana Verde: la red de oficinas físicas de tramitación
 // verde que opera con la plataforma sicr3p por dentro. Marca de dos capas:
@@ -231,6 +232,18 @@ export default function AduanaVerde() {
             <div className="l">suscripciones y cero cobros por adelantado</div>
           </div>
         </div>
+      </div>
+
+      {/* Calculadora pública: el mismo motor del terminal, para sacar la
+          cuenta antes de pisar la oficina. */}
+      <div className="container" style={{ padding: '56px 0 0' }}>
+        <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>Saca la cuenta antes de venir</h2>
+        <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
+          ¿Cuánto compensarías? Ingresa tu operación mensual aproximada y mira
+          el número que verías en el mesón — estimación referencial con los
+          mismos factores del terminal.
+        </p>
+        <CalculadoraCompensacion contexto="aduana" />
       </div>
 
       {/* Bloque REP — Ley 20.920 */}

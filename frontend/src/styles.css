@@ -290,6 +290,10 @@ table.data tr:hover td { background: var(--bg); }
 
 @media (max-width: 900px) {
   .hero { grid-template-columns: 1fr; }
+  /* Sin esto, el .flow de 3 nodos del preview-card fija un mínimo intrínseco
+     (~353px) que ensancha la columna del hero 2px sobre el viewport chico. */
+  .hero > * { min-width: 0; }
+  .flow { overflow-x: auto; }
   .hero h1 { font-size: 44px; }
   .pasos-grid, .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
   .admin-head { flex-wrap: wrap; gap: 10px; }

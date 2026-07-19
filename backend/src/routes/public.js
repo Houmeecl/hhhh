@@ -12,9 +12,11 @@ import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
-import { hashDocumento, hashCadena, eslabonValido } from '../services/cadenaHash.js';
+import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta } from '../services/cadenaHash.js';
 import { validarComponentes, calcularReciclabilidad } from '../services/rep.js';
 import { validarCompensacion, calcularMonto } from '../services/compensacion.js';
+import { generarSelloSvg } from '../services/sello.js';
+import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 
 const router = express.Router();
 
@@ -76,6 +78,76 @@ router.get('/codigos/:codigo', async (req, res, next) => {
       codigo: c.codigo,
       empresa: c.empresa,
       creditos_restantes: Math.max(0, c.creditos - c.creditos_usados),
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/publico/calculadora — factores públicos de estimación ----------
+// Expone SOLO lo necesario para que cualquiera estime su CO2e antes de
+// registrarse: tarifa vigente + factores por categoría activa. Nada de
+// palabras clave ni fuentes internas del motor.
+router.get('/publico/calculadora', async (req, res, next) => {
+  try {
+    const { rows: cfgRows } = await query(
+      `SELECT tarifa_clp_tco2e FROM config_pos WHERE id = 1`
+    );
+    const tarifa = Number(cfgRows[0]?.tarifa_clp_tco2e ?? 5000);
+
+    const { rows } = await query(
+      `SELECT codigo, nombre, unidad_fisica, factor_fisico_kgco2e, factor_gasto_kgco2e_clp1000
+       FROM motor_categorias WHERE activo = true ORDER BY codigo`
+    );
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.json({
+      tarifa_clp_tco2e: tarifa,
+      categorias: rows.map((r) => ({
+        codigo: r.codigo,
+        nombre: r.nombre,
+        unidad_fisica: r.unidad_fisica,
+        factor_fisico_kgco2e: r.factor_fisico_kgco2e === null ? null : Number(r.factor_fisico_kgco2e),
+        factor_gasto_kgco2e_clp1000: Number(r.factor_gasto_kgco2e_clp1000),
+      })),
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/publico/cadena — estado público de la cadena de hash ----------
+// Vista anonimizada (ver services/cadenaPublica.js): jamás RUT, empresa,
+// folio ni archivo. La verificación completa recalcula toda la cadena, así
+// que se cachea en memoria por 5 minutos; el listado de últimos eslabones
+// es barato y se consulta fresco en cada visita.
+const CADENA_CACHE_TTL_MS = 5 * 60 * 1000;
+let cadenaCache = { resultado: null, n: 0, ultimoHash: '', ts: 0 };
+
+router.get('/publico/cadena', async (req, res, next) => {
+  try {
+    if (!cadenaCache.resultado || Date.now() - cadenaCache.ts > CADENA_CACHE_TTL_MS) {
+      const { rows } = await query(
+        `SELECT id, hash_anterior, hash_documento, hash_cadena
+         FROM facturas WHERE hash_cadena IS NOT NULL ORDER BY eslabon ASC`
+      );
+      cadenaCache = {
+        resultado: verificarCadenaCompleta(rows),
+        n: rows.length,
+        ultimoHash: rows[rows.length - 1]?.hash_cadena || '',
+        ts: Date.now(),
+      };
+    }
+
+    const { rows: ultimos } = await query(
+      `SELECT id, eslabon, created_at, hash_cadena, total_co2e
+       FROM facturas WHERE hash_cadena IS NOT NULL ORDER BY eslabon DESC LIMIT 20`
+    );
+
+    const r = cadenaCache.resultado;
+    res.json({
+      estado: {
+        n_eslabones: cadenaCache.n,
+        ultimo_hash_corto: hashCorto(r.ultimo_hash || cadenaCache.ultimoHash),
+        intacta: r.valido === true,
+        verificado_hace_s: Math.floor((Date.now() - cadenaCache.ts) / 1000),
+      },
+      eslabones: ultimos.map(filaEslabonPublico),
     });
   } catch (err) { next(err); }
 });
@@ -522,6 +594,48 @@ router.get('/sesiones/:id/informe.pdf', async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-informe-${req.params.id.slice(0, 8)}.pdf"`);
     res.send(pdf);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/sesiones/:id/sello.svg — sello embebible ----------
+// SVG que el comercio pega en su sitio: empresa, toneladas, distintivo REP
+// y estado de la cadena, con enlace de verificación pública. ?tema=oscuro
+// para fondos oscuros. La integridad usa el mismo criterio local que
+// GET /api/verificar/:id (eslabonValido de la primera factura).
+router.get('/sesiones/:id/sello.svg', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
+    const sesion = sRows[0];
+    if (!sesion) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    // Primera factura: ancla del enlace de verificación y de la cadena.
+    const { rows: fRows } = await query(
+      `SELECT * FROM facturas WHERE sesion_id = $1 ORDER BY created_at LIMIT 1`,
+      [req.params.id]
+    );
+    const factura = fRows[0] || null;
+
+    const { rows: dRows } = await query(
+      `SELECT nivel FROM declaraciones_embalaje WHERE sesion_id = $1`,
+      [req.params.id]
+    );
+
+    const svg = generarSelloSvg({
+      empresa: sesion.nombre_cliente,
+      t_co2e: Number(sesion.total_co2e || 0),
+      fecha: sesion.fecha ? new Date(sesion.fecha).toISOString().slice(0, 10) : '',
+      nivel_rep: dRows[0]?.nivel || null,
+      cadena_intacta: factura?.hash_cadena ? eslabonValido(factura) : null,
+      verificar_url: factura
+        ? `${config.publicAppUrl}/verificar/${factura.id}`
+        : config.publicAppUrl,
+      tema: req.query.tema === 'oscuro' ? 'oscuro' : 'claro',
+    });
+    res.setHeader('Content-Type', 'image/svg+xml');
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.send(svg);
   } catch (err) {
     next(err);
   }

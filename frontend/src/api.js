@@ -72,6 +72,10 @@ export const api = {
   posConfig: () => request('/pos/config'),
   registrarCompensacion: (sesionId, body) => request(`/sesiones/${sesionId}/compensacion`, { method: 'POST', body }),
   enviarComprobanteCorreo: (sesionId) => request(`/sesiones/${sesionId}/comprobante-correo`, { method: 'POST', body: {} }),
+  // Calculadora pública de los landings (factores del motor propio + tarifa)
+  // y cadena de hash pública para verificación abierta.
+  calculadora: () => request('/publico/calculadora'),
+  cadenaPublica: () => request('/publico/cadena'),
   informeUrl: (id) => `/api/sesiones/${id}/informe.pdf`,
   etiquetaUrl: (id) => `/api/facturas/${id}/etiqueta.pdf`,
   qrUrl: (id) => `/api/facturas/${id}/qr.png`,

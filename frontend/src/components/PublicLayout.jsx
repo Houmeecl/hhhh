@@ -21,7 +21,10 @@ export default function PublicLayout({ children }) {
       <footer className="pub-footer">
         <Logo size={22} light />
         <span>SICR3P SpA · Antofagasta, Chile</span>
-        <span>Contabilidad de carbono trazable · www.sicr3p.cl</span>
+        <span>
+          <a href="/cadena" style={{ color: 'inherit' }}>Cadena de integridad</a>
+          {' · '}Contabilidad de carbono trazable · www.sicr3p.cl
+        </span>
       </footer>
     </div>
   );

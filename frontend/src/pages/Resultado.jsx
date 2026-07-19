@@ -7,6 +7,122 @@ import { Donut } from '../components/Charts.jsx';
 import DeclaracionEmbalaje from '../components/DeclaracionEmbalaje.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 
+// ---------- Sello compartible ----------
+// El sello SVG lo sirve el backend (GET /api/sesiones/:id/sello.svg). Estas
+// funciones son locales (no van en api.js, que se edita en paralelo) y se
+// duplican a propósito en PosTerminal.jsx.
+
+// Snippet HTML que el cliente pega en su sitio: el sello enlaza a la
+// verificación pública de la primera factura de la sesión.
+function selloSnippet(sesionId, facturaId) {
+  const origin = window.location.origin;
+  return `<a href="${origin}/verificar/${facturaId}"><img src="${origin}/api/sesiones/${sesionId}/sello.svg" alt="Contabilidad de carbono trazable — sicr3p" width="340"></a>`;
+}
+
+// Copia al portapapeles con fallback de <textarea> para navegadores sin
+// Clipboard API (o contextos sin permiso).
+async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function SelloVerificable({ sesionId, facturaId }) {
+  const [tema, setTema] = useState('claro');
+  const [copiado, setCopiado] = useState(false);
+  const [errorCopia, setErrorCopia] = useState(false);
+  const src = `/api/sesiones/${sesionId}/sello.svg${tema === 'oscuro' ? '?tema=oscuro' : ''}`;
+
+  async function copiar() {
+    setErrorCopia(false);
+    const ok = await copiarTexto(selloSnippet(sesionId, facturaId));
+    if (ok) {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } else {
+      setErrorCopia(true);
+    }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 8 }}>
+      <h3 style={{ margin: '0 0 4px' }}>Tu sello verificable</h3>
+      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+        Pégalo en tu sitio o firma de correo: quien lo vea llega a la verificación pública de esta sesión.
+      </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+        {['claro', 'oscuro'].map((t) => (
+          <button
+            key={t}
+            type="button"
+            className={`btn btn-sm ${tema === t ? 'btn-primary' : 'btn-outline'}`}
+            aria-pressed={tema === t}
+            onClick={() => setTema(t)}
+          >
+            {t === 'claro' ? 'Claro' : 'Oscuro'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{
+        padding: 18, borderRadius: 12, display: 'flex', justifyContent: 'center',
+        background: tema === 'oscuro' ? 'var(--navy)' : 'var(--bg)',
+        border: '1px solid var(--border)',
+      }}>
+        <img
+          src={src}
+          alt={`Sello verificable de contabilidad de carbono trazable de sicr3p, tema ${tema}`}
+          width={340}
+          style={{ maxWidth: '100%', height: 'auto' }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+        <button type="button" className="btn btn-outline btn-sm" onClick={copiar}>
+          {copiado ? '✓ Copiado' : 'Copiar código para tu sitio'}
+        </button>
+        <a className="btn btn-ghost btn-sm" href={src} download={`sello-sicr3p-${sesionId}.svg`}>
+          <Icon.Download size={15} /> Descargar SVG
+        </a>
+        {copiado && <span className="badge badge-green">Código copiado al portapapeles</span>}
+        {errorCopia && (
+          <span className="badge badge-red">No se pudo copiar — selecciona y copia manualmente</span>
+        )}
+      </div>
+      {errorCopia && (
+        <textarea
+          readOnly
+          value={selloSnippet(sesionId, facturaId)}
+          onFocus={(e) => e.target.select()}
+          aria-label="Código HTML del sello para copiar manualmente"
+          style={{ width: '100%', marginTop: 8, fontFamily: 'monospace', fontSize: 12, minHeight: 64 }}
+        />
+      )}
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
+        El sello muestra tu contabilidad trazable — no es una certificación acreditada.
+      </p>
+    </div>
+  );
+}
+
 export default function Resultado() {
   const { id } = useParams();
   const [data, setData] = useState(null);
@@ -86,6 +202,10 @@ export default function Resultado() {
             onGuardada={setEmbalajeGuardado}
             onModificar={() => setEmbalajeGuardado(null)}
           />
+
+          {/* Sello compartible: SVG servido por el backend, con snippet para
+              pegar en el sitio del cliente. */}
+          <SelloVerificable sesionId={sesion.id} facturaId={(facturas[0] || factura).id} />
 
           {/* Donut de CO2e por categoría */}
           {porCategoria.length > 0 && (
