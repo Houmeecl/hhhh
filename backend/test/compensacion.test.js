@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {
   validarCompensacion,
   validarTarifa,
+  validarTipoCambio,
   calcularMonto,
   ESTADOS_PUBLICOS,
   MAX_METODO,
   TARIFA_MAX_CLP,
+  TIPO_CAMBIO_MAX_CLP,
 } from '../src/services/compensacion.js';
 
 // ---------- validarCompensacion ----------
@@ -49,6 +51,26 @@ test('validarTarifa exige número > 0 y <= $1.000.000', () => {
 
   for (const v of [0, -1, TARIFA_MAX_CLP + 1, 'abc', '', null, undefined, NaN, Infinity, true]) {
     assert.equal(validarTarifa(v).ok, false, `tarifa ${JSON.stringify(v)} debió rechazarse`);
+  }
+});
+
+// ---------- validarTipoCambio ----------
+
+test('validarTipoCambio: null/vacío/undefined LIMPIAN el valor (frontend sin USD)', () => {
+  assert.deepEqual(validarTipoCambio(null), { ok: true, tipo_cambio: null });
+  assert.deepEqual(validarTipoCambio(undefined), { ok: true, tipo_cambio: null });
+  assert.deepEqual(validarTipoCambio(''), { ok: true, tipo_cambio: null });
+});
+
+test('validarTipoCambio acepta números > 0 hasta el tope', () => {
+  assert.deepEqual(validarTipoCambio(950), { ok: true, tipo_cambio: 950 });
+  assert.deepEqual(validarTipoCambio('987.45'), { ok: true, tipo_cambio: 987.45 }); // string del form
+  assert.equal(validarTipoCambio(TIPO_CAMBIO_MAX_CLP).ok, true);
+});
+
+test('validarTipoCambio rechaza basura, negativos y sobre el tope', () => {
+  for (const v of [0, -1, TIPO_CAMBIO_MAX_CLP + 1, 'abc', NaN, Infinity, true, false]) {
+    assert.equal(validarTipoCambio(v).ok, false, `tipo de cambio ${JSON.stringify(v)} debió rechazarse`);
   }
 });
 

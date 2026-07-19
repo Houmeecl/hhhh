@@ -92,6 +92,17 @@ a:hover { text-decoration: underline; }
   padding: 22px 40px; border-bottom: 1px solid var(--border); background: #fff;
 }
 .pub-header nav { display: flex; gap: 18px; align-items: center; }
+/* Selector de idioma discreto del header público (ES · EN · PT).
+   Texto plano, sin bordes: no compite con los CTA y no desborda a 375px
+   (el header ya hace wrap en móvil). */
+.lang-switch { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray-300); white-space: nowrap; }
+.lang-switch button {
+  background: none; border: none; padding: 2px 3px; cursor: pointer;
+  font-family: var(--font); font-size: 12px; font-weight: 600;
+  color: var(--gray); letter-spacing: 0.04em;
+}
+.lang-switch button:hover { color: var(--navy); }
+.lang-switch button.on { color: var(--green-600); }
 .pub-footer {
   background: var(--navy); color: #cbd5e1;
   padding: 28px 40px; display: flex; align-items: center; justify-content: space-between;
@@ -164,6 +175,9 @@ a:hover { text-decoration: underline; }
 .resultado-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
 .resultado-grid > * { min-width: 0; }
 .result-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+/* Variante de 3 columnas (Verificar). Como clase — nunca inline — para que
+   el colapso a 1 columna bajo 900px siga aplicando. */
+.result-cards.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .result-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
 .result-card .big { font-size: 28px; font-weight: 800; color: var(--green-600); }
 .result-card .big small { font-size: 14px; color: var(--navy); font-weight: 600; }
@@ -317,7 +331,8 @@ table.data tr:hover td { background: var(--bg); }
 
 @media (max-width: 640px) {
   .pub-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
-  .pub-header nav { gap: 10px; }
+  /* El nav (idiomas + CTA) también puede quebrar línea: cero desborde a 375px */
+  .pub-header nav { gap: 10px; flex-wrap: wrap; }
   .pub-footer { padding: 20px 16px; flex-direction: column; align-items: flex-start; text-align: left; }
   .narrow-page { margin: 28px auto; padding: 0 14px; }
   .dropzone { padding: 28px 16px; }

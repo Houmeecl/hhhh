@@ -33,15 +33,24 @@ export function normalizarUnidad(unidad) {
 }
 
 // Clasifica un ítem por coincidencia de palabra clave en su glosa.
+// Gana la palabra clave MÁS LARGA (la más específica): "flete maritimo"
+// le gana a "flete" y "agua potable" a "agua", así el resultado no
+// depende del orden en que la BD devuelva las categorías. A igual largo
+// gana la primera categoría leída (comportamiento previo).
 // Devuelve el código de categoría (default 'servicios', catch-all).
 export function clasificar(texto, categorias) {
   const t = limpiar(texto);
+  let mejor = null; // { codigo, largo }
   for (const cat of categorias.values()) {
     if (!cat.activo) continue;
     for (const kw of cat.palabras_clave || []) {
-      if (t.includes(limpiar(kw))) return cat.codigo;
+      const k = limpiar(kw);
+      if (k && t.includes(k) && (!mejor || k.length > mejor.largo)) {
+        mejor = { codigo: cat.codigo, largo: k.length };
+      }
     }
   }
+  if (mejor) return mejor.codigo;
   return categorias.has('servicios') ? 'servicios' : [...categorias.keys()][0];
 }
 

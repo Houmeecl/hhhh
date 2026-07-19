@@ -49,6 +49,9 @@ app.use('/api/admin/transporte', transporteRoutes);
 app.use('/api/admin/accesos', accesosRoutes);
 app.use('/api/mandante', apiLimiter, mandanteRoutes);
 app.use('/api/admin/motor-propio', motorRoutes);
+// Alias del mismo router: el registro de fuentes metodológicas se consume
+// como /api/admin/motor/fuentes; /api/admin/motor-propio sigue vivo (compat).
+app.use('/api/admin/motor', motorRoutes);
 app.use('/api/admin/cadena', cadenaRoutes);
 app.use('/api/pos', apiLimiter, posRoutes);
 app.use('/api/admin/pos', posAdminRoutes);

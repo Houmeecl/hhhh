@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
+import { useIdioma } from '../lib/i18n.js';
 
 // Landing pública de Aduana Verde: la red de oficinas físicas de tramitación
 // verde que opera con la plataforma sicr3p por dentro. Marca de dos capas:
@@ -91,6 +92,7 @@ function StandAduanaVerde() {
 }
 
 export default function AduanaVerde() {
+  const { t } = useIdioma();
   return (
     <PublicLayout>
       {/* Hero con gradiente radial verde sutil */}
@@ -98,47 +100,40 @@ export default function AduanaVerde() {
         <div className="container">
           <section className="hero">
             <div className="fade-up">
-              <span className="badge badge-amber">Red de oficinas en preparación</span>
+              <span className="badge badge-amber">{t('av.badge_red')}</span>
               <h1 style={{ marginTop: 14, marginBottom: 10 }}>
                 Aduana<br />
                 Verde<span style={{ color: 'var(--green)' }}>.</span>
               </h1>
               <p className="av-kicker">
-                Red de oficinas físicas · by{' '}
+                {t('av.kicker')}{' '}
                 <Link to="/" className="av-brand">sicr3p<span className="av-dot">.</span></Link>
               </p>
-              <p className="lead-green">Lo que calculas es lo que compensas.</p>
-              <p className="sub">
-                ¿Tu mandante te pide reportar emisiones y no sabes por dónde
-                partir? Llega con tus facturas y guías, mira el cálculo en
-                pantalla, compensa exactamente ese número y sal con tu informe
-                y tu etiqueta QR en la mano. Todo en una visita.
-              </p>
+              <p className="lead-green">{t('av.lead')}</p>
+              <p className="sub">{t('av.sub')}</p>
               <div className="hero-actions">
-                <Link to="/pos" className="btn btn-primary">Conoce el terminal en 2 minutos</Link>
-                <a href="mailto:contacto@sicr3p.cl?subject=Cupo%20fundador%20Aduana%20Verde" className="btn btn-outline">Escríbenos</a>
+                <Link to="/pos" className="btn btn-primary">{t('av.cta_terminal')}</Link>
+                <a href="mailto:contacto@sicr3p.cl?subject=Cupo%20fundador%20Aduana%20Verde" className="btn btn-outline">{t('av.cta_escribenos')}</a>
               </div>
               <p className="muted" style={{ marginTop: 22, fontSize: 14 }}>
-                Cuando salgas de la oficina, tu respaldo queda verificable en
-                línea: quien escanee tu QR verá lo mismo que tú.
+                {t('av.nota_qr')}
               </p>
               <div className="trust-bar">
-                <span className="item"><Icon.Building size={17} /> Oficinas físicas</span>
-                <span className="item"><Icon.Qr size={17} /> Etiqueta QR verificable</span>
-                <span className="item"><Icon.Shield size={17} /> Trazabilidad con cadena de hash</span>
+                <span className="item"><Icon.Building size={17} /> {t('av.trust_oficinas')}</span>
+                <span className="item"><Icon.Qr size={17} /> {t('av.trust_qr')}</span>
+                <span className="item"><Icon.Shield size={17} /> {t('av.trust_hash')}</span>
               </div>
             </div>
 
-            {/* La oficina: ilustración del stand físico Aduana Verde */}
+            {/* La oficina: ilustración del stand físico Aduana Verde.
+                El texto del SVG queda en español: es escenografía del local. */}
             <div className="av-stand-wrap fade-up d2">
               <StandAduanaVerde />
               <div className="av-stand-note">
                 <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
                 <span>
-                  <b>Compensas exactamente lo que calculaste.</b>{' '}
-                  <span className="muted">No pagas un trámite: pagas compensar el CO2 de tus propios
-                  documentos, con tarifa referencial por t CO2e. Sin cobros por
-                  adelantado ni suscripciones.</span>
+                  <b>{t('av.stand_nota_b')}</b>{' '}
+                  <span className="muted">{t('av.stand_nota')}</span>
                 </span>
               </div>
             </div>
@@ -149,35 +144,32 @@ export default function AduanaVerde() {
       {/* Franja "terminal físico": el flujo de la oficina como diagrama */}
       <section className="av-terminal">
         <div className="container">
-          <p className="av-term-label"><span className="av-led" /> Flujo del terminal · Aduana Verde</p>
-          <h2>Del mesón a tu etiqueta, sin vueltas</h2>
-          <p className="av-term-sub">
-            Esto es lo que pasa dentro de la oficina mientras esperas: cuatro
-            estaciones, un solo resultado verificable.
-          </p>
+          <p className="av-term-label"><span className="av-led" /> {t('av.term_label')}</p>
+          <h2>{t('av.term_titulo')}</h2>
+          <p className="av-term-sub">{t('av.term_sub')}</p>
           <div className="av-flow">
             <div className="av-flow-node">
               <div className="av-ico"><Icon.Doc size={22} /></div>
-              <b>Documento</b>
-              <span>Entregas tus facturas y guías en el mesón; se escanean ahí mismo.</span>
+              <b>{t('av.flujo_doc')}</b>
+              <span>{t('av.flujo_doc_d')}</span>
             </div>
             <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
             <div className="av-flow-node">
               <div className="av-ico"><Icon.Cog size={22} /></div>
-              <b>Cálculo</b>
-              <span>La plataforma sicr3p reconoce los datos y calcula tus emisiones en t CO2e.</span>
+              <b>{t('av.flujo_calc')}</b>
+              <span>{t('av.flujo_calc_d')}</span>
             </div>
             <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
             <div className="av-flow-node">
               <div className="av-ico"><Icon.CreditCard size={22} /></div>
-              <b>Compensación</b>
-              <span>Ves el número exacto en pantalla y pagas compensar eso, con tarifa referencial por t CO2e.</span>
+              <b>{t('av.flujo_comp')}</b>
+              <span>{t('av.flujo_comp_d')}</span>
             </div>
             <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
             <div className="av-flow-node">
               <div className="av-ico"><Icon.Qr size={22} /></div>
-              <b>Etiqueta QR</b>
-              <span>Sales con tu informe y una etiqueta verificable, con trazabilidad de cadena de hash.</span>
+              <b>{t('av.flujo_qr')}</b>
+              <span>{t('av.flujo_qr_d')}</span>
             </div>
           </div>
         </div>
@@ -185,27 +177,27 @@ export default function AduanaVerde() {
 
       <section className="pasos">
         <div className="container">
-          <h2>Tu visita, paso a paso</h2>
+          <h2>{t('av.pasos_titulo')}</h2>
           <div className="two-col-grid" style={{ gap: 28 }}>
             <div className="paso fade-up d1">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Doc size={28} /></div>
-              <h3>1. Llegas con lo que ya tienes</h3>
-              <p>Facturas y guías de despacho de tu operación, en papel o digitales. Sin preparación previa ni planillas.</p>
+              <h3>{t('av.paso1_t')}</h3>
+              <p>{t('av.paso1_d')}</p>
             </div>
             <div className="paso fade-up d2">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Cog size={28} /></div>
-              <h3>2. Miras el cálculo en pantalla</h3>
-              <p>Los documentos se escanean en el terminal y la plataforma sicr3p calcula tus emisiones frente a ti. Ves el número exacto antes de decidir.</p>
+              <h3>{t('av.paso2_t')}</h3>
+              <p>{t('av.paso2_d')}</p>
             </div>
             <div className="paso fade-up d3">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.CreditCard size={28} /></div>
-              <h3>3. Compensas ese número, no otro</h3>
-              <p>No pagas un trámite: pagas compensar el CO2 que acabas de ver calculado, con tarifa referencial por t CO2e. Ese es todo el modelo.</p>
+              <h3>{t('av.paso3_t')}</h3>
+              <p>{t('av.paso3_d')}</p>
             </div>
             <div className="paso fade-up d4">
               <div className="ico" style={{ color: 'var(--green-600)' }}><Icon.Qr size={28} /></div>
-              <h3>4. Te llevas el respaldo en la mano</h3>
-              <p>Informe de tu contabilidad de carbono y etiqueta con QR verificable. Cuando tu mandante lo escanee, verá lo mismo que tú.</p>
+              <h3>{t('av.paso4_t')}</h3>
+              <p>{t('av.paso4_d')}</p>
             </div>
           </div>
         </div>
@@ -216,31 +208,27 @@ export default function AduanaVerde() {
           consistente (.sec-pad) para dar ritmo vertical a la página. */}
       <section className="sec-pad">
         <div className="container">
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>La cuenta es corta</h2>
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.cuenta_titulo')}</h2>
           <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
-            Sin letra chica: el modelo completo de Aduana Verde cabe en cuatro números.
+            {t('av.cuenta_sub')}
           </p>
           <div className="av-cuenta-grid">
             <div className="av-stat av-tarifa fade-up d1">
               <div className="n">1 = 1</div>
-              <div className="l">
-                Una tonelada calculada es una tonelada compensada. Pagas según
-                los documentos escaneados en tu visita, con tarifa referencial
-                por t CO2e.
-              </div>
-              <div className="av-nota">Tarifa referencial — se confirma en la oficina antes de pagar.</div>
+              <div className="l">{t('av.stat_1eq')}</div>
+              <div className="av-nota">{t('av.stat_1eq_nota')}</div>
             </div>
             <div className="av-stat fade-up d2">
               <div className="n">1</div>
-              <div className="l">visita basta para salir con informe y etiqueta QR</div>
+              <div className="l">{t('av.stat_visita')}</div>
             </div>
             <div className="av-stat fade-up d3">
               <div className="n">2</div>
-              <div className="l">declaraciones en la misma pasada: emisiones y REP</div>
+              <div className="l">{t('av.stat_decls')}</div>
             </div>
             <div className="av-stat fade-up d4">
               <div className="n">0</div>
-              <div className="l">suscripciones y cero cobros por adelantado</div>
+              <div className="l">{t('av.stat_cero')}</div>
             </div>
           </div>
         </div>
@@ -250,11 +238,9 @@ export default function AduanaVerde() {
           cuenta antes de pisar la oficina. */}
       <section className="sec-alt sec-pad">
         <div className="container">
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>Saca la cuenta antes de venir</h2>
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.calc_titulo')}</h2>
           <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
-            ¿Cuánto compensarías? Ingresa tu operación mensual aproximada y mira
-            el número que verías en el mesón — estimación referencial con los
-            mismos factores del terminal.
+            {t('av.calc_sub')}
           </p>
           <CalculadoraCompensacion contexto="aduana" />
         </div>
@@ -267,33 +253,26 @@ export default function AduanaVerde() {
           <div className="card card-pad av-card-hover">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.List size={24} /></span>
-              <h3 style={{ margin: 0 }}>Declara tu embalaje en la misma visita</h3>
+              <h3 style={{ margin: 0 }}>{t('av.rep_titulo')}</h3>
             </div>
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
-              Mientras el terminal calcula tus emisiones, declaras también tus
-              envases y embalajes — productos prioritarios de la Ley REP
-              20.920 — con su porcentaje de reciclabilidad, clasificado en
-              tres niveles:
+              {t('av.rep_texto')}
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-              <span className="badge badge-green">Reciclabilidad Alta</span>
-              <span className="badge badge-amber">Reciclabilidad Media</span>
-              <span className="badge badge-red">Reciclabilidad Baja</span>
+              <span className="badge badge-green">{t('av.rep_alta')}</span>
+              <span className="badge badge-amber">{t('av.rep_media')}</span>
+              <span className="badge badge-red">{t('av.rep_baja')}</span>
             </div>
           </div>
           <div className="card card-pad av-card-hover">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.Users size={24} /></span>
-              <h3 style={{ margin: 0 }}>Para el proveedor al que le exigen</h3>
+              <h3 style={{ margin: 0 }}>{t('av.prov_titulo')}</h3>
             </div>
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
-              Si le vendes a mandantes o grandes compañías que piden
-              información REP y de emisiones, y hasta ahora respondes con
-              correos y planillas, esto te cambia la conversación: de una sola
-              visita sales con ambas declaraciones respaldadas y verificables.
-              En tu próxima licitación, muestras el QR y listo.
+              {t('av.prov_texto')}
             </p>
-            <a href="mailto:contacto@sicr3p.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">Quiero saber más</a>
+            <a href="mailto:contacto@sicr3p.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('av.prov_cta')}</a>
           </div>
         </div>
         </div>
@@ -303,36 +282,31 @@ export default function AduanaVerde() {
       <section className="pasos">
         <div className="container">
           <div className="card card-pad av-card-hover" style={{ textAlign: 'center' }}>
-            <span className="badge badge-amber">Red de oficinas en preparación</span>
-            <h2 style={{ margin: '14px 0 10px', fontSize: 26 }}>Estamos armando la red</h2>
+            <span className="badge badge-amber">{t('av.badge_red')}</span>
+            <h2 style={{ margin: '14px 0 10px', fontSize: 26 }}>{t('av.pre_titulo')}</h2>
             <p className="muted" style={{ fontSize: 15, lineHeight: 1.6, maxWidth: 560, margin: '0 auto 20px' }}>
-              Aduana Verde está en pre-lanzamiento: todavía no publicamos
-              direcciones de oficinas. Los primeros cupos son para clientes
-              fundadores y operadores de punto. Escríbenos hoy — es un correo,
-              nada más — y te guardamos el tuyo: cuando abramos cerca tuyo,
-              serás de los primeros en pasar por el mesón.
+              {t('av.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicr3p.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">Guárdame un cupo fundador</a>
-              <a href="mailto:contacto@sicr3p.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">Quiero operar un punto</a>
+              <a href="mailto:contacto@sicr3p.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">{t('av.pre_cta1')}</a>
+              <a href="mailto:contacto@sicr3p.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">{t('av.pre_cta2')}</a>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-              ¿Prefieres mirar antes de escribir?{' '}
-              <Link to="/pos">Conoce el terminal en 2 minutos</Link>.
+              {t('av.pre_mirar')}{' '}
+              <Link to="/pos">{t('av.cta_terminal')}</Link>.
             </p>
 
             {/* Nota de compensación, en el tono ya aprobado del sitio */}
             <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span className="badge badge-gray" style={{ fontSize: 11 }}>Próximamente</span>
+              <span className="badge badge-gray" style={{ fontSize: 11 }}>{t('comun.proximamente')}</span>
               <span className="muted" style={{ fontSize: 12 }}>
-                Compensación de carbono vía un socio ambiental acreditado.
+                {t('comun.socio_ambiental')}
               </span>
             </div>
+            {/* Honestidad de marca: en inglés incluye "not affiliated with any
+                national customs service" (Aduana Verde no es aduana estatal). */}
             <p className="muted" style={{ fontSize: 12, marginTop: 8, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
-              Aduana Verde no realiza trámites ante el servicio de aduanas ni
-              constituye una verificación de tercera parte acreditada: es
-              tramitación verde de tus documentos comerciales sobre la
-              plataforma sicr3p.
+              {t('av.disclaimer')}
             </p>
           </div>
         </div>

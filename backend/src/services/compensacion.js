@@ -52,6 +52,29 @@ export function validarTarifa(valor) {
   return { ok: true, tarifa: t };
 }
 
+// Valida el tipo de cambio USD→CLP que fija el admin (migración 018).
+// null / '' / undefined es VÁLIDO y significa "limpiar": el frontend deja
+// de mostrar USD. El valor lo pone el admin a mano citando su fuente.
+// Devuelve { ok: true, tipo_cambio } (Number o null) o { ok: false, error }.
+export const TIPO_CAMBIO_MAX_CLP = 5000; // CLP por USD: más es un error de tipeo
+
+export function validarTipoCambio(valor) {
+  if (valor === null || valor === undefined || valor === '') {
+    return { ok: true, tipo_cambio: null };
+  }
+  const t = Number(valor);
+  if (typeof valor === 'boolean' || !Number.isFinite(t)) {
+    return { ok: false, error: 'El tipo de cambio debe ser un número (CLP por USD) o null para limpiarlo.' };
+  }
+  if (t <= 0) {
+    return { ok: false, error: 'El tipo de cambio debe ser mayor que 0.' };
+  }
+  if (t > TIPO_CAMBIO_MAX_CLP) {
+    return { ok: false, error: 'El tipo de cambio supera el máximo permitido ($5.000 por USD).' };
+  }
+  return { ok: true, tipo_cambio: t };
+}
+
 // Monto a cobrar en CLP: ROUND(t_co2e × tarifa), pesos enteros.
 // Un trámite 'omitido' registra la decisión pero cobra $0.
 // Valores no numéricos o negativos jamás producen un cobro (0).

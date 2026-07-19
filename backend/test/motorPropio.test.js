@@ -61,6 +61,61 @@ test('clasificar encuentra categoría por palabra clave, ignorando tildes y may�
   assert.equal(clasificar('Flete regional norte', cats), 'transporte');
 });
 
+// Subconjunto del seed de migrations/018_metodologias_avaladas.sql, en memoria.
+function categoriasConNuevas() {
+  const cats = categoriasEjemplo();
+  // La 018 traslada 'glp'/'gas licuado' desde combustible a la categoría dedicada.
+  cats.get('combustible').palabras_clave = cats
+    .get('combustible')
+    .palabras_clave.filter((k) => k !== 'glp' && k !== 'gas licuado');
+  cats.set('glp', {
+    codigo: 'glp', nombre: 'Gas licuado (GLP)', unidad_fisica: 'L',
+    factor_fisico_kgco2e: 1.61, factor_gasto_kgco2e_clp1000: 1.00,
+    palabras_clave: ['glp', 'gas licuado', 'lipigas', 'abastible', 'gasco', 'cilindro de gas', 'balon de gas'],
+    activo: true,
+  });
+  cats.set('agua_potable', {
+    codigo: 'agua_potable', nombre: 'Agua potable (red)', unidad_fisica: 'm3',
+    factor_fisico_kgco2e: 0.41, factor_gasto_kgco2e_clp1000: 0.30,
+    palabras_clave: ['agua potable', 'aguas andinas', 'esval', 'essbio', 'smapa'],
+    activo: true,
+  });
+  cats.set('residuos_relleno', {
+    codigo: 'residuos_relleno', nombre: 'Residuos a relleno sanitario', unidad_fisica: 'kg',
+    factor_fisico_kgco2e: 0.45, factor_gasto_kgco2e_clp1000: 0.50,
+    palabras_clave: ['relleno sanitario', 'disposicion final', 'retiro de residuos', 'residuos', 'vertedero', 'basura'],
+    activo: true,
+  });
+  cats.set('maritimo_contenedor', {
+    codigo: 'maritimo_contenedor', nombre: 'Marítimo — contenedor', unidad_fisica: 't-km',
+    factor_fisico_kgco2e: 0.012, factor_gasto_kgco2e_clp1000: 0.20,
+    palabras_clave: ['flete maritimo', 'maritimo', 'naviera', 'contenedor', 'embarque maritimo'],
+    activo: true,
+  });
+  return cats;
+}
+
+test('clasificar prefiere la palabra clave más específica (la más larga)', () => {
+  const cats = categoriasConNuevas();
+  // "flete marítimo" (14) le gana a "flete" (5) del transporte terrestre.
+  assert.equal(clasificar('Flete marítimo Valparaíso-Shanghái', cats), 'maritimo_contenedor');
+  // "aguas andinas" / "agua potable" le ganan a "agua" de la categoría genérica.
+  assert.equal(clasificar('Consumo Aguas Andinas junio', cats), 'agua_potable');
+  assert.equal(clasificar('Agua potable planta', cats), 'agua_potable');
+  // "relleno sanitario" (17) le gana a "sanitario" (9) de la categoría agua.
+  assert.equal(clasificar('Disposición en relleno sanitario', cats), 'residuos_relleno');
+  // "gas licuado" ya no vive en combustible: cae en la categoría GLP (IPCC).
+  assert.equal(clasificar('Gas licuado 15 kg Lipigas', cats), 'glp');
+});
+
+test('clasificar no depende del orden en que la BD devuelva las categorías', () => {
+  const cats = categoriasConNuevas();
+  const invertidas = new Map([...cats.entries()].reverse());
+  for (const glosa of ['Flete marítimo contenedor', 'Agua potable planta', 'Relleno sanitario mensual', 'Flete regional norte']) {
+    assert.equal(clasificar(glosa, cats), clasificar(glosa, invertidas), `"${glosa}" debe clasificar igual en ambos órdenes`);
+  }
+});
+
 test('clasificar cae a "servicios" cuando no hay coincidencia', () => {
   const cats = categoriasEjemplo();
   assert.equal(clasificar('Concepto sin relación aparente', cats), 'servicios');

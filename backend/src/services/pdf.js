@@ -65,10 +65,38 @@ export async function fetchDeclaracionEmbalaje(sesionId) {
 }
 
 // ---------- Alcances GHG por categoría ----------
+// Cita corta de una fuente metodológica: "organismo — documento (año)".
+// PURA y exportada para test. Honestidad: los organismos citados avalan
+// la METODOLOGÍA, no a sicr3p.
+export function citaFuente({ organismo, documento, version_anio } = {}) {
+  const cuerpo = [organismo, documento]
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+    .join(' — ');
+  if (!cuerpo) return '';
+  const anio = String(version_anio ?? '').trim();
+  return anio ? `${cuerpo} (${anio})` : cuerpo;
+}
+
 // Trae las categorías activas con alcance GHG declarado (columna nueva
-// motor_categorias.alcance_ghg). Tolerante: si la columna aún no existe o la
-// consulta falla, devuelve [] y el informe sale exactamente como hoy.
+// motor_categorias.alcance_ghg) y, si existe el registro de fuentes
+// (migración 018), la fuente vinculada para citarla en la metodología.
+// Tolerante en dos niveles: sin tabla/columna de fuentes se reintenta la
+// consulta original (render idéntico al actual, sin citas); si tampoco
+// existe alcance_ghg, devuelve [] y el informe sale exactamente como hoy.
 async function fetchAlcancesGHG() {
+  try {
+    const { rows } = await query(
+      `SELECT mc.nombre, mc.alcance_ghg, f.organismo, f.documento, f.version_anio
+         FROM motor_categorias mc
+         LEFT JOIN fuentes_metodologicas f ON f.id = mc.fuente_metodologica_id
+        WHERE mc.activo = true AND mc.alcance_ghg IS NOT NULL
+        ORDER BY mc.nombre`
+    );
+    return rows;
+  } catch {
+    // fuentes_metodologicas o la FK aún no migradas: sigue el camino original
+  }
   try {
     const { rows } = await query(
       `SELECT nombre, alcance_ghg
@@ -127,8 +155,9 @@ function folio(sesion) {
 // ---------- INFORME CONSOLIDADO ----------
 // `declaracion` (opcional): fila de declaraciones_embalaje ya consultada por la
 // ruta. Si viene undefined, el servicio la busca por sesion.id; con null se omite.
-// `alcances` (opcional): filas {nombre, alcance_ghg} ya consultadas. Si viene
-// undefined, el servicio las busca en motor_categorias; con [] se omiten.
+// `alcances` (opcional): filas {nombre, alcance_ghg} ya consultadas — pueden
+// traer además {organismo, documento, version_anio} para citar la fuente. Si
+// viene undefined, el servicio las busca en motor_categorias; con [] se omiten.
 export async function generateReport({ sesion, facturas, declaracion, alcances }) {
   const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
   const alcancesGhg = Array.isArray(alcances) ? alcances : await fetchAlcancesGHG();
@@ -300,8 +329,11 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     y = doc.y + 4;
     for (const a of alcancesGhg) {
       if (y > 760) { doc.addPage(); y = 48; }
+      // Con fuente vinculada (migración 018) se cita "organismo — documento
+      // (año)"; sin fuente la línea queda idéntica a la actual.
+      const cita = citaFuente(a);
       doc.font('Helvetica').fontSize(9).fillColor(GRAY)
-        .text(`· ${a.nombre}: ${a.alcance_ghg}`, 64, y, { width: 483 });
+        .text(`· ${a.nombre}: ${a.alcance_ghg}${cita ? ` · Fuente: ${cita}` : ''}`, 64, y, { width: 483 });
       y = doc.y + 3;
     }
     y += 3;

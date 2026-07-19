@@ -33,6 +33,25 @@ const TEMAS = {
 const VERDE = '#28a745';
 const FUENTE = 'Poppins, -apple-system, Segoe UI, sans-serif';
 
+// Etiquetas fijas del sello por idioma. El español es el default y queda
+// byte a byte idéntico al sello original; 'en' traduce SOLO los textos
+// fijos (empresa, toneladas y fecha son datos y no se tocan). Igual que
+// en español, jamás "certified" ni "accredited": contabilidad verificable.
+const ETIQUETAS = {
+  es: {
+    aria: 'Sello sicr3p de contabilidad de carbono trazable',
+    subtitulo: 'Contabilidad de carbono trazable',
+    cadena: 'cadena de integridad',
+    verificar: 'verificable en',
+  },
+  en: {
+    aria: 'sicr3p verifiable carbon accounting seal',
+    subtitulo: 'Verifiable carbon accounting',
+    cadena: 'chain intact',
+    verificar: 'verify at',
+  },
+};
+
 // Genera el sello completo como string SVG (~340×120). Función PURA:
 // recibe todo lo que necesita, no toca red ni base de datos.
 export function generarSelloSvg({
@@ -43,8 +62,10 @@ export function generarSelloSvg({
   cadena_intacta = null,
   verificar_url = '',
   tema = 'claro',
+  lang = 'es',
 } = {}) {
   const c = TEMAS[tema] || TEMAS.claro;
+  const L = ETIQUETAS[lang] || ETIQUETAS.es;
   const emp = escapeXml(truncar(empresa, 28));
   const toneladas = escapeXml(`${Number(t_co2e || 0)} t CO2e`);
   const fechaTxt = escapeXml(fecha || '');
@@ -52,7 +73,7 @@ export function generarSelloSvg({
 
   const partes = [];
   partes.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="340" height="120" viewBox="0 0 340 120" role="img" aria-label="Sello sicr3p de contabilidad de carbono trazable">`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="340" height="120" viewBox="0 0 340 120" role="img" aria-label="${L.aria}">`
   );
   partes.push(
     `<rect x="0.5" y="0.5" width="339" height="119" rx="10" fill="${c.fondo}" stroke="${c.borde}"/>`
@@ -62,7 +83,7 @@ export function generarSelloSvg({
     `<text x="16" y="26" font-family="${FUENTE}" font-size="16" font-weight="700" fill="${c.texto}">sicr3p<tspan fill="${VERDE}">.</tspan></text>`
   );
   partes.push(
-    `<text x="16" y="40" font-family="${FUENTE}" font-size="8.5" fill="${c.suave}">Contabilidad de carbono trazable</text>`
+    `<text x="16" y="40" font-family="${FUENTE}" font-size="8.5" fill="${c.suave}">${L.subtitulo}</text>`
   );
   partes.push(
     `<text x="16" y="61" font-family="${FUENTE}" font-size="12" font-weight="600" fill="${c.texto}">${emp}</text>`
@@ -84,13 +105,13 @@ export function generarSelloSvg({
   }
   if (cadena_intacta === true) {
     partes.push(
-      `<text x="${x}" y="95" font-family="${FUENTE}" font-size="8.5" fill="${VERDE}">&#10003; cadena de integridad</text>`
+      `<text x="${x}" y="95" font-family="${FUENTE}" font-size="8.5" fill="${VERDE}">&#10003; ${L.cadena}</text>`
     );
   }
 
   if (urlSinProtocolo) {
     partes.push(
-      `<text x="16" y="112" font-family="${FUENTE}" font-size="7.5" fill="${c.suave}">verificable en ${urlSinProtocolo}</text>`
+      `<text x="16" y="112" font-family="${FUENTE}" font-size="7.5" fill="${c.suave}">${L.verificar} ${urlSinProtocolo}</text>`
     );
   }
   partes.push('</svg>');

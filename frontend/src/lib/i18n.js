@@ -1,0 +1,468 @@
+// ============================================================
+// i18n liviano de las superficies públicas de Aduana Verde (es/en/pt).
+// Sin dependencias: diccionarios planos + pub/sub mínimo con
+// useSyncExternalStore. Español es la fuente de verdad: si falta una
+// clave en en/pt se cae a es (nunca aparece undefined en pantalla).
+// Idioma inicial: ?lang= en la URL > localStorage('idioma') > es.
+//
+// Honestidad de marca: "Aduana Verde" NO se traduce como "customs" —
+// es una marca de tramitación verde de documentos ("green document
+// processing"); la versión en inglés lo aclara explícitamente.
+// ============================================================
+import { useSyncExternalStore } from 'react';
+
+export const IDIOMAS = ['es', 'en', 'pt'];
+const STORAGE_IDIOMA = 'idioma';
+
+const DICCIONARIOS = {
+  // ---------- Español (Chile): fuente de verdad ----------
+  es: {
+    // Layout público (header/footer)
+    'layout.comienza': 'Comienza ahora',
+    'layout.ingresar': 'Ingresar',
+    'layout.cadena': 'Cadena de integridad',
+    'layout.tagline': 'Contabilidad de carbono trazable',
+    'layout.idioma': 'Cambiar idioma',
+
+    // Compartido
+    'comun.referencial': 'referencial',
+    'comun.proximamente': 'Próximamente',
+    'comun.socio_ambiental': 'Compensación de carbono vía un socio ambiental acreditado.',
+
+    // Calculadora pública de compensación
+    'calc.electricidad': 'Electricidad',
+    'calc.combustibles': 'Combustibles',
+    'calc.transporte': 'Transporte',
+    'calc.otros_gastos': 'Otros gastos',
+    'calc.u.kwh': 'kWh/mes',
+    'calc.u.litros': 'litros/mes',
+    'calc.u.km': 'km/mes',
+    'calc.u.clp': '$/mes',
+    'calc.ajusta': 'Ajusta tu consumo mensual aproximado y mira el número en vivo.',
+    'calc.clp_mes': 'de compensación al mes',
+    'calc.nota': 'Estimación referencial con los factores reales del motor sicr3p y la tarifa vigente — tu número exacto sale de tus documentos.',
+    'calc.cta': 'Calcula el tuyo con tus facturas',
+    'calc.o': 'o',
+    'calc.conoce_terminal': 'conoce el terminal',
+    'calc.en_oficina_pre': 'o en una',
+    'calc.en_oficina_link': 'oficina Aduana Verde',
+
+    // Verificación pública (/verificar/:id)
+    'ver.error_titulo': 'Documento no encontrado',
+    'ver.error_texto': 'No pudimos verificar la trazabilidad de este documento.',
+    'ver.trazabilidad_ok': 'Trazabilidad verificada',
+    'ver.cadena_intacta': 'Cadena de hash intacta',
+    'ver.cadena_alterada': 'Cadena de hash alterada',
+    'ver.documento': 'Documento',
+    'ver.subtitulo': 'Verificación pública de trazabilidad · sicr3p',
+    'ver.resultado_incorporado': 'Resultado incorporado',
+    'ver.categoria': 'Categoría',
+    'ver.items': 'Ítems',
+    'ver.cliente': 'Cliente',
+    'ver.rut': 'RUT',
+    'ver.fecha': 'Fecha',
+    'ver.estado': 'Estado',
+    'ver.eslabon': 'Eslabón',
+    'ver.hash_cadena': 'hash de la cadena',
+    'ver.embalaje_titulo': 'Declaración de embalaje REP (Ley 20.920)',
+    'ver.reciclabilidad': 'Reciclabilidad',
+    'ver.de_reciclabilidad': 'de reciclabilidad',
+    'ver.componente': 'componente',
+    'ver.componentes': 'componentes',
+    'ver.gr_totales': 'gr totales',
+    'ver.detalle_item': 'Detalle por ítem',
+    'ver.col_descripcion': 'Descripción',
+    'ver.col_pct': '% del total',
+    'ver.nota_legal': 'Esta página confirma la trazabilidad del documento registrado en sicr3p. No constituye una verificación de tercera parte acreditada.',
+
+    // Landing Aduana Verde
+    'av.badge_red': 'Red de oficinas en preparación',
+    'av.kicker': 'Red de oficinas físicas · by',
+    'av.lead': 'Lo que calculas es lo que compensas.',
+    'av.sub': '¿Tu mandante te pide reportar emisiones y no sabes por dónde partir? Llega con tus facturas y guías, mira el cálculo en pantalla, compensa exactamente ese número y sal con tu informe y tu etiqueta QR en la mano. Todo en una visita.',
+    'av.cta_terminal': 'Conoce el terminal en 2 minutos',
+    'av.cta_escribenos': 'Escríbenos',
+    'av.nota_qr': 'Cuando salgas de la oficina, tu respaldo queda verificable en línea: quien escanee tu QR verá lo mismo que tú.',
+    'av.trust_oficinas': 'Oficinas físicas',
+    'av.trust_qr': 'Etiqueta QR verificable',
+    'av.trust_hash': 'Trazabilidad con cadena de hash',
+    'av.stand_nota_b': 'Compensas exactamente lo que calculaste.',
+    'av.stand_nota': 'No pagas un trámite: pagas compensar el CO2 de tus propios documentos, con tarifa referencial por t CO2e. Sin cobros por adelantado ni suscripciones.',
+    'av.term_label': 'Flujo del terminal · Aduana Verde',
+    'av.term_titulo': 'Del mesón a tu etiqueta, sin vueltas',
+    'av.term_sub': 'Esto es lo que pasa dentro de la oficina mientras esperas: cuatro estaciones, un solo resultado verificable.',
+    'av.flujo_doc': 'Documento',
+    'av.flujo_doc_d': 'Entregas tus facturas y guías en el mesón; se escanean ahí mismo.',
+    'av.flujo_calc': 'Cálculo',
+    'av.flujo_calc_d': 'La plataforma sicr3p reconoce los datos y calcula tus emisiones en t CO2e.',
+    'av.flujo_comp': 'Compensación',
+    'av.flujo_comp_d': 'Ves el número exacto en pantalla y pagas compensar eso, con tarifa referencial por t CO2e.',
+    'av.flujo_qr': 'Etiqueta QR',
+    'av.flujo_qr_d': 'Sales con tu informe y una etiqueta verificable, con trazabilidad de cadena de hash.',
+    'av.pasos_titulo': 'Tu visita, paso a paso',
+    'av.paso1_t': '1. Llegas con lo que ya tienes',
+    'av.paso1_d': 'Facturas y guías de despacho de tu operación, en papel o digitales. Sin preparación previa ni planillas.',
+    'av.paso2_t': '2. Miras el cálculo en pantalla',
+    'av.paso2_d': 'Los documentos se escanean en el terminal y la plataforma sicr3p calcula tus emisiones frente a ti. Ves el número exacto antes de decidir.',
+    'av.paso3_t': '3. Compensas ese número, no otro',
+    'av.paso3_d': 'No pagas un trámite: pagas compensar el CO2 que acabas de ver calculado, con tarifa referencial por t CO2e. Ese es todo el modelo.',
+    'av.paso4_t': '4. Te llevas el respaldo en la mano',
+    'av.paso4_d': 'Informe de tu contabilidad de carbono y etiqueta con QR verificable. Cuando tu mandante lo escanee, verá lo mismo que tú.',
+    'av.cuenta_titulo': 'La cuenta es corta',
+    'av.cuenta_sub': 'Sin letra chica: el modelo completo de Aduana Verde cabe en cuatro números.',
+    'av.stat_1eq': 'Una tonelada calculada es una tonelada compensada. Pagas según los documentos escaneados en tu visita, con tarifa referencial por t CO2e.',
+    'av.stat_1eq_nota': 'Tarifa referencial — se confirma en la oficina antes de pagar.',
+    'av.stat_visita': 'visita basta para salir con informe y etiqueta QR',
+    'av.stat_decls': 'declaraciones en la misma pasada: emisiones y REP',
+    'av.stat_cero': 'suscripciones y cero cobros por adelantado',
+    'av.calc_titulo': 'Saca la cuenta antes de venir',
+    'av.calc_sub': '¿Cuánto compensarías? Ingresa tu operación mensual aproximada y mira el número que verías en el mesón — estimación referencial con los mismos factores del terminal.',
+    'av.rep_titulo': 'Declara tu embalaje en la misma visita',
+    'av.rep_texto': 'Mientras el terminal calcula tus emisiones, declaras también tus envases y embalajes — productos prioritarios de la Ley REP 20.920 — con su porcentaje de reciclabilidad, clasificado en tres niveles:',
+    'av.rep_alta': 'Reciclabilidad Alta',
+    'av.rep_media': 'Reciclabilidad Media',
+    'av.rep_baja': 'Reciclabilidad Baja',
+    'av.prov_titulo': 'Para el proveedor al que le exigen',
+    'av.prov_texto': 'Si le vendes a mandantes o grandes compañías que piden información REP y de emisiones, y hasta ahora respondes con correos y planillas, esto te cambia la conversación: de una sola visita sales con ambas declaraciones respaldadas y verificables. En tu próxima licitación, muestras el QR y listo.',
+    'av.prov_cta': 'Quiero saber más',
+    'av.pre_titulo': 'Estamos armando la red',
+    'av.pre_texto': 'Aduana Verde está en pre-lanzamiento: todavía no publicamos direcciones de oficinas. Los primeros cupos son para clientes fundadores y operadores de punto. Escríbenos hoy — es un correo, nada más — y te guardamos el tuyo: cuando abramos cerca tuyo, serás de los primeros en pasar por el mesón.',
+    'av.pre_cta1': 'Guárdame un cupo fundador',
+    'av.pre_cta2': 'Quiero operar un punto',
+    'av.pre_mirar': '¿Prefieres mirar antes de escribir?',
+    'av.disclaimer': 'Aduana Verde no realiza trámites ante el servicio de aduanas ni constituye una verificación de tercera parte acreditada: es tramitación verde de tus documentos comerciales sobre la plataforma sicr3p.',
+
+    // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
+    'pos.tramite_registrado': 'Trámite registrado',
+    'pos.comprobante_sub': 'Comprobante Aduana Verde · plataforma sicr3p',
+    'pos.cliente': 'Cliente',
+    'pos.total_calculado': 'Total calculado',
+    'pos.compensacion': 'Compensación',
+    'pos.pago_simulado': 'Pago simulado',
+    'pos.sin_cobro': 'Sin cobro',
+    'pos.n_compensacion': 'N° compensación:',
+    'pos.registro': 'Registro:',
+    'pos.documentos': 'Documentos',
+    'pos.embalaje_rep': 'Embalaje REP',
+    'pos.reciclabilidad': 'reciclabilidad',
+    'pos.nivel': 'nivel',
+    'pos.error_registro': 'No se pudo registrar la compensación en la plataforma. El trámite y el cálculo quedaron registrados igual; los montos mostrados son referenciales del terminal.',
+    'pos.qr_alt': 'Código QR de verificación del documento',
+    'pos.verificar_traz': 'Verificar trazabilidad →',
+    'pos.eslabon': 'Eslabón',
+    'pos.hash': 'hash',
+    'pos.sello_alt': 'Sello verificable de contabilidad de carbono trazable — sicr3p',
+    'pos.copiar_sello': 'Copiar código del sello',
+    'pos.copiado': '✓ Copiado',
+    'pos.copia_error': 'No se pudo copiar en este navegador.',
+    'pos.enviar_correo': 'Enviar comprobante por correo',
+    'pos.enviado': '✓ Comprobante enviado',
+    'pos.enviado_a': 'Comprobante enviado a',
+    'pos.envio_error': 'No se pudo enviar el correo. Intenta de nuevo.',
+    'pos.informe_pdf': 'Informe PDF',
+    'pos.nuevo_tramite': 'Nuevo trámite',
+  },
+
+  // ---------- Inglés ----------
+  // "Aduana Verde" se mantiene como marca; el subtítulo dice "green
+  // document processing" y el disclaimer aclara que no es aduana estatal.
+  en: {
+    'layout.comienza': 'Start now',
+    'layout.ingresar': 'Sign in',
+    'layout.cadena': 'Integrity chain',
+    'layout.tagline': 'Traceable carbon accounting',
+    'layout.idioma': 'Change language',
+
+    'comun.referencial': 'reference only',
+    'comun.proximamente': 'Coming soon',
+    'comun.socio_ambiental': 'Carbon offsetting through an accredited environmental partner.',
+
+    'calc.electricidad': 'Electricity',
+    'calc.combustibles': 'Fuels',
+    'calc.transporte': 'Transport',
+    'calc.otros_gastos': 'Other spending',
+    'calc.u.kwh': 'kWh/month',
+    'calc.u.litros': 'liters/month',
+    'calc.u.km': 'km/month',
+    'calc.u.clp': 'CLP/month',
+    'calc.ajusta': 'Adjust your approximate monthly usage and watch the number update live.',
+    'calc.clp_mes': 'of monthly offsetting',
+    'calc.nota': 'Reference estimate using the real factors of the sicr3p engine and the current rate — your exact number comes from your documents.',
+    'calc.cta': 'Calculate yours with your invoices',
+    'calc.o': 'or',
+    'calc.conoce_terminal': 'see the terminal',
+    'calc.en_oficina_pre': 'or at an',
+    'calc.en_oficina_link': 'Aduana Verde office',
+
+    'ver.error_titulo': 'Document not found',
+    'ver.error_texto': 'We could not verify the traceability of this document.',
+    'ver.trazabilidad_ok': 'Traceability verified',
+    'ver.cadena_intacta': 'Hash chain intact',
+    'ver.cadena_alterada': 'Hash chain altered',
+    'ver.documento': 'Document',
+    'ver.subtitulo': 'Public traceability verification · sicr3p',
+    'ver.resultado_incorporado': 'Embedded result',
+    'ver.categoria': 'Category',
+    'ver.items': 'Line items',
+    'ver.cliente': 'Client',
+    'ver.rut': 'RUT (Chilean tax ID)',
+    'ver.fecha': 'Date',
+    'ver.estado': 'Status',
+    'ver.eslabon': 'Link',
+    'ver.hash_cadena': 'chain hash',
+    'ver.embalaje_titulo': 'REP packaging declaration (Chilean Law 20,920)',
+    'ver.reciclabilidad': 'Recyclability',
+    'ver.de_reciclabilidad': 'recyclability',
+    'ver.componente': 'component',
+    'ver.componentes': 'components',
+    'ver.gr_totales': 'g total',
+    'ver.detalle_item': 'Breakdown by line item',
+    'ver.col_descripcion': 'Description',
+    'ver.col_pct': '% of total',
+    'ver.nota_legal': 'This page confirms the traceability of the document registered in sicr3p. It does not constitute an accredited third-party verification.',
+
+    'av.badge_red': 'Office network in preparation',
+    'av.kicker': 'Green document processing · physical offices · by',
+    'av.lead': 'What you calculate is what you offset.',
+    'av.sub': 'Does your buyer ask you to report emissions and you do not know where to start? Bring your invoices and dispatch documents, watch the calculation on screen, offset exactly that number and walk out with your report and your QR label in hand. All in one visit.',
+    'av.cta_terminal': 'See the terminal in 2 minutes',
+    'av.cta_escribenos': 'Write to us',
+    'av.nota_qr': 'When you leave the office, your record stays verifiable online: whoever scans your QR sees the same thing you do.',
+    'av.trust_oficinas': 'Physical offices',
+    'av.trust_qr': 'Verifiable QR label',
+    'av.trust_hash': 'Hash-chain traceability',
+    'av.stand_nota_b': 'You offset exactly what you calculated.',
+    'av.stand_nota': 'You are not paying for paperwork: you pay to offset the CO2 of your own documents, at a reference rate per t CO2e. No upfront charges, no subscriptions.',
+    'av.term_label': 'Terminal flow · Aduana Verde',
+    'av.term_titulo': 'From the counter to your label, no detours',
+    'av.term_sub': 'This is what happens inside the office while you wait: four stations, one verifiable result.',
+    'av.flujo_doc': 'Document',
+    'av.flujo_doc_d': 'You hand over your invoices and dispatch documents at the counter; they are scanned right there.',
+    'av.flujo_calc': 'Calculation',
+    'av.flujo_calc_d': 'The sicr3p platform recognizes the data and calculates your emissions in t CO2e.',
+    'av.flujo_comp': 'Offsetting',
+    'av.flujo_comp_d': 'You see the exact number on screen and pay to offset that, at a reference rate per t CO2e.',
+    'av.flujo_qr': 'QR label',
+    'av.flujo_qr_d': 'You leave with your report and a verifiable label, with hash-chain traceability.',
+    'av.pasos_titulo': 'Your visit, step by step',
+    'av.paso1_t': '1. Arrive with what you already have',
+    'av.paso1_d': 'Invoices and dispatch documents from your operation, on paper or digital. No prior preparation, no spreadsheets.',
+    'av.paso2_t': '2. Watch the calculation on screen',
+    'av.paso2_d': 'Documents are scanned at the terminal and the sicr3p platform calculates your emissions in front of you. You see the exact number before deciding.',
+    'av.paso3_t': '3. Offset that number, not another',
+    'av.paso3_d': 'You are not paying for paperwork: you pay to offset the CO2 you just saw calculated, at a reference rate per t CO2e. That is the whole model.',
+    'av.paso4_t': '4. Take your record with you',
+    'av.paso4_d': 'A report of your carbon accounting and a label with a verifiable QR. When your buyer scans it, they see the same thing you do.',
+    'av.cuenta_titulo': 'The math is short',
+    'av.cuenta_sub': 'No fine print: the entire Aduana Verde model fits in four numbers.',
+    'av.stat_1eq': 'One tonne calculated is one tonne offset. You pay according to the documents scanned during your visit, at a reference rate per t CO2e.',
+    'av.stat_1eq_nota': 'Reference rate — confirmed at the office before you pay.',
+    'av.stat_visita': 'visit is enough to leave with a report and QR label',
+    'av.stat_decls': 'declarations in the same pass: emissions and REP',
+    'av.stat_cero': 'subscriptions and zero upfront charges',
+    'av.calc_titulo': 'Run the numbers before you come',
+    'av.calc_sub': 'How much would you offset? Enter your approximate monthly operation and see the number you would see at the counter — a reference estimate with the same factors as the terminal.',
+    'av.rep_titulo': 'Declare your packaging in the same visit',
+    'av.rep_texto': 'While the terminal calculates your emissions, you also declare your containers and packaging — priority products under Chile’s REP Law 20,920 — with their recyclability percentage, classified into three levels:',
+    'av.rep_alta': 'High recyclability',
+    'av.rep_media': 'Medium recyclability',
+    'av.rep_baja': 'Low recyclability',
+    'av.prov_titulo': 'For the supplier being asked to comply',
+    'av.prov_texto': 'If you sell to buyers or large companies that request REP and emissions information, and so far you answer with emails and spreadsheets, this changes the conversation: from a single visit you leave with both declarations backed and verifiable. At your next tender, you show the QR and that is it.',
+    'av.prov_cta': 'I want to know more',
+    'av.pre_titulo': 'We are building the network',
+    'av.pre_texto': 'Aduana Verde is in pre-launch: we have not published office addresses yet. The first spots go to founding clients and point operators. Write to us today — it is just an email — and we will hold yours: when we open near you, you will be among the first at the counter.',
+    'av.pre_cta1': 'Hold a founding spot for me',
+    'av.pre_cta2': 'I want to operate a point',
+    'av.pre_mirar': 'Prefer to take a look before writing?',
+    // Honestidad: "Aduana Verde" es marca de tramitación verde de documentos,
+    // no una aduana estatal — se dice explícitamente en inglés.
+    'av.disclaimer': '"Aduana Verde" is a green document processing brand, not affiliated with any national customs service. It does not file paperwork with customs authorities and does not constitute an accredited third-party verification: it is green processing of your commercial documents on the sicr3p platform.',
+
+    'pos.tramite_registrado': 'Transaction recorded',
+    'pos.comprobante_sub': 'Aduana Verde receipt · sicr3p platform',
+    'pos.cliente': 'Client',
+    'pos.total_calculado': 'Calculated total',
+    'pos.compensacion': 'Offset',
+    'pos.pago_simulado': 'Simulated payment',
+    'pos.sin_cobro': 'No charge',
+    'pos.n_compensacion': 'Offset record no.:',
+    'pos.registro': 'Record:',
+    'pos.documentos': 'Documents',
+    'pos.embalaje_rep': 'REP packaging',
+    'pos.reciclabilidad': 'recyclability',
+    'pos.nivel': 'level',
+    'pos.error_registro': 'The offset could not be recorded on the platform. The transaction and the calculation were still recorded; the amounts shown are terminal reference values.',
+    'pos.qr_alt': 'Verification QR code for document',
+    'pos.verificar_traz': 'Verify traceability →',
+    'pos.eslabon': 'Link',
+    'pos.hash': 'hash',
+    'pos.sello_alt': 'Verifiable seal of traceable carbon accounting — sicr3p',
+    'pos.copiar_sello': 'Copy seal embed code',
+    'pos.copiado': '✓ Copied',
+    'pos.copia_error': 'Could not copy in this browser.',
+    'pos.enviar_correo': 'Email receipt',
+    'pos.enviado': '✓ Receipt sent',
+    'pos.enviado_a': 'Receipt sent to',
+    'pos.envio_error': 'The email could not be sent. Try again.',
+    'pos.informe_pdf': 'PDF report',
+    'pos.nuevo_tramite': 'New transaction',
+  },
+
+  // ---------- Portugués ----------
+  pt: {
+    'layout.comienza': 'Comece agora',
+    'layout.ingresar': 'Entrar',
+    'layout.cadena': 'Cadeia de integridade',
+    'layout.tagline': 'Contabilidade de carbono rastreável',
+    'layout.idioma': 'Mudar idioma',
+
+    'comun.referencial': 'referencial',
+    'comun.proximamente': 'Em breve',
+    'comun.socio_ambiental': 'Compensação de carbono por meio de um parceiro ambiental acreditado.',
+
+    'calc.electricidad': 'Eletricidade',
+    'calc.combustibles': 'Combustíveis',
+    'calc.transporte': 'Transporte',
+    'calc.otros_gastos': 'Outros gastos',
+    'calc.u.kwh': 'kWh/mês',
+    'calc.u.litros': 'litros/mês',
+    'calc.u.km': 'km/mês',
+    'calc.u.clp': 'CLP/mês',
+    'calc.ajusta': 'Ajuste seu consumo mensal aproximado e veja o número ao vivo.',
+    'calc.clp_mes': 'de compensação por mês',
+    'calc.nota': 'Estimativa referencial com os fatores reais do motor sicr3p e a tarifa vigente — seu número exato sai dos seus documentos.',
+    'calc.cta': 'Calcule o seu com suas faturas',
+    'calc.o': 'ou',
+    'calc.conoce_terminal': 'conheça o terminal',
+    'calc.en_oficina_pre': 'ou em um',
+    'calc.en_oficina_link': 'escritório Aduana Verde',
+
+    'ver.error_titulo': 'Documento não encontrado',
+    'ver.error_texto': 'Não foi possível verificar a rastreabilidade deste documento.',
+    'ver.trazabilidad_ok': 'Rastreabilidade verificada',
+    'ver.cadena_intacta': 'Cadeia de hash intacta',
+    'ver.cadena_alterada': 'Cadeia de hash alterada',
+    'ver.documento': 'Documento',
+    'ver.subtitulo': 'Verificação pública de rastreabilidade · sicr3p',
+    'ver.resultado_incorporado': 'Resultado incorporado',
+    'ver.categoria': 'Categoria',
+    'ver.items': 'Itens',
+    'ver.cliente': 'Cliente',
+    'ver.rut': 'RUT (ID fiscal chileno)',
+    'ver.fecha': 'Data',
+    'ver.estado': 'Status',
+    'ver.eslabon': 'Elo',
+    'ver.hash_cadena': 'hash da cadeia',
+    'ver.embalaje_titulo': 'Declaração de embalagem REP (Lei chilena 20.920)',
+    'ver.reciclabilidad': 'Reciclabilidade',
+    'ver.de_reciclabilidad': 'de reciclabilidade',
+    'ver.componente': 'componente',
+    'ver.componentes': 'componentes',
+    'ver.gr_totales': 'g totais',
+    'ver.detalle_item': 'Detalhe por item',
+    'ver.col_descripcion': 'Descrição',
+    'ver.col_pct': '% do total',
+    'ver.nota_legal': 'Esta página confirma a rastreabilidade do documento registrado no sicr3p. Não constitui uma verificação de terceira parte acreditada.',
+
+    'av.badge_red': 'Rede de escritórios em preparação',
+    'av.kicker': 'Processamento verde de documentos · escritórios físicos · by',
+    'av.lead': 'O que você calcula é o que você compensa.',
+    'av.sub': 'Seu contratante pede relatório de emissões e você não sabe por onde começar? Chegue com suas faturas e guias, veja o cálculo na tela, compense exatamente esse número e saia com seu relatório e sua etiqueta QR na mão. Tudo em uma visita.',
+    'av.cta_terminal': 'Conheça o terminal em 2 minutos',
+    'av.cta_escribenos': 'Escreva para nós',
+    'av.nota_qr': 'Quando você sair do escritório, seu respaldo fica verificável on-line: quem escanear seu QR verá o mesmo que você.',
+    'av.trust_oficinas': 'Escritórios físicos',
+    'av.trust_qr': 'Etiqueta QR verificável',
+    'av.trust_hash': 'Rastreabilidade com cadeia de hash',
+    'av.stand_nota_b': 'Você compensa exatamente o que calculou.',
+    'av.stand_nota': 'Você não paga um trâmite: paga para compensar o CO2 dos seus próprios documentos, com tarifa referencial por t CO2e. Sem cobranças antecipadas nem assinaturas.',
+    'av.term_label': 'Fluxo do terminal · Aduana Verde',
+    'av.term_titulo': 'Do balcão à sua etiqueta, sem rodeios',
+    'av.term_sub': 'Isto é o que acontece dentro do escritório enquanto você espera: quatro estações, um único resultado verificável.',
+    'av.flujo_doc': 'Documento',
+    'av.flujo_doc_d': 'Você entrega suas faturas e guias no balcão; elas são escaneadas ali mesmo.',
+    'av.flujo_calc': 'Cálculo',
+    'av.flujo_calc_d': 'A plataforma sicr3p reconhece os dados e calcula suas emissões em t CO2e.',
+    'av.flujo_comp': 'Compensação',
+    'av.flujo_comp_d': 'Você vê o número exato na tela e paga para compensar isso, com tarifa referencial por t CO2e.',
+    'av.flujo_qr': 'Etiqueta QR',
+    'av.flujo_qr_d': 'Você sai com seu relatório e uma etiqueta verificável, com rastreabilidade de cadeia de hash.',
+    'av.pasos_titulo': 'Sua visita, passo a passo',
+    'av.paso1_t': '1. Chegue com o que você já tem',
+    'av.paso1_d': 'Faturas e guias de despacho da sua operação, em papel ou digitais. Sem preparação prévia nem planilhas.',
+    'av.paso2_t': '2. Veja o cálculo na tela',
+    'av.paso2_d': 'Os documentos são escaneados no terminal e a plataforma sicr3p calcula suas emissões na sua frente. Você vê o número exato antes de decidir.',
+    'av.paso3_t': '3. Compense esse número, não outro',
+    'av.paso3_d': 'Você não paga um trâmite: paga para compensar o CO2 que acabou de ver calculado, com tarifa referencial por t CO2e. Esse é todo o modelo.',
+    'av.paso4_t': '4. Leve o respaldo na mão',
+    'av.paso4_d': 'Relatório da sua contabilidade de carbono e etiqueta com QR verificável. Quando seu contratante escanear, verá o mesmo que você.',
+    'av.cuenta_titulo': 'A conta é curta',
+    'av.cuenta_sub': 'Sem letras miúdas: o modelo completo do Aduana Verde cabe em quatro números.',
+    'av.stat_1eq': 'Uma tonelada calculada é uma tonelada compensada. Você paga conforme os documentos escaneados na sua visita, com tarifa referencial por t CO2e.',
+    'av.stat_1eq_nota': 'Tarifa referencial — confirmada no escritório antes de pagar.',
+    'av.stat_visita': 'visita basta para sair com relatório e etiqueta QR',
+    'av.stat_decls': 'declarações na mesma passada: emissões e REP',
+    'av.stat_cero': 'assinaturas e zero cobranças antecipadas',
+    'av.calc_titulo': 'Faça a conta antes de vir',
+    'av.calc_sub': 'Quanto você compensaria? Informe sua operação mensal aproximada e veja o número que veria no balcão — estimativa referencial com os mesmos fatores do terminal.',
+    'av.rep_titulo': 'Declare sua embalagem na mesma visita',
+    'av.rep_texto': 'Enquanto o terminal calcula suas emissões, você também declara suas embalagens — produtos prioritários da Lei REP chilena 20.920 — com seu percentual de reciclabilidade, classificado em três níveis:',
+    'av.rep_alta': 'Reciclabilidade Alta',
+    'av.rep_media': 'Reciclabilidade Média',
+    'av.rep_baja': 'Reciclabilidade Baixa',
+    'av.prov_titulo': 'Para o fornecedor de quem exigem',
+    'av.prov_texto': 'Se você vende para contratantes ou grandes empresas que pedem informações REP e de emissões, e até agora responde com e-mails e planilhas, isto muda a conversa: de uma única visita você sai com as duas declarações respaldadas e verificáveis. Na sua próxima licitação, mostra o QR e pronto.',
+    'av.prov_cta': 'Quero saber mais',
+    'av.pre_titulo': 'Estamos montando a rede',
+    'av.pre_texto': 'O Aduana Verde está em pré-lançamento: ainda não publicamos endereços de escritórios. As primeiras vagas são para clientes fundadores e operadores de ponto. Escreva hoje — é só um e-mail — e guardamos a sua: quando abrirmos perto de você, você será um dos primeiros a passar pelo balcão.',
+    'av.pre_cta1': 'Guarde uma vaga de fundador para mim',
+    'av.pre_cta2': 'Quero operar um ponto',
+    'av.pre_mirar': 'Prefere olhar antes de escrever?',
+    'av.disclaimer': 'O Aduana Verde não realiza trâmites junto a nenhum serviço nacional de alfândega nem constitui uma verificação de terceira parte acreditada: é o processamento verde dos seus documentos comerciais na plataforma sicr3p.',
+  },
+};
+
+// ---------- Estado del idioma (módulo, sobrevive a la navegación SPA) ----------
+function detectarInicial() {
+  try {
+    const porUrl = new URLSearchParams(window.location.search).get('lang');
+    if (IDIOMAS.includes(porUrl)) return porUrl;
+    const guardado = localStorage.getItem(STORAGE_IDIOMA);
+    if (IDIOMAS.includes(guardado)) return guardado;
+  } catch { /* sin window/localStorage: se usa el default */ }
+  return 'es';
+}
+
+let idiomaActual = detectarInicial();
+const oyentes = new Set();
+
+export function getIdioma() {
+  return idiomaActual;
+}
+
+export function setIdioma(nuevo) {
+  if (!IDIOMAS.includes(nuevo) || nuevo === idiomaActual) return;
+  idiomaActual = nuevo;
+  try { localStorage.setItem(STORAGE_IDIOMA, nuevo); } catch { /* modo privado */ }
+  oyentes.forEach((fn) => fn());
+}
+
+// t(clave, idioma?) — el segundo argumento permite forzar un idioma puntual
+// (comprobante bilingüe del POS). Cae SIEMPRE a español si falta la clave;
+// como último recurso devuelve la clave (visible en dev, nunca undefined).
+export function t(clave, idioma = idiomaActual) {
+  const dic = DICCIONARIOS[idioma] || DICCIONARIOS.es;
+  return dic[clave] ?? DICCIONARIOS.es[clave] ?? clave;
+}
+
+function suscribir(fn) {
+  oyentes.add(fn);
+  return () => oyentes.delete(fn);
+}
+
+// Hook: re-renderiza el componente cuando cambia el idioma global.
+export function useIdioma() {
+  const idioma = useSyncExternalStore(suscribir, getIdioma);
+  return { idioma, setIdioma, t: (clave) => t(clave, idioma) };
+}

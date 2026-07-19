@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { signAccess, requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { generarSerial, generarClave, clampDocumentos } from '../services/posTerminal.js';
-import { validarTarifa } from '../services/compensacion.js';
+import { validarTarifa, validarTipoCambio } from '../services/compensacion.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 
 // ============================================================
@@ -60,17 +60,30 @@ router.post('/auth', loginLimiter, async (req, res, next) => {
 
 // ---------- GET /api/pos/config — tarifa vigente de compensación ----------
 // Sin auth: el POS necesita la tarifa ANTES de cobrar (pantalla pública).
-// No expone nada sensible, solo la tarifa CLP/t CO2e y su fuente.
+// No expone nada sensible: tarifa CLP/t CO2e, su fuente y el tipo de
+// cambio USD→CLP que fijó el admin (null = sin fijar → no se muestra USD).
+// Defensivo: si la columna nueva (migración 018) aún no existe, responde
+// igual que siempre con tipo_cambio_usd_clp en null.
 router.get('/config', async (req, res, next) => {
   try {
-    const { rows } = await query(
-      `SELECT tarifa_clp_tco2e, fuente, updated_at FROM config_pos WHERE id = 1`
-    );
-    const c = rows[0] || { tarifa_clp_tco2e: 5000, fuente: null, updated_at: null };
+    let c = null;
+    try {
+      const { rows } = await query(
+        `SELECT tarifa_clp_tco2e, fuente, updated_at, tipo_cambio_usd_clp FROM config_pos WHERE id = 1`
+      );
+      c = rows[0];
+    } catch {
+      const { rows } = await query(
+        `SELECT tarifa_clp_tco2e, fuente, updated_at FROM config_pos WHERE id = 1`
+      );
+      c = rows[0];
+    }
+    c = c || { tarifa_clp_tco2e: 5000, fuente: null, updated_at: null };
     res.json({
       tarifa_clp_tco2e: Number(c.tarifa_clp_tco2e),
       fuente: c.fuente,
       updated_at: c.updated_at,
+      tipo_cambio_usd_clp: c.tipo_cambio_usd_clp != null ? Number(c.tipo_cambio_usd_clp) : null,
     });
   } catch (err) { next(err); }
 });
@@ -102,22 +115,47 @@ adminRouter.use(requireAuth, requireRole('admin'));
 // ---------- PUT /config — editar la tarifa de compensación ----------
 // La fila 1 es única (CHECK id = 1); el upsert cubre bases donde la
 // migración corrió pero alguien borró la fila a mano.
+// tipo_cambio_usd_clp (migración 018) solo se toca si el body trae la
+// llave: un número lo fija, null lo LIMPIA (el frontend deja de mostrar
+// USD). El valor lo pone el admin a mano citando su fuente; el servidor
+// solo lo valida — jamás consulta un tipo de cambio automático.
 adminRouter.put('/config', async (req, res, next) => {
   try {
     const { tarifa_clp_tco2e, fuente } = req.body || {};
     const val = validarTarifa(tarifa_clp_tco2e);
     if (!val.ok) return res.status(400).json({ error: val.error });
 
-    const { rows } = await query(
-      `INSERT INTO config_pos (id, tarifa_clp_tco2e, fuente, updated_at)
-       VALUES (1, $1, $2, now())
-       ON CONFLICT (id) DO UPDATE SET
-         tarifa_clp_tco2e = EXCLUDED.tarifa_clp_tco2e,
-         fuente           = COALESCE($2, config_pos.fuente),
-         updated_at       = now()
-       RETURNING tarifa_clp_tco2e, fuente, updated_at`,
-      [val.tarifa, fuente !== undefined && fuente !== null ? String(fuente).trim() : null]
-    );
+    const fuenteVal = fuente !== undefined && fuente !== null ? String(fuente).trim() : null;
+    const tieneTipoCambio = Object.prototype.hasOwnProperty.call(req.body || {}, 'tipo_cambio_usd_clp');
+
+    let rows;
+    if (tieneTipoCambio) {
+      const tc = validarTipoCambio(req.body.tipo_cambio_usd_clp);
+      if (!tc.ok) return res.status(400).json({ error: tc.error });
+      ({ rows } = await query(
+        `INSERT INTO config_pos (id, tarifa_clp_tco2e, fuente, tipo_cambio_usd_clp, updated_at)
+         VALUES (1, $1, $2, $3, now())
+         ON CONFLICT (id) DO UPDATE SET
+           tarifa_clp_tco2e    = EXCLUDED.tarifa_clp_tco2e,
+           fuente              = COALESCE($2, config_pos.fuente),
+           tipo_cambio_usd_clp = $3,
+           updated_at          = now()
+         RETURNING tarifa_clp_tco2e, fuente, tipo_cambio_usd_clp, updated_at`,
+        [val.tarifa, fuenteVal, tc.tipo_cambio]
+      ));
+    } else {
+      // Consulta original: sigue funcionando aunque la columna nueva no exista.
+      ({ rows } = await query(
+        `INSERT INTO config_pos (id, tarifa_clp_tco2e, fuente, updated_at)
+         VALUES (1, $1, $2, now())
+         ON CONFLICT (id) DO UPDATE SET
+           tarifa_clp_tco2e = EXCLUDED.tarifa_clp_tco2e,
+           fuente           = COALESCE($2, config_pos.fuente),
+           updated_at       = now()
+         RETURNING tarifa_clp_tco2e, fuente, updated_at`,
+        [val.tarifa, fuenteVal]
+      ));
+    }
 
     await logActividad({
       usuarioId: req.user.sub,
@@ -132,6 +170,7 @@ adminRouter.put('/config', async (req, res, next) => {
         tarifa_clp_tco2e: Number(rows[0].tarifa_clp_tco2e),
         fuente: rows[0].fuente,
         updated_at: rows[0].updated_at,
+        tipo_cambio_usd_clp: rows[0].tipo_cambio_usd_clp != null ? Number(rows[0].tipo_cambio_usd_clp) : null,
       },
     });
   } catch (err) { next(err); }

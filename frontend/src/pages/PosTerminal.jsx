@@ -4,6 +4,7 @@ import { Icon } from '../components/icons.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { validarRut, formatearRut } from '../lib/rut.js';
 import DeclaracionEmbalaje, { NIVEL_BADGE } from '../components/DeclaracionEmbalaje.jsx';
+import { t } from '../lib/i18n.js';
 
 // ============================================================
 // Terminal POS "Aduana Verde" (tablet) — la cara al público de sicr3p.
@@ -728,6 +729,9 @@ function Cobro({ sesionId, posToken, totalCo2e, onVolver, onPagado, onOmitir }) 
 
   const tarifaNum = Number(tarifa) || 0;
   const monto = Math.round(totalCo2e * tarifaNum);
+  // Tipo de cambio USD/CLP referencial: solo si la config lo trae (> 0).
+  // Tolerante a backends sin el campo: null = no se muestra nada en USD.
+  const tipoCambio = Number(config?.tipo_cambio_usd_clp) > 0 ? Number(config.tipo_cambio_usd_clp) : null;
 
   // Registra la compensación en la plataforma. Si falla, el trámite continúa
   // igual (no se bloquea) pero el comprobante avisa que no quedó registrada.
@@ -752,6 +756,11 @@ function Cobro({ sesionId, posToken, totalCo2e, onVolver, onPagado, onOmitir }) 
       metodo,
       monto: compensacion?.monto_clp != null ? Number(compensacion.monto_clp) : monto,
       tarifa: compensacion?.tarifa_clp_tco2e != null ? Number(compensacion.tarifa_clp_tco2e) : tarifaNum,
+      // Para el "≈ US$ (referencial)" del comprobante: manda el tipo de cambio
+      // del servidor si vino en la compensación; si no, el de la config.
+      tipoCambio: Number(compensacion?.tipo_cambio_usd_clp) > 0
+        ? Number(compensacion.tipo_cambio_usd_clp)
+        : tipoCambio,
       compensacion,
       errorRegistro,
     });
@@ -843,6 +852,9 @@ function Cobro({ sesionId, posToken, totalCo2e, onVolver, onPagado, onOmitir }) 
 }
 
 // ---------- Paso comprobante: QR real, verificación pública y actividad POS ----------
+// Comprobante bilingüe: un botón discreto alterna las ETIQUETAS entre español
+// e inglés (los datos no cambian). Usa t(clave, idioma) del i18n con idioma
+// explícito, sin tocar el idioma global del sitio.
 function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const { sesion, facturas = [] } = resultado;
   const f0 = facturas[0];
@@ -851,6 +863,13 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const [envio, setEnvio] = useState(null);
   // Feedback del botón "Copiar código del sello": null | 'ok' | 'error'
   const [selloCopia, setSelloCopia] = useState(null);
+  // Idioma del comprobante (solo etiquetas): false = español, true = inglés.
+  const [enIngles, setEnIngles] = useState(false);
+  const lr = (clave) => t(clave, enIngles ? 'en' : 'es');
+  // USD referencial del monto compensado: solo si llegó tipo de cambio (> 0).
+  const usdComp = pago?.estado === 'simulado' && Number(pago?.tipoCambio) > 0
+    ? Math.round(Number(pago.monto) / Number(pago.tipoCambio))
+    : null;
 
   async function copiarSello() {
     const ok = await copiarTexto(selloSnippet(sesion.id, f0.id));
@@ -885,46 +904,56 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
       <div style={{ color: 'var(--green-600)', display: 'flex', justifyContent: 'center', margin: '6px 0' }}>
         <Icon.CheckCircle size={56} />
       </div>
-      <h2 style={{ margin: '0 0 4px' }}>Trámite registrado</h2>
-      <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>Comprobante Aduana Verde · plataforma sicr3p</p>
+      <h2 style={{ margin: '0 0 4px' }}>{lr('pos.tramite_registrado')}</h2>
+      <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>{lr('pos.comprobante_sub')}</p>
+
+      {/* Alterna solo las etiquetas del comprobante; los datos no cambian. */}
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEnIngles((v) => !v)}
+        aria-pressed={enIngles} style={{ marginTop: 2 }}>
+        {enIngles ? 'Comprobante en español / Spanish receipt' : 'Comprobante en inglés / English receipt'}
+      </button>
 
       {pago?.errorRegistro && (
         <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', margin: '10px 0', textAlign: 'left' }}>
-          No se pudo registrar la compensación en la plataforma. El trámite y el cálculo quedaron
-          registrados igual; los montos mostrados son referenciales del terminal.
+          {lr('pos.error_registro')}
         </div>
       )}
 
       <div style={{ margin: '16px 0', padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, textAlign: 'left' }}>
         <div className="two-col-grid" style={{ fontSize: 14, gap: 10 }}>
-          <div><span className="muted">Cliente</span><br /><b>{cliente.empresa}</b><br /><span className="muted" style={{ fontSize: 12 }}>{cliente.rut}</span></div>
-          <div><span className="muted">Total calculado</span><br /><b>{fmt(sesion?.total_co2e, 3)} t CO2e</b></div>
+          <div><span className="muted">{lr('pos.cliente')}</span><br /><b>{cliente.empresa}</b><br /><span className="muted" style={{ fontSize: 12 }}>{cliente.rut}</span></div>
+          <div><span className="muted">{lr('pos.total_calculado')}</span><br /><b>{fmt(sesion?.total_co2e, 3)} t CO2e</b></div>
           <div>
-            <span className="muted">Compensación</span><br />
+            <span className="muted">{lr('pos.compensacion')}</span><br />
             {pago?.estado === 'simulado'
               ? <>
-                  <b>${fmtInt(pago.monto)} CLP</b><br />
-                  <span className="badge badge-amber" style={{ marginTop: 2 }}>Pago simulado · {pago.metodo}</span>
+                  <b>${fmtInt(pago.monto)} CLP</b>
+                  {usdComp != null && (
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      ≈ US$ {usdComp.toLocaleString('en-US')} ({lr('comun.referencial')})
+                    </div>
+                  )}
+                  <span className="badge badge-amber" style={{ marginTop: 2 }}>{lr('pos.pago_simulado')} · {pago.metodo}</span>
                   {compIdCorto && (
                     <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      N° compensación: <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
+                      {lr('pos.n_compensacion')} <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
                     </div>
                   )}
                 </>
               : <>
-                  <span className="badge badge-gray">Sin cobro</span>
+                  <span className="badge badge-gray">{lr('pos.sin_cobro')}</span>
                   {compIdCorto && (
                     <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      Registro: <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
+                      {lr('pos.registro')} <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
                     </div>
                   )}
                 </>}
           </div>
-          <div><span className="muted">Documentos</span><br /><b>{fmtInt(facturas.length)}</b></div>
+          <div><span className="muted">{lr('pos.documentos')}</span><br /><b>{fmtInt(facturas.length)}</b></div>
           {embalaje && (
             <div style={{ gridColumn: '1 / -1' }}>
-              <span className="muted">Embalaje REP</span><br />
-              <b>{fmt(embalaje.porcentaje, 1)}% reciclabilidad · nivel {embalaje.nivel}</b>
+              <span className="muted">{lr('pos.embalaje_rep')}</span><br />
+              <b>{fmt(embalaje.porcentaje, 1)}% {lr('pos.reciclabilidad')} · {lr('pos.nivel')} {embalaje.nivel}</b>
             </div>
           )}
         </div>
@@ -932,34 +961,36 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
 
       {f0 && (
         <>
-          <img src={api.qrUrl(f0.id)} alt={`Código QR de verificación del documento ${f0.numero_venta || f0.id}`}
+          <img src={api.qrUrl(f0.id)} alt={`${lr('pos.qr_alt')} ${f0.numero_venta || f0.id}`}
             width={150} height={150}
             style={{ maxWidth: '100%', border: '1px solid var(--border)', borderRadius: 12, padding: 8, background: '#fff' }} />
           <div style={{ marginTop: 8 }}>
-            <a href={`/verificar/${f0.id}`} target="_blank" rel="noreferrer" style={{ fontWeight: 700, fontSize: 14 }}>
-              Verificar trazabilidad →
+            <a href={`/verificar/${f0.id}${enIngles ? '?lang=en' : ''}`} target="_blank" rel="noreferrer" style={{ fontWeight: 700, fontSize: 14 }}>
+              {lr('pos.verificar_traz')}
             </a>
           </div>
           {hashCorto && (
             <div className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-              Eslabón #{fmtInt(f0.eslabon)} · hash{' '}
+              {lr('pos.eslabon')} #{fmtInt(f0.eslabon)} · {lr('pos.hash')}{' '}
               <span style={{ fontFamily: 'monospace' }}>{hashCorto}</span>
             </div>
           )}
 
-          {/* Sello compartible en miniatura, con el snippet para el sitio del cliente. */}
+          {/* Sello compartible en miniatura, con el snippet para el sitio del
+              cliente. Con el comprobante en inglés pide el sello con ?lang=en
+              (si el backend aún no lo soporta, sirve el sello de siempre). */}
           <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
             <img
-              src={`/api/sesiones/${sesion.id}/sello.svg`}
-              alt="Sello verificable de contabilidad de carbono trazable — sicr3p"
+              src={`/api/sesiones/${sesion.id}/sello.svg${enIngles ? '?lang=en' : ''}`}
+              alt={lr('pos.sello_alt')}
               width={260}
               style={{ maxWidth: '100%', height: 'auto' }}
             />
             <button type="button" className="btn btn-outline btn-sm" onClick={copiarSello}>
-              {selloCopia === 'ok' ? '✓ Copiado' : 'Copiar código del sello'}
+              {selloCopia === 'ok' ? lr('pos.copiado') : lr('pos.copiar_sello')}
             </button>
             {selloCopia === 'error' && (
-              <span className="badge badge-red">No se pudo copiar en este navegador.</span>
+              <span className="badge badge-red">{lr('pos.copia_error')}</span>
             )}
           </div>
         </>
@@ -971,16 +1002,16 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
             onClick={enviarCorreo} disabled={envio === 'enviando' || envio === 'ok'}>
             {envio === 'enviando'
               ? <span className="spinner dark" />
-              : envio === 'ok' ? '✓ Comprobante enviado' : 'Enviar comprobante por correo'}
+              : envio === 'ok' ? lr('pos.enviado') : lr('pos.enviar_correo')}
           </button>
           {envio === 'ok' && (
             <div className="badge badge-green" style={{ display: 'inline-block', marginTop: 8 }}>
-              Comprobante enviado a {cliente.email}
+              {lr('pos.enviado_a')} {cliente.email}
             </div>
           )}
           {envio === 'error' && (
             <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>
-              No se pudo enviar el correo. Intenta de nuevo.
+              {lr('pos.envio_error')}
             </div>
           )}
         </div>
@@ -989,9 +1020,9 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
       <div className="two-col-grid" style={{ marginTop: 18 }}>
         <a className="btn btn-outline" href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"
           style={{ display: 'inline-flex' }}>
-          <Icon.Download size={16} /> Informe PDF
+          <Icon.Download size={16} /> {lr('pos.informe_pdf')}
         </a>
-        <button className="btn btn-primary" onClick={onNuevo}>Nuevo trámite</button>
+        <button className="btn btn-primary" onClick={onNuevo}>{lr('pos.nuevo_tramite')}</button>
       </div>
     </div>
   );

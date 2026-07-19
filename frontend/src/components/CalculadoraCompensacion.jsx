@@ -6,20 +6,22 @@
 // Si el endpoint falla, el componente no se renderiza (null): el landing
 // nunca se rompe por la calculadora. Siempre se rotula como estimación
 // referencial — el número exacto sale de los documentos del cliente.
+// Etiquetas con i18n (es/en/pt); los montos CLP mantienen formato chileno.
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, fmtInt } from '../api.js';
 import { Skeleton } from './Skeleton.jsx';
 import { Icon } from './icons.jsx';
+import { useIdioma } from '../lib/i18n.js';
 
 // Entradas del formulario, buscadas por código en las categorías del motor.
 // Si una categoría no existe (o no trae el factor que necesita), su fila se
-// omite en vez de mostrar un cálculo inventado.
+// omite en vez de mostrar un cálculo inventado. label/unidad son claves i18n.
 const ENTRADAS = [
-  { codigo: 'electricidad', tipo: 'fisico', label: 'Electricidad', unidad: 'kWh/mes', icon: 'Plug', inicial: '2.500' },
-  { codigo: 'combustibles', tipo: 'fisico', label: 'Combustibles', unidad: 'litros/mes', icon: 'Cog', inicial: '300' },
-  { codigo: 'transporte', tipo: 'fisico', label: 'Transporte', unidad: 'km/mes', icon: 'Package', inicial: '1.000' },
-  { codigo: 'servicios', tipo: 'gasto', label: 'Otros gastos', unidad: '$/mes', icon: 'CreditCard', inicial: '500.000' },
+  { codigo: 'electricidad', tipo: 'fisico', labelKey: 'calc.electricidad', unidadKey: 'calc.u.kwh', icon: 'Plug', inicial: '2.500' },
+  { codigo: 'combustibles', tipo: 'fisico', labelKey: 'calc.combustibles', unidadKey: 'calc.u.litros', icon: 'Cog', inicial: '300' },
+  { codigo: 'transporte', tipo: 'fisico', labelKey: 'calc.transporte', unidadKey: 'calc.u.km', icon: 'Package', inicial: '1.000' },
+  { codigo: 'servicios', tipo: 'gasto', labelKey: 'calc.otros_gastos', unidadKey: 'calc.u.clp', icon: 'CreditCard', inicial: '500.000' },
 ];
 
 // Parseo de números escritos a la chilena: "." de miles y "," decimal.
@@ -30,6 +32,7 @@ const parseCL = (s) => {
 const fmt3 = (n) => (Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
 export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
+  const { t } = useIdioma();
   const [data, setData] = useState(null);
   const [estado, setEstado] = useState('cargando'); // cargando | ok | error
   const [valores, setValores] = useState(() =>
@@ -57,13 +60,19 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
   }, [data]);
 
   const { totalT, compensacion } = useMemo(() => {
-    const t = filas.reduce((acc, f) => {
+    // "ton" y no "t": el nombre corto quedó tomado por t() del i18n.
+    const ton = filas.reduce((acc, f) => {
       const v = parseCL(valores[f.codigo]);
       if (f.tipo === 'fisico') return acc + (v * f.factor) / 1000;
       return acc + ((v / 1000) * f.factor) / 1000;
     }, 0);
-    return { totalT: t, compensacion: Math.round(t * (Number(data?.tarifa_clp_tco2e) || 0)) };
+    return { totalT: ton, compensacion: Math.round(ton * (Number(data?.tarifa_clp_tco2e) || 0)) };
   }, [filas, valores, data]);
+
+  // USD referencial: solo si el backend expone tipo_cambio_usd_clp (> 0).
+  // Si viene null/undefined o el endpoint aún no lo trae, no se muestra nada.
+  const tipoCambio = Number(data?.tipo_cambio_usd_clp) || 0;
+  const usd = tipoCambio > 0 ? Math.round(compensacion / tipoCambio) : null;
 
   // Skeleton discreto mientras llega la respuesta.
   if (estado === 'cargando') {
@@ -93,7 +102,7 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
         {/* Entradas */}
         <div>
           <p className="muted" style={{ fontSize: 13, margin: '0 0 14px', lineHeight: 1.5 }}>
-            Ajusta tu consumo mensual aproximado y mira el número en vivo.
+            {t('calc.ajusta')}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {filas.map((f) => {
@@ -102,7 +111,7 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
                 <div className="field" key={f.codigo} style={{ minWidth: 0 }}>
                   <label htmlFor={`calc-${f.codigo}`} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Ico size={15} /></span>
-                    {f.label} <span className="muted" style={{ fontWeight: 400 }}>({f.unidad})</span>
+                    {t(f.labelKey)} <span className="muted" style={{ fontWeight: 400 }}>({t(f.unidadKey)})</span>
                   </label>
                   <input
                     id={`calc-${f.codigo}`}
@@ -134,18 +143,22 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
               ≈ {fmt3(totalT)} t CO2e
             </div>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--navy)', marginTop: 6, overflowWrap: 'anywhere' }}>
-              $ {fmtInt(compensacion)} CLP de compensación al mes
+              $ {fmtInt(compensacion)} CLP {t('calc.clp_mes')}
             </div>
+            {usd != null && (
+              <div className="muted" style={{ fontSize: 13, marginTop: 4, fontVariantNumeric: 'tabular-nums', overflowWrap: 'anywhere' }}>
+                ≈ US$ {usd.toLocaleString('en-US')} ({t('comun.referencial')})
+              </div>
+            )}
             <div className="l" style={{ marginTop: 10, lineHeight: 1.5 }}>
-              Estimación referencial con los factores reales del motor sicr3p y
-              la tarifa vigente — tu número exacto sale de tus documentos.
+              {t('calc.nota')}
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
-            <Link to="/cargar" className="btn btn-primary">Calcula el tuyo con tus facturas</Link>
+            <Link to="/cargar" className="btn btn-primary">{t('calc.cta')}</Link>
             {enAduana
-              ? <span className="muted" style={{ fontSize: 13 }}>o <Link to="/pos">conoce el terminal</Link></span>
-              : <span className="muted" style={{ fontSize: 13 }}>o en una <Link to="/aduana-verde">oficina Aduana Verde</Link></span>}
+              ? <span className="muted" style={{ fontSize: 13 }}>{t('calc.o')} <Link to="/pos">{t('calc.conoce_terminal')}</Link></span>
+              : <span className="muted" style={{ fontSize: 13 }}>{t('calc.en_oficina_pre')} <Link to="/aduana-verde">{t('calc.en_oficina_link')}</Link></span>}
           </div>
         </div>
       </div>

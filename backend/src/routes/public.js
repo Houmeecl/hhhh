@@ -90,10 +90,21 @@ router.get('/codigos/:codigo', async (req, res, next) => {
 // palabras clave ni fuentes internas del motor.
 router.get('/publico/calculadora', async (req, res, next) => {
   try {
-    const { rows: cfgRows } = await query(
-      `SELECT tarifa_clp_tco2e FROM config_pos WHERE id = 1`
-    );
-    const tarifa = Number(cfgRows[0]?.tarifa_clp_tco2e ?? 5000);
+    // Tipo de cambio USD→CLP (migración 018): NULL = sin fijar, y el
+    // frontend no muestra USD. Defensivo: si la columna aún no existe,
+    // se consulta solo la tarifa y el tipo de cambio queda en null.
+    let cfg = null;
+    try {
+      const { rows } = await query(
+        `SELECT tarifa_clp_tco2e, tipo_cambio_usd_clp FROM config_pos WHERE id = 1`
+      );
+      cfg = rows[0];
+    } catch {
+      const { rows } = await query(`SELECT tarifa_clp_tco2e FROM config_pos WHERE id = 1`);
+      cfg = rows[0];
+    }
+    const tarifa = Number(cfg?.tarifa_clp_tco2e ?? 5000);
+    const tipoCambio = cfg?.tipo_cambio_usd_clp != null ? Number(cfg.tipo_cambio_usd_clp) : null;
 
     const { rows } = await query(
       `SELECT codigo, nombre, unidad_fisica, factor_fisico_kgco2e, factor_gasto_kgco2e_clp1000
@@ -102,6 +113,7 @@ router.get('/publico/calculadora', async (req, res, next) => {
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json({
       tarifa_clp_tco2e: tarifa,
+      tipo_cambio_usd_clp: tipoCambio,
       categorias: rows.map((r) => ({
         codigo: r.codigo,
         nombre: r.nombre,
@@ -644,8 +656,9 @@ router.get('/sesiones/:id/informe.pdf', async (req, res, next) => {
 // ---------- GET /api/sesiones/:id/sello.svg — sello embebible ----------
 // SVG que el comercio pega en su sitio: empresa, toneladas, distintivo REP
 // y estado de la cadena, con enlace de verificación pública. ?tema=oscuro
-// para fondos oscuros. La integridad usa el mismo criterio local que
-// GET /api/verificar/:id (eslabonValido de la primera factura).
+// para fondos oscuros; ?lang=en para etiquetas en inglés (default español).
+// La integridad usa el mismo criterio local que GET /api/verificar/:id
+// (eslabonValido de la primera factura).
 router.get('/sesiones/:id/sello.svg', async (req, res, next) => {
   try {
     const { rows: sRows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
@@ -674,6 +687,7 @@ router.get('/sesiones/:id/sello.svg', async (req, res, next) => {
         ? `${config.publicAppUrl}/verificar/${factura.id}`
         : config.publicAppUrl,
       tema: req.query.tema === 'oscuro' ? 'oscuro' : 'claro',
+      lang: req.query.lang === 'en' ? 'en' : 'es',
     });
     res.setHeader('Content-Type', 'image/svg+xml');
     res.setHeader('Cache-Control', 'public, max-age=300');
