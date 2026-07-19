@@ -1,0 +1,144 @@
+/* ============================================================
+   Base compartida de los documentos comerciales sicr3p (A4 print).
+   Paleta de marca: navy #0f1f2e · verde #28a745 / #218838 · menta #eaf6ef.
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --navy: #0f1f2e;
+  --verde: #28a745;
+  --verde-oscuro: #218838;
+  --menta: #eaf6ef;
+  --gris: #64748b;
+  --borde: #e6e9ed;
+  --tinta: #1f2937;
+}
+html, body {
+  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--tinta);
+  font-size: 10.5pt;
+  line-height: 1.55;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+@page { size: A4; margin: 0; }
+
+/* ---------- Portada ---------- */
+.portada {
+  height: 296.5mm;
+  background: linear-gradient(160deg, var(--navy) 0%, #16324a 55%, var(--verde-oscuro) 140%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 28mm 22mm 20mm;
+  page-break-after: always;
+}
+.portada .marca { font-size: 15pt; font-weight: 700; letter-spacing: 0.5px; }
+.portada .marca .punto { color: var(--verde); }
+.portada .tipo-doc {
+  display: inline-block;
+  background: rgba(40, 167, 69, 0.18);
+  border: 1px solid rgba(40, 167, 69, 0.55);
+  color: #b9e8c6;
+  font-size: 9pt;
+  font-weight: 600;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  margin-bottom: 10mm;
+}
+.portada h1 { font-size: 30pt; line-height: 1.15; font-weight: 800; margin-bottom: 6mm; }
+.portada .bajada { font-size: 13pt; color: #cbd5e1; max-width: 130mm; line-height: 1.5; }
+.portada .pie { font-size: 9pt; color: #94a3b8; display: flex; justify-content: space-between; }
+
+/* ---------- Cuerpo ---------- */
+.pagina { padding: 18mm 20mm; }
+h2 {
+  color: var(--navy);
+  font-size: 16pt;
+  font-weight: 800;
+  margin: 0 0 5mm;
+  padding-bottom: 2.5mm;
+  border-bottom: 2.5px solid var(--verde);
+  page-break-after: avoid;
+}
+h3 { color: var(--verde-oscuro); font-size: 12pt; font-weight: 700; margin: 6mm 0 2.5mm; page-break-after: avoid; }
+h4 { color: var(--navy); font-size: 10.5pt; font-weight: 700; margin: 4mm 0 1.5mm; page-break-after: avoid; }
+p { margin-bottom: 3mm; text-align: justify; }
+ul, ol { margin: 0 0 3.5mm 6mm; }
+li { margin-bottom: 1.6mm; }
+strong { color: var(--navy); }
+.seccion { page-break-before: always; }
+
+/* ---------- Tablas ---------- */
+table { width: 100%; border-collapse: collapse; margin: 3.5mm 0 5mm; font-size: 9.5pt; page-break-inside: avoid; }
+th { background: var(--navy); color: #fff; padding: 2.6mm 3mm; text-align: left; font-weight: 700; }
+td { padding: 2.4mm 3mm; border-bottom: 1px solid var(--borde); vertical-align: top; }
+tr:nth-child(even) td { background: #f8fafc; }
+
+/* ---------- Cajas ---------- */
+.caja {
+  background: var(--menta);
+  border-left: 4px solid var(--verde);
+  border-radius: 3px;
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  page-break-inside: avoid;
+}
+.caja-navy {
+  background: var(--navy);
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 5mm 6mm;
+  margin: 4mm 0;
+  page-break-inside: avoid;
+}
+.caja-navy strong, .caja-navy h4 { color: #fff; }
+.caja-alerta {
+  background: #fff8e6;
+  border-left: 4px solid #d97706;
+  border-radius: 3px;
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  page-break-inside: avoid;
+}
+.dos-col { display: flex; gap: 5mm; }
+.dos-col > div { flex: 1; }
+
+/* ---------- Flujo visual ---------- */
+.flujo { margin: 4mm 0 5mm; page-break-inside: avoid; }
+.paso {
+  display: flex;
+  align-items: flex-start;
+  gap: 4mm;
+  margin-bottom: 3mm;
+}
+.paso .num {
+  flex: 0 0 auto;
+  width: 8mm;
+  height: 8mm;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #fff;
+  font-weight: 800;
+  font-size: 10pt;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.paso .txt b { color: var(--navy); }
+
+/* ---------- Otros ---------- */
+.ok { color: var(--verde-oscuro); font-weight: 700; }
+.no { color: #b91c1c; font-weight: 700; }
+.ref { font-size: 8.5pt; color: var(--gris); }
+.pie-doc {
+  margin-top: 8mm;
+  padding-top: 3mm;
+  border-top: 1px solid var(--borde);
+  font-size: 8.5pt;
+  color: var(--gris);
+  text-align: center;
+}
+.faq dt { font-weight: 700; color: var(--navy); margin-top: 3.5mm; page-break-after: avoid; }
+.faq dd { margin: 1mm 0 0 0; }

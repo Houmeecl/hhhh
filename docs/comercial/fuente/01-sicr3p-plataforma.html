@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Plataforma de contabilidad de carbono trazable</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">DOCUMENTO 1 DE 3 · FICHA DETALLADA</div>
+    <h1>sicr3p<br>Contabilidad de carbono trazable</h1>
+    <p class="bajada">Qué es, cómo funciona, qué le sirve a una empresa mandante,
+    qué se cobra (y qué no) y sobre qué normativa se sostiene.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- QUÉ ES -->
+<div class="pagina">
+  <h2>1. Qué es sicr3p, en simple</h2>
+  <p><strong>sicr3p es una plataforma chilena que convierte los documentos que una empresa ya tiene
+  — sus facturas — en contabilidad de carbono verificable.</strong> La empresa sube sus documentos
+  tributarios (XML de DTE, PDF o incluso una foto de la factura) y recibe un informe con las
+  toneladas de CO2 equivalente (t CO2e) asociadas a cada compra, clasificadas por alcance del
+  GHG Protocol, con una etiqueta QR verificable por documento.</p>
+
+  <p>La diferencia con una consultoría tradicional está en el punto de partida: sicr3p no estima
+  a partir de encuestas ni promedios de industria — <strong>calcula a partir del documento real</strong>,
+  ítem por ítem, y deja cada cálculo encadenado criptográficamente para que cualquiera
+  (un mandante, un auditor, un cliente) pueda verificar que el dato no fue alterado después.</p>
+
+  <div class="caja">
+    <strong>La frase que resume el modelo:</strong> la empresa no paga por "un bono" ni por
+    "compensar". Paga por la <strong>gestión</strong>: el cálculo, la trazabilidad, los informes y
+    la verificación. La compensación de CO2 existe como opción, es <strong>siempre voluntaria</strong>
+    y su tarifa es referencial y visible.
+  </div>
+
+  <h3>1.1 Qué entrega concretamente</h3>
+  <table>
+    <tr><th>Entregable</th><th>Descripción</th></tr>
+    <tr><td><strong>Informe consolidado PDF</strong></td><td>t CO2e por documento y por ítem, con metodología citada y desglose por Alcance GHG 1 / 2 / 3.</td></tr>
+    <tr><td><strong>Etiqueta QR por factura</strong></td><td>Cada documento procesado tiene una página pública de verificación (sicr3p.cl/verificar/…), sin exponer datos sensibles.</td></tr>
+    <tr><td><strong>Informe mensual por cliente</strong></td><td>Evolución período a período: total t CO2e, documentos procesados, alcances del período.</td></tr>
+    <tr><td><strong>Sello digital verificable</strong></td><td>Imagen SVG viva para pegar en el sitio web o firma de la empresa: t CO2e del período, estado de la cadena de integridad y enlace de verificación.</td></tr>
+    <tr><td><strong>Libro mayor de carbono</strong></td><td>Registro contable de las emisiones calculadas, al estilo de un libro contable tradicional.</td></tr>
+    <tr><td><strong>Estado de Capital Natural</strong></td><td>Balance de activos naturales (si la empresa registra sus cuentas naturales), con valorización por fuente citada.</td></tr>
+  </table>
+
+  <h3>1.2 Qué NO es (honestidad por diseño)</h3>
+  <ul>
+    <li>No es una <strong>verificación de tercera parte acreditada</strong> (ISO 14064-3). Cada informe lo
+    dice de forma impresa. sicr3p ordena y traza el dato para que una verificación
+    acreditada, si la empresa la necesita, sea más barata y rápida.</li>
+    <li>No es una <strong>red blockchain pública</strong>: la cadena de integridad es interna, verificable
+    públicamente, pero no una criptomoneda ni un registro distribuido.</li>
+    <li>No emite <strong>bonos de carbono</strong>: eso exige un proyecto de reducción verificado por un
+    organismo acreditado y un registro reconocido (Verra, Gold Standard, registro del MMA).</li>
+  </ul>
+</div>
+
+<!-- CÓMO FUNCIONA -->
+<div class="pagina seccion">
+  <h2>2. Cómo funciona</h2>
+
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>La empresa sube sus documentos.</b> XML de DTE (el formato oficial del SII), PDF de factura o una foto tomada con el celular. Hasta 5 documentos por sesión en la modalidad de prueba.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>El motor propio lee el documento.</b> Si es XML, lee los ítems directamente. Si es PDF, extrae el texto. Si es foto, aplica reconocimiento óptico (OCR) en español. El motor identifica folio, RUT emisor y receptor, fecha, ítems y montos — y <b>si el documento no entrega señal suficiente, no inventa datos</b>.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Cada ítem se clasifica y se calcula.</b> El motor asigna cada ítem a una categoría (combustibles, energía, transporte, servicios, etc.) con su Alcance GHG (1, 2 o 3) y aplica el factor de emisión correspondiente: físico (cantidad × factor por unidad) cuando el documento trae unidades, o por gasto (metodología spend-based del GHG Protocol) cuando solo hay montos.</div></div>
+    <div class="paso"><div class="num">4</div><div class="txt"><b>El resultado queda encadenado.</b> Cada documento procesado genera un eslabón con hash SHA-256 que se encadena al anterior. Si alguien altera un registro histórico, la cadena completa deja de cuadrar y eso es visible públicamente.</div></div>
+    <div class="paso"><div class="num">5</div><div class="txt"><b>La empresa recibe sus entregables.</b> Informe PDF, etiquetas QR, sello digital, y acceso a sus sesiones históricas. Opcionalmente puede registrar una compensación voluntaria del CO2 calculado.</div></div>
+  </div>
+
+  <h3>2.1 El motor de cálculo es propio</h3>
+  <p>sicr3p desarrolló su propio motor de clasificación y cálculo, con <strong>factores de emisión
+  citados y editables</strong> desde el panel de administración (cada factor indica su fuente).
+  Esto significa tres cosas para la empresa:</p>
+  <ul>
+    <li><strong>Independencia:</strong> los datos de la empresa no se envían a motores de cálculo de
+    terceros para los formatos que el motor propio cubre (XML, PDF con texto, fotos).</li>
+    <li><strong>Transparencia:</strong> el factor aplicado a cada ítem es visible y auditable — no hay
+    "caja negra" metodológica.</li>
+    <li><strong>Coherencia:</strong> la calculadora pública del sitio y el cálculo real de los documentos
+    usan exactamente los mismos factores.</li>
+  </ul>
+
+  <h3>2.2 Alcances GHG: qué significa cada uno</h3>
+  <table>
+    <tr><th>Alcance</th><th>Qué cubre</th><th>Ejemplo en una factura</th></tr>
+    <tr><td><strong>Alcance 1</strong></td><td>Emisiones directas por combustión propia</td><td>Compra de diésel o bencina para vehículos y equipos de la empresa</td></tr>
+    <tr><td><strong>Alcance 2</strong></td><td>Emisiones indirectas por energía comprada</td><td>Cuenta de electricidad (kWh de la red)</td></tr>
+    <tr><td><strong>Alcance 3</strong></td><td>Emisiones indirectas de la cadena de valor</td><td>Fletes contratados, servicios, materiales y embalajes comprados</td></tr>
+  </table>
+  <p class="ref">Referencia: GHG Protocol Corporate Accounting and Reporting Standard (WRI / WBCSD).
+  El desglose por alcance es el lenguaje que piden bancos, mandantes y reportes de sostenibilidad.</p>
+</div>
+
+<!-- QUÉ GANA LA EMPRESA MANDANTE -->
+<div class="pagina seccion">
+  <h2>3. Qué gana una empresa mandante</h2>
+
+  <p>Una <strong>empresa mandante</strong> (minera, industrial, retail — la que contrata proveedores y
+  responde ante directorio, bancos y clientes por su cadena de valor) tiene hoy un problema
+  concreto: sus emisiones de Alcance 3 son las de sus proveedores, y esos datos o no existen,
+  o llegan en planillas sin respaldo. sicr3p ataca exactamente ese punto.</p>
+
+  <table>
+    <tr><th>Necesidad del mandante</th><th>Hoy (sin sicr3p)</th><th>Con sicr3p</th></tr>
+    <tr>
+      <td><strong>Datos de proveedores (Alcance 3)</strong></td>
+      <td>Encuestas anuales, planillas autodeclaradas, sin respaldo documental</td>
+      <td>Cálculo por documento real del proveedor, trazable por RUT, verificable por QR</td>
+    </tr>
+    <tr>
+      <td><strong>Defendibilidad ante auditoría</strong></td>
+      <td>Estimaciones de consultora, difíciles de reconstruir</td>
+      <td>Cada cifra se reconstruye desde el documento origen; cadena de integridad detecta alteraciones</td>
+    </tr>
+    <tr>
+      <td><strong>Trazabilidad comprador-vendedor</strong></td>
+      <td>Inexistente entre sistemas distintos</td>
+      <td>Cruce por RUT: qué proveedores concentran las emisiones de la cadena</td>
+    </tr>
+    <tr>
+      <td><strong>Acceso programático</strong></td>
+      <td>Pedir planillas por correo</td>
+      <td>API para mandantes con clave propia, lista blanca de proveedores autorizados y webhooks por cada sesión nueva</td>
+    </tr>
+    <tr>
+      <td><strong>Costo y velocidad</strong></td>
+      <td>Consultorías por período, semanas de plazo</td>
+      <td>Cálculo en minutos, plataforma disponible todo el año</td>
+    </tr>
+  </table>
+
+  <h3>3.1 Y para el proveedor de ese mandante</h3>
+  <p>El proveedor pequeño o mediano — el que recibe la exigencia "mándame tus datos de
+  emisiones" — obtiene con sicr3p una forma de responder <strong>sin contratar una consultoría</strong>:
+  sube sus facturas, descarga su informe, comparte su sello verificable. Cumplir la exigencia
+  del mandante se vuelve un trámite, no un proyecto.</p>
+
+  <div class="caja">
+    <strong>Efecto de red:</strong> cada mandante que exige datos verificables empuja a sus proveedores
+    a la plataforma; cada proveedor con datos trazables hace más valiosa la vista del mandante.
+    La cadena de integridad pública (sicr3p.cl/cadena) permite a cualquiera comprobar que el
+    sistema está vivo y sin alteraciones, sin exponer datos de nadie.
+  </div>
+</div>
+
+<!-- QUÉ SE COBRA -->
+<div class="pagina seccion">
+  <h2>4. Qué se cobra — y qué no</h2>
+
+  <div class="caja-navy">
+    <h4>El principio, sin letra chica</h4>
+    <p style="text-align:left; margin:0;">sicr3p cobra por la <strong>gestión</strong>: el servicio de calcular,
+    clasificar, trazar, informar y verificar. <strong>No cobra por el CO2.</strong> La compensación del
+    CO2 calculado es una decisión voluntaria del cliente, con tarifa referencial visible, y no
+    es requisito para recibir ningún informe.</p>
+  </div>
+
+  <table>
+    <tr><th>Concepto</th><th>¿Se cobra?</th><th>Detalle</th></tr>
+    <tr><td>Cálculo y clasificación de documentos (motor propio)</td><td class="ok">Sí — gestión</td><td>Parte del servicio de plataforma</td></tr>
+    <tr><td>Informes (consolidado, mensual, libro mayor, Capital Natural)</td><td class="ok">Sí — gestión</td><td>Parte del servicio de plataforma</td></tr>
+    <tr><td>Trazabilidad, QR verificables, sello digital, cadena de integridad</td><td class="ok">Sí — gestión</td><td>Parte del servicio de plataforma</td></tr>
+    <tr><td>API para mandantes y webhooks</td><td class="ok">Sí — gestión</td><td>Servicio para empresas mandantes</td></tr>
+    <tr><td><strong>Compensación del CO2 calculado</strong></td><td class="no">Opcional y voluntaria</td><td>Tarifa referencial CLP 5.000 por t CO2e (ancla: impuesto verde chileno, US$5/t). El cliente puede omitirla y el trámite queda igual de completo, con la decisión registrada.</td></tr>
+    <tr><td>Emisión de bonos de carbono</td><td class="no">No se ofrece</td><td>Requiere verificador acreditado y registro reconocido; fuera del alcance de sicr3p</td></tr>
+  </table>
+
+  <p>La tarifa de compensación se administra desde el panel (fuente citada, marcada
+  "referencial — validar") y el monto se calcula <strong>siempre en el servidor</strong>: toneladas de la
+  sesión × tarifa vigente, redondeado a pesos. Un trámite donde el cliente decide no compensar
+  queda registrado con monto $0 — la decisión también es parte de la trazabilidad.</p>
+
+  <h3>4.1 Por qué este modelo protege al cliente</h3>
+  <ul>
+    <li><strong>Sin conflicto de interés:</strong> como sicr3p no gana por tonelada compensada, no tiene
+    incentivo para inflar cálculos.</li>
+    <li><strong>Presupuestable:</strong> la gestión es un costo conocido; la compensación es una decisión
+    de cada empresa según su política ambiental.</li>
+    <li><strong>Coherente con la ley:</strong> replica la lógica de la normativa chilena — la Ley REP obliga
+    a <em>declarar y gestionar</em>, no a pagar un impuesto por existir (ver Documento 3).</li>
+  </ul>
+</div>
+
+<!-- MARCO NORMATIVO -->
+<div class="pagina seccion">
+  <h2>5. Marco normativo en que se apoya sicr3p</h2>
+
+  <table>
+    <tr><th>Norma / estándar</th><th>Qué establece</th><th>Cómo se relaciona sicr3p</th></tr>
+    <tr>
+      <td><strong>GHG Protocol Corporate Standard</strong> (WRI/WBCSD)</td>
+      <td>Estándar internacional de contabilidad de emisiones por Alcances 1, 2 y 3; base de la mayoría de los reportes corporativos</td>
+      <td>El motor propio clasifica cada ítem por alcance y aplica factores físicos o por gasto (spend-based) según lo que el documento permita. La metodología se cita en cada informe.</td>
+    </tr>
+    <tr>
+      <td><strong>ISO 14064-1</strong></td>
+      <td>Especificación para cuantificar y reportar emisiones a nivel de organización; la 14064-3 regula su verificación por terceros</td>
+      <td>sicr3p produce el registro cuantificado y trazable que una verificación posterior necesita. Cada informe declara que <em>no constituye una verificación de tercera parte acreditada</em>.</td>
+    </tr>
+    <tr>
+      <td><strong>Ley 20.780, art. 8 (impuesto verde)</strong>, modificada por Ley 21.210</td>
+      <td>Impuesto de US$5 por tonelada de CO2 a fuentes emisoras reguladas en Chile</td>
+      <td>sicr3p usa ese valor solo como <strong>ancla de precio referencial</strong> de la compensación voluntaria (CLP 5.000/t). No recauda impuestos ni sustituye obligación tributaria alguna.</td>
+    </tr>
+    <tr>
+      <td><strong>Ley 20.920 (REP)</strong> y su decreto de metas de envases y embalajes (D.S. 12/2020, MMA)</td>
+      <td>Responsabilidad extendida del productor: obligación de <em>declarar</em> y de organizarse en sistemas de gestión para cumplir metas de valorización</td>
+      <td>sicr3p captura la declaración de embalaje por componentes y la deja trazada por documento — el detalle completo está en el Documento 3.</td>
+    </tr>
+    <tr>
+      <td><strong>Ley 19.628 (datos personales)</strong></td>
+      <td>Protección de la vida privada en el tratamiento de datos</td>
+      <td>Los datos públicos (verificador, cadena, sello) están anonimizados: sin RUT, sin razón social, sin folios. Los accesos usan tokens de corta duración y las contraseñas se almacenan con hash robusto.</td>
+    </tr>
+  </table>
+
+  <div class="caja-alerta">
+    <strong>Compromiso de honestidad regulatoria.</strong> sicr3p declara en sus propios documentos qué es
+    y qué no es. Ningún informe afirma acreditaciones que no existen; toda tarifa referencial está
+    marcada como tal; y las capacidades en preparación (pago electrónico en línea, integración
+    SII) se comunican como "en preparación", nunca como operativas.
+  </div>
+</div>
+
+<!-- FAQ + CONTACTO -->
+<div class="pagina seccion">
+  <h2>6. Preguntas frecuentes</h2>
+  <dl class="faq">
+    <dt>¿Necesito saber de carbono o de normativa para usar sicr3p?</dt>
+    <dd>No. Subes tus facturas y la plataforma hace el resto. Los informes explican cada cifra y su metodología.</dd>
+
+    <dt>¿Qué documentos acepta?</dt>
+    <dd>XML de DTE (el formato del SII), PDF de facturas y fotos (JPG/PNG). El XML es el ideal porque trae los ítems estructurados; con PDF y fotos el motor extrae el texto y, si la señal no es suficiente, lo dice en vez de inventar.</dd>
+
+    <dt>¿Mis datos quedan expuestos públicamente?</dt>
+    <dd>No. Lo público (páginas de verificación, cadena de integridad, sello) está anonimizado: muestra fechas, toneladas y hashes abreviados — nunca RUT, razones sociales ni folios.</dd>
+
+    <dt>¿Estoy obligado a compensar?</dt>
+    <dd>No. La compensación es voluntaria. Tu informe es igual de completo si decides no compensar, y la decisión queda registrada de forma transparente.</dd>
+
+    <dt>¿El informe sirve como certificación oficial?</dt>
+    <dd>Es contabilidad trazable y defendible, no una verificación acreditada. Si tu empresa necesita verificación ISO 14064-3, sicr3p te deja el trabajo ordenado para que esa verificación cueste menos.</dd>
+
+    <dt>¿Qué pasa si un documento no se puede leer?</dt>
+    <dd>El motor lo marca y lo deriva a procesamiento alternativo. Nunca se inventan ítems ni montos: sin señal suficiente, no hay cálculo.</dd>
+
+    <dt>¿Cómo verifica un tercero que mis cifras no fueron alteradas?</dt>
+    <dd>Cada documento tiene una página pública de verificación (QR) y su eslabón en la cadena de integridad. Si un registro histórico se altera, la cadena deja de cuadrar y eso es visible en sicr3p.cl/cadena.</dd>
+  </dl>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Contacto</h4>
+    <p style="margin:0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicr3p.cl</strong> · www.sicr3p.cl<br>
+    Verificador público: sicr3p.cl/verificar · Cadena de integridad: sicr3p.cl/cadena</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Documento comercial 1 de 3 · Versión 1.0 · Julio 2026 ·
+  Este documento describe capacidades operativas de la plataforma a la fecha de emisión.
+  Las tarifas referenciales deben validarse comercialmente antes de contratar.</p>
+</div>
+
+</body>
+</html>
