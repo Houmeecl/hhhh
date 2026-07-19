@@ -23,14 +23,17 @@ Responsable de que producción esté arriba, segura y actualizable.
     `CORS_ORIGIN` y `PUBLIC_APP_URL` a mano y `pm2 restart sicr3p-backend`.
   - El firewall (ufw) SIEMPRE detecta el puerto SSH activo antes de habilitarse.
 
-## Actualización de producción (flujo estándar)
-```bash
-cd /opt/sicr3p && git pull
-cd backend && npm ci --omit=dev
-cd ../frontend && npm ci && npx vite build
-pm2 restart sicr3p-backend
-```
-Las migraciones corren solas al arrancar el backend (son idempotentes).
+## Actualización de producción
+- **Automática** (flujo estándar): cron cada 30 min → `deploy/agente-deploy.sh`
+  ejecuta `deploy/actualizar.sh` (fetch → respaldo BD → pull --ff-only → build →
+  pm2 restart → health → **rollback** si falla). Ver `deploy/AUTODEPLOY.md`.
+  - Instalar: `bash deploy/actualizar.sh --instalar-cron` · quitar: `--desinstalar-cron`.
+  - Log: `/var/log/sicr3p-actualizar.log` · diagnósticos: `/root/sicr3p-diagnostico-*.txt`.
+- **Manual** (sigue disponible, mismo ciclo con rollback): `bash deploy/actualizar.sh`.
+- Las migraciones corren solas al arrancar el backend (son idempotentes).
+- **Regla**: el Claude del VPS solo **diagnostica** (lectura: logs, pm2 status,
+  curl) — JAMÁS repara producción por su cuenta (ni restart, ni git, ni .env);
+  las correcciones las aplica un humano leyendo el diagnóstico.
 
 ## Diagnóstico rápido
 ```bash

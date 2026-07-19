@@ -239,6 +239,10 @@ cd backend && npm ci && npm run migrate && pm2 restart sicr3p-api
 cd ../frontend && npm ci && npm run build
 ```
 
+**Actualización automática**: ver `deploy/AUTODEPLOY.md` — cron cada 30 min
+(`bash deploy/actualizar.sh --instalar-cron`) que hace pull + build + restart con
+respaldo previo, health check, **rollback** y diagnóstico por agente si falla.
+
 ---
 
 ## Estructura de la base de datos
