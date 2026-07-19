@@ -98,6 +98,19 @@ Sin estos binarios el sistema no falla: cada camino se detecta solo
 (`ocrDisponible()`, `rasterPdfDisponible()`, `heicDisponible()`) y el
 documento sigue el camino siguiente.
 
+## CI propio del VPS (tests antes de desplegar)
+
+El repositorio no depende del CI de GitHub (hoy bloqueado por la cuenta):
+`actualizar.sh` corre los **tests del backend en el propio VPS, ANTES de
+reiniciar** el servicio. Si algún test falla, el deploy no avanza y se hace
+rollback — el código malo jamás llega a producción. Los tests son puros
+(node:test, segundos de duración; los de OCR se saltan solos si faltan los
+binarios). `SICR3P_SKIP_TESTS=1` los omite (solo para ensayos).
+
+El pipeline completo del VPS queda: commits nuevos → respaldo BD → pull →
+**tests** → build → restart → health → **smoke E2E** → OK (o rollback en
+cualquier tropiezo).
+
 ## Smoke test E2E post-deploy
 
 Después de cada deploy exitoso (health OK), `actualizar.sh` corre

@@ -94,6 +94,19 @@ construir() {
     return 0
   fi
   ( cd "$REPO_DIR/backend" && npm ci --omit=dev ) >> "$LOG" 2>&1 || return 1
+  # CI propio del VPS: los tests del backend corren ANTES de reiniciar.
+  # Son puros (node:test, sin BD ni red; los de OCR se saltan solos si
+  # faltan binarios), así que tardan segundos. Si fallan, el deploy no
+  # avanza y se hace rollback — el código malo jamás llega a producción,
+  # sin depender del CI de GitHub. SICR3P_SKIP_TESTS=1 lo omite.
+  if [ "${SICR3P_SKIP_TESTS:-0}" != "1" ]; then
+    if ( cd "$REPO_DIR/backend" && npm test ) >> "$LOG" 2>&1; then
+      log "tests del backend: OK (CI propio del VPS)."
+    else
+      log "ERROR: tests del backend FALLARON — el deploy no avanza (detalle arriba en $LOG)."
+      return 1
+    fi
+  fi
   ( cd "$REPO_DIR/frontend" && npm ci && npx vite build ) >> "$LOG" 2>&1 || return 1
 }
 
