@@ -74,6 +74,40 @@ export function magicEmail({ link }) {
   };
 }
 
+// Formato es-CL (punto de miles, coma decimal).
+function nfClp(n, dec = 0) {
+  return Number(n || 0).toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+// Comprobante del POS Aduana Verde. `estado`: 'simulado' | 'omitido'.
+export async function enviarComprobantePos({ para, empresa, t_co2e, monto_clp, estado, metodo, verificarUrl, informeUrl }) {
+  const total = nfClp(t_co2e, 2);
+  const compensacion = estado === 'simulado'
+    ? `
+        <p style="margin:4px 0"><b>Compensación (pago simulado${metodo ? `, ${metodo}` : ''}):</b> $ ${nfClp(monto_clp)} CLP</p>
+        <p style="margin:4px 0;color:#b45309;font-size:13px">Pago simulado — sin pasarela de pago real conectada todavía.</p>`
+    : `
+        <p style="margin:4px 0"><b>Sin cobro en esta visita.</b></p>`;
+  return sendMail({
+    to: para,
+    subject: `Comprobante Aduana Verde — ${empresa}`,
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Comprobante de tu visita — Aduana Verde · by sicr3p</h2>
+        <p>Hola${empresa ? ` <b>${empresa}</b>` : ''}, este es el resumen de tu paso por el POS Aduana Verde.</p>
+        <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:12px 0">
+          <div style="font-size:12px;color:#218838;font-weight:700">RESULTADO INCORPORADO</div>
+          <div style="font-size:22px;font-weight:800">${total} t CO2e</div>
+          <div style="font-size:13px;color:#64748b">Total calculado en tu visita</div>
+        </div>
+        ${compensacion}
+        <p><a href="${verificarUrl}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Verificar trazabilidad</a></p>
+        <p><a href="${informeUrl}" style="color:#0f1f2e;font-size:14px">Descargar informe PDF</a></p>
+        <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad. Este informe no constituye una verificación de tercera parte acreditada.</p>
+      </div>`,
+  });
+}
+
 export function resetEmail({ nombre, link }) {
   return {
     subject: 'Restablece tu contraseña · sicr3p',

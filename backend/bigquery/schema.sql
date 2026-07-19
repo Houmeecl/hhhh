@@ -76,3 +76,18 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.declaraciones_embalaje` (
   nivel              STRING,           -- Alto | Medio | Bajo
   created_at         TIMESTAMP NOT NULL
 );
+
+-- Compensaciones del POS Aduana Verde — una fila por VERSIÓN del cobro
+-- (en Postgres solo vive el cobro vigente por sesión; acá el historial).
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.compensaciones` (
+  id               STRING NOT NULL,
+  sesion_id        STRING NOT NULL,
+  rut_cliente      STRING,
+  terminal_id      STRING,
+  t_co2e           NUMERIC,
+  tarifa_clp_tco2e NUMERIC,            -- tarifa vigente aplicada (CLP por t CO2e)
+  monto_clp        NUMERIC,            -- ROUND(t_co2e × tarifa); 0 si 'omitido'
+  metodo           STRING,
+  estado           STRING,             -- simulado | omitido | pendiente | pagado
+  created_at       TIMESTAMP NOT NULL
+);

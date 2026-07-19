@@ -1,0 +1,64 @@
+// ============================================================
+// Compensaciones POS "Aduana Verde" — helpers PUROS (sin BD, sin red).
+// El monto SIEMPRE se calcula en el SERVIDOR: t CO2e de la sesión ×
+// tarifa vigente (config_pos), redondeado a pesos enteros. Jamás se
+// confía en montos calculados por el cliente.
+// Hoy el flujo público solo acepta 'simulado' (pago simulado, sin
+// pasarela conectada) y 'omitido' (se decidió no cobrar, monto $0);
+// 'pendiente' y 'pagado' quedan reservados para la pasarela real
+// (VirtualPos) y solo existen a nivel de esquema.
+// ============================================================
+
+// Estados que acepta el endpoint público hoy.
+export const ESTADOS_PUBLICOS = ['simulado', 'omitido'];
+
+// Límites defensivos.
+export const MAX_METODO = 40;          // largo máximo del método de pago
+export const TARIFA_MAX_CLP = 1e6;     // $1.000.000 por t CO2e: más es un error de tipeo
+
+// Valida el body del POST /api/sesiones/:id/compensacion.
+// Devuelve { ok: true, estado, metodo } (metodo saneado o null)
+// o { ok: false, error: 'mensaje en español' }.
+export function validarCompensacion({ metodo, estado } = {}) {
+  if (!ESTADOS_PUBLICOS.includes(estado)) {
+    return { ok: false, error: "El estado debe ser 'simulado' u 'omitido'." };
+  }
+  if (metodo === undefined || metodo === null || metodo === '') {
+    return { ok: true, estado, metodo: null };
+  }
+  if (typeof metodo !== 'string' || !metodo.trim()) {
+    return { ok: false, error: 'El método de pago es inválido.' };
+  }
+  if (metodo.trim().length > MAX_METODO) {
+    return { ok: false, error: `El método de pago no puede superar ${MAX_METODO} caracteres.` };
+  }
+  return { ok: true, estado, metodo: metodo.trim() };
+}
+
+// Valida la tarifa que edita el admin (PUT /api/admin/pos/config).
+// Devuelve { ok: true, tarifa } (Number) o { ok: false, error }.
+export function validarTarifa(valor) {
+  const t = Number(valor);
+  if (typeof valor === 'boolean' || valor === null || valor === undefined ||
+      valor === '' || !Number.isFinite(t)) {
+    return { ok: false, error: 'La tarifa debe ser un número (CLP por t CO2e).' };
+  }
+  if (t <= 0) {
+    return { ok: false, error: 'La tarifa debe ser mayor que 0.' };
+  }
+  if (t > TARIFA_MAX_CLP) {
+    return { ok: false, error: 'La tarifa supera el máximo permitido ($1.000.000 por t CO2e).' };
+  }
+  return { ok: true, tarifa: t };
+}
+
+// Monto a cobrar en CLP: ROUND(t_co2e × tarifa), pesos enteros.
+// Un trámite 'omitido' registra la decisión pero cobra $0.
+// Valores no numéricos o negativos jamás producen un cobro (0).
+export function calcularMonto(tCo2e, tarifa, estado) {
+  if (estado === 'omitido') return 0;
+  const t = Number(tCo2e);
+  const tf = Number(tarifa);
+  if (!Number.isFinite(t) || !Number.isFinite(tf) || t <= 0 || tf <= 0) return 0;
+  return Math.round(t * tf);
+}

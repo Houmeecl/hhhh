@@ -66,6 +66,12 @@ export const api = {
   getSesion: (id) => request(`/sesiones/${id}`),
   verificar: (id) => request(`/verificar/${id}`),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
+  // Tarifa oficial de compensación (pública) y registro de la compensación
+  // del trámite (pago simulado — sin pasarela). El servidor recalcula el
+  // monto con SU tarifa; el frontend solo muestra lo que devuelve.
+  posConfig: () => request('/pos/config'),
+  registrarCompensacion: (sesionId, body) => request(`/sesiones/${sesionId}/compensacion`, { method: 'POST', body }),
+  enviarComprobanteCorreo: (sesionId) => request(`/sesiones/${sesionId}/comprobante-correo`, { method: 'POST', body: {} }),
   informeUrl: (id) => `/api/sesiones/${id}/informe.pdf`,
   etiquetaUrl: (id) => `/api/facturas/${id}/etiqueta.pdf`,
   qrUrl: (id) => `/api/facturas/${id}/qr.png`,
@@ -157,6 +163,8 @@ export const api = {
   posTerminales: () => request('/admin/pos/terminales', { authed: true }),
   crearPosTerminal: (b) => request('/admin/pos/terminales', { method: 'POST', body: b, authed: true }),
   editarPosTerminal: (id, b) => request(`/admin/pos/terminales/${id}`, { method: 'PUT', body: b, authed: true }),
+  editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authed: true }),
+  compensacionesResumen: () => request('/admin/pos/compensaciones/resumen', { authed: true }),
 
   // Motor propio de cálculo
   motorCategorias: () => request('/admin/motor-propio/categorias', { authed: true }),

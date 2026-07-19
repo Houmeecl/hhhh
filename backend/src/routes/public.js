@@ -1,11 +1,12 @@
 import express from 'express';
 import multer from 'multer';
+import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
 import { qrBuffer } from '../services/qr.js';
-import { sendMail, reporteEmail } from '../services/mailer.js';
+import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
@@ -13,6 +14,7 @@ import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { hashDocumento, hashCadena, eslabonValido } from '../services/cadenaHash.js';
 import { validarComponentes, calcularReciclabilidad } from '../services/rep.js';
+import { validarCompensacion, calcularMonto } from '../services/compensacion.js';
 
 const router = express.Router();
 
@@ -376,6 +378,115 @@ router.post('/sesiones/:id/embalaje', async (req, res, next) => {
   }
 });
 
+// Si la petición trae un Bearer con JWT válido de rol 'pos', devuelve el id
+// del terminal; si no, null. El parse es OPCIONAL: el flujo de compensación
+// es público y jamás se rechaza por un token ausente, vencido o ajeno —
+// solo se aprovecha para atribuir el cobro al terminal que lo originó.
+function terminalIdOpcional(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, config.jwt.accessSecret);
+    return payload.rol === 'pos' ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- POST /api/sesiones/:id/compensacion — cobro del POS Aduana Verde ----------
+// El SERVIDOR toma las toneladas de la sesión y la tarifa vigente de
+// config_pos y calcula el monto (ROUND(t CO2e × tarifa); $0 si 'omitido').
+// Nunca se acepta un monto calculado por el cliente. Una compensación por
+// sesión: un re-cobro del mismo trámite reemplaza la anterior.
+router.post('/sesiones/:id/compensacion', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(
+      `SELECT id, rut_cliente, total_co2e FROM sesiones WHERE id = $1`,
+      [req.params.id]
+    );
+    const sesion = sRows[0];
+    if (!sesion) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    const val = validarCompensacion(req.body || {});
+    if (!val.ok) return res.status(400).json({ error: val.error });
+
+    // Tarifa vigente (la migración siembra la fila 1; 5000 es el respaldo).
+    const { rows: cfgRows } = await query(
+      `SELECT tarifa_clp_tco2e FROM config_pos WHERE id = 1`
+    );
+    const tarifa = Number(cfgRows[0]?.tarifa_clp_tco2e ?? 5000);
+
+    const tCo2e = Number(sesion.total_co2e || 0);
+    const monto = calcularMonto(tCo2e, tarifa, val.estado);
+    const terminalId = terminalIdOpcional(req);
+
+    const { rows } = await query(
+      `INSERT INTO compensaciones
+         (sesion_id, terminal_id, t_co2e, tarifa_clp_tco2e, monto_clp, metodo, estado)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (sesion_id) DO UPDATE SET
+         terminal_id      = EXCLUDED.terminal_id,
+         t_co2e           = EXCLUDED.t_co2e,
+         tarifa_clp_tco2e = EXCLUDED.tarifa_clp_tco2e,
+         monto_clp        = EXCLUDED.monto_clp,
+         metodo           = EXCLUDED.metodo,
+         estado           = EXCLUDED.estado,
+         created_at       = now()
+       RETURNING *`,
+      [req.params.id, terminalId, tCo2e, tarifa, monto, val.metodo, val.estado]
+    );
+    res.status(201).json({ compensacion: rows[0] });
+    // Export al warehouse (no bloqueante; cada versión queda como fila propia).
+    bigquery.exportCompensacion(rows[0], sesion);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- POST /api/sesiones/:id/comprobante-correo — comprobante del POS ----------
+// Envía por correo el resumen de la visita (resultado + compensación +
+// enlaces de verificación e informe). Un fallo del mailer NO bota el
+// endpoint: responde { ok: false } y el POS puede reintentar.
+router.post('/sesiones/:id/comprobante-correo', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
+    const sesion = sRows[0];
+    if (!sesion) return res.status(404).json({ error: 'Sesión no encontrada' });
+
+    const { rows: cRows } = await query(
+      `SELECT * FROM compensaciones WHERE sesion_id = $1`,
+      [req.params.id]
+    );
+    const comp = cRows[0] || null;
+
+    // Primera factura de la sesión: ancla del enlace de verificación pública.
+    const { rows: fRows } = await query(
+      `SELECT id FROM facturas WHERE sesion_id = $1 ORDER BY created_at LIMIT 1`,
+      [req.params.id]
+    );
+
+    try {
+      await enviarComprobantePos({
+        para: sesion.email_cliente,
+        empresa: sesion.nombre_cliente,
+        t_co2e: Number(comp?.t_co2e ?? sesion.total_co2e ?? 0),
+        monto_clp: Number(comp?.monto_clp ?? 0),
+        estado: comp?.estado || null,
+        metodo: comp?.metodo || null,
+        verificarUrl: fRows[0] ? `${config.publicAppUrl}/verificar/${fRows[0].id}` : null,
+        informeUrl: `${config.publicAppUrl}/api/sesiones/${req.params.id}/informe.pdf`,
+      });
+      res.json({ ok: true });
+    } catch (e) {
+      console.warn('[comprobante-correo] no se pudo enviar:', e.message);
+      res.json({ ok: false, error: 'No se pudo enviar el comprobante. Intenta de nuevo.' });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ---------- GET /api/sesiones/:id — resultados ----------
 router.get('/sesiones/:id', async (req, res, next) => {
   try {
@@ -386,7 +497,16 @@ router.get('/sesiones/:id', async (req, res, next) => {
       `SELECT * FROM declaraciones_embalaje WHERE sesion_id = $1`,
       [req.params.id]
     );
-    res.json({ sesion: rows[0], facturas, declaracion_embalaje: dRows[0] || null });
+    const { rows: cRows } = await query(
+      `SELECT * FROM compensaciones WHERE sesion_id = $1`,
+      [req.params.id]
+    );
+    res.json({
+      sesion: rows[0],
+      facturas,
+      declaracion_embalaje: dRows[0] || null,
+      compensacion: cRows[0] || null,
+    });
   } catch (err) {
     next(err);
   }

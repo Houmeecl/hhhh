@@ -3,12 +3,7 @@ import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { validarRut, formatearRut } from '../lib/rut.js';
-import {
-  MATERIALES_REP,
-  calcularReciclabilidad,
-  UMBRAL_EXENCION_REP_KG,
-  EXENCION_REP_NOTA,
-} from '../lib/rep.js';
+import DeclaracionEmbalaje, { NIVEL_BADGE } from '../components/DeclaracionEmbalaje.jsx';
 
 // ============================================================
 // Terminal POS "Aduana Verde" (tablet) — la cara al público de sicr3p.
@@ -35,12 +30,22 @@ const STORAGE_KEY = 'av_terminal';
 const MAX_ARCHIVOS = 5;
 const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
 
+// Etiquetas legibles de cada paso, para el aria-label del header y lectores
+// de pantalla (el estado interno usa claves cortas).
+const PASO_LABEL = {
+  inicio: 'Inicio',
+  conexion: 'Conexión del terminal',
+  verificacion: 'Verificación en recepción',
+  cliente: 'Datos del cliente',
+  captura: 'Captura de documentos',
+  procesando: 'Procesando',
+  resultado: 'Resultado del cálculo',
+  cobro: 'Compensación',
+  comprobante: 'Comprobante',
+};
+
 // Quita tildes y baja a minúsculas para detectar "envase/embalaje" en las
 // descripciones sin importar cómo vengan escritas.
-// Color del badge según nivel de reciclabilidad REP (compartido entre la
-// declaración en el resultado y la verificación en recepción).
-const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
-
 const sinTildes = (s) =>
   String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const esItemRep = (descripcion) => /envase|embalaje/.test(sinTildes(descripcion));
@@ -66,6 +71,22 @@ function posActividad(token, documentos_procesados) {
   }).catch(() => {});
 }
 
+// Registra la compensación (simulada u omitida) de la sesión. Fetch directo
+// local para poder mandar el Bearer del terminal POS cuando hay uno conectado
+// (así el backend atribuye el cobro al terminal); sin token va anónimo.
+async function posRegistrarCompensacion(token, sesionId, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api/sesiones/${sesionId}/compensacion`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'No se pudo registrar la compensación');
+  return data; // { compensacion }
+}
+
 export default function PosTerminal() {
   // pos: null = sin conectar; { demo:true } = modo demostración;
   // { token, terminal } = terminal registrado.
@@ -78,7 +99,11 @@ export default function PosTerminal() {
   const [codigoInfo, setCodigoInfo] = useState(null);
   const [files, setFiles] = useState([]);
   const [resultado, setResultado] = useState(null); // { sesion, facturas }
-  const [pago, setPago] = useState(null); // { monto, metodo, tarifa } | 'omitido'
+  // pago: { estado:'simulado'|'omitido', monto?, metodo?, tarifa?, compensacion?, errorRegistro? } | null
+  const [pago, setPago] = useState(null);
+  // Accesibilidad: al cambiar de paso, el foco salta al título del paso para
+  // que lectores de pantalla anuncien dónde quedó el usuario.
+  const contenidoRef = useRef(null);
   // Declaración de embalaje REP: los componentes en edición y la declaración
   // ya guardada en el backend viven en el padre para sobrevivir al cambio de
   // paso (resultado → cobro → comprobante y de vuelta).
@@ -97,6 +122,15 @@ export default function PosTerminal() {
       localStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    const titulo = contenidoRef.current?.querySelector('h1, h2');
+    if (titulo) {
+      titulo.setAttribute('tabindex', '-1');
+      titulo.style.outline = 'none';
+      titulo.focus();
+    }
+  }, [paso]);
 
   function limpiarTramite() {
     setCliente({ rut: '', empresa: '', email: '' });
@@ -118,10 +152,10 @@ export default function PosTerminal() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
-      <HeaderAv pos={pos} />
+      <HeaderAv pos={pos} paso={paso} />
 
       <main style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '28px 16px' }}>
-        <div style={{ width: '100%', maxWidth: 640, minWidth: 0 }}>
+        <div ref={contenidoRef} style={{ width: '100%', maxWidth: 640, minWidth: 0 }}>
           {paso === 'inicio' && (
             <Inicio
               onConectar={() => setPaso('conexion')}
@@ -179,10 +213,12 @@ export default function PosTerminal() {
 
           {paso === 'cobro' && resultado && (
             <Cobro
+              sesionId={resultado.sesion?.id}
+              posToken={pos?.token}
               totalCo2e={Number(resultado.sesion?.total_co2e) || 0}
               onVolver={() => setPaso('resultado')}
               onPagado={(p) => { setPago(p); setPaso('comprobante'); }}
-              onOmitir={() => { setPago('omitido'); setPaso('comprobante'); }}
+              onOmitir={(p) => { setPago(p); setPaso('comprobante'); }}
             />
           )}
 
@@ -199,12 +235,14 @@ export default function PosTerminal() {
 }
 
 // ---------- Header persistente: marca de dos capas ----------
-function HeaderAv({ pos }) {
+function HeaderAv({ pos, paso }) {
   return (
-    <header style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-      padding: '14px 20px', background: '#fff', borderBottom: '1px solid var(--border)',
-    }}>
+    <header
+      aria-label={`Terminal Aduana Verde — paso: ${PASO_LABEL[paso] || paso}`}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+        padding: '14px 20px', background: '#fff', borderBottom: '1px solid var(--border)',
+      }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span style={{ color: 'var(--green-600)', display: 'inline-flex', flexShrink: 0 }}>
           <Icon.Leaf size={26} />
@@ -633,176 +671,64 @@ function Resultado({ resultado, embComponentes, setEmbComponentes, embalajeGuard
   );
 }
 
-// Sección plegable: pre-declaración de embalaje por componentes (Ley 20.920)
-// con % de reciclabilidad en vivo (preview local) y guardado real en el
-// backend (POST /api/sesiones/:id/embalaje — el servidor recalcula todo).
-function DeclaracionEmbalaje({ sesionId, componentes, setComponentes, guardada, onGuardada, onModificar }) {
-  const [abierta, setAbierta] = useState(() => !!guardada);
-  const [guardando, setGuardando] = useState(false);
-  const [errorGuardar, setErrorGuardar] = useState('');
-  const calculo = calcularReciclabilidad(componentes);
-
-  const nivelBadge = NIVEL_BADGE;
-
-  async function guardar() {
-    setErrorGuardar('');
-    setGuardando(true);
-    try {
-      // Solo componentes con peso efectivo; el servidor recalcula porcentaje,
-      // nivel y pesos (no se le mandan resultados locales).
-      const payload = componentes
-        .map((c) => ({
-          material: c.material,
-          peso_gr: Number(c.peso_gr) || 0,
-          cantidad: c.cantidad === '' ? 1 : Number(c.cantidad) || 0,
-          reciclable: !!c.reciclable,
-        }))
-        .filter((c) => c.peso_gr > 0 && c.cantidad > 0);
-      const { declaracion } = await api.guardarEmbalaje(sesionId, payload);
-      onGuardada(declaracion);
-    } catch (e) {
-      setErrorGuardar(e.message || 'No se pudo guardar la declaración. Intenta de nuevo.');
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  function agregar() {
-    setComponentes((cs) => [...cs, { material: MATERIALES_REP[0].codigo, peso_gr: '', cantidad: '1', reciclable: true }]);
-  }
-  function actualizar(i, patch) {
-    setComponentes((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
-  }
-  function quitar(i) {
-    setComponentes((cs) => cs.filter((_, j) => j !== i));
-  }
-
-  return (
-    <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-      <button type="button" onClick={() => setAbierta((a) => !a)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
-          background: 'var(--bg)', border: 'none', cursor: 'pointer', textAlign: 'left',
-          font: 'inherit', color: 'var(--navy)',
-        }}>
-        <span style={{ color: 'var(--green-600)', display: 'inline-flex', flexShrink: 0 }}><Icon.Package size={20} /></span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: 14 }}>Declaración de embalaje (opcional)</span>
-          <span className="muted" style={{ display: 'block', fontSize: 12 }}>Ley 20.920 · composición por componentes y reciclabilidad</span>
-        </span>
-        {guardada && <span className="badge badge-green" style={{ flexShrink: 0 }}>Guardada</span>}
-        <span className="muted" style={{ flexShrink: 0 }}>{abierta ? '▴' : '▾'}</span>
-      </button>
-
-      {/* Declaración ya guardada en el backend: resumen bloqueado + Modificar. */}
-      {abierta && guardada && (
-        <div style={{ padding: 16 }}>
-          <div className="badge badge-green" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>
-            ✓ Declaración guardada — quedará en la verificación pública
-          </div>
-          <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(guardada.porcentaje, 1)}%</div>
-            <div style={{ minWidth: 0 }}>
-              <span className={`badge ${nivelBadge[guardada.nivel] || 'badge-gray'}`}>Reciclabilidad: {guardada.nivel}</span>
-              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                {fmtInt(guardada.peso_reciclable_gr)} gr reciclables de {fmtInt(guardada.peso_total_gr)} gr totales
-              </div>
-            </div>
-          </div>
-          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={onModificar}>
-            Modificar
-          </button>
-        </div>
-      )}
-
-      {abierta && !guardada && (
-        <div style={{ padding: 16 }}>
-          {componentes.length === 0 && (
-            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-              Agrega los componentes del embalaje (caja, film, zuncho…) para estimar su reciclabilidad.
-            </p>
-          )}
-
-          {componentes.map((c, i) => (
-            <div key={i} style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10,
-              alignItems: 'end', padding: '10px 0', borderBottom: '1px solid var(--border)',
-            }}>
-              <div className="field" style={{ margin: 0, minWidth: 0 }}>
-                <label>Material</label>
-                <select value={c.material} onChange={(e) => actualizar(i, { material: e.target.value })}>
-                  {MATERIALES_REP.map((m) => <option key={m.codigo} value={m.codigo}>{m.nombre}</option>)}
-                </select>
-              </div>
-              <div className="field" style={{ margin: 0, minWidth: 0 }}>
-                <label>Peso unitario (gr)</label>
-                <input inputMode="decimal" value={c.peso_gr} placeholder="250"
-                  onChange={(e) => actualizar(i, { peso_gr: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} />
-              </div>
-              <div className="field" style={{ margin: 0, minWidth: 0 }}>
-                <label>Cantidad</label>
-                <input inputMode="numeric" value={c.cantidad} placeholder="1"
-                  onChange={(e) => actualizar(i, { cantidad: e.target.value.replace(/\D/g, '') })} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 10, minWidth: 0 }}>
-                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--navy)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!c.reciclable} onChange={(e) => actualizar(i, { reciclable: e.target.checked })} />
-                  Reciclable
-                </label>
-                <span className="rm" style={{ color: '#b91c1c', cursor: 'pointer', fontWeight: 600, fontSize: 13 }} onClick={() => quitar(i)}>Quitar</span>
-              </div>
-            </div>
-          ))}
-
-          <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 12 }} onClick={agregar}>
-            + Agregar componente
-          </button>
-
-          {calculo.nivel && (
-            <div style={{ marginTop: 14, padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(calculo.porcentaje, 1)}%</div>
-              <div style={{ minWidth: 0 }}>
-                <span className={`badge ${nivelBadge[calculo.nivel]}`}>Reciclabilidad: {calculo.nivel}</span>
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  {fmtInt(calculo.peso_reciclable_gr)} gr reciclables de {fmtInt(calculo.peso_total_gr)} gr totales · preview local, el servidor recalcula al guardar
-                </div>
-              </div>
-            </div>
-          )}
-
-          {errorGuardar && (
-            <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginTop: 12 }}>
-              {errorGuardar}
-            </div>
-          )}
-
-          <button type="button" className="btn btn-primary" style={{ width: '100%', marginTop: 14 }}
-            onClick={guardar} disabled={!calculo.nivel || guardando || !sesionId}>
-            {guardando ? <span className="spinner" /> : 'Guardar declaración'}
-          </button>
-
-          <p className="muted" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
-            <b>Exención &lt;{UMBRAL_EXENCION_REP_KG} kg/año:</b> {EXENCION_REP_NOTA}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------- Paso cobro: compensación del CO2 calculado (pago SIMULADO) ----------
-function Cobro({ totalCo2e, onVolver, onPagado, onOmitir }) {
-  const [tarifa, setTarifa] = useState('5000'); // CLP por t CO2e
+function Cobro({ sesionId, posToken, totalCo2e, onVolver, onPagado, onOmitir }) {
+  const [tarifa, setTarifa] = useState('5000'); // fallback si no hay config del servidor
+  const [config, setConfig] = useState(null); // { tarifa_clp_tco2e, fuente } | null
+  const [configFallo, setConfigFallo] = useState(false);
   const [metodo, setMetodo] = useState('tarjeta');
   const [procesando, setProcesando] = useState(false);
+  const [omitiendo, setOmitiendo] = useState(false);
 
-  const monto = Math.round(totalCo2e * (Number(tarifa) || 0));
+  // Tarifa oficial desde la plataforma; si no responde, se cae al modo
+  // editable con el valor referencial de siempre.
+  useEffect(() => {
+    let vivo = true;
+    api.posConfig()
+      .then((c) => {
+        if (!vivo) return;
+        setConfig(c);
+        if (c?.tarifa_clp_tco2e != null) setTarifa(String(c.tarifa_clp_tco2e));
+      })
+      .catch(() => { if (vivo) setConfigFallo(true); });
+    return () => { vivo = false; };
+  }, []);
+
+  const tarifaNum = Number(tarifa) || 0;
+  const monto = Math.round(totalCo2e * tarifaNum);
+
+  // Registra la compensación en la plataforma. Si falla, el trámite continúa
+  // igual (no se bloquea) pero el comprobante avisa que no quedó registrada.
+  async function registrar(estado, extra = {}) {
+    try {
+      const { compensacion } = await posRegistrarCompensacion(posToken, sesionId, { estado, ...extra });
+      return { compensacion, errorRegistro: false };
+    } catch {
+      return { compensacion: null, errorRegistro: true };
+    }
+  }
 
   async function cobrar() {
     setProcesando(true);
     // Simulación del cobro: sin pasarela conectada todavía.
     await new Promise((r) => setTimeout(r, 1200));
-    onPagado({ monto, metodo, tarifa: Number(tarifa) || 0 });
+    const { compensacion, errorRegistro } = await registrar('simulado', { metodo });
+    // El monto/tarifa que se muestra después es el que DEVUELVE el servidor
+    // (recalcula con su tarifa); lo local queda solo de respaldo.
+    onPagado({
+      estado: 'simulado',
+      metodo,
+      monto: compensacion?.monto_clp != null ? Number(compensacion.monto_clp) : monto,
+      tarifa: compensacion?.tarifa_clp_tco2e != null ? Number(compensacion.tarifa_clp_tco2e) : tarifaNum,
+      compensacion,
+      errorRegistro,
+    });
+  }
+
+  async function omitir() {
+    setOmitiendo(true);
+    const { compensacion, errorRegistro } = await registrar('omitido');
+    onOmitir({ estado: 'omitido', compensacion, errorRegistro });
   }
 
   return (
@@ -816,11 +742,25 @@ function Cobro({ totalCo2e, onVolver, onPagado, onOmitir }) {
 
         <div className="field">
           <label>Tarifa por t CO2e (CLP)</label>
-          <input inputMode="numeric" value={tarifa}
-            onChange={(e) => setTarifa(e.target.value.replace(/\D/g, ''))} />
-          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Tarifa referencial (ancla: impuesto verde chileno US$5/t) — validar.
-          </div>
+          {config ? (
+            <>
+              <input inputMode="numeric" value={tarifa} readOnly aria-readonly="true"
+                style={{ background: 'var(--bg)' }} />
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Tarifa vigente — configurable en el panel{config.fuente ? ` · Fuente: ${config.fuente}` : ''}.
+              </div>
+            </>
+          ) : (
+            <>
+              <input inputMode="numeric" value={tarifa}
+                onChange={(e) => setTarifa(e.target.value.replace(/\D/g, ''))} />
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {configFallo
+                  ? 'No se pudo cargar la tarifa oficial — usando valor referencial editable (ancla: impuesto verde chileno US$5/t) — validar.'
+                  : 'Tarifa referencial (ancla: impuesto verde chileno US$5/t) — validar.'}
+              </div>
+            </>
+          )}
         </div>
 
         <div style={{ margin: '14px 0', padding: '14px 16px', background: 'var(--bg)', borderRadius: 10, textAlign: 'center' }}>
@@ -854,11 +794,11 @@ function Cobro({ totalCo2e, onVolver, onPagado, onOmitir }) {
         </div>
 
         <button className="btn btn-primary" style={{ width: '100%', padding: '14px 0', fontSize: 16 }}
-          onClick={cobrar} disabled={procesando || monto <= 0}>
+          onClick={cobrar} disabled={procesando || omitiendo || monto <= 0}>
           {procesando ? <span className="spinner" /> : `Cobrar $${fmtInt(monto)}`}
         </button>
-        <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={onOmitir} disabled={procesando}>
-          Omitir cobro
+        <button className="btn btn-ghost" style={{ width: '100%', marginTop: 8 }} onClick={omitir} disabled={procesando || omitiendo}>
+          {omitiendo ? <span className="spinner dark" /> : 'Omitir cobro'}
         </button>
 
         <p className="muted" style={{ fontSize: 12, marginTop: 12, textAlign: 'center' }}>
@@ -875,6 +815,8 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const { sesion, facturas = [] } = resultado;
   const f0 = facturas[0];
   const notificado = useRef(false);
+  // Envío del comprobante por correo: null | 'enviando' | 'ok' | 'error'
+  const [envio, setEnvio] = useState(null);
 
   // Registrar actividad del terminal (solo si hay terminal real conectado).
   useEffect(() => {
@@ -885,6 +827,18 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
 
   const hash = f0?.hash_cadena || '';
   const hashCorto = hash ? `${hash.slice(0, 10)}…${hash.slice(-8)}` : null;
+  const compId = pago?.compensacion?.id != null ? String(pago.compensacion.id) : null;
+  const compIdCorto = compId ? (compId.length > 8 ? `${compId.slice(0, 8)}…` : compId) : null;
+
+  async function enviarCorreo() {
+    setEnvio('enviando');
+    try {
+      const r = await api.enviarComprobanteCorreo(sesion.id);
+      setEnvio(r?.ok ? 'ok' : 'error');
+    } catch {
+      setEnvio('error');
+    }
+  }
 
   return (
     <div className="card card-pad" style={{ textAlign: 'center' }}>
@@ -894,15 +848,37 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
       <h2 style={{ margin: '0 0 4px' }}>Trámite registrado</h2>
       <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>Comprobante Aduana Verde · plataforma sicr3p</p>
 
+      {pago?.errorRegistro && (
+        <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', margin: '10px 0', textAlign: 'left' }}>
+          No se pudo registrar la compensación en la plataforma. El trámite y el cálculo quedaron
+          registrados igual; los montos mostrados son referenciales del terminal.
+        </div>
+      )}
+
       <div style={{ margin: '16px 0', padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, textAlign: 'left' }}>
         <div className="two-col-grid" style={{ fontSize: 14, gap: 10 }}>
           <div><span className="muted">Cliente</span><br /><b>{cliente.empresa}</b><br /><span className="muted" style={{ fontSize: 12 }}>{cliente.rut}</span></div>
           <div><span className="muted">Total calculado</span><br /><b>{fmt(sesion?.total_co2e, 3)} t CO2e</b></div>
           <div>
             <span className="muted">Compensación</span><br />
-            {pago && pago !== 'omitido'
-              ? <><b>${fmtInt(pago.monto)} CLP</b><br /><span className="badge badge-amber" style={{ marginTop: 2 }}>Pago simulado · {pago.metodo}</span></>
-              : <span className="badge badge-gray">Sin cobro</span>}
+            {pago?.estado === 'simulado'
+              ? <>
+                  <b>${fmtInt(pago.monto)} CLP</b><br />
+                  <span className="badge badge-amber" style={{ marginTop: 2 }}>Pago simulado · {pago.metodo}</span>
+                  {compIdCorto && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      N° compensación: <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
+                    </div>
+                  )}
+                </>
+              : <>
+                  <span className="badge badge-gray">Sin cobro</span>
+                  {compIdCorto && (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      Registro: <span style={{ fontFamily: 'monospace' }}>{compIdCorto}</span>
+                    </div>
+                  )}
+                </>}
           </div>
           <div><span className="muted">Documentos</span><br /><b>{fmtInt(facturas.length)}</b></div>
           {embalaje && (
@@ -931,6 +907,27 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
             </div>
           )}
         </>
+      )}
+
+      {cliente.email && (
+        <div style={{ marginTop: 16 }}>
+          <button className="btn btn-outline" style={{ width: '100%' }}
+            onClick={enviarCorreo} disabled={envio === 'enviando' || envio === 'ok'}>
+            {envio === 'enviando'
+              ? <span className="spinner dark" />
+              : envio === 'ok' ? '✓ Comprobante enviado' : 'Enviar comprobante por correo'}
+          </button>
+          {envio === 'ok' && (
+            <div className="badge badge-green" style={{ display: 'inline-block', marginTop: 8 }}>
+              Comprobante enviado a {cliente.email}
+            </div>
+          )}
+          {envio === 'error' && (
+            <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>
+              No se pudo enviar el correo. Intenta de nuevo.
+            </div>
+          )}
+        </div>
       )}
 
       <div className="two-col-grid" style={{ marginTop: 18 }}>

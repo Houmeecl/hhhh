@@ -252,6 +252,7 @@ function Terminales({ flash }) {
             <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Guárdala ahora: no se puede volver a ver.</p>
           </div>
         )}
+        <TarifaCompensacion flash={flash} />
       </div>
 
       <div className="card">
@@ -277,6 +278,78 @@ function Terminales({ flash }) {
         </table>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------- Tarifa de compensación (terminales POS + flujo web) ----------
+// La tarifa oficial en CLP por t CO2e con que se calcula el cobro simulado
+// de compensación. GET público (/pos/config), edición solo admin (PUT).
+function TarifaCompensacion({ flash }) {
+  const [config, setConfig] = useState(null);
+  const [tarifa, setTarifa] = useState('');
+  const [fuente, setFuente] = useState('');
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    api.posConfig()
+      .then((c) => {
+        setConfig(c);
+        setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : '');
+        setFuente(c?.fuente || '');
+      })
+      .catch(() => setErrorCarga(true));
+  }, []);
+
+  async function guardar() {
+    const n = Number(tarifa);
+    if (!n || n <= 0) { flash('Ingresa una tarifa válida en CLP por t CO2e.', true); return; }
+    if (!window.confirm(`¿Actualizar la tarifa de compensación a $${fmtInt(n)} CLP por t CO2e? Aplica de inmediato a todos los terminales y al flujo web.`)) return;
+    setGuardando(true);
+    try {
+      const { config: c } = await api.editarPosConfig({ tarifa_clp_tco2e: n, fuente });
+      setConfig(c);
+      setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : String(n));
+      setFuente(c?.fuente || fuente);
+      setErrorCarga(false);
+      flash('Tarifa de compensación actualizada.');
+    } catch (e) { flash(e.message, true); }
+    finally { setGuardando(false); }
+  }
+
+  return (
+    <div className="card card-pad">
+      <h3 style={{ marginTop: 0 }}>Tarifa de compensación</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        CLP por t CO2e con que los terminales y el flujo web calculan el cobro de compensación
+        (pago simulado — sin pasarela conectada).
+      </p>
+      {config && (
+        <div style={{ padding: '10px 14px', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
+          Vigente: <b>${fmtInt(config.tarifa_clp_tco2e)} CLP / t CO2e</b>
+          {config.fuente && <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Fuente: {config.fuente}</div>}
+          {config.updated_at && <div className="muted" style={{ fontSize: 12 }}>Actualizada el {fmtFecha(config.updated_at)}</div>}
+        </div>
+      )}
+      {errorCarga && (
+        <div className="badge badge-red" style={{ display: 'block', padding: '8px 12px', marginBottom: 12 }}>
+          No se pudo cargar la tarifa vigente.
+        </div>
+      )}
+      <div className="field">
+        <label>Nueva tarifa (CLP por t CO2e)</label>
+        <input inputMode="numeric" value={tarifa} placeholder="5000"
+          onChange={(e) => setTarifa(e.target.value.replace(/\D/g, ''))} />
+      </div>
+      <div className="field" style={{ marginBottom: 14 }}>
+        <label>Fuente (opcional)</label>
+        <input value={fuente} placeholder="Ancla: impuesto verde chileno US$5/t"
+          onChange={(e) => setFuente(e.target.value)} />
+      </div>
+      <button className="btn btn-primary" style={{ width: '100%' }} onClick={guardar} disabled={guardando || !tarifa}>
+        {guardando ? <span className="spinner" /> : 'Guardar tarifa'}
+      </button>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { signAccess, requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { generarSerial, generarClave, clampDocumentos } from '../services/posTerminal.js';
+import { validarTarifa } from '../services/compensacion.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 
 // ============================================================
@@ -57,6 +58,23 @@ router.post('/auth', loginLimiter, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- GET /api/pos/config — tarifa vigente de compensación ----------
+// Sin auth: el POS necesita la tarifa ANTES de cobrar (pantalla pública).
+// No expone nada sensible, solo la tarifa CLP/t CO2e y su fuente.
+router.get('/config', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT tarifa_clp_tco2e, fuente, updated_at FROM config_pos WHERE id = 1`
+    );
+    const c = rows[0] || { tarifa_clp_tco2e: 5000, fuente: null, updated_at: null };
+    res.json({
+      tarifa_clp_tco2e: Number(c.tarifa_clp_tco2e),
+      fuente: c.fuente,
+      updated_at: c.updated_at,
+    });
+  } catch (err) { next(err); }
+});
+
 // ---------- POST /api/pos/actividad — el terminal reporta un documento ----------
 router.post('/actividad', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
@@ -80,6 +98,75 @@ router.post('/actividad', requireAuth, requireRole('pos'), async (req, res, next
 // ============================================================
 export const adminRouter = express.Router();
 adminRouter.use(requireAuth, requireRole('admin'));
+
+// ---------- PUT /config — editar la tarifa de compensación ----------
+// La fila 1 es única (CHECK id = 1); el upsert cubre bases donde la
+// migración corrió pero alguien borró la fila a mano.
+adminRouter.put('/config', async (req, res, next) => {
+  try {
+    const { tarifa_clp_tco2e, fuente } = req.body || {};
+    const val = validarTarifa(tarifa_clp_tco2e);
+    if (!val.ok) return res.status(400).json({ error: val.error });
+
+    const { rows } = await query(
+      `INSERT INTO config_pos (id, tarifa_clp_tco2e, fuente, updated_at)
+       VALUES (1, $1, $2, now())
+       ON CONFLICT (id) DO UPDATE SET
+         tarifa_clp_tco2e = EXCLUDED.tarifa_clp_tco2e,
+         fuente           = COALESCE($2, config_pos.fuente),
+         updated_at       = now()
+       RETURNING tarifa_clp_tco2e, fuente, updated_at`,
+      [val.tarifa, fuente !== undefined && fuente !== null ? String(fuente).trim() : null]
+    );
+
+    await logActividad({
+      usuarioId: req.user.sub,
+      accion: 'editar_tarifa_pos',
+      entidad: 'config_pos',
+      detalle: { tarifa_clp_tco2e: val.tarifa },
+      ip: req.ip,
+    });
+
+    res.json({
+      config: {
+        tarifa_clp_tco2e: Number(rows[0].tarifa_clp_tco2e),
+        fuente: rows[0].fuente,
+        updated_at: rows[0].updated_at,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /compensaciones/resumen — métricas del cobro simulado ----------
+// El total "principal" solo considera 'simulado' (los omitidos registran
+// la decisión pero no suman monto); el desglose por estado va aparte.
+adminRouter.get('/compensaciones/resumen', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT estado,
+              COUNT(*)::int              AS n,
+              COALESCE(SUM(t_co2e), 0)   AS total_t_co2e,
+              COALESCE(SUM(monto_clp), 0) AS total_monto_clp
+       FROM compensaciones
+       GROUP BY estado`
+    );
+    const porEstado = {};
+    for (const r of rows) {
+      porEstado[r.estado] = {
+        n: r.n,
+        total_t_co2e: Number(r.total_t_co2e),
+        total_monto_clp: Number(r.total_monto_clp),
+      };
+    }
+    const sim = porEstado.simulado || { n: 0, total_t_co2e: 0, total_monto_clp: 0 };
+    res.json({
+      n: sim.n,
+      total_t_co2e: sim.total_t_co2e,
+      total_monto_clp: sim.total_monto_clp,
+      por_estado: porEstado,
+    });
+  } catch (err) { next(err); }
+});
 
 // ---------- GET /terminales ----------
 adminRouter.get('/terminales', async (req, res, next) => {

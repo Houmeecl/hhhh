@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, bigquery } from '../src/services/bigquery.js';
+import { rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, rowCompensacion, bigquery } from '../src/services/bigquery.js';
 
 test('rowFactura normaliza RUT y tipos para el warehouse', () => {
   const r = rowFactura(
@@ -85,5 +85,42 @@ test('rowDeclaracionEmbalaje tolera campos ausentes sin lanzar', () => {
 
 test('exportDeclaracionEmbalaje apagado es no-op silencioso', async () => {
   const res = await bigquery.exportDeclaracionEmbalaje({ id: 'd3', sesion_id: 's3' }, {});
+  assert.equal(res, false);
+});
+
+// ---------- rowCompensacion (POS Aduana Verde) ----------
+
+test('rowCompensacion mapea el cobro completo con RUT normalizado', () => {
+  const comp = {
+    id: 'c1', sesion_id: 's1', terminal_id: 't1',
+    t_co2e: '0.582', tarifa_clp_tco2e: '5000', monto_clp: '2910',
+    metodo: 'tarjeta', estado: 'simulado', created_at: '2026-07-19T00:00:00Z',
+  };
+  const row = rowCompensacion(comp, { rut_cliente: '11.111.111-1' });
+  assert.equal(row.id, 'c1');
+  assert.equal(row.sesion_id, 's1');
+  assert.equal(row.rut_cliente, '111111111');  // sin puntos ni guión
+  assert.equal(row.terminal_id, 't1');
+  assert.equal(row.t_co2e, 0.582);             // NUMERIC de pg (string) → Number
+  assert.equal(row.tarifa_clp_tco2e, 5000);
+  assert.equal(row.monto_clp, 2910);
+  assert.equal(row.metodo, 'tarjeta');
+  assert.equal(row.estado, 'simulado');
+  assert.equal(row.created_at, '2026-07-19T00:00:00.000Z');
+});
+
+test('rowCompensacion tolera campos ausentes sin lanzar (omitido sin terminal)', () => {
+  const row = rowCompensacion({ id: 'c2', sesion_id: 's2', estado: 'omitido' }, null);
+  assert.equal(row.rut_cliente, null);
+  assert.equal(row.terminal_id, null);
+  assert.equal(row.t_co2e, 0);
+  assert.equal(row.monto_clp, 0);
+  assert.equal(row.metodo, null);
+  assert.equal(row.estado, 'omitido');
+  assert.ok(row.created_at.endsWith('Z'));
+});
+
+test('exportCompensacion apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportCompensacion({ id: 'c3', sesion_id: 's3' }, {});
   assert.equal(res, false);
 });

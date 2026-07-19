@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
-import { api, clienteAuth, fmt, fmtFecha } from '../api.js';
+import { api, clienteAuth, fmt, fmtInt, fmtFecha } from '../api.js';
 
 // Historial del cliente (acceso vía magic link).
 export default function MisSesiones() {
@@ -69,6 +69,22 @@ export default function MisSesiones() {
                     {fmt(s.total_co2e, 3)} <span style={{ fontSize: 12, color: 'var(--gray, #64748b)' }}>t CO2e</span>
                   </div>
                 </div>
+                {/* Solo lectura: declaración REP y compensación, si el backend las trae. */}
+                {(s.declaracion_embalaje || s.compensacion) && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {s.declaracion_embalaje && (
+                      <span className="badge badge-gray" title="Declaración de embalaje (Ley 20.920)">
+                        REP {s.declaracion_embalaje.nivel} {fmt(s.declaracion_embalaje.porcentaje, 1)}%
+                      </span>
+                    )}
+                    {s.compensacion && (
+                      <span className="badge badge-gray" title="Compensación registrada (pago simulado, sin pasarela)">
+                        ${fmtInt(s.compensacion.monto_clp)} ({s.compensacion.estado})
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="table-scroll">
                 <table className="data" style={{ marginTop: 10 }}>
                   <tbody>
                     {s.facturas.map((f) => (
@@ -83,6 +99,7 @@ export default function MisSesiones() {
                     ))}
                   </tbody>
                 </table>
+                </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                   <a className="btn btn-primary btn-sm" href={api.informeUrl(s.id)} target="_blank" rel="noreferrer">Informe (PDF)</a>
                   <Link className="btn btn-outline btn-sm" to={`/resultado/${s.id}`}>Ver resultados</Link>

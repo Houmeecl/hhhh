@@ -9,12 +9,14 @@ export default function Dashboard() {
   const [alertas, setAlertas] = useState([]);
   const [cadena, setCadena] = useState(null);
   const [verificacion, setVerificacion] = useState(null); // null | 'cargando' | resultado
+  const [compensacion, setCompensacion] = useState(null); // resumen de compensaciones POS | null
   const [err, setErr] = useState('');
 
   useEffect(() => {
     api.dashboard().then(setD).catch((e) => setErr(e.message));
     api.alertasContratos().then((r) => setAlertas(r.alertas)).catch(() => {});
     api.cadenaEstado().then((r) => setCadena(r.estado)).catch(() => {});
+    api.compensacionesResumen().then(setCompensacion).catch(() => {});
   }, []);
 
   async function verificarCadena() {
@@ -92,15 +94,37 @@ export default function Dashboard() {
       )}
 
       <div className="card card-pad" style={{ marginTop: 16 }}>
-        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Icon.Leaf size={18} /> Compensación de carbono
-          <span className="badge badge-gray" style={{ fontSize: 11 }}>Próximamente</span>
+        <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Icon.Leaf size={18} /> Compensación (simulada)
+          <span className="badge badge-amber" style={{ fontSize: 11 }}>Pago simulado — sin pasarela</span>
         </h3>
-        <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-          Estamos evaluando un convenio con un socio de compensación ambiental acreditado
-          para que las emisiones medidas por sicr3p puedan derivarse a proyectos reales de
-          reducción o captura. Todavía no hay una integración activa — esta sección es solo
-          informativa para el equipo mientras se define el acuerdo.
+        {compensacion ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy)' }}>
+                ${fmtInt(compensacion.total_monto_clp)} <small style={{ fontSize: 14, fontWeight: 600 }}>CLP</small>
+              </div>
+              <span className="muted" style={{ fontSize: 13 }}>
+                {fmtInt(compensacion.n)} trámite{Number(compensacion.n) === 1 ? '' : 's'} ·{' '}
+                {fmt(compensacion.total_t_co2e, 3)} t CO2e
+              </span>
+            </div>
+            {compensacion.por_estado && Object.keys(compensacion.por_estado).length > 0 && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                {Object.entries(compensacion.por_estado).map(([estado, n]) => (
+                  <span key={estado} className="badge badge-gray">{estado}: {fmtInt(n)}</span>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Aún no hay compensaciones registradas desde los terminales Aduana Verde o el flujo web.
+          </p>
+        )}
+        <p className="muted" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
+          Los cobros son simulados: no hay pasarela de pago ni convenio de compensación activos todavía.
+          Estos montos son registro operativo, no dinero recaudado.
         </p>
       </div>
 

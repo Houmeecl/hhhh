@@ -128,6 +128,25 @@ export function rowDeclaracionEmbalaje(decl, sesion) {
   };
 }
 
+// Compensación del POS Aduana Verde — una por sesión en Postgres; un
+// re-cobro del mismo trámite reemplaza la fila allá, pero acá cada
+// versión queda como fila propia (insertId id+created_at, mismo patrón
+// que las declaraciones de embalaje): el historial de cobros es trazable.
+export function rowCompensacion(comp, sesion) {
+  return {
+    id: comp.id,
+    sesion_id: comp.sesion_id,
+    rut_cliente: rutNorm(sesion?.rut_cliente),
+    terminal_id: comp.terminal_id || null,
+    t_co2e: Number(comp.t_co2e || 0),
+    tarifa_clp_tco2e: Number(comp.tarifa_clp_tco2e || 0),
+    monto_clp: Number(comp.monto_clp || 0),
+    metodo: comp.metodo || null,
+    estado: comp.estado || null,
+    created_at: new Date(comp.created_at || Date.now()).toISOString(),
+  };
+}
+
 export function rowDocumentoCorredor(doc) {
   return {
     id: doc.id,
@@ -179,5 +198,13 @@ export const bigquery = {
     const row = rowDeclaracionEmbalaje(decl, sesion);
     row.insertId = `${row.id}-${row.created_at}`;
     return exportar('declaraciones_embalaje', [row]);
+  },
+
+  // La compensación del POS se exporta al registrarse/reemplazarse
+  // (insertId id+created_at → cada versión del cobro es fila propia).
+  exportCompensacion(comp, sesion) {
+    const row = rowCompensacion(comp, sesion);
+    row.insertId = `${row.id}-${row.created_at}`;
+    return exportar('compensaciones', [row]);
   },
 };

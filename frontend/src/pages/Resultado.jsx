@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { Donut } from '../components/Charts.jsx';
+import DeclaracionEmbalaje from '../components/DeclaracionEmbalaje.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 
 export default function Resultado() {
@@ -11,9 +12,19 @@ export default function Resultado() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [sel, setSel] = useState(0);
+  // Declaración de embalaje REP (Ley 20.920): misma sección plegable del
+  // terminal Aduana Verde, ahora también en el flujo web.
+  const [embComponentes, setEmbComponentes] = useState([]);
+  const [embalajeGuardado, setEmbalajeGuardado] = useState(null);
 
   useEffect(() => {
-    api.getSesion(id).then(setData).catch((e) => setError(e.message));
+    api.getSesion(id)
+      .then((d) => {
+        setData(d);
+        // Si la sesión ya tiene declaración guardada, se muestra tal cual.
+        setEmbalajeGuardado(d.declaracion_embalaje || d.sesion?.declaracion_embalaje || null);
+      })
+      .catch((e) => setError(e.message));
   }, [id]);
 
   if (error) return <PublicLayout><div className="container" style={{ padding: 60 }}><h2>{error}</h2><Link to="/cargar">Volver a cargar</Link></div></PublicLayout>;
@@ -65,6 +76,16 @@ export default function Resultado() {
               <div className="lbl">{proveedores} proveedor{proveedores !== 1 ? 'es' : ''} identificado{proveedores !== 1 ? 's' : ''}</div>
             </div>
           </div>
+
+          {/* Declaración de embalaje REP (opcional) — guarda en el backend y
+              queda visible en la verificación pública del documento. */}
+          <DeclaracionEmbalaje
+            sesionId={sesion.id}
+            componentes={embComponentes} setComponentes={setEmbComponentes}
+            guardada={embalajeGuardado}
+            onGuardada={setEmbalajeGuardado}
+            onModificar={() => setEmbalajeGuardado(null)}
+          />
 
           {/* Donut de CO2e por categoría */}
           {porCategoria.length > 0 && (
