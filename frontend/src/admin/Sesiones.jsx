@@ -7,13 +7,16 @@ const MOTOR_LABELS = {
   propio: 'Propio · XML',
   propio_texto: 'Propio · PDF texto',
   propio_ocr: 'Propio · OCR',
+  propio_revisado: 'Propio · Revisado',
+  revision: 'En revisión',
   externo: 'Externo',
 };
 
 function BadgeMotor({ motor }) {
-  const esPropio = motor === 'propio' || motor === 'propio_texto' || motor === 'propio_ocr';
+  const esPropio = ['propio', 'propio_texto', 'propio_ocr', 'propio_revisado'].includes(motor);
+  const enRevision = motor === 'revision';
   return (
-    <span className={`badge ${esPropio ? 'badge-green' : 'badge-gray'}`}>
+    <span className={`badge ${esPropio ? 'badge-green' : enRevision ? 'badge-yellow' : 'badge-gray'}`}>
       {MOTOR_LABELS[motor] || motor || '—'}
     </span>
   );

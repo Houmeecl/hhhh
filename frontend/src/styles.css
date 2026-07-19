@@ -196,6 +196,7 @@ table.data tr:hover td { background: var(--bg); }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .badge-green { background: var(--green-50); color: var(--green-600); }
 .badge-gray { background: #f1f5f9; color: var(--gray); }
+.badge-yellow { background: #fff8e6; color: #b45309; }
 .badge-amber { background: #fffbeb; color: #b45309; }
 .badge-red { background: #fef2f2; color: #b91c1c; }
 

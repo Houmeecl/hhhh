@@ -174,6 +174,12 @@ export const api = {
   motorCategorias: () => request('/admin/motor-propio/categorias', { authed: true }),
   guardarCategoriaMotor: (codigo, b) => request(`/admin/motor-propio/categorias/${codigo}`, { method: 'PUT', body: b, authed: true }),
   motorEstadisticas: () => request('/admin/motor-propio/estadisticas', { authed: true }),
+  motorFuentes: () => request('/admin/motor-propio/fuentes', { authed: true }),
+  guardarFuenteMotor: (id, b) => request(`/admin/motor-propio/fuentes/${id}`, { method: 'PUT', body: b, authed: true }),
+  // Cola de revisión humana (documentos sin señal, con el motor externo apagado)
+  motorRevision: () => request('/admin/motor-propio/revision', { authed: true }),
+  confirmarRevisionMotor: (facturaId, b) => request(`/admin/motor-propio/revision/${facturaId}`, { method: 'PUT', body: b, authed: true }),
+  abrirArchivoRevision: (facturaId) => abrirPdfAuth(`/api/admin/motor-propio/revision/${facturaId}/archivo`),
 
   // Acceso de clientes (magic link)
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),

@@ -3,12 +3,14 @@
 //
 // - PDF: capa de texto con pdf-parse (sin OCR). Si el PDF es solo imagen
 //   (sin capa de texto) devuelve '' y el llamador decide el siguiente paso.
-// - Imagen (jpg/jpeg/png): OCR con tesseract del sistema, si está
-//   instalado. HEIC y otros formatos quedan fuera → motor externo.
+// - PDF escaneado: rasterizado local con pdftoppm (poppler-utils) y OCR
+//   de las primeras páginas.
+// - Imagen (jpg/jpeg/png): OCR con tesseract del sistema, si está instalado.
+// - HEIC: conversión local a JPG con heif-convert (libheif-examples) y OCR.
 //
 // Contrato honesto: cualquier falla devuelve '' — NUNCA se lanza hacia el
 // flujo de sesiones. Sin texto no hay señal, y sin señal el llamador cae
-// al motor externo (comportamiento actual intacto).
+// al camino siguiente (motor externo o cola de revisión, según config).
 // ============================================================
 
 import { execFile, spawnSync } from 'node:child_process';
@@ -99,5 +101,111 @@ export async function extraerTextoImagenBuffer(buffer, extension) {
     return '';
   } finally {
     await fs.unlink(ruta).catch(() => {});
+  }
+}
+
+// ---------- PDF escaneado (pdftoppm + OCR) ----------
+
+let _rasterDisponible = null; // cache por proceso, igual que ocrDisponible.
+
+/** true si el binario `pdftoppm` (poppler-utils) está instalado. */
+export function rasterPdfDisponible() {
+  if (_rasterDisponible === null) {
+    try {
+      const r = spawnSync('pdftoppm', ['-v'], { timeout: 5000 });
+      // pdftoppm -v imprime la versión por stderr y sale con 0 ó 99 según
+      // build; lo que importa es que el binario exista (sin ENOENT).
+      _rasterDisponible = !r.error;
+    } catch {
+      _rasterDisponible = false;
+    }
+  }
+  return _rasterDisponible;
+}
+
+/**
+ * PDF sin capa de texto (escaneado): rasteriza las primeras `maxPaginas`
+ * a PNG con pdftoppm (300 dpi) y les pasa OCR, concatenando el texto.
+ * Devuelve '' si falta pdftoppm o tesseract, o ante cualquier falla.
+ * Temporales SIEMPRE limpiados (incluso en timeout).
+ */
+export async function extraerTextoPdfEscaneado(buffer, maxPaginas = 2) {
+  if (!buffer || !buffer.length) return '';
+  if (!rasterPdfDisponible() || !ocrDisponible()) return '';
+  const base = path.join(os.tmpdir(), `sicr3p-raster-${crypto.randomUUID()}`);
+  const rutaPdf = `${base}.pdf`;
+  try {
+    await fs.writeFile(rutaPdf, buffer);
+    await execFileAsync(
+      'pdftoppm',
+      ['-r', '300', '-png', '-f', '1', '-l', String(maxPaginas), rutaPdf, base],
+      { timeout: OCR_TIMEOUT_MS }
+    );
+    // pdftoppm nombra base-1.png, base-2.png… (o base-01.png según total).
+    const dir = path.dirname(base);
+    const prefijo = path.basename(base);
+    const generados = (await fs.readdir(dir))
+      .filter((f) => f.startsWith(`${prefijo}-`) && f.endsWith('.png'))
+      .sort()
+      .map((f) => path.join(dir, f));
+    let texto = '';
+    for (const png of generados) {
+      texto += `${await extraerTextoImagen(png)}\n`;
+    }
+    return texto.trim() ? texto : '';
+  } catch {
+    return '';
+  } finally {
+    await fs.unlink(rutaPdf).catch(() => {});
+    // Limpieza de los PNG generados aunque el OCR haya fallado a medias.
+    try {
+      const dir = path.dirname(base);
+      const prefijo = path.basename(base);
+      for (const f of await fs.readdir(dir)) {
+        if (f.startsWith(`${prefijo}-`) && f.endsWith('.png')) {
+          await fs.unlink(path.join(dir, f)).catch(() => {});
+        }
+      }
+    } catch { /* el tmpdir siempre existe; nada que hacer */ }
+  }
+}
+
+// ---------- HEIC (heif-convert + OCR) ----------
+
+let _heicDisponible = null;
+
+/** true si el binario `heif-convert` (libheif-examples) está instalado. */
+export function heicDisponible() {
+  if (_heicDisponible === null) {
+    try {
+      const r = spawnSync('heif-convert', ['--version'], { timeout: 5000 });
+      _heicDisponible = !r.error;
+    } catch {
+      _heicDisponible = false;
+    }
+  }
+  return _heicDisponible;
+}
+
+/**
+ * Foto HEIC (formato por defecto de iPhone): convierte a JPG local con
+ * heif-convert y le pasa el OCR normal. Devuelve '' si falta el binario
+ * o ante cualquier falla. Ambos temporales limpiados siempre.
+ */
+export async function extraerTextoHeicBuffer(buffer) {
+  if (!buffer || !buffer.length) return '';
+  if (!heicDisponible() || !ocrDisponible()) return '';
+  const base = path.join(os.tmpdir(), `sicr3p-heic-${crypto.randomUUID()}`);
+  const rutaHeic = `${base}.heic`;
+  const rutaJpg = `${base}.jpg`;
+  try {
+    await fs.writeFile(rutaHeic, buffer);
+    await execFileAsync('heif-convert', [rutaHeic, rutaJpg], { timeout: OCR_TIMEOUT_MS });
+    return await extraerTextoImagen(rutaJpg);
+  } catch {
+    return '';
+  } finally {
+    await fs.unlink(rutaHeic).catch(() => {});
+    await fs.unlink(rutaJpg).catch(() => {});
   }
 }

@@ -80,14 +80,35 @@ Enviar el diagnóstico por correo al fallar (Resend o el webmail del VPS), para
 no depender de entrar por SSH a leer `/root/sicr3p-diagnostico-*.txt`.
 
 
-## Requisito del motor propio para fotos (OCR)
+## Requisito del motor propio para fotos y escaneos (OCR)
 
-El cálculo de facturas fotografiadas usa tesseract en el propio servidor
-(nada sale a terceros). Instalarlo UNA vez en el VPS:
+El cálculo de facturas fotografiadas, PDFs escaneados y fotos HEIC usa
+binarios locales en el propio servidor (nada sale a terceros). Instalarlos
+UNA vez en el VPS:
 
 ```bash
-apt install -y tesseract-ocr tesseract-ocr-spa
+apt install -y tesseract-ocr tesseract-ocr-spa poppler-utils libheif-examples
 ```
 
-Sin tesseract el sistema no falla: las fotos simplemente siguen el camino
-del motor externo (hoy en mock), y `ocrDisponible()` lo detecta solo.
+- `tesseract-ocr` + `-spa`: OCR de imágenes y escaneos (español + inglés).
+- `poppler-utils` (pdftoppm): rasteriza PDFs escaneados para pasarles OCR.
+- `libheif-examples` (heif-convert): convierte fotos HEIC de iPhone a JPG.
+
+Sin estos binarios el sistema no falla: cada camino se detecta solo
+(`ocrDisponible()`, `rasterPdfDisponible()`, `heicDisponible()`) y el
+documento sigue el camino siguiente.
+
+## Apagar el motor externo (independencia total)
+
+Cuando el panel "Motor propio" muestre ~100% de independencia sostenida,
+poner en `backend/.env`:
+
+```bash
+MOTOR_EXTERNO=off
+```
+
+y reiniciar pm2. Desde ese momento ningún documento del cliente sale a un
+motor de terceros: lo ilegible queda en la **cola de revisión** del panel,
+donde un operador corrige los datos mirando el archivo, el motor propio
+calcula y el documento recién ahí se encadena. Con la cola bajo control,
+`SIMPLE_API_KEY` puede eliminarse del .env.
