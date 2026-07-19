@@ -45,14 +45,19 @@ if [ "${1:-}" = "--instalar-cron" ]; then
   if crontab -l 2>/dev/null | grep -q 'agente-deploy.sh'; then
     echo "==> El cron de auto-deploy ya estaba instalado; no se duplica."
   else
-    (crontab -l 2>/dev/null; echo "*/30 * * * * $SCRIPT_DIR/agente-deploy.sh") | crontab -
+    # OJO: sin "|| true", en una cuenta SIN crontab previo `crontab -l` falla y
+    # con set -e/pipefail el subshell muere antes del echo → instalaba un cron
+    # vacío y el script abortaba en silencio (bug visto en el VPS real).
+    { crontab -l 2>/dev/null || true; echo "*/30 * * * * $SCRIPT_DIR/agente-deploy.sh"; } | crontab -
     echo "==> Auto-deploy instalado: cada 30 min corre $SCRIPT_DIR/agente-deploy.sh (log: $LOG)."
   fi
   exit 0
 fi
 if [ "${1:-}" = "--desinstalar-cron" ]; then
   if crontab -l 2>/dev/null | grep -q 'agente-deploy.sh'; then
-    crontab -l 2>/dev/null | grep -v 'agente-deploy.sh' | crontab -
+    # grep -v sale 1 si el crontab quedaría vacío; el || true evita que pipefail
+    # aborte el script después de haber aplicado el cambio.
+    { crontab -l 2>/dev/null | grep -v 'agente-deploy.sh' || true; } | crontab -
     echo "==> Auto-deploy desinstalado (se quitó la línea de agente-deploy.sh del crontab)."
   else
     echo "==> No había cron de auto-deploy instalado."
