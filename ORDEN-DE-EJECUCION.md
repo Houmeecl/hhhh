@@ -94,6 +94,36 @@ logueado como Houmeecl, y pega el mensaje de texto que aparece arriba de la
 lista de pasos (la API de GitHub no lo expone; solo la interfaz web lo
 muestra).
 
+### Alternativa real: runner propio en el VPS (sortea el bloqueo)
+
+`ci.yml` ya quedó apuntando a `runs-on: self-hosted`. Un runner self-hosted
+es tu propio VPS conectándose a buscar trabajo — si el bloqueo es solo de
+asignación de máquinas alojadas por GitHub, esto lo evita por completo.
+Esta parte **requiere que la hagas tú**: necesita tu sesión de navegador
+logueada y acceso a la terminal del VPS — dos cosas que este entorno nunca
+tuvo.
+
+1. Ve a `github.com/Houmeecl/hhhh/settings/actions/runners/new`, elige
+   **Linux x64**. GitHub te muestra un bloque de comandos con un token de
+   un solo uso (válido ~1 hora).
+2. En el VPS, en una carpeta aparte (ej. `/opt/gh-runner`, NO dentro de
+   `/opt/sicr3p`), pega y corre esos mismos comandos tal cual los entrega
+   GitHub (descarga, extrae, `./config.sh --url ... --token ...`).
+3. Para que quede corriendo siempre (no solo mientras tengas la terminal
+   abierta):
+   ```bash
+   sudo ./svc.sh install
+   sudo ./svc.sh start
+   ```
+4. Confirma que aparece "Idle" en
+   `github.com/Houmeecl/hhhh/settings/actions/runners`.
+5. Haz cualquier commit a la rama (o pide un re-run) — el próximo build
+   debería tomarlo tu runner en segundos.
+
+**Nota de seguridad:** el runner corre en una carpeta propia, separada de
+`/opt/sicr3p`; no toca pm2 ni nginx ni la base de datos de producción.
+Consume CPU/disco brevemente durante cada corrida de CI, nada más.
+
 ---
 
 *Generado a partir de ETAPA3.md, deploy/AUTODEPLOY.md, deploy/WEBMAIL.md y
