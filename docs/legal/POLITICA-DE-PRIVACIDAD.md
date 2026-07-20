@@ -88,7 +88,7 @@ sicr3p **no vende datos** ni los cede para publicidad.
   vigente, porque son el historial trazable del cliente. `[REVISAR ABOGADO:
   plazo máximo y política de eliminación a solicitud]`
 - **Particularidad técnica honesta**: la cadena de integridad almacena
-  huellas criptográficas (hashes) de los documentos. Un hash no permite
+  resúmenes criptográficos (hashes) de los documentos. Un hash no permite
   reconstruir el documento ni identifica por sí solo a una persona, pero es
   inmutable por diseño: la supresión de un registro elimina sus datos
   legibles, no su hash histórico. `[REVISAR ABOGADO: redacción frente al
