@@ -3,6 +3,7 @@ import Landing from './pages/Landing.jsx';
 import Cargar from './pages/Cargar.jsx';
 import Resultado from './pages/Resultado.jsx';
 import Verificar from './pages/Verificar.jsx';
+import Pasaporte from './pages/Pasaporte.jsx';
 import Ingresar from './pages/Ingresar.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
@@ -22,6 +23,7 @@ export default function App() {
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
+      <Route path="/pasaporte/:id" element={<Pasaporte />} />
       <Route path="/ingresar" element={<Ingresar />} />
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />

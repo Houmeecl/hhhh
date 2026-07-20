@@ -75,6 +75,18 @@ export function validarTipoCambio(valor) {
   return { ok: true, tipo_cambio: t };
 }
 
+// Equivalente en USD de un monto CLP con el tipo de cambio vigente.
+// null si falta el tipo de cambio o el monto no es un número > 0 — el
+// frontend simplemente no muestra USD (mismo criterio que el POS).
+// Redondeo a 2 decimales; siempre calculado en el SERVIDOR.
+export function montoUsdDesdeClp(montoClp, tipoCambio) {
+  const m = Number(montoClp);
+  const tc = Number(tipoCambio);
+  if (!Number.isFinite(m) || m <= 0) return null;
+  if (!Number.isFinite(tc) || tc <= 0) return null;
+  return Math.round((m / tc) * 100) / 100;
+}
+
 // Monto a cobrar en CLP: ROUND(t_co2e × tarifa), pesos enteros.
 // Un trámite 'omitido' registra la decisión pero cobra $0.
 // Valores no numéricos o negativos jamás producen un cobro (0).

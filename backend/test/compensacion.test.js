@@ -5,6 +5,7 @@ import {
   validarTarifa,
   validarTipoCambio,
   calcularMonto,
+  montoUsdDesdeClp,
   ESTADOS_PUBLICOS,
   MAX_METODO,
   TARIFA_MAX_CLP,
@@ -90,4 +91,21 @@ test('calcularMonto es $0 para omitido y para entradas inválidas', () => {
   assert.equal(calcularMonto(1, 0, 'simulado'), 0);
   assert.equal(calcularMonto('abc', 5000, 'simulado'), 0);
   assert.equal(calcularMonto(1, NaN, 'simulado'), 0);
+});
+
+// ---------- montoUsdDesdeClp ----------
+
+test('montoUsdDesdeClp convierte y redondea a 2 decimales', () => {
+  assert.equal(montoUsdDesdeClp(10000, 943.5), 10.6); // 10.5989… → 10.6
+  assert.equal(montoUsdDesdeClp(5000, 1000), 5);
+  assert.equal(montoUsdDesdeClp('5000', '1000'), 5); // strings numéricos de la BD
+});
+
+test('montoUsdDesdeClp devuelve null sin tipo de cambio o con valores inválidos', () => {
+  for (const [monto, tc] of [
+    [5000, null], [5000, undefined], [5000, 0], [5000, -10], [5000, 'abc'],
+    [null, 900], [0, 900], [-1, 900], ['abc', 900], [NaN, 900], [Infinity, 900],
+  ]) {
+    assert.equal(montoUsdDesdeClp(monto, tc), null, `(${monto}, ${tc}) debió ser null`);
+  }
 });

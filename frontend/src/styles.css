@@ -531,3 +531,24 @@ table.data tr:hover td { background: var(--bg); }
   .av-swing, .av-fade-slow { animation: none; }
   .mobile-cta { transition: none; }
 }
+
+/* ---------- Pasaporte Digital de Producto (/pasaporte/:id) ---------- */
+.pasaporte-doc { max-width: 800px; margin: 0 auto; }
+.pasaporte-sec {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border-radius: 12px;
+}
+.pasaporte-sec h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+/* Impresión: el pasaporte se guarda como PDF desde el navegador */
+@media print {
+  header, footer, nav, .no-print { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none !important; border: 1px solid #d1d5db; }
+}

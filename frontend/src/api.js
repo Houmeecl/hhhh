@@ -65,6 +65,7 @@ export const api = {
   crearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true }),
   getSesion: (id) => request(`/sesiones/${id}`),
   verificar: (id) => request(`/verificar/${id}`),
+  pasaporte: (id) => request(`/pasaporte/${id}`),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el

@@ -5,7 +5,8 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
-import { qrBuffer } from '../services/qr.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl } from '../services/qr.js';
+import { montoUsdDesdeClp } from '../services/compensacion.js';
 import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { parseDte } from '../services/dte.js';
@@ -848,6 +849,115 @@ router.get('/verificar/:id', async (req, res, next) => {
       } : null,
       items,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/pasaporte/:id — Pasaporte Digital de Producto ----------
+// Consolida en UN documento público lo que ya es verificable por partes:
+// emisiones (con clasificación GHG de la categoría), economía circular
+// (declaración REP), compensación (CLP + USD server-side) e integridad
+// (cadena de hash). El formato se alinea al CONCEPTO de Pasaporte Digital
+// de Producto (UE/ESPR) sin presentarse jamás como documento oficial de
+// una autoridad — el frontend muestra ese disclaimer en el idioma del
+// lector. No expone nada que /verificar/:id, /pos/config o el sello no
+// expongan ya.
+router.get('/pasaporte/:id', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT * FROM facturas WHERE id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Pasaporte no encontrado' });
+    const factura = rows[0];
+
+    const [{ rows: sRows }, { rows: items }, { rows: eRows }, { rows: cRows }, { rows: aRows }] =
+      await Promise.all([
+        query(`SELECT nombre_cliente, rut_cliente, fecha FROM sesiones WHERE id = $1`, [factura.sesion_id]),
+        query(`SELECT descripcion, cantidad, co2e, porcentaje_total FROM line_items WHERE factura_id = $1`, [factura.id]),
+        query(
+          `SELECT porcentaje, nivel, peso_total_gr, jsonb_array_length(componentes) AS n_componentes
+           FROM declaraciones_embalaje WHERE sesion_id = $1`,
+          [factura.sesion_id]
+        ),
+        query(
+          `SELECT estado, monto_clp, tarifa_clp_tco2e, t_co2e, created_at
+           FROM compensaciones WHERE sesion_id = $1`,
+          [factura.sesion_id]
+        ),
+        query(`SELECT nombre, alcance_ghg FROM motor_categorias WHERE codigo = $1`, [factura.categoria]),
+      ]);
+
+    // Equivalente USD server-authoritative: solo si hay tipo de cambio
+    // vigente (manual o automático). Defensivo ante columna sin migrar.
+    const comp = cRows[0] || null;
+    let montoUsd = null;
+    if (comp) {
+      try {
+        const { rows: tcRows } = await query(`SELECT tipo_cambio_usd_clp FROM config_pos WHERE id = 1`);
+        montoUsd = montoUsdDesdeClp(comp.monto_clp, tcRows[0]?.tipo_cambio_usd_clp);
+      } catch { /* sin columna aún: sin USD */ }
+    }
+
+    res.json({
+      pasaporte: {
+        id: factura.id,
+        url: pasaporteUrl(factura.id),
+        verificar_url: verifyUrl(factura.id),
+        sello_svg: `/api/sesiones/${factura.sesion_id}/sello.svg`,
+        qr_png: `/api/pasaporte/${factura.id}/qr.png`,
+      },
+      producto: {
+        documento: factura.numero_venta,
+        categoria: factura.categoria,
+        clasificacion_ghg: aRows[0]?.alcance_ghg || null,
+        motor: factura.motor,
+        status: factura.status,
+        fecha: sRows[0]?.fecha || null,
+      },
+      titular: {
+        nombre: sRows[0]?.nombre_cliente || null,
+        rut: sRows[0]?.rut_cliente || null,
+      },
+      clima: {
+        total_co2e: factura.total_co2e,
+        items,
+      },
+      circular: eRows[0]
+        ? {
+            porcentaje: eRows[0].porcentaje,
+            nivel: eRows[0].nivel,
+            peso_total_gr: eRows[0].peso_total_gr,
+            n_componentes: eRows[0].n_componentes,
+          }
+        : null,
+      compensacion: comp
+        ? {
+            estado: comp.estado,
+            monto_clp: comp.monto_clp,
+            monto_usd: montoUsd,
+            t_co2e: comp.t_co2e,
+            fecha: comp.created_at,
+          }
+        : null,
+      integridad: factura.hash_cadena
+        ? {
+            eslabon: factura.eslabon,
+            hash_documento: factura.hash_documento,
+            hash_cadena: factura.hash_cadena,
+            intacto: eslabonValido(factura),
+          }
+        : null,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/pasaporte/:id/qr.png — QR de la página del pasaporte ----------
+router.get('/pasaporte/:id/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id FROM facturas WHERE id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Pasaporte no encontrado' });
+    res.type('png').send(await qrBufferDe(pasaporteUrl(rows[0].id)));
   } catch (err) {
     next(err);
   }

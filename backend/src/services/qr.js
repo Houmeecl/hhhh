@@ -25,3 +25,18 @@ export async function qrBuffer(facturaId) {
     color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }
+
+// URL pública del Pasaporte Digital de Producto de una factura.
+export function pasaporteUrl(facturaId) {
+  return `${config.publicAppUrl}/pasaporte/${facturaId}`;
+}
+
+// Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
+export async function qrBufferDe(url) {
+  return QRCode.toBuffer(url, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width: 320,
+    color: { dark: '#0f1f2e', light: '#ffffff' },
+  });
+}

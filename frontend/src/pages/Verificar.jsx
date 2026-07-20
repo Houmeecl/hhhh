@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
@@ -106,6 +106,10 @@ export default function Verificar() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <Link className="btn btn-primary" to={`/pasaporte/${id}`}>{t('pas.ver_pasaporte')}</Link>
             </div>
 
             <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
