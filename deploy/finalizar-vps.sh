@@ -15,6 +15,8 @@
 #   4. Instala el cron de auto-deploy (si falta) — desde aquí, cada push
 #      llega solo, con tests + smoke + rollback.
 #   5. Corre el SMOKE E2E contra producción y muestra el resumen final.
+#   6. Expone docs/comercial y docs/metodologia por nginx (PDFs por URL);
+#      docs/legal NUNCA se expone (borradores sin revisión de abogado).
 #
 # Lo que NO puede hacer un script (pasos humanos, se listan al final):
 #   DNS/SPF del correo, ticket rDNS a DonWeb, facturación de GitHub.
@@ -30,7 +32,7 @@ paso() { echo; echo "==> $*"; }
 [ -d "$DIR/backend" ] || { echo "ERROR: no existe $DIR/backend — primero corre deploy/instalar-vps.sh"; exit 1; }
 cd "$DIR"
 
-paso "1/5 Binarios del motor propio (OCR + raster de PDF + HEIC)"
+paso "1/6 Binarios del motor propio (OCR + raster de PDF + HEIC)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y >/dev/null
 apt-get install -y tesseract-ocr tesseract-ocr-spa poppler-utils libheif-examples >/dev/null
@@ -38,27 +40,30 @@ echo "   tesseract: $(tesseract --version 2>&1 | head -1)"
 echo "   pdftoppm:  $(pdftoppm -v 2>&1 | head -1)"
 echo "   heif-convert: instalado"
 
-paso "2/5 Última versión de la rama + migraciones"
+paso "2/6 Última versión de la rama + migraciones"
 git fetch origin "$RAMA"
 git checkout "$RAMA" 2>/dev/null || true
 git pull --ff-only origin "$RAMA"
 echo "   HEAD: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s | cut -c1-70)"
 ( cd backend && npm ci --omit=dev && npm run migrate )
 
-paso "3/5 Tests del backend en el VPS (CI propio)"
+paso "3/6 Tests del backend en el VPS (CI propio)"
 ( cd backend && npm test ) > /tmp/sicr3p-tests-final.log 2>&1 \
   && echo "   tests: OK ($(grep -c '^ok ' /tmp/sicr3p-tests-final.log || true) pasados)" \
   || { echo "   ERROR: tests fallaron — ver /tmp/sicr3p-tests-final.log"; exit 1; }
 
-paso "4/5 Build del frontend + reinicio del backend"
+paso "4/6 Build del frontend + reinicio del backend"
 ( cd frontend && npm ci && npx vite build )
 pm2 restart "$PM2_APP" 2>/dev/null || ( cd backend && pm2 start src/index.js --name "$PM2_APP" )
 pm2 save >/dev/null
 sleep 3
 
-paso "5/5 Auto-deploy + smoke E2E de producción"
+paso "5/6 Auto-deploy + smoke E2E de producción"
 bash deploy/actualizar.sh --instalar-cron
 node deploy/smoke-e2e.mjs || { echo "   ERROR: el smoke E2E falló — revisar arriba"; exit 1; }
+
+paso "6/6 Exponer docs comerciales y metodológicos por nginx (PDFs por URL)"
+bash deploy/servir-docs.sh
 
 echo
 echo "============================================================"

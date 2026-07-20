@@ -18,8 +18,20 @@ cd /opt/sicr3p && git pull && bash deploy/finalizar-vps.sh
 Este único comando instala los binarios del motor total (tesseract, poppler,
 libheif), aplica las migraciones 001→019, corre los 185 tests del backend
 en el propio VPS, compila el frontend, reinicia el servicio, instala el cron
-de auto-deploy (si falta) y corre el smoke E2E contra tu producción real. Si
-algo falla, se detiene y te dice exactamente dónde.
+de auto-deploy (si falta), corre el smoke E2E contra tu producción real, y
+**expone los PDFs comerciales y de metodología por nginx** (paso 6/6) en:
+
+```
+http://<tu-dominio-o-IP>/docs/comercial/01-sicr3p-plataforma.pdf
+http://<tu-dominio-o-IP>/docs/comercial/02-aduana-verde.pdf
+http://<tu-dominio-o-IP>/docs/comercial/03-rep-ley-20920.pdf
+http://<tu-dominio-o-IP>/docs/comercial/04-correo-corporativo.pdf
+http://<tu-dominio-o-IP>/docs/metodologia/guia-metodologica-sicr3p.pdf
+```
+
+`docs/legal/` **nunca** se expone ahí (son borradores marcados "NO PUBLICAR
+SIN ABOGADO"). Si algo falla, el script se detiene y te dice exactamente
+dónde.
 
 ---
 

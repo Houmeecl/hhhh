@@ -105,6 +105,17 @@ server {
     location / {
         try_files \$uri /index.html;
     }
+
+    # Documentos comerciales y metodológicos — público a propósito.
+    # docs/legal/ NUNCA se sirve aquí (borradores sin revisión de abogado).
+    location /docs/comercial/ {
+        alias $DIR/docs/comercial/;
+        autoindex on;
+    }
+    location /docs/metodologia/ {
+        alias $DIR/docs/metodologia/;
+        autoindex on;
+    }
 }
 NGINX
 ln -sf /etc/nginx/sites-available/sicr3p /etc/nginx/sites-enabled/sicr3p
