@@ -290,6 +290,7 @@ function TarifaCompensacion({ flash }) {
   const [tarifa, setTarifa] = useState('');
   const [fuente, setFuente] = useState('');
   const [tipoCambio, setTipoCambio] = useState('');
+  const [tcAuto, setTcAuto] = useState(false);
   const [errorCarga, setErrorCarga] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
@@ -300,6 +301,7 @@ function TarifaCompensacion({ flash }) {
         setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : '');
         setFuente(c?.fuente || '');
         setTipoCambio(c?.tipo_cambio_usd_clp != null ? String(c.tipo_cambio_usd_clp) : '');
+        setTcAuto(c?.tipo_cambio_auto === true);
       })
       .catch(() => setErrorCarga(true));
   }, []);
@@ -308,21 +310,27 @@ function TarifaCompensacion({ flash }) {
     const n = Number(tarifa);
     if (!n || n <= 0) { flash('Ingresa una tarifa válida en CLP por t CO2e.', true); return; }
     const tc = tipoCambio.trim() === '' ? null : Number(tipoCambio);
-    if (tc !== null && (!Number.isFinite(tc) || tc <= 0)) {
+    if (!tcAuto && tc !== null && (!Number.isFinite(tc) || tc <= 0)) {
       flash('El tipo de cambio debe ser un número mayor que 0, o dejarse vacío para no mostrar USD.', true);
       return;
     }
-    const detalleTc = tc != null ? ` y el tipo de cambio a $${tc} CLP por USD` : '';
+    const detalleTc = tcAuto
+      ? ' con dólar automático (observado BCCh, se actualiza solo)'
+      : (tc != null ? ` y el tipo de cambio a $${tc} CLP por USD` : '');
     if (!window.confirm(`¿Actualizar la tarifa de compensación a $${fmtInt(n)} CLP por t CO2e${detalleTc}? Aplica de inmediato a todos los terminales y al flujo web.`)) return;
     setGuardando(true);
     try {
-      const { config: c } = await api.editarPosConfig({ tarifa_clp_tco2e: n, fuente, tipo_cambio_usd_clp: tc });
+      const body = { tarifa_clp_tco2e: n, fuente, tipo_cambio_auto: tcAuto };
+      if (!tcAuto) body.tipo_cambio_usd_clp = tc;
+      const { config: c, aviso } = await api.editarPosConfig(body);
       setConfig(c);
       setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : String(n));
       setFuente(c?.fuente || fuente);
       setTipoCambio(c?.tipo_cambio_usd_clp != null ? String(c.tipo_cambio_usd_clp) : '');
+      setTcAuto(c?.tipo_cambio_auto === true);
       setErrorCarga(false);
-      flash('Configuración de compensación actualizada.');
+      if (aviso) flash(aviso, true);
+      else flash('Configuración de compensación actualizada.');
     } catch (e) { flash(e.message, true); }
     finally { setGuardando(false); }
   }
@@ -340,8 +348,16 @@ function TarifaCompensacion({ flash }) {
           Vigente: <b>${fmtInt(config.tarifa_clp_tco2e)} CLP / t CO2e</b>
           <div style={{ fontSize: 12, marginTop: 2 }}>
             {config.tipo_cambio_usd_clp != null
-              ? <>Tipo de cambio: <b>${config.tipo_cambio_usd_clp} CLP / USD</b></>
-              : <span className="muted">Tipo de cambio USD sin fijar — el sitio no muestra montos en USD.</span>}
+              ? <>Tipo de cambio: <b>${config.tipo_cambio_usd_clp} CLP / USD</b>{config.tipo_cambio_auto && ' · automático'}</>
+              : config.tipo_cambio_auto
+                ? <span className="muted">Dólar automático activado — esperando la primera actualización…</span>
+                : <span className="muted">Tipo de cambio USD sin fijar — el sitio no muestra montos en USD.</span>}
+            {config.tipo_cambio_fuente && (
+              <div className="muted" style={{ fontSize: 12 }}>
+                {config.tipo_cambio_fuente}
+                {config.tipo_cambio_actualizado && ` · actualizado el ${fmtFecha(config.tipo_cambio_actualizado)}`}
+              </div>
+            )}
           </div>
           {config.fuente && <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Fuente: {config.fuente}</div>}
           {config.updated_at && <div className="muted" style={{ fontSize: 12 }}>Actualizada el {fmtFecha(config.updated_at)}</div>}
@@ -358,13 +374,27 @@ function TarifaCompensacion({ flash }) {
           onChange={(e) => setTarifa(e.target.value.replace(/\D/g, ''))} />
       </div>
       <div className="field">
-        <label>Tipo de cambio (CLP por USD, opcional)</label>
-        <input inputMode="decimal" value={tipoCambio} placeholder="943.5 (dólar observado BCCh)"
-          onChange={(e) => setTipoCambio(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} />
-        <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>
-          Vacío = no se muestran montos en USD. Fija el dólar observado del Banco Central y cita la fuente abajo.
-        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={tcAuto} onChange={(e) => setTcAuto(e.target.checked)}
+            style={{ width: 'auto', margin: 0 }} />
+          Actualizar el dólar automáticamente (observado BCCh vía mindicador.cl, cada 6 h)
+        </label>
       </div>
+      {tcAuto ? (
+        <p className="muted" style={{ fontSize: 12, margin: '0 0 10px' }}>
+          El servidor obtiene el dólar observado del Banco Central y lo mantiene al día solo.
+          Si la fuente falla, conserva el último valor conocido.
+        </p>
+      ) : (
+        <div className="field">
+          <label>Tipo de cambio (CLP por USD, opcional)</label>
+          <input inputMode="decimal" value={tipoCambio} placeholder="943.5 (dólar observado BCCh)"
+            onChange={(e) => setTipoCambio(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} />
+          <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>
+            Vacío = no se muestran montos en USD. Fija el dólar observado del Banco Central y cita la fuente abajo.
+          </p>
+        </div>
+      )}
       <div className="field" style={{ marginBottom: 14 }}>
         <label>Fuente (opcional)</label>
         <input value={fuente} placeholder="Impuesto verde US$5/t · dólar observado BCCh 20-07-2026"

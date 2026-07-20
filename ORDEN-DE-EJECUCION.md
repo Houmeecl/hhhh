@@ -38,11 +38,14 @@ dónde.
 ## 2. Panel admin — configuración de negocio
 **Acceso:** navegador (`/admin`, ya en producción tras el paso 1)
 
-- [ ] **Fijar el tipo de cambio USD**: menú **Accesos externos → pestaña
-  Terminales → tarjeta "Tarifa de compensación y tipo de cambio"**, citando
-  la fuente (ej. dólar observado del Banco Central). Mientras quede vacío,
-  el sitio no muestra montos en USD — es el comportamiento correcto, no un
-  error.
+- [ ] **Tipo de cambio USD**: menú **Accesos externos → pestaña Terminales
+  → tarjeta "Tarifa de compensación y tipo de cambio"**. Lo más simple:
+  marca la casilla **"Actualizar el dólar automáticamente"** y guarda — el
+  servidor trae el dólar observado del Banco Central (vía mindicador.cl)
+  al instante y lo renueva solo cada 6 horas. Si prefieres fijarlo a mano,
+  deja la casilla desmarcada e ingresa el valor citando la fuente. Mientras
+  no haya valor, el sitio no muestra montos en USD — comportamiento
+  correcto, no un error.
 - [ ] **Validar los factores de emisión nuevos**: menú **Motor propio**
   contra sus fuentes oficiales descargadas, y subirlos de
   `avalada_referencial` a `validada_oficial` uno por uno. Los que necesitan

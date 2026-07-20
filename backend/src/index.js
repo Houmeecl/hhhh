@@ -19,6 +19,7 @@ import accesosRoutes from './routes/accesos.js';
 import motorRoutes from './routes/motor.js';
 import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
+import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 
 const app = express();
 
@@ -70,6 +71,9 @@ async function start() {
   try {
     // Aplica migraciones al arrancar (idempotente).
     await runMigrations();
+    // Dólar observado automático: solo actúa si el admin activó el modo
+    // auto en config_pos (si no, cada tick es un SELECT y nada más).
+    if (config.env !== 'test') iniciarDolarAutomatico();
     app.listen(config.port, () => {
       console.log(`\n  sicr3p backend escuchando en http://localhost:${config.port}`);
       console.log(`  Modo motor: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);
