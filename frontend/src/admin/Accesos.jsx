@@ -289,6 +289,7 @@ function TarifaCompensacion({ flash }) {
   const [config, setConfig] = useState(null);
   const [tarifa, setTarifa] = useState('');
   const [fuente, setFuente] = useState('');
+  const [tipoCambio, setTipoCambio] = useState('');
   const [errorCarga, setErrorCarga] = useState(false);
   const [guardando, setGuardando] = useState(false);
 
@@ -298,6 +299,7 @@ function TarifaCompensacion({ flash }) {
         setConfig(c);
         setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : '');
         setFuente(c?.fuente || '');
+        setTipoCambio(c?.tipo_cambio_usd_clp != null ? String(c.tipo_cambio_usd_clp) : '');
       })
       .catch(() => setErrorCarga(true));
   }, []);
@@ -305,29 +307,42 @@ function TarifaCompensacion({ flash }) {
   async function guardar() {
     const n = Number(tarifa);
     if (!n || n <= 0) { flash('Ingresa una tarifa válida en CLP por t CO2e.', true); return; }
-    if (!window.confirm(`¿Actualizar la tarifa de compensación a $${fmtInt(n)} CLP por t CO2e? Aplica de inmediato a todos los terminales y al flujo web.`)) return;
+    const tc = tipoCambio.trim() === '' ? null : Number(tipoCambio);
+    if (tc !== null && (!Number.isFinite(tc) || tc <= 0)) {
+      flash('El tipo de cambio debe ser un número mayor que 0, o dejarse vacío para no mostrar USD.', true);
+      return;
+    }
+    const detalleTc = tc != null ? ` y el tipo de cambio a $${tc} CLP por USD` : '';
+    if (!window.confirm(`¿Actualizar la tarifa de compensación a $${fmtInt(n)} CLP por t CO2e${detalleTc}? Aplica de inmediato a todos los terminales y al flujo web.`)) return;
     setGuardando(true);
     try {
-      const { config: c } = await api.editarPosConfig({ tarifa_clp_tco2e: n, fuente });
+      const { config: c } = await api.editarPosConfig({ tarifa_clp_tco2e: n, fuente, tipo_cambio_usd_clp: tc });
       setConfig(c);
       setTarifa(c?.tarifa_clp_tco2e != null ? String(c.tarifa_clp_tco2e) : String(n));
       setFuente(c?.fuente || fuente);
+      setTipoCambio(c?.tipo_cambio_usd_clp != null ? String(c.tipo_cambio_usd_clp) : '');
       setErrorCarga(false);
-      flash('Tarifa de compensación actualizada.');
+      flash('Configuración de compensación actualizada.');
     } catch (e) { flash(e.message, true); }
     finally { setGuardando(false); }
   }
 
   return (
     <div className="card card-pad">
-      <h3 style={{ marginTop: 0 }}>Tarifa de compensación</h3>
+      <h3 style={{ marginTop: 0 }}>Tarifa de compensación y tipo de cambio</h3>
       <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
         CLP por t CO2e con que los terminales y el flujo web calculan el cobro de compensación
-        (pago simulado — sin pasarela conectada).
+        (pago simulado — sin pasarela conectada). El tipo de cambio define el equivalente en USD
+        que se muestra junto a los montos.
       </p>
       {config && (
         <div style={{ padding: '10px 14px', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
           Vigente: <b>${fmtInt(config.tarifa_clp_tco2e)} CLP / t CO2e</b>
+          <div style={{ fontSize: 12, marginTop: 2 }}>
+            {config.tipo_cambio_usd_clp != null
+              ? <>Tipo de cambio: <b>${config.tipo_cambio_usd_clp} CLP / USD</b></>
+              : <span className="muted">Tipo de cambio USD sin fijar — el sitio no muestra montos en USD.</span>}
+          </div>
           {config.fuente && <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Fuente: {config.fuente}</div>}
           {config.updated_at && <div className="muted" style={{ fontSize: 12 }}>Actualizada el {fmtFecha(config.updated_at)}</div>}
         </div>
@@ -342,9 +357,17 @@ function TarifaCompensacion({ flash }) {
         <input inputMode="numeric" value={tarifa} placeholder="5000"
           onChange={(e) => setTarifa(e.target.value.replace(/\D/g, ''))} />
       </div>
+      <div className="field">
+        <label>Tipo de cambio (CLP por USD, opcional)</label>
+        <input inputMode="decimal" value={tipoCambio} placeholder="943.5 (dólar observado BCCh)"
+          onChange={(e) => setTipoCambio(e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1'))} />
+        <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>
+          Vacío = no se muestran montos en USD. Fija el dólar observado del Banco Central y cita la fuente abajo.
+        </p>
+      </div>
       <div className="field" style={{ marginBottom: 14 }}>
         <label>Fuente (opcional)</label>
-        <input value={fuente} placeholder="Ancla: impuesto verde chileno US$5/t"
+        <input value={fuente} placeholder="Impuesto verde US$5/t · dólar observado BCCh 20-07-2026"
           onChange={(e) => setFuente(e.target.value)} />
       </div>
       <button className="btn btn-primary" style={{ width: '100%' }} onClick={guardar} disabled={guardando || !tarifa}>
