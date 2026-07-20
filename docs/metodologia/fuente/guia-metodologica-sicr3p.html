@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Guía metodológica sicr3p — medición y reporte de emisiones a partir de documentos tributarios</title>
+<link rel="stylesheet" href="base.css">
+<style>
+/* Estilos propios de la guía metodológica (árboles decisionales y TOC) */
+.toc { width: 100%; border-collapse: collapse; font-size: 10pt; }
+.toc td { padding: 2mm 2.5mm; border-bottom: 1px solid var(--borde); }
+.toc .cap { color: var(--verde-oscuro); font-weight: 700; white-space: nowrap; padding-right: 4mm; }
+.toc .pagina-num { text-align: right; color: var(--gris); width: 12mm; }
+.arbol { margin: 5mm 0; page-break-inside: avoid; }
+.arbol .fila { display: flex; align-items: center; gap: 3mm; margin-bottom: 3mm; }
+.nodo-p {
+  background: var(--navy); color: #fff; border-radius: 4px;
+  padding: 3mm 4mm; font-size: 9pt; line-height: 1.4; flex: 1;
+}
+.nodo-r {
+  background: var(--verde); color: #fff; border-radius: 4px;
+  padding: 3mm 4mm; font-size: 9pt; font-weight: 700; flex: 0 0 44mm; text-align: center;
+}
+.flecha { color: var(--verde-oscuro); font-weight: 800; font-size: 11pt; flex: 0 0 auto; }
+.etiqueta-si { color: var(--verde-oscuro); font-weight: 700; font-size: 8.5pt; }
+.etiqueta-no { color: #b91c1c; font-weight: 700; font-size: 8.5pt; }
+.principio { border-left: 4px solid var(--verde); padding-left: 4mm; margin-bottom: 4mm; page-break-inside: avoid; }
+.principio b { color: var(--navy); }
+.kicker { color: var(--verde-oscuro); font-weight: 700; letter-spacing: 1.5px; font-size: 9pt; text-transform: uppercase; }
+.figura-titulo { color: var(--verde-oscuro); font-weight: 700; font-size: 9.5pt; margin: 4mm 0 2mm; }
+.fuente-fig { text-align: center; font-size: 8.5pt; color: var(--gris); font-style: italic; margin-top: 1.5mm; }
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">DOCUMENTO METODOLÓGICO</div>
+    <h1>Guía metodológica</h1>
+    <p style="font-size:16pt; color:#e2e8f0; margin-bottom:6mm; line-height:1.35;">para la medición y reporte de emisiones de gases de efecto invernadero <em style="color:#7fd99a;">a partir de documentos tributarios</em> con la plataforma <em style="color:#7fd99a;">sicr3p</em></p>
+    <p class="bajada">Cómo la plataforma implementa el Protocolo GHG documento a documento,
+    qué métodos aplica, con qué factores y fuentes, y cómo su resultado alimenta el
+    inventario de alcance 3 de una empresa mandante.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- TABLA DE CONTENIDOS -->
+<div class="pagina">
+  <h2>Tabla de contenidos</h2>
+  <table class="toc">
+    <tr><td class="cap">Resumen ejecutivo</td><td>Por qué existe esta guía y a quién sirve</td></tr>
+    <tr><td class="cap">Capítulo 1</td><td>La cadena de valor del dato en sicr3p</td></tr>
+    <tr><td class="cap">Capítulo 2</td><td>Los principios del Protocolo GHG, implementados en software</td></tr>
+    <tr><td class="cap">Capítulo 3</td><td>Guía metodológica por categoría del motor de cálculo</td></tr>
+    <tr><td class="cap">Capítulo 4</td><td>Árboles decisionales: lectura del documento y método de cálculo</td></tr>
+    <tr><td class="cap">Capítulo 5</td><td>Calidad del dato, trazabilidad y verificación</td></tr>
+    <tr><td class="cap">Anexo I</td><td>Correspondencia con las 15 categorías de alcance 3 del Protocolo GHG</td></tr>
+    <tr><td class="cap">Anexo II</td><td>Fuentes de factores de emisión registradas en la plataforma</td></tr>
+    <tr><td class="cap">Anexo III</td><td>Límites del método y declaraciones de honestidad</td></tr>
+  </table>
+
+  <h2 style="margin-top:10mm;">Resumen ejecutivo</h2>
+
+  <p><strong>Las grandes empresas chilenas ya están midiendo su alcance 3 — y eso convirtió a cada
+  proveedor en una fuente de datos.</strong> La minería del cobre formalizó el proceso en 2024 con la
+  guía metodológica de la Mesa de Trazabilidad de Emisiones de Alcance 3 (Anglo American,
+  Antofagasta Minerals, BHP, Codelco, Freeport-McMoRan, Glencore, Lundin y Teck, articuladas
+  por Corporación Alta Ley). Esa guía, construida sobre el Protocolo GHG y los estándares del
+  ICMM, establece una jerarquía clara de calidad: el mejor dato es el <strong>específico del
+  proveedor</strong>, y recomienda usarlo para los bienes y servicios que concentran el 80% de las
+  emisiones de la categoría 1. El mensaje práctico para las miles de empresas que venden a la
+  gran industria es directo: <strong>tarde o temprano, el mandante va a pedir el dato</strong>.</p>
+
+  <p>Esta guía documenta cómo la plataforma <strong>sicr3p</strong> resuelve ese problema desde el lado
+  del proveedor: en vez de encuestas anuales o planillas sin respaldo, sicr3p calcula las
+  emisiones <strong>a partir de los documentos tributarios reales</strong> de la empresa (facturas
+  electrónicas XML, PDF o fotografías), ítem por ítem, con factores de emisión de fuente citada,
+  clasificación por alcance del Protocolo GHG y un registro encadenado criptográficamente que
+  cualquier tercero puede verificar. El resultado es exactamente el insumo que la jerarquía del
+  mandante necesita: un dato por documento, trazable y defendible.</p>
+
+  <p>Los marcos de referencia de esta guía son el <strong>GHG Protocol Corporate Accounting and
+  Reporting Standard</strong> y su guía técnica para el cálculo de emisiones de alcance 3 (WRI/WBCSD),
+  la <strong>ISO 14064-1</strong> como referencia de reporte organizacional, y — para el diálogo con la
+  gran minería — la citada guía de la Mesa de Trazabilidad (diciembre 2024). sicr3p no reemplaza
+  esos estándares: los implementa en software, documento a documento, y lo declara con
+  honestidad donde corresponde (Anexo III).</p>
+
+  <div class="caja">
+    <strong>A quién sirve esta guía:</strong> a la empresa que carga sus documentos y quiere entender
+    qué se calcula y por qué; al mandante que recibe datos de sicr3p vía API o informes y necesita
+    citarlos en su inventario de alcance 3; y al auditor o verificador que quiera reconstruir
+    cualquier cifra desde su documento de origen.
+  </div>
+</div>
+
+<!-- CAPÍTULO 1 -->
+<div class="pagina seccion">
+  <p class="kicker">Capítulo 1</p>
+  <h2>La cadena de valor del dato en sicr3p</h2>
+
+  <p>Así como la cadena de valor del cobre va de la mina al cátodo, en sicr3p el dato recorre
+  una cadena con etapas definidas, cada una con su producto y su control. La Tabla 1 la resume.</p>
+
+  <p class="figura-titulo">Tabla 1: Etapas de la cadena de valor del dato</p>
+  <table>
+    <tr><th>Etapa</th><th>Descripción del proceso</th><th>Producto de la etapa</th></tr>
+    <tr>
+      <td><strong>Captura</strong></td>
+      <td>La empresa carga sus documentos por la web, o un operador los procesa en el mostrador de una oficina Aduana Verde (terminal POS autenticado). Formatos: XML DTE, PDF, JPG/PNG y HEIC.</td>
+      <td>Documento original en memoria (no se retiene salvo revisión, ver Cap. 4)</td>
+    </tr>
+    <tr>
+      <td><strong>Extracción</strong></td>
+      <td>Lectura LOCAL del documento: ítems estructurados del XML; capa de texto del PDF; rasterizado + OCR para escaneos; conversión + OCR para fotos HEIC. Nada sale a servicios de terceros en estos caminos.</td>
+      <td>Folio, RUT emisor y receptor, fecha, ítems con glosa, cantidad, unidad y monto</td>
+    </tr>
+    <tr>
+      <td><strong>Clasificación</strong></td>
+      <td>Cada ítem se asigna a una categoría del motor por coincidencia de palabra clave (gana la más específica), con su alcance GHG asociado.</td>
+      <td>Ítem clasificado con categoría + Alcance 1, 2 o 3</td>
+    </tr>
+    <tr>
+      <td><strong>Cálculo</strong></td>
+      <td>Método físico (cantidad × factor por unidad) cuando el documento trae cantidades con unidad reconocida; método por gasto (monto × factor económico) cuando solo hay montos. Siempre en el servidor.</td>
+      <td>kg CO2e por ítem; t CO2e por documento</td>
+    </tr>
+    <tr>
+      <td><strong>Encadenamiento</strong></td>
+      <td>El documento calculado genera un eslabón con hash SHA-256 encadenado al anterior. Un eslabón jamás se reescribe; las correcciones generan eslabones nuevos.</td>
+      <td>Eslabón verificable en la cadena de integridad pública</td>
+    </tr>
+    <tr>
+      <td><strong>Reporte y verificación</strong></td>
+      <td>Informe PDF con metodología citada, etiqueta QR pública por documento, sello digital, informes mensuales y acceso por API para mandantes autorizados.</td>
+      <td>Dato consumible por el inventario del mandante, verificable por cualquiera</td>
+    </tr>
+  </table>
+
+  <h3>1.1 Los seis orígenes del cálculo</h3>
+  <p>Cada documento queda marcado con el origen exacto de su cálculo — el equivalente a declarar
+  la configuración operacional en un inventario minero:</p>
+  <table>
+    <tr><th>Origen (campo motor)</th><th>Camino</th><th>Naturaleza del dato</th></tr>
+    <tr><td><code>propio</code></td><td>XML DTE con ítems reales</td><td>El mejor caso: cantidades, unidades y montos estructurados del documento oficial del SII</td></tr>
+    <tr><td><code>propio_texto</code></td><td>PDF con capa de texto</td><td>Ítems y montos leídos del texto del documento</td></tr>
+    <tr><td><code>propio_ocr</code></td><td>PDF escaneado, JPG/PNG o HEIC vía OCR local</td><td>Ítems y montos reconocidos ópticamente; sin señal suficiente, no se calcula</td></tr>
+    <tr><td><code>propio_revisado</code></td><td>Corrección humana confirmada</td><td>Datos ingresados por un operador mirando el documento; el cálculo sigue siendo del motor</td></tr>
+    <tr><td><code>revision</code></td><td>En cola de revisión</td><td>Documento aún sin calcular — total 0, sin eslabón; jamás se inventa</td></tr>
+    <tr><td><code>externo</code></td><td>Motor externo (residual, en retiro)</td><td>Solo si está habilitado y ningún camino local logró señal</td></tr>
+  </table>
+</div>
+
+<!-- CAPÍTULO 2 -->
+<div class="pagina seccion">
+  <p class="kicker">Capítulo 2</p>
+  <h2>Los principios del Protocolo GHG, implementados en software</h2>
+
+  <p>El Protocolo GHG y el ICMM establecen cinco principios de contabilidad. En la mayoría de
+  las organizaciones son declaraciones de intención; en sicr3p son mecanismos del sistema:</p>
+
+  <div class="principio"><b>1. Relevancia.</b> El inventario refleja las decisiones que los usuarios
+  necesitan tomar. En sicr3p el dato nace del gasto real de la empresa (sus facturas), por lo que
+  la relevancia es estructural: se calcula sobre lo que efectivamente se compró.</div>
+
+  <div class="principio"><b>2. Integridad.</b> Contabilizar todas las fuentes dentro del límite y
+  justificar exclusiones. sicr3p procesa todo documento cargado; lo que no logra leer NO se omite
+  en silencio: queda visible como "en revisión" o derivado, con su estado impreso en informes y
+  estadísticas (% de independencia con desglose por origen).</div>
+
+  <div class="principio"><b>3. Coherencia.</b> Metodologías consistentes en el tiempo. Los factores
+  viven en una tabla versionada con fuente y año; todo cambio del administrador queda en el log de
+  actividad, y el informe cita el factor y la fuente vigentes al momento del cálculo.</div>
+
+  <div class="principio"><b>4. Transparencia.</b> Registro de auditoría claro y referencias a las
+  fuentes. Cada cifra se reconstruye desde su documento de origen: informe → documento → ítems →
+  factor citado (organismo, documento, año) → eslabón en la cadena pública. El registro de
+  auditoría no es un anexo: es la arquitectura.</div>
+
+  <div class="principio"><b>5. Precisión.</b> Ni sobreestimar ni subestimar sistemáticamente, y
+  reducir la incertidumbre en el tiempo. sicr3p usa el dato físico cuando el documento lo trae
+  (menor incertidumbre) y el método por gasto cuando no; jamás rellena vacíos con supuestos — la
+  regla del motor es explícita: <em>sin señal suficiente, no hay cálculo</em>.</div>
+
+  <h3>2.1 La materialidad del alcance 3 y el rol del proveedor</h3>
+  <p>Según el ICMM, en algunas compañías mineras el alcance 3 puede representar hasta el
+  <strong>95% de las emisiones totales</strong>, con las categorías 1, 3, 10 y 11 como las más
+  críticas. Para la categoría 1 (bienes y servicios comprados), la guía de la Mesa de
+  Trazabilidad recomienda el método <strong>específico del proveedor</strong> — datos entregados por
+  el propio proveedor — para los productos y servicios que representen el 80% de las emisiones o
+  del gasto, y anticipa que la industria "trabajará con proveedores críticos para transitar de
+  información promedio hacia una configuración híbrida o específica del proveedor".</p>
+
+  <div class="caja">
+    <strong>Aquí calza sicr3p.</strong> Cuando el mandante golpee la puerta pidiendo "tu dato",
+    el proveedor que usa sicr3p responde con un inventario por documento: cada compra clasificada
+    por alcance, calculada con factor citado, verificable por QR y entregable por API. Es la
+    diferencia entre contestar una encuesta y entregar evidencia.
+  </div>
+</div>
+
+<!-- CAPÍTULO 3 -->
+<div class="pagina seccion">
+  <p class="kicker">Capítulo 3</p>
+  <h2>Guía metodológica por categoría del motor de cálculo</h2>
+
+  <p>El motor de sicr3p opera con categorías editables por el administrador, cada una con su
+  alcance GHG, su factor físico (cuando existe unidad natural), su factor por gasto y su fuente
+  metodológica registrada. La Tabla 2 muestra la configuración vigente al cierre de esta guía —
+  los valores exactos se administran en la plataforma y el informe siempre cita los vigentes al
+  momento del cálculo.</p>
+
+  <p class="figura-titulo">Tabla 2: Categorías del motor, factores y fuentes (configuración vigente, referencial — validar)</p>
+  <table style="font-size:8.5pt;">
+    <tr><th>Categoría</th><th>Alcance GHG</th><th>Factor físico</th><th>Factor por gasto<br>(kgCO2e/$1.000)</th><th>Fuente metodológica</th></tr>
+    <tr><td>Combustible (diésel repr.)</td><td>Alcance 1 — combustión propia</td><td>2,68 kg/L</td><td>1,20</td><td>IPCC 2006 Guidelines Vol. 2</td></tr>
+    <tr><td>Gas natural</td><td>Alcance 1 — combustión estacionaria</td><td>2,02 kg/m³</td><td>0,90</td><td>IPCC 2006 Guidelines Vol. 2</td></tr>
+    <tr><td>GLP</td><td>Alcance 1 — combustión propia</td><td>1,61 kg/L</td><td>1,00</td><td>IPCC 2006 Guidelines Vol. 2</td></tr>
+    <tr><td>Kerosene / Jet A-1</td><td>Alcance 1 — combustión propia</td><td>2,54 kg/L</td><td>1,10</td><td>DEFRA 2024</td></tr>
+    <tr><td>Refrigerante R-134a</td><td>Alcance 1 — fugitivas</td><td>1.530 kg/kg fugado (GWP100)</td><td>25,0</td><td>IPCC AR6 (2021)</td></tr>
+    <tr><td>Refrigerante R-410A</td><td>Alcance 1 — fugitivas</td><td>2.256 kg/kg fugado (GWP100)</td><td>35,0</td><td>IPCC AR6 (2021)</td></tr>
+    <tr><td>Electricidad</td><td>Alcance 2 — electricidad comprada</td><td>0,2421 kg/kWh</td><td>0,60</td><td>MMA Chile — HuellaChile (2023)</td></tr>
+    <tr><td>Materiales</td><td>Alcance 3 · Cat. 1 — bienes</td><td>1,50 kg/kg</td><td>0,45</td><td>GHG Protocol (spend-based)</td></tr>
+    <tr><td>Agua / Agua potable</td><td>Alcance 3 · Cat. 1 — bienes</td><td>0,344–0,41 kg/m³</td><td>0,30</td><td>DEFRA 2024</td></tr>
+    <tr><td>Servicios</td><td>Alcance 3 · Cat. 1 — servicios</td><td>— (solo gasto)</td><td>0,25</td><td>GHG Protocol (spend-based)</td></tr>
+    <tr><td>Transporte terrestre</td><td>Alcance 3 · Cat. 4 — T&amp;D</td><td>0,12 kg/km</td><td>0,35</td><td>GLEC Framework v3 / ISO 14083</td></tr>
+    <tr><td>Marítimo contenedor</td><td>Alcance 3 · Cat. 4 — T&amp;D</td><td>0,012 kg/t-km</td><td>0,20</td><td>GLEC Framework v3 / ISO 14083</td></tr>
+    <tr><td>Residuos a relleno</td><td>Alcance 3 · Cat. 5 — residuos</td><td>0,45 kg/kg</td><td>0,50</td><td>DEFRA 2024</td></tr>
+    <tr><td>Vuelo corto</td><td>Alcance 3 · Cat. 6 — viajes</td><td>0,15 kg/pax-km</td><td>0,70</td><td>DEFRA 2024</td></tr>
+    <tr><td>Vuelo largo</td><td>Alcance 3 · Cat. 6 — viajes</td><td>0,19 kg/pax-km</td><td>0,60</td><td>DEFRA 2024</td></tr>
+  </table>
+  <p class="ref">Todos los factores están en estado "avalada_referencial": la fuente que avala la
+  METODOLOGÍA está citada, y el valor debe validarse contra la edición oficial vigente antes de
+  declararse "validada_oficial" (Anexo II). Los factores por gasto de las categorías nuevas son
+  proxies referenciales.</p>
+
+  <h3>3.1 Los dos métodos de cálculo</h3>
+  <table>
+    <tr><th>Método</th><th>Fórmula</th><th>Cuándo aplica</th><th>Equivalente en la jerarquía del mandante</th></tr>
+    <tr>
+      <td><strong>Físico</strong></td>
+      <td>cantidad × factor por unidad</td>
+      <td>El documento trae cantidad con unidad reconocida (L, kWh, m³, kg, km, t-km) — típico del XML DTE</td>
+      <td>"Método promedio" con dato de actividad REAL del documento — el peldaño superior al gasto</td>
+    </tr>
+    <tr>
+      <td><strong>Por gasto (spend-based)</strong></td>
+      <td>(monto CLP ÷ 1.000) × factor económico</td>
+      <td>El documento solo trae montos — típico de PDF/OCR y de servicios</td>
+      <td>"Método basado en gastos" del Protocolo GHG, aceptado como punto de partida a mejorar en el tiempo</td>
+    </tr>
+  </table>
+  <p>Esta dualidad replica la lógica de la guía del cobre para transporte (basado en combustible &gt;
+  basado en distancia &gt; basado en gasto): sicr3p usa el mejor método que el documento permita, y
+  deja constancia de cuál usó en cada ítem.</p>
+</div>
+
+<!-- CAPÍTULO 4 -->
+<div class="pagina seccion">
+  <p class="kicker">Capítulo 4</p>
+  <h2>Árboles decisionales</h2>
+
+  <p>Igual que la guía de la Mesa de Trazabilidad utiliza árboles decisionales para elegir
+  fuentes y métodos, el motor de sicr3p aplica dos árboles — con la diferencia de que aquí las
+  decisiones las ejecuta el software, de forma determinista y auditable.</p>
+
+  <p class="figura-titulo">Figura 1: Árbol decisional de lectura del documento (se ejecuta por archivo)</p>
+  <div class="arbol">
+    <div class="fila"><div class="nodo-p">¿El archivo es un <b>XML DTE</b> con ítems estructurados?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Motor propio<br>(origen: propio)</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿Es un <b>PDF con capa de texto</b> y el parser encuentra señal suficiente (total &gt; 0)?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Parser de texto<br>(propio_texto)</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿Es un <b>PDF escaneado</b>? Se rasteriza localmente (300 dpi) y se lee con OCR. ¿O es una <b>imagen JPG/PNG/HEIC</b>? Se lee con OCR local (HEIC se convierte antes). ¿Hay señal?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">OCR local<br>(propio_ocr)</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin señal suficiente. <b>Jamás se inventa un dato.</b> Con el motor externo desactivado (configuración de independencia total), el documento espera corrección humana.</div><span class="flecha">→</span><div class="nodo-r">Cola de revisión<br>(revision → propio_revisado)</div></div>
+  </div>
+  <p class="fuente-fig">Fuente: comportamiento implementado en la plataforma (verificable en el código y por prueba en vivo)</p>
+
+  <p class="figura-titulo">Figura 2: Árbol decisional del método de cálculo (se ejecuta por ítem)</p>
+  <div class="arbol">
+    <div class="fila"><div class="nodo-p">El ítem se clasifica por su glosa (gana la palabra clave más específica: "flete marítimo" le gana a "flete"). ¿La categoría tiene <b>factor físico</b> y el ítem trae <b>cantidad con unidad reconocida</b>?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método físico<br>cantidad × factor</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿El ítem trae <b>monto</b>? (las unidades leídas de texto libre u OCR no se consideran confiables por diseño: solo el XML y la revisión humana entregan unidades al método físico)</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método por gasto<br>monto × factor</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin cantidad ni monto: el ítem no aporta al total y el documento puede caer a revisión.</div><span class="flecha">→</span><div class="nodo-r">No se calcula</div></div>
+  </div>
+  <p class="fuente-fig">Fuente: comportamiento implementado en la plataforma</p>
+
+  <div class="caja-alerta">
+    <strong>Decisión de diseño declarada:</strong> una distancia o cantidad mencionada dentro del texto
+    libre de una glosa (ej: "flete 1.360 km") NO se usa como dato físico — el texto libre y el OCR
+    son ambiguos y usar esos valores sería fabricar precisión. El dato físico entra por el XML DTE,
+    por la corrección humana en la cola de revisión, o por el módulo de viajes del panel.
+  </div>
+</div>
+
+<!-- CAPÍTULO 5 -->
+<div class="pagina seccion">
+  <p class="kicker">Capítulo 5</p>
+  <h2>Calidad del dato, trazabilidad y verificación</h2>
+
+  <h3>5.1 Dónde se ubica sicr3p en la jerarquía de calidad del mandante</h3>
+  <p>La guía de la Mesa de Trazabilidad ordena los métodos de la categoría 1 así: específico del
+  proveedor (el mejor) → híbrido → promedio de industria → basado en gastos (el punto de
+  partida). El informe sicr3p le entrega al mandante un paquete con doble naturaleza:</p>
+  <ul>
+    <li><strong>Como dato de actividad, es específico y documental:</strong> compras reales del
+    proveedor, ítem por ítem, con respaldo tributario y verificación pública — mucho más fino que
+    una encuesta o un promedio sectorial.</li>
+    <li><strong>Como factores de emisión, es promedio referencial citado:</strong> IPCC, DEFRA,
+    HuellaChile, GLEC (Tabla 2). sicr3p no fabrica factores propios ni los presenta como
+    verificados; el camino de mejora es la validación contra las ediciones oficiales vigentes y,
+    a futuro, factores específicos por producto.</li>
+  </ul>
+  <p>En la práctica: un mandante que hoy usa el método basado en gastos con SUS estimaciones puede
+  subir de peldaño usando el dato documental de su proveedor vía sicr3p, y declarar la mejora con
+  transparencia — exactamente la transición que la guía del cobre pide fomentar.</p>
+
+  <h3>5.2 El registro de auditoría es la arquitectura</h3>
+  <table>
+    <tr><th>Mecanismo</th><th>Qué garantiza</th></tr>
+    <tr><td><strong>Cadena de integridad</strong> (hash SHA-256 encadenado por documento)</td><td>Que ningún registro histórico fue alterado: la alteración rompe la cadena y es visible públicamente. Un eslabón jamás se reescribe; las correcciones generan eslabones nuevos.</td></tr>
+    <tr><td><strong>Etiqueta QR pública por documento</strong></td><td>Que cualquier tercero (mandante, auditor, cliente final) verifique el cálculo sin pedir acceso — la página pública está anonimizada (sin RUT ni razón social).</td></tr>
+    <tr><td><strong>Cita metodológica en el informe</strong></td><td>Que cada categoría declare su alcance GHG y su fuente ("organismo — documento (año)").</td></tr>
+    <tr><td><strong>API para mandantes</strong> (clave propia + lista blanca de proveedores + webhooks)</td><td>Que el dato llegue al inventario del mandante de forma programática y con permisos finos.</td></tr>
+    <tr><td><strong>Log de actividad + cálculo en servidor</strong></td><td>Que todo cambio de factores quede registrado y que ningún monto o total pueda ser manipulado desde un dispositivo cliente.</td></tr>
+  </table>
+</div>
+
+<!-- ANEXO I -->
+<div class="pagina seccion">
+  <p class="kicker">Anexo I</p>
+  <h2>Correspondencia con las 15 categorías de alcance 3 del Protocolo GHG</h2>
+
+  <p>Desde el punto de vista del MANDANTE que reporta, las compras registradas por sus
+  proveedores en sicr3p alimentan estas categorías de su alcance 3:</p>
+
+  <table style="font-size:9pt;">
+    <tr><th>Categoría GHG del mandante</th><th>Cobertura vía sicr3p hoy</th></tr>
+    <tr><td><strong>1. Bienes y servicios comprados</strong></td><td class="ok">Núcleo de la plataforma: cada factura del proveedor, clasificada y calculada, es el dato específico documental de esta categoría.</td></tr>
+    <tr><td><strong>2. Bienes de capital</strong></td><td>Cubierta por la misma vía documental cuando la compra pasa por factura; la distinción 1/2 es del inventario del mandante (el Protocolo permite reportarlas conjuntas si se declara).</td></tr>
+    <tr><td><strong>3. Combustibles y energía (no incluidos en 1 y 2)</strong></td><td>Parcial: sicr3p calcula la combustión (Alcance 1 del proveedor); las emisiones aguas arriba del combustible ("del pozo al estanque") no se agregan por separado hoy.</td></tr>
+    <tr><td><strong>4 y 9. Transporte y distribución</strong></td><td class="ok">Categorías de transporte terrestre y marítimo del motor (GLEC/ISO 14083) + módulo de viajes del panel con modos y factores propios.</td></tr>
+    <tr><td><strong>5. Residuos</strong></td><td class="ok">Categoría de residuos a relleno (DEFRA) + declaración REP de embalajes por componentes con nivel de reciclabilidad.</td></tr>
+    <tr><td><strong>6. Viajes de negocios</strong></td><td class="ok">Categorías de vuelo corto/largo (DEFRA, pax-km) cuando la compra aparece en documentos.</td></tr>
+    <tr><td><strong>7. Transporte de trabajadores</strong></td><td>Vía módulo de viajes del panel (registro de traslados con factor por modo); no automático desde facturas.</td></tr>
+    <tr><td><strong>8 y 13. Arriendos</strong></td><td>Los consumos facturados (electricidad, combustible) se calculan; la asignación arrendador/arrendatario es del inventario del mandante.</td></tr>
+    <tr><td><strong>10, 11 y 12. Procesamiento, uso y fin de vida de productos vendidos</strong></td><td>Fuera del método documental (dependen del destino del producto, no de facturas de compra). La trazabilidad comprador-vendedor por RUT de sicr3p aporta el mapa de la cadena para estimarlas.</td></tr>
+    <tr><td><strong>14. Franquicias / 15. Inversiones</strong></td><td>No aplican al método documental (la 15 corresponde a metodología PCAF, evaluada y documentada como fuera de alcance actual).</td></tr>
+  </table>
+</div>
+
+<!-- ANEXO II + III -->
+<div class="pagina seccion">
+  <p class="kicker">Anexo II</p>
+  <h2>Fuentes de factores de emisión registradas</h2>
+
+  <p>Equivalente al "Anexo II: Fuentes confiables de factores de emisión" de la guía del cobre,
+  sicr3p mantiene un registro citable en la propia plataforma (editable por el administrador,
+  con URL y estado):</p>
+
+  <table style="font-size:9pt;">
+    <tr><th>Organismo</th><th>Documento</th><th>Uso en sicr3p</th></tr>
+    <tr><td>IPCC</td><td>2006 Guidelines for National GHG Inventories, Vol. 2</td><td>Factores de combustión (diésel, gas natural, GLP)</td></tr>
+    <tr><td>IPCC</td><td>Sexto Informe de Evaluación (AR6, 2021)</td><td>GWP100 de refrigerantes (fugitivas)</td></tr>
+    <tr><td>WRI/WBCSD</td><td>GHG Protocol Corporate Standard (2004) + guía técnica de alcance 3</td><td>Marco de alcances y método por gasto</td></tr>
+    <tr><td>DEFRA (Reino Unido)</td><td>GHG Conversion Factors (2024)</td><td>Kerosene, agua, residuos, vuelos</td></tr>
+    <tr><td>MMA Chile</td><td>Programa HuellaChile</td><td>Factor de electricidad del sistema eléctrico chileno</td></tr>
+    <tr><td>Smart Freight Centre</td><td>GLEC Framework v3 / ISO 14083</td><td>Transporte de carga terrestre y marítimo</td></tr>
+    <tr><td>Coordinador Eléctrico Nacional</td><td>Estadísticas del SEN</td><td>Referencia de actualización del factor eléctrico</td></tr>
+  </table>
+
+  <div class="caja">
+    <strong>Estados del registro:</strong> toda fuente parte como <em>avalada_referencial</em> (la
+    metodología está citada; el valor es referencial) y solo sube a <em>validada_oficial</em> cuando
+    el administrador contrasta el valor contra la edición oficial vigente descargada. El informe
+    cita la fuente tal como está registrada — nunca más de lo que es.
+  </div>
+
+  <p class="kicker" style="margin-top:10mm;">Anexo III</p>
+  <h2>Límites del método y declaraciones de honestidad</h2>
+  <ul>
+    <li><strong>Estimación metodológica, no medición:</strong> los resultados aplican factores
+    referenciales citados sobre datos reales de documentos; no son mediciones instrumentales.</li>
+    <li><strong>Sin verificación acreditada:</strong> ningún informe sicr3p constituye una
+    verificación de tercera parte acreditada (ISO 14064-3); cada informe lo declara impreso.
+    sicr3p deja el expediente ordenado para que esa verificación, si se requiere, cueste menos.</li>
+    <li><strong>Sin datos inventados:</strong> documento sin señal suficiente = documento sin
+    cálculo (cola de revisión), nunca un número supuesto.</li>
+    <li><strong>REP — declarar no es pagar:</strong> la captura de embalajes es insumo de gestión
+    para la declaración del cliente; sicr3p no es sistema de gestión ni presenta declaraciones
+    oficiales.</li>
+    <li><strong>Compensación voluntaria:</strong> la tarifa referencial (anclada al impuesto verde
+    chileno) es una opción del cliente, jamás un requisito ni un impuesto.</li>
+    <li><strong>Cadena interna, no blockchain pública:</strong> la cadena de integridad garantiza
+    detección de alteraciones dentro de la plataforma, verificable públicamente; no es una red
+    distribuida.</li>
+  </ul>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Referencias</h4>
+    <p style="margin:0; text-align:left; font-size:9pt;">GHG Protocol Corporate Accounting and Reporting Standard y Technical Guidance for Calculating Scope 3 Emissions (WRI/WBCSD) · ISO 14064-1:2018 · Guía metodológica para la medición y reporte de las emisiones de alcance 3 en la industria del cobre (Mesa de Trazabilidad de Emisiones de Alcance 3 — Corporación Alta Ley, diciembre 2024) · Guías ICMM de contabilidad y reporte de alcance 3 (2023) · Registro de fuentes metodológicas de la plataforma sicr3p (Anexo II).</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Guía metodológica v1.0 · Julio 2026 · contacto@sicr3p.cl · Documento
+  técnico-comercial: describe el comportamiento implementado y verificable de la plataforma a la
+  fecha de emisión. Factores referenciales por validar contra las ediciones oficiales vigentes.</p>
+</div>
+
+</body>
+</html>
