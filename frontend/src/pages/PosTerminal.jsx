@@ -214,6 +214,7 @@ export default function PosTerminal() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
       <HeaderAv pos={pos} paso={paso} />
+      <PasosBarra paso={paso} />
 
       <main style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '28px 16px' }}>
         <div ref={contenidoRef} style={{ width: '100%', maxWidth: 640, minWidth: 0 }}>
@@ -329,6 +330,28 @@ function HeaderAv({ pos, paso }) {
   );
 }
 
+// ---------- Barra de pasos del trámite ----------
+// El operador siempre sabe dónde va y cuánto falta. Solo aparece durante
+// el trámite (no en inicio/conexión/verificación). 'procesando' cuenta
+// como el paso Documentos (aún no hay resultado que mostrar).
+const PASOS_TRAMITE = ['Cliente', 'Documentos', 'Resultado', 'Cobro', 'Entrega'];
+const INDICE_PASO = { cliente: 0, captura: 1, procesando: 1, resultado: 2, cobro: 3, comprobante: 4 };
+
+function PasosBarra({ paso }) {
+  const actual = INDICE_PASO[paso];
+  if (actual === undefined) return null;
+  return (
+    <nav className="pos-pasos" aria-label={`Progreso del trámite: paso ${actual + 1} de ${PASOS_TRAMITE.length}`}>
+      {PASOS_TRAMITE.map((etiqueta, i) => (
+        <div key={etiqueta} className={`pos-paso${i < actual ? ' hecho' : ''}${i === actual ? ' actual' : ''}`}>
+          <span className="pos-paso-n" aria-hidden="true">{i < actual ? '✓' : i + 1}</span>
+          <span className="pos-paso-t">{etiqueta}</span>
+        </div>
+      ))}
+    </nav>
+  );
+}
+
 function Volver({ onClick, children = '← Volver' }) {
   return (
     <button className="btn btn-outline btn-sm" onClick={onClick} style={{ marginBottom: 16 }}>
@@ -340,8 +363,8 @@ function Volver({ onClick, children = '← Volver' }) {
 // ---------- Pantalla inicial (terminal sin conectar) ----------
 function Inicio({ onConectar, onVerificar }) {
   return (
-    <div>
-      <h1 style={{ fontSize: 24, textAlign: 'center', margin: '10px 0 4px' }}>Terminal Aduana Verde</h1>
+    <div style={{ marginTop: '14vh' }}>
+      <h1 style={{ fontSize: 26, textAlign: 'center', margin: '10px 0 4px' }}>Terminal Aduana Verde</h1>
       <p className="muted" style={{ textAlign: 'center', marginTop: 0, marginBottom: 24 }}>
         Captura y compensación de CO2e en el punto de atención.
       </p>
@@ -498,25 +521,30 @@ function Cliente({ cliente, setCliente, codigo, setCodigo, codigoInfo, setCodigo
             <input type="email" value={cliente.email} onChange={(e) => setCliente({ ...cliente, email: e.target.value })} placeholder="contacto@empresa.cl" />
           </div>
 
-          <div className="field">
-            <label>Código de acceso (opcional, con créditos)</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input value={codigo}
-                onChange={(e) => { setCodigo(e.target.value.toUpperCase()); setCodigoInfo(null); setCodigoError(''); }}
-                onBlur={validarCodigo}
-                placeholder="SICR3P-XXXXXX"
-                style={{ textTransform: 'uppercase', letterSpacing: '.05em', flex: 1, minWidth: 0 }} />
-              <button type="button" className="btn btn-outline" onClick={validarCodigo} disabled={validandoCodigo || !codigo.trim()}>
-                {validandoCodigo ? <span className="spinner dark" /> : 'Validar'}
-              </button>
-            </div>
-            {codigoInfo && (
-              <div className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                <Icon.Tag size={13} /> Código válido · {fmtInt(codigoInfo.creditos_restantes)} crédito{Number(codigoInfo.creditos_restantes) === 1 ? '' : 's'} restante{Number(codigoInfo.creditos_restantes) === 1 ? '' : 's'}
+          {/* El código con créditos es la excepción, no la regla: plegado
+              para que los 3 campos obligatorios queden solos y claros.
+              Si ya hay uno validado, se muestra abierto. */}
+          <details className="pos-detalle" open={Boolean(codigoInfo || codigo)}>
+            <summary>¿Tienes un código de acceso con créditos?</summary>
+            <div className="field" style={{ marginTop: 10 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input value={codigo}
+                  onChange={(e) => { setCodigo(e.target.value.toUpperCase()); setCodigoInfo(null); setCodigoError(''); }}
+                  onBlur={validarCodigo}
+                  placeholder="SICR3P-XXXXXX"
+                  style={{ textTransform: 'uppercase', letterSpacing: '.05em', flex: 1, minWidth: 0 }} />
+                <button type="button" className="btn btn-outline" onClick={validarCodigo} disabled={validandoCodigo || !codigo.trim()}>
+                  {validandoCodigo ? <span className="spinner dark" /> : 'Validar'}
+                </button>
               </div>
-            )}
-            {codigoError && <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>{codigoError}</div>}
-          </div>
+              {codigoInfo && (
+                <div className="badge badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                  <Icon.Tag size={13} /> Código válido · {fmtInt(codigoInfo.creditos_restantes)} crédito{Number(codigoInfo.creditos_restantes) === 1 ? '' : 's'} restante{Number(codigoInfo.creditos_restantes) === 1 ? '' : 's'}
+                </div>
+              )}
+              {codigoError && <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>{codigoError}</div>}
+            </div>
+          </details>
 
           {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', margin: '10px 0' }}>{error}</div>}
           <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, padding: '14px 0', fontSize: 16 }}>
@@ -661,7 +689,6 @@ function Resultado({ resultado, embComponentes, setEmbComponentes, embalajeGuard
     () => [...new Set(facturas.map((f) => f.categoria).filter(Boolean))],
     [facturas]
   );
-  const motorPropio = facturas.some((f) => f.motor === 'propio');
   const hayRep = items.some((it) => esItemRep(it.descripcion));
 
   return (
@@ -674,9 +701,9 @@ function Resultado({ resultado, embComponentes, setEmbComponentes, embalajeGuard
       <div className="card card-pad">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <h2 style={{ margin: 0, flex: 1, minWidth: 0 }}>Resultado del cálculo</h2>
-          <span className={`badge ${motorPropio ? 'badge-green' : 'badge-gray'}`}>
-            {motorPropio ? 'Cálculo motor sicr3p' : 'Cálculo motor externo'}
-          </span>
+          {/* De cara al cliente no se habla de motores (jerga interna del
+              panel admin): lo que importa es que el cálculo es verificable. */}
+          <span className="badge badge-green">Cálculo verificable · sicr3p</span>
         </div>
 
         <div style={{ textAlign: 'center', margin: '18px 0' }}>
@@ -1005,50 +1032,11 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
             </div>
           )}
 
-          {/* Sello compartible en miniatura, con el snippet para el sitio del
-              cliente. Con el comprobante en inglés pide el sello con ?lang=en
-              (si el backend aún no lo soporta, sirve el sello de siempre). */}
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <img
-              src={`/api/sesiones/${sesion.id}/sello.svg${enIngles ? '?lang=en' : ''}`}
-              alt={lr('pos.sello_alt')}
-              width={260}
-              style={{ maxWidth: '100%', height: 'auto' }}
-            />
-            <button type="button" className="btn btn-outline btn-sm" onClick={copiarSello}>
-              {selloCopia === 'ok' ? lr('pos.copiado') : lr('pos.copiar_sello')}
-            </button>
-            {selloCopia === 'error' && (
-              <span className="badge badge-red">{lr('pos.copia_error')}</span>
-            )}
-          </div>
         </>
       )}
 
-      {cliente.email && (
-        <div style={{ marginTop: 16 }}>
-          <button className="btn btn-outline" style={{ width: '100%' }}
-            onClick={enviarCorreo} disabled={envio === 'enviando' || envio === 'ok'}>
-            {envio === 'enviando'
-              ? <span className="spinner dark" />
-              : envio === 'ok' ? lr('pos.enviado') : lr('pos.enviar_correo')}
-          </button>
-          {envio === 'ok' && (
-            <div className="badge badge-green" style={{ display: 'inline-block', marginTop: 8 }}>
-              {lr('pos.enviado_a')} {cliente.email}
-            </div>
-          )}
-          {envio === 'error' && (
-            <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>
-              {lr('pos.envio_error')}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Carpeta física para el mandante: mineras y grandes empresas piden
-          la evidencia en papel — un solo PDF imprimible con portada, QRs
-          por documento, REP y hoja de verificación. */}
+      {/* LA ENTREGA — lo que el cliente se lleva del mostrador: el QR de
+          arriba y la carpeta impresa. Todo lo demás vive plegado abajo. */}
       <div style={{ marginTop: 18, padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, textAlign: 'left' }}>
         <b style={{ fontSize: 14 }}>{lr('pos.carpeta_titulo')}</b>
         <p className="muted" style={{ fontSize: 12, margin: '4px 0 10px' }}>{lr('pos.carpeta_texto')}</p>
@@ -1062,13 +1050,60 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
         </div>
       </div>
 
-      <div className="two-col-grid" style={{ marginTop: 14 }}>
-        <a className="btn btn-outline" href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"
-          style={{ display: 'inline-flex' }}>
-          <Icon.Download size={16} /> {lr('pos.informe_pdf')}
-        </a>
-        <button className="btn btn-primary" onClick={onNuevo}>{lr('pos.nuevo_tramite')}</button>
-      </div>
+      <button className="btn btn-primary" style={{ width: '100%', marginTop: 14, padding: '14px 0', fontSize: 16 }} onClick={onNuevo}>
+        {lr('pos.nuevo_tramite')}
+      </button>
+
+      {/* Acciones secundarias, plegadas: correo, sello compartible e informe. */}
+      <details className="pos-detalle" style={{ marginTop: 16, textAlign: 'left' }}>
+        <summary>{lr('pos.mas_opciones')}</summary>
+        <div style={{ display: 'grid', gap: 14, marginTop: 12 }}>
+          {cliente.email && (
+            <div>
+              <button className="btn btn-outline" style={{ width: '100%' }}
+                onClick={enviarCorreo} disabled={envio === 'enviando' || envio === 'ok'}>
+                {envio === 'enviando'
+                  ? <span className="spinner dark" />
+                  : envio === 'ok' ? lr('pos.enviado') : lr('pos.enviar_correo')}
+              </button>
+              {envio === 'ok' && (
+                <div className="badge badge-green" style={{ display: 'inline-block', marginTop: 8 }}>
+                  {lr('pos.enviado_a')} {cliente.email}
+                </div>
+              )}
+              {envio === 'error' && (
+                <div className="badge badge-red" style={{ display: 'inline-block', marginTop: 8 }}>
+                  {lr('pos.envio_error')}
+                </div>
+              )}
+            </div>
+          )}
+
+          {f0 && (
+            /* Sello compartible en miniatura, con el snippet para el sitio
+               del cliente. En inglés pide el sello con ?lang=en. */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <img
+                src={`/api/sesiones/${sesion.id}/sello.svg${enIngles ? '?lang=en' : ''}`}
+                alt={lr('pos.sello_alt')}
+                width={260}
+                style={{ maxWidth: '100%', height: 'auto' }}
+              />
+              <button type="button" className="btn btn-outline btn-sm" onClick={copiarSello}>
+                {selloCopia === 'ok' ? lr('pos.copiado') : lr('pos.copiar_sello')}
+              </button>
+              {selloCopia === 'error' && (
+                <span className="badge badge-red">{lr('pos.copia_error')}</span>
+              )}
+            </div>
+          )}
+
+          <a className="btn btn-outline" href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"
+            style={{ display: 'inline-flex', justifyContent: 'center' }}>
+            <Icon.Download size={16} /> {lr('pos.informe_pdf')}
+          </a>
+        </div>
+      </details>
     </div>
   );
 }
