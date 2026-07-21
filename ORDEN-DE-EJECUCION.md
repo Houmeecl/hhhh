@@ -65,19 +65,40 @@ completa de instalación y modo kiosco: `docs/TABLET.md`.
 
 ---
 
-## 3. Correo corporativo (contacto@sicr3p.cl)
-**Acceso:** panel DNS del dominio + navegador; en paralelo con 1-2
+## 3. Sistema de correo (contacto@sicr3p.cl + correos de la plataforma)
+**Acceso:** panel DNS de DonWeb + navegador; en paralelo con 1-2. ~30 min.
 
-- [ ] Reemplazar el TXT SPF actual por:
-  `v=spf1 mx include:spf.hostmar.com ~all`
-- [ ] Crear el TXT `_dmarc`:
-  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`
-- [ ] Abrir ticket a DonWeb pidiendo rDNS de 138.36.237.61 → mail.sicr3p.cl
-  y confirmación de puerto 25 saliente abierto.
-- [ ] En el VPS: `bash deploy/instalar-webmail.sh`
-- [ ] Probar en mail-tester.com hasta lograr ≥9/10.
+Camino recomendado (decisión de julio 2026): **Zoho Mail gratuito** para los
+buzones humanos + **Resend** para los correos que envía la plataforma
+(informes, comprobantes). Sin servidor de correo propio que mantener.
 
-Detalle completo, con la alternativa Zoho si DonWeb no cumple: `deploy/WEBMAIL.md`.
+- [ ] Crear cuenta en **zoho.com/mail** (plan Forever Free) y agregar el
+  dominio `sicr3p.cl`. Zoho entrega un TXT `zoho-verification=…`: pegarlo
+  en el panel DNS de DonWeb y verificar. Crear los usuarios `contacto@`
+  y `postmaster@`.
+- [ ] Pegar en el panel DNS de DonWeb estos registros exactos:
+  - **MX** (los tres): `mx.zoho.com` prioridad 10, `mx2.zoho.com`
+    prioridad 20, `mx3.zoho.com` prioridad 50.
+  - **TXT @** (REEMPLAZA al SPF actual — jamás dos `v=spf1`):
+    `v=spf1 include:zoho.com ~all`
+  - **TXT `zmail._domainkey`**: el valor DKIM que muestra el panel de Zoho.
+  - **TXT `_dmarc`**:
+    `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`
+- [ ] Comprobar desde cualquier terminal del repo (se puede correr mil
+  veces, no cambia nada): `bash deploy/verificar-correo.sh sicr3p.cl`
+  hasta ver todo ✓ (el DNS puede tardar minutos u horas en propagar).
+- [ ] Enviar un correo desde `contacto@sicr3p.cl` a **mail-tester.com**
+  hasta lograr nota ≥ 9/10.
+- [ ] Activar **Resend** (transaccional de la plataforma, hoy en modo
+  consola): cuenta en resend.com → verificar el dominio (sus registros
+  van en subdominio propio, NO tocan el SPF raíz de Zoho) →
+  `RESEND_API_KEY` y `MAIL_FROM` en `backend/.env` del VPS →
+  `pm2 restart sicr3p-backend`. Paso a paso: `deploy/WEBMAIL.md` §6.1.
+
+Alternativa autoalojada (soberanía total, más mantención): Poste.io —
+`deploy/WEBMAIL.md` camino B. El ticket a DonWeb pidiendo rDNS de
+138.36.237.61 → mail.sicr3p.cl y puerto 25 saliente abierto SOLO aplica
+si se elige ese camino.
 
 ---
 

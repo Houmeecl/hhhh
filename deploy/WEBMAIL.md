@@ -1,12 +1,20 @@
-# Correo con webmail para sicr3p.cl
+# Correo para sicr3p.cl — la decisión y las dos rutas
 
-Guía para levantar correo propio (`contacto@sicr3p.cl`, `postmaster@sicr3p.cl`, …)
-con webmail en el VPS DonWeb usando **Poste.io**, y la alternativa hosted si el
-autoalojado no es viable.
+> **CAMINO RECOMENDADO (decisión de julio 2026): Zoho Mail hosted — sección 7.**
+> Para una operación unipersonal, correo autoalojado es la infraestructura más
+> ingrata de mantener: depende del ticket rDNS de DonWeb, del puerto 25 y de
+> pelear reputación de IP para siempre. Zoho resuelve buzones + webmail + app
+> móvil en ~30 minutos con 4 registros DNS, gratis hasta 5 usuarios.
+> El autoalojado (Poste.io, secciones 2-5) queda como opción de **soberanía
+> total** para el futuro — el script `instalar-webmail.sh` no se pierde.
+>
+> Comprobación en un comando, sirva el camino que sirva:
+> `bash deploy/verificar-correo.sh sicr3p.cl` (solo lectura: reporta ✓/✗ de
+> MX, SPF único, DKIM Zoho/Resend y DMARC).
 
-> **Antes de entusiasmarse, léelo entero.** Correo autoalojado funciona bien,
-> pero exige DNS impecable, rDNS configurado por DonWeb y algo de mantención.
-> Si algo de eso falla, la opción correcta es la alternativa hosted (más abajo).
+Guía completa de ambas rutas: **Poste.io autoalojado** (secciones 1-5, 8) y
+**Zoho hosted** (sección 7). El transaccional de la plataforma (Resend) va en
+la sección 6.
 
 ---
 
@@ -174,9 +182,31 @@ Si algún día quisieras que el backend envíe por SMTP propio en vez de Resend,
 sería un cambio de código en el mailer (no está soportado hoy) — no lo hagas
 al pasar; evalúalo aparte.
 
+### 6.1 Activar Resend (hoy la app está en modo consola)
+
+Mientras `RESEND_API_KEY` esté vacía en `backend/.env`, el mailer solo
+registra los correos en el log (modo desarrollo honesto). Para activar los
+envíos reales de la plataforma (informe por correo, magic links, comprobantes
+del POS):
+
+1. Cuenta gratuita en <https://resend.com> (3.000 correos/mes gratis).
+2. Panel Resend → *Domains* → agregar `sicr3p.cl` → Resend te da 2-3
+   registros (un TXT `resend._domainkey` con su DKIM y un registro para
+   rebotes en un subdominio) → pegarlos en el panel DNS de DonWeb.
+   **No tocan el SPF del dominio raíz** (ese es de Zoho): conviven sin
+   conflicto.
+3. Panel Resend → *API Keys* → crear clave → en el VPS:
+   ```bash
+   nano /opt/sicr3p/backend/.env    # RESEND_API_KEY=re_...  y  MAIL_FROM="sicr3p <no-responder@sicr3p.cl>"
+   pm2 restart sicr3p-backend
+   ```
+4. Probar: procesar un documento y usar "Enviar informe por correo".
+5. `bash deploy/verificar-correo.sh sicr3p.cl` debe mostrar el DKIM de
+   Resend en ✓.
+
 ---
 
-## 7. Alternativa: correo hosted (Zoho Mail, plan gratuito)
+## 7. CAMINO RECOMENDADO: correo hosted (Zoho Mail, plan gratuito)
 
 Si DonWeb bloquea el puerto 25, no configura el rDNS, la IP está en listas
 negras, o simplemente no quieres mantener un servidor de correo: **Zoho Mail
