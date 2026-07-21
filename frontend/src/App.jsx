@@ -4,6 +4,7 @@ import Cargar from './pages/Cargar.jsx';
 import Resultado from './pages/Resultado.jsx';
 import Verificar from './pages/Verificar.jsx';
 import Pasaporte from './pages/Pasaporte.jsx';
+import PasaporteLote from './pages/PasaporteLote.jsx';
 import Ingresar from './pages/Ingresar.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
       <Route path="/pasaporte/:id" element={<Pasaporte />} />
+      <Route path="/lote/:codigo" element={<PasaporteLote />} />
       <Route path="/ingresar" element={<Ingresar />} />
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />

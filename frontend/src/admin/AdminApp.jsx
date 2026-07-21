@@ -12,6 +12,7 @@ import SimpleApi from './SimpleApi.jsx';
 import Usuarios from './Usuarios.jsx';
 import Actividad from './Actividad.jsx';
 import Corredor from './Corredor.jsx';
+import Origen from './Origen.jsx';
 import CapitalNatural from './CapitalNatural.jsx';
 import Trazabilidad from './Trazabilidad.jsx';
 import Buscar from './Buscar.jsx';
@@ -24,6 +25,7 @@ const NAV = [
   { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
   { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
   { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
+  { to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
   { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
   { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
   { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
@@ -134,6 +136,7 @@ export default function AdminApp() {
           <Route path="clientes" element={<Clientes rol={user?.rol} />} />
           <Route path="sesiones" element={<Sesiones />} />
           <Route path="corredor" element={<Corredor />} />
+          <Route path="origen" element={<Origen />} />
           <Route path="capital" element={<CapitalNatural />} />
           <Route path="trazabilidad" element={<Trazabilidad />} />
           <Route path="buscar" element={<Buscar />} />

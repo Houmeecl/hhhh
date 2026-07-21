@@ -31,6 +31,11 @@ export function pasaporteUrl(facturaId) {
   return `${config.publicAppUrl}/pasaporte/${facturaId}`;
 }
 
+// URL pública del Pasaporte de Origen de un lote mineral.
+export function loteUrl(codigo) {
+  return `${config.publicAppUrl}/lote/${codigo}`;
+}
+
 // Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
 export async function qrBufferDe(url) {
   return QRCode.toBuffer(url, {

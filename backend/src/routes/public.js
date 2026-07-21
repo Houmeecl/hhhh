@@ -5,8 +5,12 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel } from '../services/pdf.js';
-import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl } from '../services/qr.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
+import {
+  filtrarPorVisibilidad, enmascararRut, balanceMasas,
+  emisionesIncorporadasPorTonelada, resumenNormativo,
+} from '../services/pasaporteOrigen.js';
 import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { parseDte } from '../services/dte.js';
@@ -958,6 +962,92 @@ router.get('/pasaporte/:id/qr.png', async (req, res, next) => {
     const { rows } = await query(`SELECT id FROM facturas WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Pasaporte no encontrado' });
     res.type('png').send(await qrBufferDe(pasaporteUrl(rows[0].id)));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/lote/:codigo — Pasaporte de Origen (público) ----------
+// La cadena de custodia de un lote mineral (migración 021), con
+// DIVULGACIÓN SELECTIVA: los hashes, rol, país y fecha de TODOS los
+// eslabones son públicos (la integridad debe ser verificable por
+// cualquiera); el contenido comercial (empresa, cantidades, CO2e,
+// vínculo DTE) solo se muestra si el eslabón es 'publico'. Los RUT
+// divulgados van enmascarados (76.***.**6-0). El nonce jamás sale.
+router.get('/lote/:codigo', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM lotes_minerales WHERE codigo = $1`,
+      [String(req.params.codigo || '').toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    const lote = rows[0];
+
+    const [{ rows: eslabones }, { rows: declaraciones }, { rows: fRows }] = await Promise.all([
+      query(`SELECT * FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]),
+      query(`SELECT codigo, estado FROM lote_declaraciones WHERE lote_id = $1`, [lote.id]),
+      lote.fuente_metodologica_id
+        ? query(`SELECT organismo, documento, version_anio FROM fuentes_metodologicas WHERE id = $1`, [lote.fuente_metodologica_id])
+        : Promise.resolve({ rows: [] }),
+    ]);
+
+    const publicos = filtrarPorVisibilidad(eslabones, 'publico').map((e) => ({
+      ...e,
+      // Enmascarado incluso cuando se divulga: se reconoce al actor sin
+      // regalar el identificador completo a scrapers.
+      rut_empresa: e.divulgado && e.rut_empresa ? enmascararRut(e.rut_empresa) : undefined,
+      factura_id: undefined,
+      dte_vinculado: e.divulgado ? Boolean(e.factura_id) : undefined,
+    }));
+
+    res.json({
+      pasaporte: {
+        codigo: lote.codigo,
+        url: loteUrl(lote.codigo),
+        qr_png: `/api/lote/${lote.codigo}/qr.png`,
+      },
+      lote: {
+        material: lote.material,
+        descripcion: lote.descripcion,
+        codigo_nc: lote.codigo_nc,
+        cantidad: lote.cantidad,
+        unidad: lote.unidad,
+        pais_origen: lote.pais_origen,
+        faena_origen: lote.faena_origen,
+        composicion: lote.composicion,
+        estandar_externo: lote.estandar_externo,
+        estado: lote.estado,
+      },
+      emisiones: {
+        ...emisionesIncorporadasPorTonelada(lote, eslabones),
+        directas_t: lote.emisiones_directas_tco2e_t != null ? Number(lote.emisiones_directas_tco2e_t) : null,
+        indirectas_t: lote.emisiones_indirectas_tco2e_t != null ? Number(lote.emisiones_indirectas_tco2e_t) : null,
+        metodo: lote.metodo_emisiones,
+        fuente: fRows[0] || null,
+      },
+      cadena: {
+        eslabones: publicos,
+        n_eslabones: Number(lote.n_eslabones),
+        ultimo_hash: lote.ultimo_hash,
+        integra: verificarCadenaCompleta(eslabones).valido,
+      },
+      balance: balanceMasas(lote, eslabones),
+      normativo: resumenNormativo(lote, declaraciones),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/lote/:codigo/qr.png — QR del pasaporte de origen ----------
+router.get('/lote/:codigo/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT codigo FROM lotes_minerales WHERE codigo = $1`,
+      [String(req.params.codigo || '').toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    res.type('png').send(await qrBufferDe(loteUrl(rows[0].codigo)));
   } catch (err) {
     next(err);
   }

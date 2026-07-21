@@ -66,6 +66,18 @@ export const api = {
   getSesion: (id) => request(`/sesiones/${id}`),
   verificar: (id) => request(`/verificar/${id}`),
   pasaporte: (id) => request(`/pasaporte/${id}`),
+  lotePublico: (codigo) => request(`/lote/${codigo}`),
+
+  // --- Pasaporte de Origen (admin) ---
+  origenCatalogo: () => request('/admin/origen/catalogo', { authed: true }),
+  origenLotes: (qs = '') => request(`/admin/origen/lotes${qs}`, { authed: true }),
+  origenLote: (id) => request(`/admin/origen/lotes/${id}`, { authed: true }),
+  origenCrearLote: (b) => request('/admin/origen/lotes', { method: 'POST', body: b, authed: true }),
+  origenEditarLote: (id, b) => request(`/admin/origen/lotes/${id}`, { method: 'PATCH', body: b, authed: true }),
+  origenAgregarEslabon: (id, b) => request(`/admin/origen/lotes/${id}/eslabones`, { method: 'POST', body: b, authed: true }),
+  origenDeclarar: (id, codigo, b) => request(`/admin/origen/lotes/${id}/declaraciones/${codigo}`, { method: 'PUT', body: b, authed: true }),
+  origenCerrar: (id) => request(`/admin/origen/lotes/${id}/cerrar`, { method: 'POST', authed: true }),
+  origenVerificar: (id) => request(`/admin/origen/lotes/${id}/verificar`, { authed: true }),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el
