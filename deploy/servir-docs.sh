@@ -24,14 +24,19 @@ if [ ! -f "$CONF" ]; then
   exit 1
 fi
 
-if grep -q 'location /docs/comercial/' "$CONF"; then
-  echo "==> Ya estaba servido (/docs/comercial/ y /docs/metodologia/ en $CONF). Nada que hacer."
-else
-  # Inserta los location ANTES del cierre final del bloque server { ... }.
-  # El archivo lo genera instalar-vps.sh y termina en una línea "}" sola.
+# Inserta bloques ANTES del cierre final del bloque server { ... }.
+# El archivo lo genera instalar-vps.sh y termina en una línea "}" sola.
+insertar_bloques() {
   TMP="$(mktemp)"
   head -n -1 "$CONF" > "$TMP"
-  cat >> "$TMP" <<NGINX
+  cat >> "$TMP"
+  echo "}" >> "$TMP"
+  mv "$TMP" "$CONF"
+}
+
+CAMBIO=0
+if ! grep -q 'location /docs/comercial/' "$CONF"; then
+  insertar_bloques <<NGINX
 
     # Documentos comerciales y metodológicos — público a propósito.
     # docs/legal/ NUNCA se sirve aquí (borradores sin revisión de abogado).
@@ -43,15 +48,34 @@ else
         alias $DIR/docs/metodologia/;
         autoindex on;
     }
-}
 NGINX
-  mv "$TMP" "$CONF"
+  CAMBIO=1
+fi
+
+# El Libro del proyecto (web navegable + PDF) — puede faltar aunque los
+# bloques anteriores ya existan (configs parchadas antes de esta versión).
+if ! grep -q 'location /docs/libro/' "$CONF"; then
+  insertar_bloques <<NGINX
+
+    # El Libro sicr3p — el proyecto completo, navegable e imprimible.
+    location /docs/libro/ {
+        alias $DIR/docs/libro/;
+        index index.html;
+    }
+NGINX
+  CAMBIO=1
+fi
+
+if [ "$CAMBIO" -eq 1 ]; then
   nginx -t && systemctl reload nginx
   echo "==> nginx actualizado y recargado."
+else
+  echo "==> Ya estaba todo servido (comercial, metodologia y libro en $CONF). Nada que hacer."
 fi
 
 echo
 echo "PDFs accesibles en (reemplaza por tu dominio o IP real):"
-for f in "$DIR"/docs/comercial/*.pdf "$DIR"/docs/metodologia/*.pdf; do
+for f in "$DIR"/docs/comercial/*.pdf "$DIR"/docs/metodologia/*.pdf "$DIR"/docs/libro/*.pdf; do
   [ -f "$f" ] && echo "  http://<tu-dominio-o-IP>/docs/${f#"$DIR"/docs/}"
 done
+echo "  http://<tu-dominio-o-IP>/docs/libro/   ← El Libro del proyecto (web con menú)"

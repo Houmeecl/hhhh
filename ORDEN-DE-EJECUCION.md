@@ -27,6 +27,10 @@ http://<tu-dominio-o-IP>/docs/comercial/02-aduana-verde.pdf
 http://<tu-dominio-o-IP>/docs/comercial/03-rep-ley-20920.pdf
 http://<tu-dominio-o-IP>/docs/comercial/04-correo-corporativo.pdf
 http://<tu-dominio-o-IP>/docs/metodologia/guia-metodologica-sicr3p.pdf
+http://<tu-dominio-o-IP>/docs/comercial/05-informe-autoridades.pdf
+http://<tu-dominio-o-IP>/docs/comercial/06-informe-financiamiento.pdf
+http://<tu-dominio-o-IP>/docs/libro/            ← El Libro del proyecto (web con menú)
+http://<tu-dominio-o-IP>/docs/libro/el-libro-sicr3p.pdf
 ```
 
 `docs/legal/` **nunca** se expone ahí (son borradores marcados "NO PUBLICAR

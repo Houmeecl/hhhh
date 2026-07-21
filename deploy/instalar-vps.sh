@@ -116,6 +116,12 @@ server {
         alias $DIR/docs/metodologia/;
         autoindex on;
     }
+
+    # El Libro sicr3p — el proyecto completo, navegable e imprimible.
+    location /docs/libro/ {
+        alias $DIR/docs/libro/;
+        index index.html;
+    }
 }
 NGINX
 ln -sf /etc/nginx/sites-available/sicr3p /etc/nginx/sites-enabled/sicr3p

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>El Libro sicr3p — el proyecto completo</title>
+<link rel="stylesheet" href="libro.css">
+</head>
+<body>
+<div class="libro">
+
+<input type="checkbox" id="menu-toggle" class="menu-toggle">
+<label for="menu-toggle" class="hamburguesa">☰</label>
+
+<nav class="menu">
+  <div class="marca">sicr3p<span class="punto">.</span></div>
+  <div class="tagline">Tu contabilidad, tu trazabilidad.</div>
+  <ol>
+    <li><a href="#portada"><span class="n">—</span>Portada</a></li>
+    <li><a href="#cap-1"><span class="n">1</span>La visión</a></li>
+    <li><a href="#cap-2"><span class="n">2</span>Las tres olas regulatorias</a></li>
+    <li><a href="#cap-3"><span class="n">3</span>El motor: del documento al dato</a></li>
+    <li><a href="#cap-4"><span class="n">4</span>La cadena pública de integridad</a></li>
+    <li><a href="#cap-5"><span class="n">5</span>Aduana Verde: la red urbana</a></li>
+    <li><a href="#cap-6"><span class="n">6</span>Los tres pasaportes</a></li>
+    <li><a href="#cap-7"><span class="n">7</span>La Tarjeta de Viaje</a></li>
+    <li><a href="#cap-8"><span class="n">8</span>El Corredor Bioceánico</a></li>
+    <li><a href="#cap-9"><span class="n">9</span>Mandantes y el cruce por RUT</a></li>
+    <li><a href="#cap-10"><span class="n">10</span>Arquitectura y seguridad</a></li>
+    <li><a href="#cap-11"><span class="n">11</span>Negocio y hoja de ruta</a></li>
+    <li><a href="#cap-12"><span class="n">12</span>Opinión del autor</a></li>
+    <li><a href="#cap-13"><span class="n">13</span>Anexos</a></li>
+  </ol>
+  <a class="pdf-btn" href="el-libro-sicr3p.pdf" target="_blank">Descargar el libro en PDF</a>
+</nav>
+
+<main class="paginas">
+
+<!-- PORTADA -->
+<div class="portada" id="portada">
+  <div class="tipo">EL LIBRO DEL PROYECTO · EDICIÓN 1</div>
+  <h1>sicr3p<br>Tu contabilidad,<br>tu trazabilidad.</h1>
+  <p class="bajada">El proyecto completo, contado como un libro: la visión, la regulación que
+  lo empuja, cada módulo construido, la arquitectura que lo sostiene, el negocio que lo
+  financia — y una opinión honesta de quien lo construyó.</p>
+  <div class="edicion">sicr3p SpA · Antofagasta, Chile · Julio 2026 · contacto@sicr3p.cl</div>
+</div>
+
+<div class="caja">
+  <strong>Cómo leer este libro.</strong> Cada capítulo se sostiene solo; el menú de la izquierda
+  navega entre ellos. Todo lo que este libro afirma sobre la plataforma es <strong>verificable
+  en la plataforma misma</strong>: la cadena de integridad es pública, los pasaportes se abren
+  sin cuenta y cada informe declara su metodología. Y una advertencia que se repite a propósito:
+  <strong>sicr3p no es certificador, auditor ni autoridad</strong> — registra, estructura y
+  sella declaraciones verificables. Esa honestidad no es un pie de página: es el producto.
+</div>
+
+<!-- CAPÍTULO 1 -->
+<section class="cap" id="cap-1">
+  <div class="cap-head"><span class="num">1</span><h2>La visión</h2></div>
+  <p class="cap-resumen">Por qué existe sicr3p, y por qué nace en Antofagasta y no en Santiago.</p>
+
+  <p>Toda empresa chilena ya produce, sin saberlo, su contabilidad ambiental: está escondida en
+  sus facturas. Cada compra de electricidad, combustible, transporte o materiales es un dato de
+  emisiones esperando ser calculado. La visión de sicr3p es simple de enunciar:
+  <strong>convertir los documentos que la empresa ya tiene en la evidencia ambiental que el
+  mundo le empieza a exigir</strong> — sin encuestas, sin promedios de industria, sin
+  consultorías de meses.</p>
+
+  <p>La segunda mitad de la visión es menos obvia y más importante: <strong>que el dato sea
+  verificable por cualquiera</strong>. Un informe que solo puede validar quien lo emitió vale
+  poco. Por eso todo lo que sicr3p produce — informes, pasaportes, declaraciones REP,
+  compensaciones — queda sellado en una cadena de hash pública: alterar un registro pasado es
+  matemáticamente detectable por cualquier persona, sin pedir permiso y sin confiar en nadie,
+  incluidos nosotros.</p>
+
+  <h3>Por qué Antofagasta</h3>
+  <p>Porque aquí convergen las tres cadenas que este proyecto traza: la minería que exporta al
+  mundo y responde a compradores europeos; el comercio urbano que enfrenta la Ley REP sin
+  equipos técnicos; y el Corredor Bioceánico que unirá el Atlántico brasileño con los puertos
+  de esta región, moviendo carga a través de cuatro países. sicr3p no mira estos tres mundos
+  desde afuera: opera en el territorio donde se cruzan.</p>
+
+  <div class="caja">
+    <strong>La frase que ordena todo lo demás:</strong> la empresa no paga por "un bono" ni por
+    una promesa — paga por la <strong>gestión</strong>: cálculo, trazabilidad, informes y
+    verificación. La compensación existe, pero es voluntaria, con tarifa referencial visible.
+  </div>
+</section>
+
+<!-- CAPÍTULO 2 -->
+<section class="cap" id="cap-2">
+  <div class="cap-head"><span class="num">2</span><h2>Las tres olas regulatorias</h2></div>
+  <p class="cap-resumen">La demanda no la crea sicr3p: la crea la regulación. Tres frentes a la vez.</p>
+
+  <table>
+    <tr><th>Ola</th><th>Qué exige</th><th>A quién golpea</th></tr>
+    <tr><td><strong>Ley REP 20.920</strong> (Chile)</td><td>Declarar envases y embalajes, con metas de reciclaje crecientes por decreto (DS 12/2020).</td><td>Todo productor y comercializador de productos prioritarios — incluido el comercio urbano.</td></tr>
+    <tr><td><strong>Mandantes corporativos</strong></td><td>Las grandes empresas piden a sus proveedores datos de emisiones y REP para sus propios reportes (NCG 461 de la CMF, CDP, IFRS S2).</td><td>Miles de pymes proveedoras que hoy responden con planillas sin respaldo verificable.</td></tr>
+    <tr><td><strong>Acceso a mercados UE</strong></td><td>CBAM (emisiones incorporadas por tonelada, Reglamento UE 2023/956), Pasaporte Digital de Producto (ESPR), debida diligencia OCDE en minerales.</td><td>Exportadores y toda su cadena aguas arriba.</td></tr>
+  </table>
+
+  <p>El punto clave: <strong>las tres olas piden lo mismo con nombres distintos</strong> — datos
+  ambientales trazables hasta su origen documental. Quien resuelve la trazabilidad una vez,
+  responde a las tres. Esa es la apuesta estructural de sicr3p: un solo registro sellado que
+  sirve a la declaración REP, al reporte del mandante y al expediente de exportación.</p>
+
+  <h3>El costo de la alternativa</h3>
+  <p>La respuesta tradicional es la consultoría caso a caso: millones de pesos por empresa, sin
+  evidencia verificable, imposible de escalar a una pyme. La automatización desde el documento
+  real reduce ese costo a una fracción y deja algo que la consultoría no deja: un registro
+  público que no depende de la palabra de quien lo emitió.</p>
+</section>
+
+<!-- CAPÍTULO 3 -->
+<section class="cap" id="cap-3">
+  <div class="cap-head"><span class="num">3</span><h2>El motor: del documento al dato</h2></div>
+  <p class="cap-resumen">Cinco maneras de leer una factura, un solo resultado: t CO2e con fuente citada.</p>
+
+  <p>El corazón técnico de sicr3p es su <strong>motor de cálculo propio</strong>. La empresa sube
+  su documento y el motor lo lee por la vía que corresponda:</p>
+  <table>
+    <tr><th>Vía</th><th>Documento</th><th>Cómo se procesa</th></tr>
+    <tr><td>1</td><td>XML de DTE (SII)</td><td>Lectura directa del documento tributario electrónico: RUT emisor y receptor validados por módulo 11, ítems, montos, folio.</td></tr>
+    <tr><td>2</td><td>PDF con texto</td><td>Extracción de la capa de texto y reconstrucción de los ítems.</td></tr>
+    <tr><td>3</td><td>PDF escaneado</td><td>Rasterizado y reconocimiento óptico de caracteres (OCR) en español.</td></tr>
+    <tr><td>4</td><td>Fotos JPG/PNG</td><td>OCR directo sobre la imagen — la foto que el comerciante toma con su teléfono.</td></tr>
+    <tr><td>5</td><td>Fotos HEIC (iPhone)</td><td>Conversión de formato y OCR.</td></tr>
+  </table>
+
+  <p>Lo que ninguna vía puede resolver no se inventa: cae a una <strong>cola de revisión
+  humana</strong>, donde un operador corrige los datos, el motor calcula y el documento recién
+  entonces se sella en la cadena. Ningún dato dudoso entra al registro con apariencia de
+  certeza.</p>
+
+  <h3>Independencia y factores citados</h3>
+  <p>El motor clasifica cada ítem en categorías con su factor de emisión y su <strong>fuente
+  metodológica citada</strong> (HuellaChile del Ministerio del Medio Ambiente, IPCC, DEFRA,
+  GLEC), distinguiendo entre factores en estado referencial y validados oficialmente. La
+  plataforma nació usando un proveedor externo de cálculo; hoy el motor propio cubre todos los
+  formatos y existe un interruptor de corte (<code>MOTOR_EXTERNO=off</code>) para el retiro
+  definitivo del tercero. La metodología completa, con los 16 factores y sus fuentes, está
+  publicada en la <strong>Guía Metodológica sicr3p</strong> (espejo de la guía sectorial del
+  cobre), disponible en el sitio.</p>
+</section>
+
+<!-- CAPÍTULO 4 -->
+<section class="cap" id="cap-4">
+  <div class="cap-head"><span class="num">4</span><h2>La cadena pública de integridad</h2></div>
+  <p class="cap-resumen">El reemplazo honesto de la blockchain: verificable por todos, sin costo de red.</p>
+
+  <p>Cada documento procesado se resume en un hash SHA-256 y se encadena al anterior:
+  el eslabón N contiene el hash del eslabón N-1, por lo que <strong>alterar cualquier registro
+  pasado rompe la cadena desde ese punto en adelante</strong>, de forma detectable por
+  cualquiera que la recalcule. La cadena es de solo-agregado: nada se edita, nada se borra.</p>
+
+  <h3>Qué garantiza y qué no — dicho en la propia página pública</h3>
+  <ul>
+    <li><strong>Garantiza:</strong> integridad interna del registro. Nadie — incluido sicr3p —
+    puede modificar un dato sellado sin que la verificación falle públicamente.</li>
+    <li><strong>No es:</strong> una red blockchain pública ni una verificación de tercera parte
+    acreditada. La página pública lo dice con todas sus letras.</li>
+  </ul>
+
+  <p>La vista pública está <strong>anonimizada por diseño</strong>: muestra eslabones, fechas,
+  hashes cortos y toneladas — jamás RUT, razones sociales, folios ni archivos. Y desde la
+  incorporación de los pasaportes de origen, la cadena también recibe <strong>anclajes de
+  lote</strong>: cuando un lote de trazabilidad se cierra, su hash final queda sellado como un
+  eslabón más de la cadena global, heredando su auditabilidad.</p>
+
+  <div class="caja">
+    <strong>Por qué no blockchain:</strong> una cadena de hash propia entrega la misma garantía
+    de inmutabilidad detectable, sin comisiones de red, sin criptomonedas, sin dependencia de
+    terceros, y con un costo marginal de cero por registro. Para el caso de uso — evidencia
+    verificable — la blockchain externa agrega costo, no confianza.
+  </div>
+</section>
+
+<!-- CAPÍTULO 5 -->
+<section class="cap" id="cap-5">
+  <div class="cap-head"><span class="num">5</span><h2>Aduana Verde: la red urbana</h2></div>
+  <p class="cap-resumen">El mostrador donde el comercio de ciudad resuelve REP y carbono en una visita.</p>
+
+  <p><strong>Aduana Verde es la marca de tramitación verde de documentos comerciales</strong> —
+  y cada superficie pública aclara que no realiza trámites ante ningún servicio nacional de
+  aduanas ni constituye verificación acreditada. Es la capa de distribución física de sicr3p:
+  puntos de atención con terminales donde un comercio llega con sus facturas y sale con:</p>
+  <ul>
+    <li>Su cálculo de emisiones (t CO2e) desde sus documentos reales.</li>
+    <li>Su <strong>declaración REP de embalajes</strong>: componentes, pesos y porcentaje de
+    reciclabilidad calculado siempre en el servidor, clasificado en tres niveles.</li>
+    <li>Su etiqueta QR de verificación pública y su sello digital para el sitio web.</li>
+    <li>La opción — siempre voluntaria — de compensar, con tarifa referencial visible
+    (ancla: impuesto verde chileno, US$5/t CO2e) y equivalente en dólares con el
+    <strong>dólar observado del Banco Central actualizado automáticamente</strong>.</li>
+    <li>Si lo desea, su <strong>Pasaporte de Producto</strong> (capítulo 6).</li>
+  </ul>
+
+  <h3>Los terminales</h3>
+  <p>Cada terminal es un dispositivo con identidad propia: inicia sesión con serial y clave
+  (patrón de dispositivos, no de personas), reporta su actividad y puede revocarse individualmente.
+  El pago real por pasarela (VirtualPos) está investigado y diseñado; hoy el cobro opera en
+  modalidad simulada mientras se formaliza — y el libro lo dice porque la honestidad es política
+  editorial.</p>
+</section>
+
+<!-- CAPÍTULO 6 -->
+<section class="cap" id="cap-6">
+  <div class="cap-head"><span class="num">6</span><h2>Los tres pasaportes</h2></div>
+  <p class="cap-resumen">Una sola maquinaria de trazabilidad, tres destinos: carga, producto y mineral.</p>
+
+  <p>El módulo de Pasaporte de Origen (inspirado en el concepto internacional de pasaportes
+  digitales de cadena de suministro, estilo Minespider) crea <strong>lotes</strong> cuya cadena
+  de custodia se arma eslabón por eslabón, cada uno sellado con hash y sin posibilidad de
+  edición posterior. Hay tres tipos, cada uno con su catálogo y sus roles:</p>
+
+  <table>
+    <tr><th>Tipo</th><th>Para qué</th><th>Roles de la cadena</th></tr>
+    <tr><td><strong>Documental</strong></td><td>Corredor Bioceánico: la carga y sus documentos por tramos.</td><td>origen → transporte → depósito → frontera → puerto → destino</td></tr>
+    <tr><td><strong>Producto</strong></td><td>Comercios de ciudad (Aduana Verde): cualquier rubro — alimentos, textil, embalajes, manufactura. Sin nada de minería.</td><td>productor → proveedor → transporte → comercio → punto Aduana Verde → comprador</td></tr>
+    <tr><td><strong>Mineral</strong></td><td>Cadena minera de exportación.</td><td>mina → planta → refinería → comerciante → exportador → comprador</td></tr>
+  </table>
+
+  <h3>Las cuatro ideas que lo diferencian</h3>
+  <ul>
+    <li><strong>Eslabones anclados a documentos tributarios reales:</strong> un eslabón puede
+    vincularse a una factura DTE del SII (o a un documento MIC/DTA del corredor); si el RUT del
+    actor no calza con el documento, el sistema lo advierte. Evidencia fiscal, no autodeclaración.</li>
+    <li><strong>Divulgación selectiva:</strong> cada actor elige si su eslabón es público,
+    solo-cadena o privado. Los hashes son públicos siempre (la integridad se verifica sin
+    permiso); el contenido comercial, solo si su dueño lo divulga. Un secreto aleatorio dentro
+    del hash impide adivinar el contenido oculto por fuerza bruta.</li>
+    <li><strong>Balance de masas:</strong> si la cantidad "se pierde" a lo largo de la cadena
+    más allá de la tolerancia, el pasaporte lo advierte públicamente.</li>
+    <li><strong>Declarado versus trazado:</strong> las emisiones incorporadas que el titular
+    declara se contrastan contra la suma de los eslabones; si divergen, se advierte.</li>
+  </ul>
+
+  <p>La alineación normativa es honesta por construcción: el checklist de debida diligencia
+  OCDE (5 pasos + Anexo II) aparece <strong>solo</strong> en pasaportes minerales; los datos
+  CBAM (código NC, emisiones por tonelada, método) y el formato de Pasaporte Digital de
+  Producto (ESPR) aplican a los tres tipos — y la plataforma dice sola cuándo un material no
+  está en el Anexo I vigente del CBAM.</p>
+</section>
+
+<!-- CAPÍTULO 7 -->
+<section class="cap" id="cap-7">
+  <div class="cap-head"><span class="num">7</span><h2>La Tarjeta de Viaje y el expediente sellado</h2></div>
+  <p class="cap-resumen">La credencial viaja con la carga: QR en el teléfono, ruta sin GPS, papel que se autovalida.</p>
+
+  <p>Nadie puede obligar a la carga a pasar por puntos de control fijos. sicr3p invierte el
+  modelo: <strong>al despachar un lote se emite una Tarjeta de Viaje</strong> — una credencial
+  virtual con QR (PDF tamaño tarjeta, costo cero por unidad) que se envía al transportista por
+  mensajería o se imprime. La página de la credencial muestra su propio QR: el teléfono del
+  portador ES la tarjeta.</p>
+
+  <ul>
+    <li><strong>Cualquiera</strong> que escanee el QR ve el pasaporte público del lote. Ninguna
+    lectura anónima queda registrada — decisión deliberada de diseño.</li>
+    <li><strong>El portador</strong>, con la clave que recibió junto a la credencial, registra
+    pasos: báscula, paso fronterizo, puerto. Cada paso entra sellado a la cadena del lote con
+    fecha del servidor y punto de control.</li>
+    <li><strong>La ruta es la secuencia de pasos</strong>: lugares conocidos + tiempos sellados
+    con hash. Sin GPS, sin hardware, sin costo por unidad.</li>
+  </ul>
+
+  <h3>El cierre: papel y registro digital validándose mutuamente</h3>
+  <p>Al llegar a destino, el lote se cierra: su hash final se <strong>ancla en la cadena
+  pública global</strong> y se genera el <strong>Expediente de Trazabilidad</strong> — un PDF
+  sellado con la cadena completa, las advertencias de balance, la alineación normativa y el
+  hash impreso. Se archiva junto a la credencial física: cualquiera puede escanear el QR del
+  expediente años después y comprobar que el papel dice la verdad.</p>
+</section>
+
+<!-- CAPÍTULO 8 -->
+<section class="cap" id="cap-8">
+  <div class="cap-head"><span class="num">8</span><h2>El Corredor Bioceánico</h2></div>
+  <p class="cap-resumen">Cuatro países, cuatro metodologías, un pasaporte documental.</p>
+
+  <p>El corredor de Capricornio — Brasil, Paraguay, Argentina, Chile — moverá carga que cruza
+  hasta cuatro jurisdicciones con reglas de cálculo distintas. sicr3p lo modela desde el origen
+  del proyecto: <strong>metodologías por país</strong> (Chile activa con base
+  HuellaChile/ISO 14064-1; Argentina, Paraguay y Brasil preparadas en borrador para activarse
+  con contrapartes locales), documentos de tránsito por tramo (manifiestos, MIC/DTA) y ahora el
+  <strong>pasaporte documental</strong> del capítulo 6, cuya cadena de custodia registra
+  origen, depósitos, fronteras y puertos con la Tarjeta de Viaje del capítulo 7.</p>
+
+  <p>El resultado buscado: que una carga que sale de un puerto chileno hacia Brasil (o
+  viceversa) llegue con un expediente verificable de su ruta y sus emisiones de transporte por
+  tramo — algo que hoy ningún actor del corredor ofrece de forma pública y verificable.</p>
+
+  <div class="caja">
+    <strong>Estado honesto:</strong> la maquinaria técnica está lista; la activación real del
+    corredor requiere contrapartes en los otros tres países y carga piloto. Es una apuesta de
+    mediano plazo, no un ingreso de mañana.
+  </div>
+</section>
+
+<!-- CAPÍTULO 9 -->
+<section class="cap" id="cap-9">
+  <div class="cap-head"><span class="num">9</span><h2>Mandantes y el cruce por RUT</h2></div>
+  <p class="cap-resumen">El efecto red: cada documento enriquece un grafo que conecta compradores y vendedores.</p>
+
+  <p>Cada factura procesada lleva el RUT del emisor y del receptor, validados matemáticamente.
+  Con miles de documentos, eso deja de ser un archivo y se convierte en un <strong>grafo de la
+  economía real</strong>: quién le vende a quién, con qué emisiones asociadas.</p>
+
+  <h3>Lo que ya funciona sobre ese grafo</h3>
+  <table>
+    <tr><th>Capacidad</th><th>Qué hace</th></tr>
+    <tr><td><strong>API de mandantes</strong></td><td>La gran empresa consulta con su clave los datos de sus proveedores (solo los que le venden a ella), con lista blanca opcional por RUT y webhooks que le avisan de cada sesión nueva.</td></tr>
+    <tr><td><strong>Búsqueda con cruces</strong></td><td>Un RUT visto en sus tres roles: como cliente, como proveedor de otros, como comprador de otros.</td></tr>
+    <tr><td><strong>Cadena de valor</strong></td><td>Aguas arriba y aguas abajo de cualquier RUT: proveedores y compradores con sus t CO2e.</td></tr>
+    <tr><td><strong>Valorización FIFO/PMP</strong></td><td>Inventario valorizado en pesos y en CO2e desde los ítems del DTE — el costo de carbono del stock.</td></tr>
+    <tr><td><strong>Capital Natural</strong></td><td>Balance de activos naturales con valorización por fuente citada y su Estado en PDF.</td></tr>
+    <tr><td><strong>Informes defendibles</strong></td><td>Consolidado, mensual, etiqueta QR por factura, sello SVG vivo para el sitio del cliente, libro mayor de carbono.</td></tr>
+  </table>
+
+  <p>Este grafo es la barrera competitiva silenciosa del proyecto: cada mandante que entra trae
+  a sus proveedores, y cada proveedor procesado hace más valiosa la consulta del mandante. La
+  distribución puede copiarse; el grafo acumulado, no.</p>
+</section>
+
+<!-- CAPÍTULO 10 -->
+<section class="cap" id="cap-10">
+  <div class="cap-head"><span class="num">10</span><h2>Arquitectura y seguridad</h2></div>
+  <p class="cap-resumen">Aburrida a propósito: tecnología probada, reglas duras, y una red de seguridad que se ejecuta sola.</p>
+
+  <h3>El stack</h3>
+  <p>Node.js/Express y PostgreSQL en el backend; React/Vite en el frontend; nginx y pm2 en un
+  VPS de bajo costo. Sin microservicios, sin Kubernetes, sin dependencias exóticas: la
+  complejidad se gasta donde aporta (el motor, la cadena, los pasaportes), no en
+  infraestructura de moda.</p>
+
+  <h3>Las reglas duras (invariantes del código)</h3>
+  <ul>
+    <li><strong>El servidor manda:</strong> montos, porcentajes, niveles y hashes se calculan
+    siempre en el servidor. Jamás se confía en un número que venga del navegador.</li>
+    <li><strong>Solo-agregado:</strong> lo sellado no se edita ni se borra; los errores se
+    corrigen con registros nuevos que lo declaran.</li>
+    <li><strong>Identidades verificadas:</strong> RUT por módulo 11; dispositivos y tarjetas con
+    clave propia revocable; mensajes de error que no filtran existencia de cuentas.</li>
+    <li><strong>Privacidad por defecto:</strong> vistas públicas anonimizadas, RUT enmascarados,
+    divulgación selectiva, borradores legales jamás expuestos.</li>
+  </ul>
+
+  <h3>La red de seguridad</h3>
+  <p>Más de <strong>220 pruebas automatizadas</strong> corren antes de cada despliegue — en el
+  propio servidor de producción (CI propio, sin depender de servicios externos). Después de
+  cada despliegue, una <strong>prueba de humo de extremo a extremo</strong> golpea la
+  producción real; si falla, el sistema <strong>revierte solo</strong> a la versión anterior y
+  deja un diagnóstico escrito. El operador humano se entera del problema con la plataforma ya
+  restaurada.</p>
+
+  <p>Rendimiento reciente: la aplicación pública baja dividida en módulos — quien escanea un QR
+  descarga un tercio menos que antes, y el panel de administración solo lo descargan los
+  operadores. Todo el sitio opera en español, inglés y portugués.</p>
+</section>
+
+<!-- CAPÍTULO 11 -->
+<section class="cap" id="cap-11">
+  <div class="cap-head"><span class="num">11</span><h2>Negocio y hoja de ruta</h2></div>
+  <p class="cap-resumen">Cuatro líneas de ingreso sobre un costo marginal cercano a cero — y lo que falta, dicho sin maquillaje.</p>
+
+  <table>
+    <tr><th>Línea</th><th>Mecánica</th><th>Estado</th></tr>
+    <tr><td><strong>Suscripción SaaS</strong></td><td>Plan mensual por empresa según volumen.</td><td>Pre-lanzamiento (códigos de cliente fundador)</td></tr>
+    <tr><td><strong>Tramitación Aduana Verde</strong></td><td>Tarifa por trámite + compensación voluntaria.</td><td>Operativa en modalidad simulada</td></tr>
+    <tr><td><strong>Pasaportes de origen</strong></td><td>Por lote emitido, con credenciales y expedientes.</td><td>Operativo, listo para pilotos pagados</td></tr>
+    <tr><td><strong>API mandantes</strong></td><td>Licencia anual para grandes empresas.</td><td>Operativa (v2)</td></tr>
+  </table>
+
+  <h3>Hoja de ruta tecnológica</h3>
+  <ol>
+    <li>Pasarela de pago real (VirtualPos) en la red Aduana Verde.</li>
+    <li>Portal del mandante (interfaz propia para la gran empresa).</li>
+    <li>Exportación EPCIS 2.0 (el estándar GS1 de eventos de trazabilidad) y pases nativos de
+    billetera móvil para las credenciales.</li>
+    <li>Escala analítica (BigQuery ya conectado; buscador distribuido cuando el volumen lo pida).</li>
+    <li>Activación del corredor con contrapartes AR/PY/BR.</li>
+  </ol>
+
+  <div class="caja">
+    <strong>Estado honesto del negocio:</strong> no hay ventas facturadas aún. Hay una
+    plataforma operativa con costo mensual mínimo, una lista de espera con cupos de fundador y
+    el riesgo técnico principal ya retirado. Lo que falta no es producto: es distribución.
+  </div>
+</section>
+
+<!-- CAPÍTULO 12 -->
+<section class="cap" id="cap-12">
+  <div class="cap-head"><span class="num">12</span><h2>Opinión del autor</h2></div>
+  <p class="cap-resumen">Lo que pienso de verdad del proyecto, escrito con la misma honestidad que exige la marca.</p>
+
+  <h3>Lo que este proyecto tiene y pocos tienen</h3>
+  <p><strong>Primero, la verificabilidad pública como diferencial de fondo.</strong> Casi toda
+  la industria de sostenibilidad vende confianza declarada ("créeme, lo medí"). sicr3p vende
+  confianza comprobable ("no me creas: verifica"). Esa inversión del modelo es rara, es
+  difícil de copiar con sinceridad, y envejece bien: cada año de cadena acumulada vale más.</p>
+  <p><strong>Segundo, la honestidad como activo y no como freno.</strong> La plataforma declara
+  impreso lo que NO es — no certifica, no audita, no es aduana, el cobre no está en el CBAM
+  todavía. En un mercado que va camino a regulaciones anti-greenwashing, haber construido la
+  honestidad en el producto (no en el discurso) es una ventaja regulatoria latente.</p>
+  <p><strong>Tercero, la integración que la referencia internacional no tiene.</strong>
+  Minespider traza origen; las consultoras calculan carbono; los software REP declaran
+  embalajes. Aquí las tres cosas viven en el mismo registro, ancladas a documentos tributarios
+  reales, con costo marginal cercano a cero. Y la amplitud del sistema — motor propio,
+  pasaportes, corredor, mandantes, capital natural — se construyó en una fracción del tiempo y
+  costo habituales, lo que demuestra que la iteración aquí es barata: equivocarse cuesta poco,
+  corregir es rápido.</p>
+
+  <h3>Lo que me preocupa, sin anestesia</h3>
+  <p><strong>Uno: cero ventas.</strong> Todo lo anterior es energía potencial. El riesgo número
+  uno del proyecto no es técnico, ni legal, ni competitivo: es que la distribución comercial no
+  existe todavía. Un producto excelente sin un vendedor es un museo.</p>
+  <p><strong>Dos: la operación es unipersonal.</strong> Una sola persona decide, vende, opera y
+  ejecuta los pasos del VPS. Eso hace frágil todo lo demás: unas vacaciones, una enfermedad o
+  simplemente el cansancio detienen el proyecto entero.</p>
+  <p><strong>Tres: el ancho puede comerse el foco.</strong> Este libro tiene trece capítulos
+  porque el sistema hace muchas cosas. Eso es un logro técnico y un riesgo comercial: cada
+  módulo nuevo es una razón más para no salir a vender el que ya existe. Yo mismo, como
+  constructor, soy parte de esta tentación — por eso la escribo aquí.</p>
+  <p><strong>Cuatro: pendientes que no son de código.</strong> Los factores nuevos necesitan
+  validación oficial contra sus fuentes; los textos legales necesitan un abogado; el correo
+  corporativo necesita sus registros DNS. Está todo listado en el checklist del proyecto
+  (ORDEN-DE-EJECUCION.md) — nada es difícil, pero nadie más que el operador puede hacerlo.</p>
+
+  <h3>Lo que yo haría, en orden</h3>
+  <ol>
+    <li><strong>Congelar el desarrollo de features nuevas</strong> hasta que UN cliente real use
+    la plataforma un mes completo. El producto ya sobra para vender.</li>
+    <li><strong>Elegir una sola cuña de entrada: Aduana Verde con comercios.</strong> Es el ciclo
+    de venta más corto (visita → trámite → resultado en el momento), el precio más simple de
+    explicar, y cada trámite alimenta el grafo que después se le vende a los mandantes. El
+    corredor y la minería son apuestas más grandes pero más lentas: que esperen su turno.</li>
+    <li><strong>Cerrar los pasos humanos del checklist</strong> — validar factores, abogado,
+    correo — porque son la diferencia entre "demo impresionante" y "empresa seria".</li>
+    <li><strong>Buscar el segundo par de manos</strong> (socio comercial o primer empleado) antes
+    que financiamiento grande: el informe de financiamiento dice, con razón, que lo que se
+    financia es distribución — y la distribución empieza por una persona que venda.</li>
+  </ol>
+
+  <p class="firma">— Escrito por el equipo de ingeniería asistido por inteligencia artificial
+  que construyó la plataforma, a solicitud de su fundador, con instrucciones de opinar sin
+  cortesía diplomática. Julio de 2026.</p>
+</section>
+
+<!-- CAPÍTULO 13 -->
+<section class="cap" id="cap-13">
+  <div class="cap-head"><span class="num">13</span><h2>Anexos</h2></div>
+  <p class="cap-resumen">Glosario, mapa del sistema y dónde verificar cada afirmación de este libro.</p>
+
+  <h3>Glosario mínimo</h3>
+  <table>
+    <tr><th>Término</th><th>Significado</th></tr>
+    <tr><td><strong>DTE</strong></td><td>Documento Tributario Electrónico del SII (factura electrónica chilena).</td></tr>
+    <tr><td><strong>t CO2e</strong></td><td>Toneladas de dióxido de carbono equivalente.</td></tr>
+    <tr><td><strong>REP</strong></td><td>Responsabilidad Extendida del Productor (Ley 20.920).</td></tr>
+    <tr><td><strong>CBAM</strong></td><td>Mecanismo de Ajuste en Frontera por Carbono de la UE (Reglamento 2023/956).</td></tr>
+    <tr><td><strong>DPP / ESPR</strong></td><td>Pasaporte Digital de Producto del reglamento europeo de ecodiseño.</td></tr>
+    <tr><td><strong>Cadena de hash</strong></td><td>Secuencia donde cada registro incorpora el resumen criptográfico del anterior; alterar el pasado se vuelve detectable.</td></tr>
+    <tr><td><strong>Eslabón</strong></td><td>Un registro sellado de la cadena (documento, paso de una carga, o anclaje de un lote).</td></tr>
+    <tr><td><strong>Mandante</strong></td><td>Gran empresa que exige información a sus proveedores.</td></tr>
+  </table>
+
+  <h3>Mapa del sistema</h3>
+  <table>
+    <tr><th>Módulo</th><th>Dónde se ve</th></tr>
+    <tr><td>Carga y cálculo de documentos</td><td>/cargar · /resultado</td></tr>
+    <tr><td>Verificación pública por documento</td><td>/verificar/… · /pasaporte/…</td></tr>
+    <tr><td>Cadena de integridad</td><td>/cadena</td></tr>
+    <tr><td>Pasaportes de origen (3 tipos)</td><td>/lote/LM-… · expediente PDF</td></tr>
+    <tr><td>Tarjeta de Viaje</td><td>/v/TV-…</td></tr>
+    <tr><td>Terminal Aduana Verde</td><td>/pos · /aduana-verde</td></tr>
+    <tr><td>Calculadora pública</td><td>portada del sitio</td></tr>
+    <tr><td>Panel de administración</td><td>/admin (operadores)</td></tr>
+  </table>
+
+  <h3>Biblioteca del proyecto</h3>
+  <ul>
+    <li>Ficha de plataforma, Aduana Verde, REP y correo — <code>/docs/comercial/01…04</code></li>
+    <li>Informe para autoridades — <code>/docs/comercial/05-informe-autoridades.pdf</code></li>
+    <li>Informe para financiamiento — <code>/docs/comercial/06-informe-financiamiento.pdf</code></li>
+    <li>Guía Metodológica sicr3p — <code>/docs/metodologia/guia-metodologica-sicr3p.pdf</code></li>
+    <li>Este libro — <code>/docs/libro/</code> (web) y <code>/docs/libro/el-libro-sicr3p.pdf</code></li>
+  </ul>
+
+  <p class="firma">El Libro sicr3p · Edición 1 · Julio 2026. Se actualiza con el proyecto:
+  la versión web es siempre la vigente. sicr3p no es certificador, auditor ni autoridad.</p>
+</section>
+
+</main>
+</div>
+
+<script>
+// Resalta en el menú el capítulo visible (mejora progresiva; el libro
+// funciona igual sin JS).
+const enlaces = [...document.querySelectorAll('nav.menu a[href^="#"]')];
+const porId = Object.fromEntries(enlaces.map((a) => [a.getAttribute('href').slice(1), a]));
+const obs = new IntersectionObserver((entradas) => {
+  entradas.forEach((en) => {
+    if (en.isIntersecting) {
+      enlaces.forEach((a) => a.classList.remove('activo'));
+      porId[en.target.id]?.classList.add('activo');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+document.querySelectorAll('section.cap, .portada').forEach((s) => obs.observe(s));
+</script>
+</body>
+</html>
