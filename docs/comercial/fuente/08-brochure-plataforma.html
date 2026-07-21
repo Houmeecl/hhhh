@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Brochure de servicios para clientes</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">BROCHURE DE SERVICIOS · PARA CLIENTES</div>
+    <h1>Tus facturas de siempre,<br>convertidas en evidencia<br>ambiental verificable</h1>
+    <p class="bajada">Los documentos que tu empresa ya tiene — facturas del SII, en XML,
+    PDF o foto — se convierten en contabilidad de carbono, declaración REP y trazabilidad
+    que cualquiera puede comprobar con un código QR. Sin consultorías, sin planillas,
+    sin confiar en la palabra de nadie: cada registro queda sellado en una cadena
+    pública de integridad.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. QUÉ ES -->
+<div class="pagina">
+  <h2>1. Qué es sicr3p, en una página</h2>
+
+  <p><strong>sicr3p es una plataforma chilena, desarrollada y operada desde Antofagasta,
+  que convierte documentos tributarios reales en contabilidad de carbono y trazabilidad
+  verificables públicamente.</strong> Subes tus facturas — el XML de DTE del SII, un PDF
+  o incluso una foto tomada con el celular — y la plataforma calcula las emisiones de
+  cada compra, ítem por ítem, arma tus declaraciones y deja todo respaldado con una
+  etiqueta QR que cualquiera puede escanear y comprobar.</p>
+
+  <p>La diferencia con una consultoría o una autodeclaración está en dos cosas:</p>
+
+  <div class="dos-col">
+    <div class="caja">
+      <strong>Parte del documento real.</strong> sicr3p no estima con encuestas ni
+      promedios de industria: calcula desde la factura, ítem por ítem, con factores de
+      emisión citados a su fuente. Si un documento no entrega señal suficiente, la
+      plataforma lo dice — no inventa datos.
+    </div>
+    <div class="caja">
+      <strong>Nadie puede alterarlo sin que se note.</strong> Cada registro genera un
+      eslabón con hash SHA-256 encadenado al anterior, en una cadena de solo-agregado,
+      pública y anonimizada. Si alguien — incluido sicr3p — modifica un registro
+      histórico, la cadena deja de cuadrar y eso es visible para cualquiera.
+    </div>
+  </div>
+
+  <h3>1.1 Qué significa "verificable por QR"</h3>
+  <p>Cada documento procesado, cada declaración y cada lote tiene una página pública de
+  verificación. Tu mandante, tu comprador o cualquier tercero escanea el QR y ve el
+  registro, su fecha, sus toneladas de CO2e y su lugar en la cadena de integridad —
+  sin crear cuenta, sin pedir permiso y sin ver tus datos comerciales sensibles: lo
+  público está anonimizado (sin RUT, sin razones sociales, sin folios ni montos).</p>
+
+  <h3>1.2 Para quién es</h3>
+  <table>
+    <tr><th>Si eres…</th><th>sicr3p te sirve para…</th></tr>
+    <tr><td><strong>Pyme o comercio</strong></td><td>Responder la exigencia "mándame tus datos de emisiones" sin contratar una consultoría: subes facturas, sales con informe, declaración y QR.</td></tr>
+    <tr><td><strong>Proveedor de minera o gran empresa</strong></td><td>Entregar a tu mandante evidencia trazable — digital o en papel — que se comprueba en segundos, en vez de planillas sin respaldo.</td></tr>
+    <tr><td><strong>Exportador</strong></td><td>Preparar pasaportes de producto y de origen con los datos que los mercados de destino ya están pidiendo, capturados desde hoy.</td></tr>
+    <tr><td><strong>Empresa mandante</strong></td><td>Consultar por API la evidencia de tus proveedores, en vez de perseguir planillas por correo.</td></tr>
+  </table>
+
+  <p class="ref">Todo lo descrito en este brochure está construido en la plataforma. sicr3p está en
+  etapa de pre-lanzamiento: la red de puntos Aduana Verde está en formación y el programa de
+  pilotos fundadores está abierto (ver sección 5).</p>
+</div>
+
+<!-- 2. SERVICIOS (parte 1) -->
+<div class="pagina seccion">
+  <h2>2. Los servicios, uno por uno</h2>
+
+  <h3>2.1 Contabilidad de carbono por documento</h3>
+  <p>Subes tus documentos tributarios y la plataforma calcula las toneladas de CO2
+  equivalente (t CO2e) de cada compra, <strong>ítem por ítem</strong>, clasificadas por
+  Alcance 1, 2 o 3 del GHG Protocol. Cada factor de emisión aplicado cita su fuente
+  oficial — no hay caja negra metodológica. Recibes un <strong>informe PDF defendible</strong>:
+  cada cifra se puede reconstruir desde el documento de origen y su metodología está
+  citada de forma impresa.</p>
+
+  <h3>2.2 Declaración REP — Ley 20.920</h3>
+  <p>Para envases y embalajes, la plataforma captura la declaración <strong>por
+  componentes</strong> (cartón, plástico, vidrio, metal…) y calcula el porcentaje de
+  reciclabilidad con niveles <strong>Alta / Media / Baja</strong>. La declaración queda
+  trazada al documento que la respalda y genera una <strong>etiqueta QR verificable</strong>
+  para el producto o el despacho. Así, cumplir la obligación de declarar de la Ley REP
+  deja de ser un proyecto y pasa a ser un trámite.</p>
+
+  <h3>2.3 Pasaporte Digital de Producto</h3>
+  <p>Una página pública con QR por documento o producto, que reúne en un solo lugar sus
+  emisiones calculadas, su declaración REP, su trazabilidad y su lugar en la cadena de
+  integridad. El formato está <strong>alineado al Pasaporte Digital de Producto europeo
+  (ESPR)</strong>: identificador único, composición y desempeño ambiental — el mismo tipo
+  de dato que la Unión Europea exigirá por categorías de producto en los próximos años.
+  Quien quiera venderle a Europa mañana puede empezar a capturar esos datos hoy.</p>
+
+  <h3>2.4 Red Aduana Verde — atención presencial en una visita</h3>
+  <p><strong>Red en formación durante el pre-lanzamiento:</strong> puntos físicos de
+  atención con un terminal en tablet, pensados para el comercio y la pyme que prefiere
+  que la atiendan en persona. El terminal ya está operativo en la plataforma; los puntos
+  se abren con la red. El cliente llega con sus facturas (papel, PDF o XML) y
+  <strong>en una sola visita</strong> sale con:</p>
+  <ul>
+    <li>su <strong>cálculo de emisiones</strong> por documento, con informe PDF;</li>
+    <li>su <strong>declaración REP</strong> de envases y embalajes;</li>
+    <li>su <strong>pasaporte digital</strong> con etiqueta QR verificable;</li>
+    <li>su <strong>comprobante QR</strong> del trámite completo.</li>
+  </ul>
+  <p>En el mismo trámite puede registrar, si quiere, una <strong>compensación voluntaria</strong>
+  del CO2 calculado, a tarifa referencial. <strong>Hoy ese pago opera en modalidad
+  simulada</strong> — sin pasarela de pago real — mientras se formaliza el convenio con el
+  socio ambiental que ejecutará las compensaciones. Se dice así de claro en pantalla y
+  en el comprobante: la decisión queda registrada, el cobro real todavía no existe.</p>
+
+  <div class="caja-alerta">
+    <strong>Aclaración importante:</strong> "Aduana Verde" es el nombre comercial de la red de
+    puntos de atención de sicr3p. <strong>No es el Servicio Nacional de Aduanas</strong> ni tiene
+    relación alguna con ese organismo público; sicr3p no realiza trámites aduaneros.
+  </div>
+</div>
+
+<!-- 2. SERVICIOS (parte 2) -->
+<div class="pagina seccion">
+  <h2>2. Los servicios, uno por uno (continuación)</h2>
+  <h3>2.5 Pasaporte de Origen — para minerales y productos</h3>
+  <p>Para carga que necesita demostrar de dónde viene y por dónde pasó: una
+  <strong>cadena de custodia por lote</strong>, con su propia cadena de hash. Cada eslabón
+  (extracción o producción, planta, transporte, entrega) queda sellado con fecha y actor,
+  y es <strong>anclable a facturas reales del SII</strong> — el papel tributario y la
+  trazabilidad se respaldan mutuamente.</p>
+  <table>
+    <tr><th>Capacidad</th><th>Qué hace por ti</th></tr>
+    <tr><td><strong>Divulgación selectiva</strong></td><td>Cada eslabón se marca como público, visible solo para la cadena, o privado. Tú decides qué ve el mundo, qué ven tus socios y qué no ve nadie.</td></tr>
+    <tr><td><strong>Balance de masas</strong></td><td>La plataforma compara toneladas de entrada y salida por eslabón y <strong>alerta si hay merma</strong> fuera de lo declarado.</td></tr>
+    <tr><td><strong>Debida diligencia OCDE</strong> (lotes minerales)</td><td>Checklist guiado según la Guía OCDE de cadenas de suministro de minerales: los 5 pasos del marco más los riesgos del Anexo II, con estado por lote.</td></tr>
+    <tr><td><strong>Datos CBAM-ready</strong> (lotes minerales)</td><td>Código NC y emisiones incorporadas por tonelada, en el formato del reglamento europeo CBAM. Honestidad primero: el cobre <strong>no</strong> está en el Anexo I vigente del Reglamento (UE) 2023/956 — la plataforma no dice lo contrario; captura los datos para que, si el alcance se amplía o tu comprador los pide, ya los tengas.</td></tr>
+    <tr><td><strong>Expediente PDF sellado</strong></td><td>Al cerrar el lote se emite un expediente imprimible con el hash final anclado en la cadena pública: el respaldo físico y el registro digital se validan entre sí.</td></tr>
+  </table>
+
+  <h3>2.6 Carpeta física para el mandante</h3>
+  <p>Cuando la minera o la gran empresa exige papel, sicr3p genera un <strong>PDF único
+  imprimible</strong>: portada dirigida al mandante, cada documento con su QR de
+  verificación, la declaración REP, y una hoja final titulada <strong>"cómo comprobar esta
+  carpeta en 30 segundos"</strong>. El revisor no tiene que confiar en el papel: escanea
+  cualquier QR y comprueba el registro digital que lo respalda.</p>
+
+  <h3>2.7 Informes y sello verificable</h3>
+  <p>Además del informe por sesión, recibes un <strong>informe consolidado</strong> y un
+  <strong>informe mensual</strong> en PDF (evolución de t CO2e, documentos procesados,
+  alcances del período), enviados por correo. Y un <strong>sello web verificable</strong>
+  para el sitio de tu empresa: una imagen viva que muestra tus toneladas del período, el
+  estado de la cadena de integridad y el enlace de verificación pública. No es un sello
+  de certificación de terceros: es un indicador verificable de tus propios datos.</p>
+
+  <h3>2.8 Accesos para mandantes — API con clave</h3>
+  <p>La empresa mandante que quiera consultar la evidencia de sus proveedores recibe una
+  <strong>clave de API propia</strong>, con lista blanca opcional de proveedores
+  autorizados: en vez de pedir planillas por correo, consulta datos calculados desde
+  documentos reales, trazables por RUT y verificables por QR.</p>
+
+  <div class="caja">
+    <strong>El principio de cobro, sin letra chica:</strong> sicr3p cobra por la
+    <strong>gestión</strong> — calcular, declarar, trazar, informar y verificar. No cobra por el
+    CO2 ni vende bonos de carbono. La compensación es siempre voluntaria, con tarifa
+    referencial visible, y ningún informe queda incompleto por no compensar.
+  </div>
+</div>
+
+<!-- 3. EJEMPLO -->
+<div class="pagina seccion">
+  <h2>3. Un ejemplo completo, de la puerta a la evidencia</h2>
+
+  <div class="caja-alerta">
+    <strong>Ejemplo ilustrativo con datos ficticios.</strong> "Comercial Andina SpA" no existe;
+    las cifras siguientes se inventaron solo para mostrar cómo se ve el servicio. Ningún dato
+    de este ejemplo corresponde a un cliente real.
+  </div>
+
+  <p><strong>"Comercial Andina SpA"</strong> — un comercio proveedor de una gran empresa —
+  llega a un punto de la red Aduana Verde con <strong>una factura</strong> de sus compras del
+  mes. El operador la carga en el terminal y ocurre lo siguiente:</p>
+
+  <h3>3.1 El cálculo, ítem por ítem</h3>
+  <table>
+    <tr><th>Ítem de la factura</th><th>Categoría</th><th>Alcance GHG</th><th>t CO2e</th></tr>
+    <tr><td>Suministro eléctrico</td><td>Energía eléctrica</td><td>Alcance 2</td><td>0,2700</td></tr>
+    <tr><td>Flete regional</td><td>Transporte contratado</td><td>Alcance 3</td><td>0,1120</td></tr>
+    <tr><td>Mantención</td><td>Servicios</td><td>Alcance 3</td><td>0,0575</td></tr>
+    <tr><td colspan="3"><strong>Total de la sesión</strong> (categoría principal: energía eléctrica)</td><td><strong>0,440</strong></td></tr>
+  </table>
+  <p class="ref">Cada fila indica en el informe el factor de emisión aplicado y su fuente. Los datos
+  de la tabla son ficticios (ejemplo ilustrativo).</p>
+
+  <h3>3.2 La declaración REP del embalaje</h3>
+  <p>En la misma visita, el operador registra los componentes del embalaje que Comercial
+  Andina usa en sus despachos. Resultado: <strong>78% de reciclabilidad, nivel Alta</strong>,
+  con el detalle por componente en la declaración y una etiqueta QR para el embalaje.</p>
+
+  <h3>3.3 La compensación voluntaria</h3>
+  <p>El operador ofrece compensar las 0,440 t CO2e calculadas, a la tarifa referencial
+  vigente. Comercial Andina decide compensar. <strong>El pago se registra en modalidad
+  simulada</strong> — así lo dice el comprobante — porque la pasarela de pago real operará
+  cuando el socio ambiental esté formalizado. Si hubiera decidido no compensar, el trámite
+  quedaría igual de completo, con la decisión registrada.</p>
+
+  <h3>3.4 Con qué sale por la puerta</h3>
+  <p>Una visita, cuatro entregables: <strong>informe PDF</strong> del cálculo,
+  <strong>pasaporte digital</strong> con QR público, <strong>etiqueta REP</strong> para el
+  embalaje y <strong>comprobante QR</strong> del trámite completo.</p>
+
+  <table>
+    <tr><th>&nbsp;</th><th>Antes de la visita</th><th>Después de la visita</th></tr>
+    <tr><td><strong>Ante su mandante</strong></td><td>"Estamos viendo el tema de las emisiones"</td><td>Informe defendible con QR que el mandante comprueba en segundos</td></tr>
+    <tr><td><strong>Ley REP</strong></td><td>Sin declaración de envases y embalajes</td><td>Declaración por componentes, 78% reciclabilidad nivel Alta, trazada a documento</td></tr>
+    <tr><td><strong>Sus datos</strong></td><td>Facturas guardadas en una carpeta</td><td>Cada registro sellado en una cadena pública que nadie puede alterar sin que se note</td></tr>
+    <tr><td><strong>Tiempo invertido</strong></td><td>—</td><td>Una visita a un punto Aduana Verde</td></tr>
+  </table>
+</div>
+
+<!-- 4. CÓMO COMPROBAR -->
+<div class="pagina seccion">
+  <h2>4. Cómo comprobar cualquier registro en 30 segundos</h2>
+
+  <p>Esta es la prueba que le puedes pedir a sicr3p — y la que tu mandante o tu comprador
+  te puede pedir a ti. No requiere cuenta, ni clave, ni conocimientos técnicos.</p>
+
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Escanea el QR.</b> Del
+    informe, la etiqueta, la carpeta o el comprobante — cualquier QR de sicr3p lleva a una
+    página pública de verificación.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Mira los datos.</b> La página
+    muestra el registro: fecha, toneladas de CO2e, tipo de trámite y su hash. Sin exponer RUT,
+    razones sociales ni montos: lo público está anonimizado.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Comprueba la cadena.</b> El
+    registro apunta a su eslabón en la cadena pública de integridad. Si algún registro
+    histórico hubiera sido alterado, la cadena completa dejaría de cuadrar — y eso se vería
+    ahí mismo, a la vista de cualquiera.</div></div>
+  </div>
+
+  <div class="caja">
+    <strong>Por qué esto importa:</strong> una planilla se edita en dos clics y nadie se entera.
+    Un registro sicr3p no: la cadena de hash es de <strong>solo-agregado</strong> — se puede
+    escribir, nunca reescribir. Ni el cliente, ni un tercero, <strong>ni el propio sicr3p</strong>
+    pueden modificar un registro pasado sin que la alteración quede en evidencia pública.
+    La confianza no depende de la palabra de nadie: depende de matemática que cualquiera
+    puede revisar.
+  </div>
+
+  <p class="ref">La cadena de integridad y el verificador público son páginas del sitio de la
+  plataforma (rutas /cadena y /verificar). Pídenos el enlace directo al coordinar la
+  demostración y revísalos antes de ser cliente.</p>
+</div>
+
+<!-- 5. CÓMO EMPEZAR -->
+<div class="pagina seccion">
+  <h2>5. Cómo empezar</h2>
+
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Escríbenos.</b> Un correo a
+    contacto@sicr3p.cl contando qué necesitas: responder a un mandante, declarar REP, preparar
+    exportación o simplemente ordenar tus emisiones. Normalmente respondemos dentro de la
+    semana y coordinamos una demostración de 30 minutos, en línea o en persona — somos de
+    Antofagasta.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Prueba con tus propias
+    facturas.</b> Nada de demos con datos ajenos: en la misma sesión subes documentos reales
+    de tu empresa y ves tu cálculo, tu declaración y tu QR funcionando. Así decides con
+    evidencia, no con promesas.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Súmate como piloto
+    fundador.</b> Durante el pre-lanzamiento, los primeros clientes operan <b>sin costo de
+    licencias</b>: cada parte pone sus horas y sus documentos. Las tarifas por trámite y por
+    lote se conversan después, con datos reales del piloto en la mano — no antes.</div></div>
+  </div>
+
+  <div class="caja-navy">
+    <h4>Contacto</h4>
+    <p style="margin:2mm 0 0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicr3p.cl</strong> · www.sicr3p.cl<br>
+    Verificador público: sicr3p.cl/verificar · Cadena de integridad: sicr3p.cl/cadena<br>
+    Escríbenos indicando tu rubro y cuántos documentos mueves al mes; con eso armamos la
+    demostración a tu medida.</p>
+  </div>
+
+</div>
+
+<!-- 6. LO QUE NO ES -->
+<div class="pagina seccion">
+  <h2>6. Lo que sicr3p no es — honestidad por diseño</h2>
+
+  <ul>
+    <li><strong>No es un certificador ni un verificador acreditado.</strong> sicr3p estructura y
+    sella registros <em>alineados a</em> los marcos citados (GHG Protocol, ISO 14064-1, Ley
+    20.920, ESPR/DPP, Guía OCDE, CBAM), siempre citando la fuente. Cada informe lo declara
+    de forma impresa.</li>
+    <li><strong>No es una autoridad ni un organismo público.</strong> "Aduana Verde" es una red
+    comercial de puntos de atención; no es el Servicio Nacional de Aduanas ni realiza trámites
+    ante ese u otro servicio del Estado.</li>
+    <li><strong>No vende bonos de carbono.</strong> Eso exige proyectos verificados por organismos
+    acreditados y registros reconocidos, fuera del alcance de sicr3p. La compensación que se
+    ofrece es voluntaria, a tarifa referencial, y hoy opera en modalidad simulada, sin pasarela
+    de pago real.</li>
+    <li><strong>No es una blockchain especulativa.</strong> La cadena de integridad es una cadena
+    de hash propia, de solo-agregado, verificable públicamente — sin criptomonedas, sin
+    tokens, sin especulación.</li>
+  </ul>
+
+  <p class="pie-doc">sicr3p — Brochure de servicios para clientes · Versión 1.0 · Julio 2026 ·
+  Documento de carácter informativo. sicr3p SpA no es certificador, auditor, verificador
+  acreditado ni autoridad pública, y no realiza trámites ante el Servicio Nacional de Aduanas;
+  registra y estructura declaraciones y documentos verificables de sus usuarios, con integridad
+  respaldada por una cadena de hash pública de solo-agregado. Las tarifas referenciales deben
+  validarse comercialmente antes de contratar. Los ejemplos numéricos de este documento son
+  ilustrativos, con datos ficticios.</p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Brochure de servicio · Corredor Bioceánico de Capricornio</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">BROCHURE DE SERVICIO · CORREDOR BIOCEÁNICO</div>
+    <h1>La carga que cruza<br>cuatro países y llega<br>al Pacífico con una<br>historia verificable</h1>
+    <p class="bajada">Pasaporte de Trazabilidad Documental + Tarjeta de Viaje + Torre de Control
+    para la carga del Corredor Bioceánico de Capricornio (Brasil–Paraguay–Argentina–Chile):
+    cada paso sellado con hash y fecha, comprobable por cualquiera con un código QR.
+    Sin GPS, sin hardware, sin integración de sistemas.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. EL PROBLEMA -->
+<div class="pagina">
+  <h2>1. El problema: cuatro países, cero historia comprobable</h2>
+
+  <p>La carga que recorre el Corredor Bioceánico de Capricornio cruza hasta
+  <strong>cuatro jurisdicciones</strong> — Brasil, Paraguay, Argentina y Chile — cada una con sus
+  propios documentos, sus propios controles y sus propias metodologías de cálculo. El resultado
+  es conocido por cualquiera que opere el corredor:</p>
+
+  <table>
+    <tr><th>Lo que pasa hoy</th><th>La consecuencia</th></tr>
+    <tr>
+      <td><strong>Cada tramo genera su propio registro</strong>, en el formato de cada país y de cada actor</td>
+      <td>La carga llega al puerto sin una historia única y comprobable de su ruta</td>
+    </tr>
+    <tr>
+      <td><strong>El papel viaja con el camión</strong> — y el papel se moja, se traspapela y se pierde</td>
+      <td>Reconstruir el viaje después es lento, caro y a veces imposible</td>
+    </tr>
+    <tr>
+      <td><strong>El GPS existe, pero es caro</strong>: equipos, planes de datos, plataformas por vehículo</td>
+      <td>Gran parte de la carga viaja hoy sin una trazabilidad transferible entre actores</td>
+    </tr>
+    <tr>
+      <td><strong>Rastrear no es lo mismo que probar</strong>: un punto en un mapa privado no le sirve al comprador</td>
+      <td>El receptor final no puede verificar nada por sí mismo — solo confiar</td>
+    </tr>
+  </table>
+
+  <div class="caja">
+    <strong>El punto ciego del corredor:</strong> aunque un transportista invierta en rastreo
+    satelital, ese dato vive en un sistema privado, no se transfiere entre actores y no le prueba
+    nada a un tercero. Lo que el generador de carga, el depósito, el terminal y el comprador
+    necesitan no es <em>saber dónde está el camión</em>: es poder <strong>comprobar, sin pedirle
+    permiso a nadie, que la ruta ocurrió como se declaró</strong> — quién tuvo la carga, cuándo,
+    en qué punto, y que ningún registro fue alterado después.
+  </div>
+
+  <p>Ese es exactamente el problema que resuelve el servicio descrito en este brochure: darle a
+  cada lote de carga una <strong>historia única, sellada y de solo-agregado — cualquier alteración queda en evidencia</strong>, que
+  acompaña a la carga desde el origen en Brasil o Paraguay hasta el puerto en Chile, y que
+  cualquiera puede verificar con un teléfono.</p>
+</div>
+
+<!-- 2. LA SOLUCIÓN -->
+<div class="pagina seccion">
+  <h2>2. La solución: cómo funciona, de punta a punta</h2>
+
+  <div class="caja-navy">
+    <h4>La solución en una frase</h4>
+    <p style="margin:2mm 0 0; text-align:left;">Cada lote de carga viaja con su
+    <strong>Pasaporte de Trazabilidad Documental</strong> y su <strong>Tarjeta de Viaje</strong>
+    (credencial virtual con QR, costo cero por unidad); cada actor autorizado sella su paso con
+    hash y fecha, la <strong>Torre de Control</strong> muestra el avance en un mapa vivo, y al
+    llegar el lote se cierra con un <strong>expediente PDF sellado</strong> que cualquiera puede
+    comprobar escaneando el QR.</p>
+  </div>
+
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>El lote nace con su pasaporte.</b>
+    El generador de carga crea el lote en la plataforma y este nace con su Pasaporte Documental y
+    su <b>propia cadena de hash</b> (SHA-256, de solo-agregado). Se emite la <b>Tarjeta de
+    Viaje</b>: una credencial <b>virtual</b> con QR, de <b>costo cero por unidad</b>, que se
+    comparte por WhatsApp o se imprime y viaja con la documentación de la carga. La página
+    /v/{serial} es la credencial viva en el teléfono del portador — muestra su propio QR, siempre
+    disponible.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>En ruta, cada actor sella su
+    paso.</b> Cada actor autorizado — transportista, depósito, frontera, puerto — escanea el QR,
+    entra con su clave y registra su paso en puntos de control conocidos del corredor. Cada paso
+    queda <b>sellado con hash y fecha del servidor</b>, y ningún paso se puede borrar ni editar.
+    <b>La ruta es la secuencia de pasos — sin GPS.</b> Quien escanea sin clave solo <b>ve</b> el
+    pasaporte público del lote: nada se escribe de forma anónima.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>La Torre de Control coordina.</b>
+    Un mapa en vivo del corredor donde el camión avanza con cada paso sellado. La torre puede
+    enviarle instrucciones operativas al chofer — ir a puerto, ir a puerto seco, o una zona de
+    estacionamiento designada — que el chofer ve al instante en su credencial. El detalle completo
+    está en la sección 3.</div></div>
+    <div class="paso"><div class="num">4</div><div class="txt"><b>Cada tramo, con la metodología de
+    su país.</b> La plataforma modela metodologías de cálculo de emisiones por país — Chile, Argentina,
+    Paraguay y Brasil — con fuente citada por tramo, y permite el <b>vínculo opcional al documento
+    MIC/DTA</b> del corredor, que sigue su curso oficial normal.</div></div>
+    <div class="paso"><div class="num">5</div><div class="txt"><b>Al llegar, el lote se cierra.</b>
+    Su hash final se <b>ancla en la cadena pública global de sicr3p</b> y se emite el
+    <b>Expediente PDF sellado</b>: la cadena completa del viaje, imprimible y archivable. El
+    respaldo físico y el registro digital se validan mutuamente — el papel lleva el QR que
+    comprueba el registro digital, y el registro digital respalda al papel.</div></div>
+  </div>
+
+  <div class="caja">
+    <strong>Puntos de control del catálogo del corredor:</strong> Campo Grande, Ponta Porã,
+    Mariscal Estigarribia, Pozo Hondo, Tartagal, Jujuy, Susques, Paso de Jama, San Pedro de
+    Atacama, Calama, puerto seco La Negra y los puertos de Antofagasta y Mejillones. Un paso
+    también puede registrarse con un punto escrito a mano (texto libre): vale igual y queda en la
+    línea de tiempo del lote.
+  </div>
+</div>
+
+<!-- 3. TORRE DE CONTROL -->
+<div class="pagina seccion">
+  <h2>3. La Torre de Control: el mapa vivo del corredor</h2>
+
+  <p>La Torre de Control muestra el <strong>mapa real del corredor</strong> (OpenStreetMap) con un
+  camión que avanza cada vez que alguien registra un paso con su clave. No hay GPS ni rastreo:
+  <strong>la posición del camión ES el último punto de control cuyo paso quedó sellado con hash
+  en la cadena del lote</strong>. La pantalla se actualiza sola.</p>
+
+  <table>
+    <tr><th>Vista</th><th>Qué muestra</th><th>Quién entra</th></tr>
+    <tr>
+      <td><strong>Torre por lote</strong></td>
+      <td>El mapa de ESE camión con su ruta, la línea de tiempo de pasos sellados y el historial
+      de instrucciones. Muestra solo lo que el lote ya divulga como público.</td>
+      <td><strong>Pública</strong>: cualquiera con el enlace o el QR</td>
+    </tr>
+    <tr>
+      <td><strong>Torre de FLOTA</strong></td>
+      <td>Todos los camiones activos de la operación en un solo mapa, cada uno con su código. Un
+      camión sin pasos aún no aparece: se dibuja cuando su chofer activa la tarjeta con el primer
+      paso.</td>
+      <td><strong>Exige credencial de operador</strong> — es el tablero de la operación completa,
+      no una página pública</td>
+    </tr>
+  </table>
+
+  <h3>3.1 La torre le habla al chofer</h3>
+  <p>El operador de torre, con su credencial, puede enviarle una instrucción al camión:
+  <strong>ir a puerto</strong>, <strong>ir a puerto seco</strong>, o <strong>designar una zona de
+  estacionamiento</strong> (por ejemplo, "Zona E-3, La Negra"). El chofer la ve <strong>al
+  instante en su credencial</strong> /v/{serial}, en el mismo teléfono con el que registra sus
+  pasos. Es coordinación operativa real — descongestionar un puerto, ordenar un patio — sin radio,
+  sin llamadas, sin otra aplicación.</p>
+
+  <div class="caja">
+    <strong>Instrucciones y cadena son cosas distintas, a propósito.</strong> Las instrucciones son
+    operativas: quedan en su propio historial de solo-agregado, pero <strong>no entran en la cadena
+    de hash</strong>. La cadena registra <em>lo que pasó</em> (los pasos sellados); la instrucción
+    dice <em>adónde ir</em>. Así el expediente final cuenta la historia real del viaje, no las
+    órdenes intermedias de la operación.
+  </div>
+
+  <p class="ref">Los puntos del catálogo tienen coordenadas referenciales: ubican el paso en el
+  mapa, no son posiciones medidas. El dispositivo que mira la torre necesita conexión a internet
+  (los mosaicos del mapa vienen de OpenStreetMap); el registro de pasos es una llamada liviana.</p>
+</div>
+
+<!-- 4. EJEMPLO ILUSTRATIVO -->
+<div class="pagina seccion">
+  <h2>4. Ejemplo ilustrativo: un lote de punta a punta</h2>
+
+  <div class="caja-alerta">
+    <strong>Ejemplo ilustrativo con datos ficticios.</strong> El lote, las fechas, los actores y
+    los hashes que siguen son inventados para mostrar la mecánica del servicio. No corresponden a
+    una operación real.
+  </div>
+
+  <p>Lote <strong>"LM-2026-000123"</strong>: 28 toneladas de carga general, origen Campo Grande
+  (Brasil), destino Puerto Antofagasta (Chile). Así se ve su bitácora:</p>
+
+  <table>
+    <tr><th>Día</th><th>Evento</th><th>Quién registra</th><th>Qué queda sellado</th></tr>
+    <tr>
+      <td><strong>1</strong></td>
+      <td>Origen: se crea el lote y se emite la Tarjeta de Viaje — <strong>Campo Grande (BR)</strong></td>
+      <td>Generador de carga</td>
+      <td>Eslabón de origen · hash <strong>a3f9…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>2</strong></td>
+      <td>Paso de ruta — <strong>Mariscal Estigarribia (PY)</strong></td>
+      <td>Chofer, con su clave</td>
+      <td>Paso sellado con fecha · hash <strong>5b2c…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td>Cruce de frontera — <strong>Pozo Hondo (PY/AR)</strong></td>
+      <td>Chofer, con su clave</td>
+      <td>Paso sellado con fecha · hash <strong>9d47…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>4</strong></td>
+      <td>Paso de ruta — <strong>Jujuy (AR)</strong></td>
+      <td>Chofer, con su clave</td>
+      <td>Paso sellado con fecha · hash <strong>e81a…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>5</strong></td>
+      <td>Cruce de frontera — <strong>Paso de Jama (AR/CL)</strong></td>
+      <td>Chofer, con su clave</td>
+      <td>Paso sellado con fecha · hash <strong>04cf…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>5</strong></td>
+      <td>La torre instruye: <strong>"puerto seco · Zona E-3, La Negra"</strong> (congestión en el
+      terminal). El chofer lo ve al instante en su credencial.</td>
+      <td>Operador de torre</td>
+      <td>Nada — instrucción operativa, <strong>no entra en la cadena</strong></td>
+    </tr>
+    <tr>
+      <td><strong>6</strong></td>
+      <td>Recepción — <strong>Puerto Antofagasta (CL)</strong></td>
+      <td>Operador del terminal, con su clave</td>
+      <td>Paso "puerto" sellado · hash <strong>6f3d…</strong></td>
+    </tr>
+    <tr>
+      <td><strong>6</strong></td>
+      <td><strong>Cierre del lote</strong> + emisión del Expediente PDF sellado</td>
+      <td>Generador de carga</td>
+      <td>Hash final <strong>b7e2…</strong> anclado en la cadena pública global de sicr3p</td>
+    </tr>
+  </table>
+
+  <div class="caja">
+    <strong>Lo que importa:</strong> desde ese momento, <strong>cualquiera con el QR — el comprador, el
+    banco, un tercero — comprueba la historia completa del viaje en línea</strong>: seis días,
+    cuatro países, cada paso con su hash y su fecha, sin pedir permiso y sin crear cuenta. Y si
+    alguien intentara alterar un registro histórico, la cadena completa dejaría de cuadrar, a la
+    vista de todos.
+  </div>
+</div>
+
+<!-- 5 y 6. ROLES Y REQUISITOS -->
+<div class="pagina seccion">
+  <h2>5. Quién es quién en el viaje</h2>
+
+  <table>
+    <tr><th>Actor</th><th>Qué hace</th><th>Con qué</th></tr>
+    <tr>
+      <td><strong>Generador de carga</strong></td>
+      <td>Crea el lote, emite la Tarjeta de Viaje y cierra el lote al final del viaje</td>
+      <td>Su cuenta en la plataforma</td>
+    </tr>
+    <tr>
+      <td><strong>Portador / chofer</strong></td>
+      <td>Registra los pasos de ruta y de frontera con su clave. No necesita RUT: <strong>su
+      identidad es la clave de la tarjeta</strong>, y cada paso queda ligado al serial de la
+      credencial</td>
+      <td>La credencial /v/{serial} en su teléfono y su clave (entregada por separado, nunca
+      impresa en la credencial)</td>
+    </tr>
+    <tr>
+      <td><strong>Depósito, frontera, puerto</strong></td>
+      <td>Actores con clave propia: sellan la recepción, el tránsito o el embarque de la carga en
+      su punto</td>
+      <td>Un teléfono o tablet y su clave de actor autorizado</td>
+    </tr>
+    <tr>
+      <td><strong>Operador de torre</strong></td>
+      <td>Mira la flota completa en el mapa y envía instrucciones operativas a los camiones
+      (puerto, puerto seco, zona de estacionamiento)</td>
+      <td>Su credencial de operador de terminal</td>
+    </tr>
+    <tr>
+      <td><strong>Receptor / comprador</strong></td>
+      <td>Verifica la historia completa del lote escaneando el QR — sin cuenta, sin permiso, sin
+      hablar con nadie</td>
+      <td>Cualquier teléfono con cámara</td>
+    </tr>
+  </table>
+
+  <h2 style="margin-top:8mm;">6. Qué necesita cada actor</h2>
+
+  <div class="caja-navy">
+    <h4>Un teléfono con cámara e internet. Eso es todo.</h4>
+    <p style="margin:2mm 0 0; text-align:left;"><strong>Sin GPS. Sin lectores. Sin RFID. Sin
+    integración de sistemas.</strong> La Tarjeta de Viaje es virtual y cuesta cero por unidad; se
+    comparte por WhatsApp o se imprime en cualquier impresora. Registrar un paso está diseñado para tomar menos de un
+    minuto desde el teléfono. La verificación es una página web pública.</p>
+  </div>
+
+  <p class="ref">Para quien lo exija más adelante, existen como opción futura documentada el chip
+  NFC físico y los pases nativos Apple Wallet / Google Wallet — apuntan a la misma credencial y no
+  cambian el modelo.</p>
+</div>
+
+<!-- 7 y 8. DATOS Y CÓMO EMPEZAR -->
+<div class="pagina seccion">
+  <h2>7. Divulgación selectiva y manejo de datos</h2>
+
+  <p>La trazabilidad pública no significa exponer el negocio. El modelo de datos del pasaporte es
+  de <strong>divulgación selectiva</strong>:</p>
+
+  <table>
+    <tr><th>Dato</th><th>Quién decide / quién lo ve</th></tr>
+    <tr>
+      <td><strong>Cada eslabón de la cadena</strong></td>
+      <td>Su dueño elige el nivel: <strong>público</strong> (cualquiera lo ve), <strong>cadena</strong>
+      (solo los actores del lote) o <strong>privado</strong> (solo su autor)</td>
+    </tr>
+    <tr>
+      <td><strong>Los hashes</strong></td>
+      <td><strong>Siempre públicos</strong> — son la prueba de integridad y no revelan contenido</td>
+    </tr>
+    <tr>
+      <td><strong>RUT y datos de identidad</strong></td>
+      <td>Enmascarados en toda vista pública</td>
+    </tr>
+    <tr>
+      <td><strong>Vista de flota</strong></td>
+      <td>Exige credencial de operador — el tablero de la operación nunca es público</td>
+    </tr>
+    <tr>
+      <td><strong>Lecturas del QR sin clave</strong></td>
+      <td>Solo ven lo ya divulgado como público; <strong>nada se escribe de forma anónima</strong></td>
+    </tr>
+  </table>
+
+  <h2 style="margin-top:8mm;">8. Cómo empezar: piloto fundador</h2>
+
+  <p>Lo que proponemos para partir es deliberadamente simple: <strong>un piloto con 1 lote real,
+  de punta a punta, acompañado por sicr3p</strong> — desde la creación del lote y la emisión de la
+  Tarjeta de Viaje hasta el cierre y el expediente sellado en el puerto. <strong>Sin costo de
+  licencias</strong> durante el piloto: cada parte pone sus horas y sus documentos de siempre.
+  sicr3p capacita a los actores (30 minutos por rol), emite las credenciales y acompaña el viaje
+  completo. Después del piloto, las tarifas por trámite/lote se conversan con los datos reales en
+  la mano — no antes.</p>
+
+  <div class="caja-navy">
+    <h4>Siguiente paso</h4>
+    <p style="margin:2mm 0 0; text-align:left;">Una reunión de 30 minutos con demostración en
+    vivo: creación de un lote, registro de un paso con QR, el camión avanzando en la Torre de
+    Control y la verificación pública del expediente. Escríbanos a
+    <strong>contacto@sicr3p.cl</strong> indicando su rol en el corredor — generador de carga,
+    transportista, depósito o terminal portuario — y coordinamos a la brevedad.</p>
+  </div>
+</div>
+
+<!-- 9. LO QUE NO ES -->
+<div class="pagina seccion">
+  <h2>9. Lo que NO es (honestidad por diseño)</h2>
+
+  <ul>
+    <li><strong>No es rastreo GPS ni geolocalización de personas.</strong> Nadie es seguido: la
+    posición en el mapa es el último punto de control cuyo paso fue declarado y sellado por un
+    actor autorizado. La ruta es la secuencia de pasos, no una señal satelital.</li>
+    <li><strong>No es una autoridad ni un trámite aduanero.</strong> sicr3p no realiza trámites
+    ante ningún servicio nacional de aduanas ni sustituye documento oficial alguno. El MIC/DTA del
+    corredor sigue su curso oficial normal — el pasaporte lo <em>complementa</em> con una capa de
+    trazabilidad verificable, incluyendo el vínculo opcional a ese documento.</li>
+    <li><strong>No es una certificación acreditada.</strong> sicr3p no es certificador, auditor ni
+    verificador de tercera parte acreditado, y lo declara impreso en cada pasaporte y expediente.
+    Registra y estructura declaraciones y documentos verificables de los actores de la cadena; el
+    valor está en la verificabilidad pública, no en un título que no tenemos.</li>
+  </ul>
+
+  <div class="caja">
+    <strong>Lo que sí es:</strong> la historia única, sellada y verificable por cualquiera de un lote de
+    carga que cruzó el continente — comprobable por cualquiera, con un teléfono, en segundos.
+  </div>
+
+  <p class="pie-doc">sicr3p — Brochure de servicio · Corredor Bioceánico de Capricornio ·
+  Versión 1.0 · Julio 2026 · contacto@sicr3p.cl · sicr3p SpA · Antofagasta, Chile.<br>
+  Documento de carácter informativo. sicr3p no es certificador, auditor, verificador acreditado ni
+  autoridad, y no realiza trámites aduaneros; registra y estructura declaraciones y documentos
+  verificables de sus usuarios. La integridad de los registros la respalda la cadena de hash
+  pública de sicr3p (SHA-256, de solo-agregado), verificable por cualquiera. Los ejemplos
+  numéricos de este documento son ilustrativos, con datos ficticios.</p>
+</div>
+
+</body>
+</html>
