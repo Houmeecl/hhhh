@@ -343,11 +343,12 @@ test('resumenNormativo: OECD minerales SOLO para tipo mineral', () => {
 
 // ---------- Torre de control (migración 024) ----------
 
-test('destinoTorreValido acepta solo puerto_seco y puerto', async () => {
+test('destinoTorreValido acepta solo puerto_seco, puerto y estacionamiento', async () => {
   const { destinoTorreValido, DESTINOS_TORRE } = await import('../src/services/pasaporteOrigen.js');
-  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto']);
+  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento']);
   assert.equal(destinoTorreValido('puerto_seco'), true);
   assert.equal(destinoTorreValido('puerto'), true);
+  assert.equal(destinoTorreValido('estacionamiento'), true);
   assert.equal(destinoTorreValido('aeropuerto'), false);
   assert.equal(destinoTorreValido(''), false);
   assert.equal(destinoTorreValido(undefined), false);
@@ -378,4 +379,22 @@ test('paso de transporte chileno SIN RUT pasa (la tarjeta es la identidad); otro
   // (12345678-9 tiene DV malo; el DV correcto de ese cuerpo es 5).
   const rutMalo = validarEslabon({ ...base, rol: 'transporte', rut_empresa: '12345678-9' }, lote, []);
   assert.equal(rutMalo.ok, false);
+});
+
+test('validarMensajeTorre: estacionamiento exige zona; puerto/puerto_seco no; sanea largos', async () => {
+  const { validarMensajeTorre, DESTINOS_TORRE } = await import('../src/services/pasaporteOrigen.js');
+  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento']);
+  assert.equal(validarMensajeTorre({ destino: 'puerto' }).ok, true);
+  assert.equal(validarMensajeTorre({ destino: 'puerto_seco' }).ok, true);
+  assert.equal(validarMensajeTorre({ destino: 'aeropuerto' }).ok, false);
+  // estacionamiento sin zona → rechazado
+  assert.equal(validarMensajeTorre({ destino: 'estacionamiento' }).ok, false);
+  assert.equal(validarMensajeTorre({ destino: 'estacionamiento', zona: '   ' }).ok, false);
+  const ok = validarMensajeTorre({ destino: 'estacionamiento', zona: '  Zona E-3, La Negra  ', nota: 'esperar turno' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.zona, 'Zona E-3, La Negra');
+  assert.equal(ok.nota, 'esperar turno');
+  // zona se recorta a 60 y solo aplica a estacionamiento
+  assert.equal(validarMensajeTorre({ destino: 'estacionamiento', zona: 'z'.repeat(100) }).zona.length, 60);
+  assert.equal(validarMensajeTorre({ destino: 'puerto', zona: 'Zona X' }).zona, null);
 });

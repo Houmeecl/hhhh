@@ -4,7 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import { PUNTOS_CORREDOR, etiquetaInstruccion } from '../lib/corredor.js';
 
 // Tarjeta de Viaje: la URL grabada en el NDEF de la tarjeta NFC/RFID
 // que acompaña a la carga es /v/{serial}. Cualquiera que la lea llega
@@ -93,7 +93,7 @@ export default function TarjetaViaje() {
                 <span className="torre-banner-icono">📢</span>
                 <div>
                   <div className="torre-banner-titulo">
-                    {t('tv.instr_torre')}: {info.instruccion.destino === 'puerto_seco' ? t('torre.puerto_seco') : t('torre.puerto')}
+                    {t('tv.instr_torre')}: {etiquetaInstruccion(info.instruccion, t)}
                   </div>
                   <div className="muted" style={{ fontSize: 11 }}>
                     {info.instruccion.nota ? `${info.instruccion.nota} · ` : ''}

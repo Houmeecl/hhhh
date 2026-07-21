@@ -1092,7 +1092,7 @@ router.get('/v/:serial', async (req, res, next) => {
     // Instrucción vigente de la torre de control (migración 024): la ve
     // quien porta la credencial, sin clave — leerla no escribe nada.
     const { rows: mRows } = await query(
-      `SELECT m.destino, m.nota, m.emisor, m.creado
+      `SELECT m.destino, m.zona, m.nota, m.emisor, m.creado
        FROM torre_mensajes m
        JOIN tarjetas_viaje t ON t.lote_id = m.lote_id
        WHERE t.serial = $1
@@ -1131,7 +1131,7 @@ router.get('/lote/:codigo/mensajes', async (req, res, next) => {
     );
     if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
     const { rows } = await query(
-      `SELECT destino, nota, emisor, creado FROM torre_mensajes
+      `SELECT destino, zona, nota, emisor, creado FROM torre_mensajes
        WHERE lote_id = $1 ORDER BY creado DESC LIMIT 10`,
       [lRows[0].id]
     );

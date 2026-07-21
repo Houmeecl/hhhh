@@ -748,3 +748,55 @@ table.data tr:hover td { background: #f3f8f5; }
   .torre-layout { grid-template-columns: 1fr; }
   .torre-mapa { height: 48vh; min-height: 300px; }
 }
+
+/* Selector de destino del operador (puerto / puerto seco / estacionamiento). */
+.torre-dest { display: flex; gap: 6px; flex-wrap: wrap; }
+.torre-dest-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1.5px solid var(--borde, #d1d5db);
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+.torre-dest-btn.activo {
+  border-color: #28a745;
+  background: #eaf6ef;
+  color: #218838;
+}
+
+/* Marcador de camión en la vista de flota: emoji + etiqueta con el código. */
+.torre-camion-flota {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.torre-camion-flota .torre-camion-emoji {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  line-height: 38px;
+  text-align: center;
+  font-size: 26px;
+  background: #fff;
+  border: 2px solid #28a745;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(15, 31, 46, 0.3);
+}
+.torre-camion-flota .torre-camion-tag {
+  font-size: 10px;
+  font-weight: 800;
+  font-family: monospace;
+  background: #0f1f2e;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 31, 46, 0.25);
+}

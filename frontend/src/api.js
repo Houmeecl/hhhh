@@ -75,6 +75,12 @@ export const api = {
   // --- Torre de control (mapa público + operador con credencial pos) ---
   loteMensajes: (codigo) => request(`/lote/${codigo}/mensajes`),
   posAuth: (b) => request('/pos/auth', { method: 'POST', body: b }),
+  torreFlota: async (token) => {
+    const res = await fetch('/api/torre/flota', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al cargar la flota');
+    return data;
+  },
   torreMensaje: async (token, b) => {
     const res = await fetch('/api/torre/mensaje', {
       method: 'POST',

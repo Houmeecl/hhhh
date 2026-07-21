@@ -351,14 +351,34 @@ export function hashAnclajeLote({ codigo, ultimo_hash, n_eslabones }) {
   return sha256(canonico);
 }
 
-// ---------- Torre de control (migración 024) ----------
+// ---------- Torre de control (migraciones 024/025) ----------
 // Instrucciones operativas de la torre al portador: dirigirse al puerto
-// seco (interior) o al puerto (terminal marítimo). NO son eslabones:
-// no entran en la cadena de hash del lote.
-export const DESTINOS_TORRE = ['puerto_seco', 'puerto'];
+// seco (interior), al puerto (terminal marítimo) o a una ZONA DE
+// ESTACIONAMIENTO designada (ej. "Zona E-3, La Negra"). NO son
+// eslabones: no entran en la cadena de hash del lote.
+export const DESTINOS_TORRE = ['puerto_seco', 'puerto', 'estacionamiento'];
 
 export function destinoTorreValido(d) {
   return DESTINOS_TORRE.includes(d);
+}
+
+// Valida el mensaje completo de la torre: destino del catálogo y, si es
+// estacionamiento, zona obligatoria (¿a cuál mando al chofer si no?).
+// Devuelve la zona/nota ya saneadas para insertar.
+export function validarMensajeTorre({ destino, zona, nota } = {}) {
+  if (!destinoTorreValido(destino)) {
+    return { ok: false, error: `Destino inválido. Uno de: ${DESTINOS_TORRE.join(', ')}.` };
+  }
+  const zonaLimpia = String(zona || '').trim().slice(0, 60) || null;
+  if (destino === 'estacionamiento' && !zonaLimpia) {
+    return { ok: false, error: 'Para estacionamiento debes indicar la zona (ej: "Zona E-3, La Negra").' };
+  }
+  return {
+    ok: true,
+    destino,
+    zona: destino === 'estacionamiento' ? zonaLimpia : null,
+    nota: String(nota || '').trim().slice(0, 200) || null,
+  };
 }
 
 // Sanea el identificador de punto de control declarado por el portador

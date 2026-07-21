@@ -6,7 +6,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR, DESTINO_A_PUNTO, puntoDe } from '../lib/corredor.js';
+import { PUNTOS_CORREDOR, DESTINO_A_PUNTO, puntoDe, etiquetaInstruccion } from '../lib/corredor.js';
 
 // ============================================================
 // Torre de Control — /torre/:codigo
@@ -176,7 +176,7 @@ export default function Torre() {
               <div className="torre-banner">
                 <span className="torre-banner-icono">📢</span>
                 <div>
-                  <div className="torre-banner-titulo">{t('torre.vigente')}: {vigente.destino === 'puerto_seco' ? t('torre.puerto_seco') : t('torre.puerto')}</div>
+                  <div className="torre-banner-titulo">{t('torre.vigente')}: {etiquetaInstruccion(vigente, t)}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
                     {vigente.nota ? `${vigente.nota} · ` : ''}{vigente.emisor} · {new Date(vigente.creado).toLocaleString('es-CL')}
                   </div>
@@ -200,8 +200,8 @@ export default function Torre() {
                   {!mensajes.length && <p className="muted" style={{ fontSize: 13 }}>{t('torre.sin_mensajes')}</p>}
                   {mensajes.map((m, i) => (
                     <div key={i} className="torre-msg">
-                      <span className={`badge ${m.destino === 'puerto_seco' ? 'badge-gray' : 'badge-green'}`}>
-                        {m.destino === 'puerto_seco' ? t('torre.puerto_seco') : t('torre.puerto')}
+                      <span className={`badge ${m.destino === 'puerto' ? 'badge-green' : 'badge-gray'}`}>
+                        {etiquetaInstruccion(m, t)}
                       </span>
                       <div style={{ minWidth: 0 }}>
                         {m.nota && <div style={{ fontSize: 13 }}>{m.nota}</div>}
@@ -249,6 +249,8 @@ function Operador({ codigo, t, onEnviado }) {
   const [nombre, setNombre] = useState('');
   const [serial, setSerial] = useState('');
   const [clave, setClave] = useState('');
+  const [destino, setDestino] = useState('puerto');
+  const [zona, setZona] = useState('');
   const [nota, setNota] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -266,11 +268,18 @@ function Operador({ codigo, t, onEnviado }) {
     finally { setOcupado(false); }
   }
 
-  async function enviar(destino) {
+  async function enviar() {
+    if (destino === 'estacionamiento' && !zona.trim()) { flash(t('torre.falta_zona'), true); return; }
     setOcupado(true);
     try {
-      await api.torreMensaje(token, { codigo_lote: codigo, destino, nota: nota.trim() || undefined });
+      await api.torreMensaje(token, {
+        codigo_lote: codigo,
+        destino,
+        zona: destino === 'estacionamiento' ? zona.trim() : undefined,
+        nota: nota.trim() || undefined,
+      });
       setNota('');
+      setZona('');
       flash(`✓ ${t('torre.enviado')}`);
       onEnviado();
     } catch (e) {
@@ -278,6 +287,12 @@ function Operador({ codigo, t, onEnviado }) {
       if (/token|sesión|autoriza/i.test(e.message)) setToken(null);
     } finally { setOcupado(false); }
   }
+
+  const DESTINOS = [
+    { valor: 'puerto', etiqueta: t('torre.puerto') },
+    { valor: 'puerto_seco', etiqueta: t('torre.puerto_seco') },
+    { valor: 'estacionamiento', etiqueta: t('torre.estacionamiento') },
+  ];
 
   return (
     <div className="card card-pad">
@@ -303,18 +318,31 @@ function Operador({ codigo, t, onEnviado }) {
         <>
           <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>✓ {t('torre.conectado')}: {nombre}</p>
           <div className="field">
+            <label>{t('torre.destino')}</label>
+            <div className="torre-dest">
+              {DESTINOS.map((d) => (
+                <button key={d.valor} type="button"
+                  className={`torre-dest-btn ${destino === d.valor ? 'activo' : ''}`}
+                  onClick={() => setDestino(d.valor)}>
+                  {d.etiqueta}
+                </button>
+              ))}
+            </div>
+          </div>
+          {destino === 'estacionamiento' && (
+            <div className="field">
+              <label>{t('torre.zona')}</label>
+              <input value={zona} maxLength={60} placeholder={t('torre.zona_ej')} onChange={(e) => setZona(e.target.value)} />
+            </div>
+          )}
+          <div className="field">
             <label>{t('torre.nota')}</label>
             <input value={nota} maxLength={200} onChange={(e) => setNota(e.target.value)} />
           </div>
           {msg && <div className={`badge ${msg.error ? 'badge-red' : 'badge-green'}`} style={{ marginBottom: 8 }}>{msg.texto}</div>}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <button className="btn btn-outline" onClick={() => enviar('puerto_seco')} disabled={ocupado}>
-              {t('torre.enviar_ps')}
-            </button>
-            <button className="btn btn-primary" onClick={() => enviar('puerto')} disabled={ocupado}>
-              {t('torre.enviar_p')}
-            </button>
-          </div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={enviar} disabled={ocupado}>
+            {ocupado ? <span className="spinner" /> : t('torre.enviar')}
+          </button>
         </>
       )}
     </div>

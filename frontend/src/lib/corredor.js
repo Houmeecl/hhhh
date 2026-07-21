@@ -31,10 +31,26 @@ export const PUNTOS_CORREDOR = [
 ];
 
 // Destino de una instrucción de la torre → punto del catálogo.
+// 'estacionamiento' no tiene punto fijo: la zona la designa la torre
+// como texto (ej. "Zona E-3, La Negra") y no se dibuja línea.
 export const DESTINO_A_PUNTO = {
   puerto_seco: 'puerto-seco',
   puerto: 'puerto-antofagasta',
 };
+
+// Clave i18n de la etiqueta de un destino de torre.
+export const CLAVE_DESTINO = {
+  puerto_seco: 'torre.puerto_seco',
+  puerto: 'torre.puerto',
+  estacionamiento: 'torre.estacionamiento',
+};
+
+// Etiqueta completa de una instrucción: "PUERTO SECO" / "ESTACIONAMIENTO · Zona E-3".
+export function etiquetaInstruccion(m, t) {
+  if (!m) return '';
+  const base = t(CLAVE_DESTINO[m.destino] || m.destino);
+  return m.zona ? `${base} · ${m.zona}` : base;
+}
 
 const porId = new Map(PUNTOS_CORREDOR.map((p) => [p.id, p]));
 

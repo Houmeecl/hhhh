@@ -25,8 +25,7 @@ import {
   generarSerialTarjeta,
   hashAnclajeLote,
   hashCadena,
-  DESTINOS_TORRE,
-  destinoTorreValido,
+  validarMensajeTorre,
   sanearPuntoId,
 } from '../services/pasaporteOrigen.js';
 
@@ -507,67 +506,117 @@ router.get('/catalogo', (req, res) => {
 });
 
 // ---------- POST /demo-torre — arma la demo de la torre de control ----------
-// Crea en una transacción todo lo que la demo necesita: un lote
-// documental del Corredor con su eslabón de origen (Campo Grande), la
-// tarjeta de viaje del camión y un terminal "torre" (rol pos) que envía
-// las instrucciones. Las DOS claves viajan SOLO en esta respuesta
-// (patrón POS/mandantes). Guion de uso: docs/TORRE-DE-CONTROL.md.
+// Crea en una transacción TODO lo que la demo necesita: TRES lotes
+// documentales del Corredor, cada uno con su tarjeta de viaje (camión) —
+// los camiones 1 y 2 nacen EN MOVIMIENTO (pasos ya sellados en puntos
+// distintos del corredor) y el camión 3 nace sin ruta: aparece en el
+// mapa recién cuando su chofer ACTIVA la tarjeta con el primer paso —
+// más un terminal "torre" (rol pos) que comanda a los tres. Las claves
+// viajan SOLO en esta respuesta (patrón POS/mandantes). Guion de uso:
+// docs/TORRE-DE-CONTROL.md.
+const CAMIONES_DEMO = [
+  {
+    portador: 'Camión demo 1',
+    origen: { punto_control: 'Campo Grande', punto_id: 'campo-grande', pais: 'BR' },
+    pasos: [{ punto_control: 'Mariscal Estigarribia', punto_id: 'mariscal-estigarribia', pais: 'PY' }],
+  },
+  {
+    portador: 'Camión demo 2',
+    origen: { punto_control: 'Campo Grande', punto_id: 'campo-grande', pais: 'BR' },
+    pasos: [
+      { punto_control: 'San Salvador de Jujuy', punto_id: 'jujuy', pais: 'AR' },
+      { punto_control: 'Susques', punto_id: 'susques', pais: 'AR' },
+    ],
+  },
+  {
+    portador: 'Camión demo 3',
+    // Sin punto_id: no se dibuja en el mapa hasta su primer paso real.
+    origen: { punto_control: 'Bodega del generador (aún sin ruta)', punto_id: null, pais: 'BR' },
+    pasos: [],
+  },
+];
+
 router.post('/demo-torre', adminOnly, async (req, res, next) => {
   try {
-    const claveTarjeta = generarClave();
     const claveTorre = generarClave();
-    const [hashTarjeta, hashTorre] = await Promise.all([
-      bcrypt.hash(claveTarjeta, 10),
-      bcrypt.hash(claveTorre, 10),
-    ]);
+    const clavesTarjeta = CAMIONES_DEMO.map(() => generarClave());
+    const hashTorre = await bcrypt.hash(claveTorre, 10);
+    const hashesTarjeta = await Promise.all(clavesTarjeta.map((c) => bcrypt.hash(c, 10)));
 
     const resultado = await withTx(async (client) => {
       const anio = new Date().getFullYear();
-      const { rows: cRows } = await client.query(
-        `SELECT count(*)::int + 1 AS n FROM lotes_minerales WHERE codigo LIKE $1`,
-        [`LM-${anio}-%`]
-      );
-      const codigo = generarCodigoLote(anio, cRows[0].n);
-      const { rows: lRows } = await client.query(
-        `INSERT INTO lotes_minerales
-           (codigo, tipo, material, descripcion, cantidad, unidad, pais_origen, faena_origen, creado_por)
-         VALUES ($1,'documental','carga_general',$2,$3,'t','BR',$4,$5)
-         RETURNING *`,
-        [codigo, 'Carga demo del Corredor Bioceánico — torre de control', 28, 'Campo Grande, MS (demo)', req.user.sub]
-      );
+      const hoy = new Date().toISOString().slice(0, 10);
+      const camiones = [];
 
-      // Lock de la fila recién creada (mismo protocolo que todo append).
-      const { rows: lockRows } = await client.query(
-        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [lRows[0].id]
-      );
-      const lote = lockRows[0];
-      const r = await anexarEslabonTx(client, lote, {
-        rol: 'origen',
-        pais: 'BR',
-        fecha: new Date().toISOString().slice(0, 10),
-        nombre_empresa: 'Generador de carga (demo)',
-        cantidad: 28,
-        co2e_aportado: 0,
-        visibilidad: 'publico',
-        datos: { punto_control: 'Campo Grande', punto_id: 'campo-grande' },
-      });
-      if (r.status !== 201) return { status: r.status, body: r.body };
+      for (let i = 0; i < CAMIONES_DEMO.length; i++) {
+        const c = CAMIONES_DEMO[i];
+        const { rows: cRows } = await client.query(
+          `SELECT count(*)::int + 1 AS n FROM lotes_minerales WHERE codigo LIKE $1`,
+          [`LM-${anio}-%`]
+        );
+        const codigo = generarCodigoLote(anio, cRows[0].n);
+        const { rows: lRows } = await client.query(
+          `INSERT INTO lotes_minerales
+             (codigo, tipo, material, descripcion, cantidad, unidad, pais_origen, faena_origen, creado_por)
+           VALUES ($1,'documental','carga_general',$2,$3,'t','BR',$4,$5)
+           RETURNING *`,
+          [codigo, `Carga demo del Corredor Bioceánico — ${c.portador}`, 28, 'Campo Grande, MS (demo)', req.user.sub]
+        );
 
-      // Tarjeta del camión (serial TV-XXXX; colisión → reintento).
-      let tarjeta = null;
-      for (let intento = 0; intento < 5 && !tarjeta; intento++) {
-        try {
-          const { rows } = await client.query(
-            `INSERT INTO tarjetas_viaje (serial, lote_id, portador, clave_hash)
-             VALUES ($1,$2,$3,$4) RETURNING id, serial, portador, activo`,
-            [generarSerialTarjeta(), lote.id, 'Camión demo', hashTarjeta]
-          );
-          tarjeta = rows[0];
-        } catch (e) {
-          if (e.code !== '23505') throw e;
+        // Lock de la fila recién creada (mismo protocolo que todo append)
+        // y eslabones iniciales: origen + pasos "en movimiento".
+        let { rows: lockRows } = await client.query(
+          `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [lRows[0].id]
+        );
+        let lote = lockRows[0];
+        const eslabones = [
+          { rol: 'origen', nombre_empresa: 'Generador de carga (demo)', cantidad: 28, ...c.origen },
+          ...c.pasos.map((p) => ({ rol: 'transporte', nombre_empresa: c.portador, ...p })),
+        ];
+        for (const e of eslabones) {
+          const r = await anexarEslabonTx(client, lote, {
+            rol: e.rol,
+            pais: e.pais,
+            fecha: hoy,
+            nombre_empresa: e.nombre_empresa,
+            cantidad: e.cantidad,
+            co2e_aportado: 0,
+            visibilidad: 'publico',
+            datos: {
+              punto_control: e.punto_control,
+              ...(e.punto_id ? { punto_id: e.punto_id } : {}),
+            },
+          });
+          if (r.status !== 201) return { status: r.status, body: r.body };
+          // Releer el lote: anexarEslabonTx actualizó ultimo_hash/n_eslabones.
+          ({ rows: lockRows } = await client.query(
+            `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [lote.id]
+          ));
+          lote = lockRows[0];
         }
+
+        // Tarjeta del camión (serial TV-XXXX; colisión → reintento).
+        let tarjeta = null;
+        for (let intento = 0; intento < 5 && !tarjeta; intento++) {
+          try {
+            const { rows } = await client.query(
+              `INSERT INTO tarjetas_viaje (serial, lote_id, portador, clave_hash)
+               VALUES ($1,$2,$3,$4) RETURNING id, serial, portador, activo`,
+              [generarSerialTarjeta(), lote.id, c.portador, hashesTarjeta[i]]
+            );
+            tarjeta = rows[0];
+          } catch (e) {
+            if (e.code !== '23505') throw e;
+          }
+        }
+        if (!tarjeta) return { status: 500, body: { error: 'No se pudo generar un serial único de tarjeta.' } };
+
+        camiones.push({
+          lote: { id: lote.id, codigo: lote.codigo, en_movimiento: c.pasos.length > 0 },
+          tarjeta: { id: tarjeta.id, serial: tarjeta.serial, portador: tarjeta.portador, clave: clavesTarjeta[i] },
+          urls: { credencial: `/v/${tarjeta.serial}`, torre: `/torre/${lote.codigo}` },
+        });
       }
-      if (!tarjeta) return { status: 500, body: { error: 'No se pudo generar un serial único de tarjeta.' } };
 
       // Terminal torre (rol pos): misma tabla y login que Aduana Verde.
       let torre = null;
@@ -576,7 +625,7 @@ router.post('/demo-torre', adminOnly, async (req, res, next) => {
           const { rows } = await client.query(
             `INSERT INTO pos_terminales (nombre, ubicacion, serial, clave_hash)
              VALUES ($1,$2,$3,$4) RETURNING id, nombre, serial, activo`,
-            [`Torre demo ${codigo}`, 'Torre de control (demo)', generarSerial(), hashTorre]
+            [`Torre demo ${camiones[0].lote.codigo}`, 'Torre de control (demo)', generarSerial(), hashTorre]
           );
           torre = rows[0];
         } catch (e) {
@@ -588,10 +637,9 @@ router.post('/demo-torre', adminOnly, async (req, res, next) => {
       return {
         status: 201,
         body: {
-          lote: { id: lote.id, codigo: lote.codigo, tipo: 'documental', material: lote.material },
-          tarjeta: { id: tarjeta.id, serial: tarjeta.serial, portador: tarjeta.portador, clave: claveTarjeta },
+          camiones,
           torre: { id: torre.id, serial: torre.serial, nombre: torre.nombre, clave: claveTorre },
-          urls: { torre: `/torre/${lote.codigo}`, credencial: `/v/${tarjeta.serial}` },
+          urls: { flota: '/torre' },
         },
       };
     });
@@ -599,8 +647,11 @@ router.post('/demo-torre', adminOnly, async (req, res, next) => {
     if (resultado.status === 201) {
       await logActividad({
         usuarioId: req.user.sub, accion: 'crear_demo_torre', entidad: 'lote_mineral',
-        entidadId: resultado.body.lote.id,
-        detalle: { codigo: resultado.body.lote.codigo, tarjeta: resultado.body.tarjeta.serial, torre: resultado.body.torre.serial },
+        entidadId: resultado.body.camiones[0].lote.id,
+        detalle: {
+          lotes: resultado.body.camiones.map((x) => x.lote.codigo),
+          torre: resultado.body.torre.serial,
+        },
         ip: req.ip,
       });
     }
@@ -709,13 +760,14 @@ tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res
 // ============================================================
 export const torreRouter = express.Router();
 
-// POST /api/torre/mensaje — instrucción de la torre para un lote.
+// POST /api/torre/mensaje — instrucción de la torre para un lote:
+// puerto_seco | puerto | estacionamiento (con zona obligatoria).
 torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
     const b = req.body || {};
-    if (!destinoTorreValido(b.destino)) {
-      return res.status(400).json({ error: `Destino inválido. Uno de: ${DESTINOS_TORRE.join(', ')}.` });
-    }
+    const val = validarMensajeTorre(b);
+    if (!val.ok) return res.status(400).json({ error: val.error });
+
     const codigo = String(b.codigo_lote || '').trim().toUpperCase();
     const { rows: lRows } = await query(
       `SELECT id, codigo FROM lotes_minerales WHERE codigo = $1`, [codigo]
@@ -726,18 +778,52 @@ torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, n
       `SELECT nombre FROM pos_terminales WHERE id = $1`, [req.user.sub]
     );
     const emisor = tRows[0]?.nombre || 'torre';
-    const nota = String(b.nota || '').slice(0, 200) || null;
 
     const { rows } = await query(
-      `INSERT INTO torre_mensajes (lote_id, destino, nota, emisor)
-       VALUES ($1,$2,$3,$4) RETURNING id, destino, nota, emisor, creado`,
-      [lRows[0].id, b.destino, nota, emisor]
+      `INSERT INTO torre_mensajes (lote_id, destino, zona, nota, emisor)
+       VALUES ($1,$2,$3,$4,$5) RETURNING id, destino, zona, nota, emisor, creado`,
+      [lRows[0].id, val.destino, val.zona, val.nota, emisor]
     );
     await logActividad({
       accion: 'torre_mensaje', entidad: 'torre_mensaje', entidadId: rows[0].id,
-      detalle: { lote: lRows[0].codigo, destino: b.destino }, ip: req.ip,
+      detalle: { lote: lRows[0].codigo, destino: val.destino, zona: val.zona }, ip: req.ip,
     });
     res.status(201).json({ mensaje: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// GET /api/torre/flota — TODOS los camiones activos en un solo mapa.
+// Solo para operadores autenticados (rol pos): la vista de flota lista
+// la operación completa, no es para el público (el pasaporte de cada
+// lote sigue siendo público por su propio código, como siempre).
+// Un lote "aparece en el mapa" recién cuando tiene un paso con punto
+// reconocible — un camión nuevo se ve al ACTIVARSE con su primer paso.
+torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT l.codigo, l.tipo, l.material, l.estado, l.n_eslabones, l.updated_at,
+              (SELECT json_build_object(
+                 'punto_id', e.datos->>'punto_id',
+                 'punto_control', e.datos->>'punto_control',
+                 'fecha', e.fecha, 'pais', e.pais)
+               FROM lote_eslabones e
+               WHERE e.lote_id = l.id
+                 AND (e.datos ? 'punto_id' OR e.datos ? 'punto_control')
+               ORDER BY e.eslabon DESC LIMIT 1) AS ultimo_paso,
+              (SELECT json_build_object(
+                 'destino', m.destino, 'zona', m.zona, 'nota', m.nota, 'creado', m.creado)
+               FROM torre_mensajes m
+               WHERE m.lote_id = l.id ORDER BY m.creado DESC LIMIT 1) AS instruccion,
+              (SELECT json_agg(json_build_object('serial', t.serial, 'portador', t.portador))
+               FROM tarjetas_viaje t
+               WHERE t.lote_id = l.id AND t.activo) AS tarjetas
+       FROM lotes_minerales l
+       WHERE l.estado = 'abierto'
+         AND EXISTS (SELECT 1 FROM tarjetas_viaje t WHERE t.lote_id = l.id AND t.activo)
+       ORDER BY l.updated_at DESC
+       LIMIT 100`
+    );
+    res.json({ flota: rows });
   } catch (err) { next(err); }
 });
 

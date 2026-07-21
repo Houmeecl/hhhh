@@ -24,6 +24,7 @@ const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
 const PosTerminal = lazy(() => import('./pages/PosTerminal.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
+const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
 
 const CargandoModulo = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/pasaporte/:id" element={<Pasaporte />} />
       <Route path="/lote/:codigo" element={<PasaporteLote />} />
       <Route path="/v/:serial" element={<TarjetaViaje />} />
+      <Route path="/torre" element={<TorreFlota />} />
       <Route path="/torre/:codigo" element={<Torre />} />
       <Route path="/ingresar" element={<Ingresar />} />
       <Route path="/prueba" element={<Prueba />} />
