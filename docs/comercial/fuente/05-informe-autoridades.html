@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Informe institucional para autoridades</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">INFORME INSTITUCIONAL · PARA AUTORIDADES</div>
+    <h1>Infraestructura pública de<br>trazabilidad ambiental verificable</h1>
+    <p class="bajada">Qué es sicr3p, sobre qué normativa se apoya, qué aporta al territorio
+    (Corredor Bioceánico, comercio urbano, exportación) y qué formas de colaboración
+    institucional propone. Documento preparado para autoridades nacionales, regionales y municipales.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. RESUMEN EJECUTIVO -->
+<div class="pagina">
+  <h2>1. Resumen ejecutivo</h2>
+  <p><strong>sicr3p es una plataforma tecnológica chilena, desarrollada y operada desde Antofagasta,
+  que convierte documentos que las empresas ya poseen — sus documentos tributarios electrónicos —
+  en contabilidad de carbono y trazabilidad de origen verificables por cualquier persona.</strong></p>
+
+  <p>El problema público que atiende: las exigencias de información ambiental crecen por tres
+  frentes a la vez — la Ley REP 20.920 y sus metas de reciclaje, los reportes corporativos que las
+  grandes empresas mandantes exigen a sus proveedores, y la regulación internacional que condiciona
+  el acceso a mercados (el Mecanismo de Ajuste en Frontera por Carbono de la UE, el Pasaporte
+  Digital de Producto europeo, la debida diligencia de minerales de la OCDE). Las grandes empresas
+  pueden pagar consultorías; <strong>las pymes, los comercios urbanos y los actores logísticos del
+  Corredor Bioceánico, en general, no</strong>. sicr3p reduce ese costo a una fracción, automatizando
+  el cálculo desde el documento real.</p>
+
+  <div class="caja">
+    <strong>En una frase:</strong> sicr3p hace que un dato ambiental declarado en Chile sea
+    <strong>verificable públicamente</strong> — cualquiera con el enlace o el código QR puede comprobar
+    que el registro existe y que no fue alterado después, sin necesidad de confiar en la palabra
+    de nadie, incluida la nuestra.
+  </div>
+
+  <h3>1.1 Qué está operativo hoy</h3>
+  <table>
+    <tr><th>Capacidad</th><th>Descripción</th></tr>
+    <tr><td><strong>Contabilidad de carbono por documento</strong></td><td>Cálculo de t CO2e a partir del DTE real (XML del SII, PDF o fotografía), ítem por ítem, clasificado por alcances del GHG Protocol, con motor de cálculo propio y factores citados a fuentes oficiales.</td></tr>
+    <tr><td><strong>Cadena pública de integridad</strong></td><td>Cada documento procesado queda sellado en una cadena de hash SHA-256 de solo-agregado. Su estado es público y anonimizado: nadie —incluido sicr3p— puede alterar un registro pasado sin que se note.</td></tr>
+    <tr><td><strong>Declaración REP (Ley 20.920)</strong></td><td>Declaración de envases y embalajes con porcentaje de reciclabilidad calculado siempre en el servidor, por niveles, verificable por QR.</td></tr>
+    <tr><td><strong>Tres pasaportes de trazabilidad</strong></td><td>Documental (carga del Corredor Bioceánico por tramos), de Producto (comercios urbanos, cualquier rubro) y Mineral (cadena minera). Cada lote tiene su propia cadena de custodia con página pública y QR.</td></tr>
+    <tr><td><strong>Tarjeta de Viaje con QR</strong></td><td>Credencial virtual que acompaña a la carga: cualquiera que la escanee ve el pasaporte del lote; solo el portador autorizado registra pasos (la ruta queda sellada sin GPS).</td></tr>
+    <tr><td><strong>Expediente físico sellado</strong></td><td>Al cerrar un lote, su expediente PDF imprimible queda anclado a la cadena pública: el papel y el registro digital se validan mutuamente.</td></tr>
+  </table>
+</div>
+
+<!-- 2. MARCO NORMATIVO -->
+<div class="pagina">
+  <h2>2. Sobre qué normativa se apoya</h2>
+  <p>sicr3p no inventa metodologías: <strong>estructura sus registros alineándolos a marcos normativos
+  y técnicos existentes, siempre citando la fuente</strong>. La tabla resume el rol de cada marco.</p>
+
+  <table>
+    <tr><th>Marco</th><th>Rol en la plataforma</th></tr>
+    <tr><td><strong>Ley 20.920 (REP)</strong> — Chile</td><td>Núcleo de la declaración de envases y embalajes: componentes, peso, porcentaje de reciclabilidad por niveles. La red "Aduana Verde" acerca esta declaración al comercio urbano.</td></tr>
+    <tr><td><strong>GHG Protocol e ISO 14064-1</strong></td><td>Clasificación de emisiones por Alcance 1 / 2 / 3 en cada informe; los factores del motor citan HuellaChile (Ministerio del Medio Ambiente), IPCC, DEFRA y GLEC según la categoría.</td></tr>
+    <tr><td><strong>Reglamento (UE) 2023/956 — CBAM</strong></td><td>Los lotes capturan los datos que el mecanismo europeo estructura: código NC, emisiones incorporadas directas e indirectas por tonelada, método, país e instalación. La plataforma indica honestamente qué materiales están o no en el Anexo I vigente.</td></tr>
+    <tr><td><strong>ESPR / Pasaporte Digital de Producto (UE)</strong></td><td>Formato de los pasaportes públicos: identificador único con QR, composición, actores de la cadena, desempeño ambiental.</td></tr>
+    <tr><td><strong>Guía de Debida Diligencia OCDE (minerales)</strong></td><td>Checklist de los 5 pasos y las banderas del Anexo II — exclusivamente en pasaportes de tipo mineral, donde corresponde.</td></tr>
+  </table>
+
+  <h3>2.1 Lo que sicr3p NO es — honestidad por diseño</h3>
+  <ul>
+    <li><strong>No es un organismo certificador ni un verificador de tercera parte acreditado.</strong>
+    Todos los pasaportes, informes y sellos lo declaran de forma impresa y visible.</li>
+    <li><strong>No es una autoridad ni actúa por delegación de una.</strong> "Aduana Verde" es una marca
+    de tramitación verde de documentos comerciales; cada superficie pública aclara que no realiza
+    trámites ante ningún servicio nacional de aduanas.</li>
+    <li><strong>No emite bonos de carbono ni vende compensaciones obligatorias.</strong> La compensación
+    es siempre voluntaria, con tarifa referencial visible, y hoy opera en modalidad simulada
+    (sin pasarela de pago real) mientras se formaliza el socio ambiental.</li>
+    <li><strong>No usa blockchain especulativa.</strong> La integridad la da una cadena de hash propia,
+    pública y auditable — sin criptomonedas, sin costos de red, sin intermediarios.</li>
+  </ul>
+
+  <div class="caja">
+    <strong>Por qué esto le importa a una autoridad:</strong> cada afirmación de la plataforma es
+    comprobable en línea sin pedir permiso. La fiscalización y el estudio del ecosistema REP y de
+    carbono pueden apoyarse en registros que ya nacen estructurados, citados y sellados.
+  </div>
+</div>
+
+<!-- 3. APORTE AL TERRITORIO -->
+<div class="pagina">
+  <h2>3. Aporte al territorio</h2>
+
+  <h3>3.1 Corredor Bioceánico — trazabilidad documental multi-país</h3>
+  <p>El corredor Capricornio (Chile–Argentina–Paraguay–Brasil) mueve carga que cruza hasta cuatro
+  jurisdicciones con metodologías de cálculo distintas. sicr3p modela <strong>tramos por país</strong>
+  con metodología nacional citada (base HuellaChile/ISO 14064-1 para Chile) y emite el
+  <strong>Pasaporte de Trazabilidad Documental</strong>: la carga viaja con una credencial QR, cada
+  actor registra su paso (origen, depósito, frontera, puerto, destino) sellado con hash y fecha,
+  y al llegar queda un expediente imprimible anclado a la cadena pública. Sin GPS, sin hardware
+  costoso: la ruta es la secuencia de pasos verificables.</p>
+
+  <h3>3.2 Comercio urbano — red Aduana Verde</h3>
+  <p>El comercio de ciudad enfrenta la REP y las exigencias de sus mandantes sin equipos técnicos.
+  En un punto Aduana Verde, un comercio sale en una sola visita con: su cálculo de emisiones desde
+  sus propias facturas, su declaración REP de embalajes con nivel de reciclabilidad, su etiqueta QR
+  verificable y — si lo desea — su <strong>Pasaporte de Producto</strong> (alimentos, textil,
+  embalajes, manufactura: cualquier rubro). Terminales de atención con login de dispositivo ya
+  están operativos en la plataforma.</p>
+
+  <h3>3.3 Exportación y minería</h3>
+  <p>Para exportadores y cadena minera, el <strong>Pasaporte de Origen tipo mineral</strong> agrega
+  la capa de debida diligencia OCDE y los datos CBAM estructurados, con eslabones anclados a
+  documentos tributarios reales del SII (RUT verificados por módulo 11) y control de balance de
+  masas con alertas de merma. La empresa chilena llega a la conversación europea con evidencia
+  fiscal, no con autodeclaraciones.</p>
+
+  <h3>3.4 Empleo y capacidades locales</h3>
+  <p>El proyecto se desarrolla y opera desde Antofagasta. El modelo de red Aduana Verde contempla
+  operadores de punto locales (personas y pymes de servicio), y toda la documentación técnica y
+  metodológica es pública en español, inglés y portugués.</p>
+</div>
+
+<!-- 4. PROTECCIÓN DE DATOS Y COLABORACIÓN -->
+<div class="pagina">
+  <h2>4. Protección de datos</h2>
+  <ul>
+    <li><strong>Divulgación selectiva por diseño:</strong> cada actor de una cadena decide si su
+    eslabón es público, visible solo para la cadena, o privado. La integridad (los hashes) es
+    pública siempre; el contenido comercial, solo si su dueño lo divulga.</li>
+    <li><strong>Anonimización de las vistas públicas:</strong> la cadena pública no muestra RUT,
+    razones sociales, folios ni archivos; los RUT divulgados en pasaportes van enmascarados
+    (76.***.**6-0).</li>
+    <li><strong>Cálculos del lado del servidor:</strong> montos, porcentajes y niveles jamás se
+    aceptan desde el navegador del usuario — se calculan y validan en el servidor.</li>
+    <li><strong>Política de privacidad y términos en revisión legal profesional</strong> antes de su
+    publicación (borradores ya redactados con el cruce de datos entre empresas como tema central).</li>
+  </ul>
+
+  <h2>5. Formas de colaboración que se proponen</h2>
+  <table>
+    <tr><th>Propuesta</th><th>Qué implica</th><th>Costo para la autoridad</th></tr>
+    <tr><td><strong>Piloto territorial</strong></td><td>Un grupo de comercios o una ruta del corredor operando con pasaportes verificables durante 90 días, con informe público de resultados.</td><td>Convocatoria y difusión. Sin costo de licencias durante el piloto.</td></tr>
+    <tr><td><strong>Mesa técnica de datos</strong></td><td>Revisión conjunta del formato de los registros (REP, emisiones, origen) para que sirvan a estudios y fiscalización.</td><td>Horas técnicas.</td></tr>
+    <tr><td><strong>Verificación abierta</strong></td><td>Acceso permanente de la autoridad a la cadena pública y a los pasaportes — ya disponible hoy, sin convenio, porque es público.</td><td>Ninguno.</td></tr>
+  </table>
+
+  <div class="caja">
+    <strong>Verificación en vivo:</strong> el estado de la cadena de integridad, el explorador de
+    eslabones y los pasaportes de ejemplo pueden revisarse en cualquier momento en el sitio de la
+    plataforma (sección "Cadena de integridad" y páginas /lote y /verificar). Solicite una
+    demostración guiada a contacto@sicr3p.cl.
+  </div>
+
+  <p style="margin-top:8mm; color:var(--gris); font-size:9pt;">Este documento es informativo y no
+  constituye oferta comercial ni solicitud de acto administrativo. sicr3p no es certificador,
+  auditor ni autoridad; registra y estructura declaraciones y documentos verificables de sus
+  usuarios, con integridad garantizada por una cadena de hash pública.</p>
+</div>
+
+</body>
+</html>

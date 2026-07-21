@@ -59,20 +59,20 @@ export default function TarjetaViaje() {
         )}
 
         {info && (
-          <div className="card card-pad" style={{ textAlign: 'center' }}>
-            <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>sicr3p</div>
-            <h1 style={{ fontSize: 24, margin: '6px 0 2px' }}>{t('tv.titulo')}</h1>
-            <p className="muted" style={{ margin: '0 0 6px' }}>
-              {t('tv.serial')}: <b style={{ fontFamily: 'monospace' }}>{info.serial}</b>
-            </p>
-            <p style={{ margin: '0 0 14px' }}>
-              {t('tv.lote')}: <b style={{ fontFamily: 'monospace' }}>{info.codigo}</b>
+          <div className="card card-pad pasaporte-doc" style={{ textAlign: 'center' }}>
+            <div className="pas-kicker">sicr3p</div>
+            <h1 style={{ fontSize: 24, margin: '10px 0 10px' }}>{t('tv.titulo')}</h1>
+            <div className="pas-lbl" style={{ marginBottom: 4 }}>{t('tv.lote')}</div>
+            <div className="pas-code">{info.codigo}</div>
+            <p className="muted" style={{ margin: '8px 0 16px', fontSize: 12 }}>
+              {t('tv.serial')}: <span className="mono">{info.serial}</span>
             </p>
 
             {/* QR de la propia credencial: el portador muestra la pantalla
                 y otro la escanea — la tarjeta ES el teléfono. */}
-            <img src={`/api/v/${info.serial}/qr.png`} alt={t('tv.qr_alt')} width={132} height={132}
-              style={{ borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }} />
+            <div className="pas-qr" style={{ marginBottom: 16 }}>
+              <img src={`/api/v/${info.serial}/qr.png`} alt={t('tv.qr_alt')} width={132} height={132} />
+            </div>
 
             <Link className="btn btn-primary" style={{ width: '100%', marginBottom: 10 }} to={`/lote/${info.codigo}`}>
               {t('tv.ver_pasaporte')}

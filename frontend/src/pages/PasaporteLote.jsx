@@ -53,12 +53,13 @@ export default function PasaporteLote() {
 
         {data && (
           <div className="card card-pad pasaporte-doc">
-            {/* Encabezado */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            {/* Encabezado: código del lote como protagonista */}
+            <div className="pas-head">
               <div style={{ minWidth: 0 }}>
-                <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>sicr3p</div>
-                <h1 style={{ fontSize: 26, margin: '4px 0 2px' }}>{tituloPas} · {data.pasaporte.codigo}</h1>
-                <p className="muted" style={{ margin: '0 0 10px' }}>{subPas}</p>
+                <div className="pas-kicker">sicr3p</div>
+                <h1 style={{ fontSize: 24, margin: '10px 0 6px' }}>{tituloPas}</h1>
+                <div className="pas-code">{data.pasaporte.codigo}</div>
+                <p className="muted" style={{ margin: '10px 0 12px', fontSize: 14 }}>{subPas}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span className={`badge ${data.cadena.integra ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
                     {data.cadena.integra ? `✓ ${t('lote.cadena_integra')}` : `⚠ ${t('lote.cadena_alterada')}`}
@@ -73,25 +74,26 @@ export default function PasaporteLote() {
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <img src={data.pasaporte.qr_png} alt={t('lote.qr_alt')} width={104} height={104}
-                  style={{ borderRadius: 8, border: '1px solid var(--border)' }} />
-                <div className="muted" style={{ fontSize: 11, maxWidth: 120, marginTop: 4 }}>{t('lote.escanea')}</div>
+                <div className="pas-qr">
+                  <img src={data.pasaporte.qr_png} alt={t('lote.qr_alt')} width={104} height={104} />
+                </div>
+                <div className="muted" style={{ fontSize: 11, maxWidth: 128, margin: '6px auto 0' }}>{t('lote.escanea')}</div>
               </div>
             </div>
 
             {/* Identificación del lote */}
-            <div className="pasaporte-sec" style={{ marginTop: 18 }}>
+            <div className="pasaporte-sec">
               <h3>{t('lote.sec_lote')}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 14 }}>
-                <div><span className="muted">{t('lote.material')}</span><br /><b>{nombreMaterial(data.lote.material)}</b></div>
-                <div><span className="muted">{t('lote.cantidad')}</span><br /><b>{fmt(data.lote.cantidad, 3)} {data.lote.unidad}</b></div>
-                <div><span className="muted">{t('lote.pais_origen')}</span><br /><b>{data.lote.pais_origen}</b></div>
-                <div><span className="muted">{t('lote.faena')}</span><br /><b>{data.lote.faena_origen || '—'}</b></div>
+              <div className="pas-grid">
+                <div><span className="pas-lbl">{t('lote.material')}</span><b>{nombreMaterial(data.lote.material)}</b></div>
+                <div><span className="pas-lbl">{t('lote.cantidad')}</span><b>{fmt(data.lote.cantidad, 3)} {data.lote.unidad}</b></div>
+                <div><span className="pas-lbl">{t('lote.pais_origen')}</span><b>{data.lote.pais_origen}</b></div>
+                <div><span className="pas-lbl">{t('lote.faena')}</span><b>{data.lote.faena_origen || '—'}</b></div>
                 {data.lote.codigo_nc && (
-                  <div><span className="muted">{t('lote.codigo_nc')}</span><br /><b>{data.lote.codigo_nc}</b></div>
+                  <div><span className="pas-lbl">{t('lote.codigo_nc')}</span><b>{data.lote.codigo_nc}</b></div>
                 )}
                 {data.lote.composicion && Object.keys(data.lote.composicion).length > 0 && (
-                  <div><span className="muted">{t('lote.composicion')}</span><br />
+                  <div><span className="pas-lbl">{t('lote.composicion')}</span>
                     <b>{Object.entries(data.lote.composicion).map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ')}</b>
                   </div>
                 )}
@@ -106,9 +108,9 @@ export default function PasaporteLote() {
                   ⚠ {t('lote.merma_alerta')} ({fmt(data.balance.merma_pct, 1)}%)
                 </div>
               )}
-              <div style={{ borderLeft: '2px solid var(--border)', paddingLeft: 14, display: 'grid', gap: 12 }}>
+              <div className="tl">
                 {data.cadena.eslabones.map((e) => (
-                  <div key={e.eslabon} style={{ fontSize: 13 }}>
+                  <div key={e.eslabon} className="tl-item">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <b>#{e.eslabon} · {nombreRol(e.rol)}</b>
                       <span className="muted">{e.pais} · {fmtFecha(e.fecha)}</span>
@@ -120,19 +122,19 @@ export default function PasaporteLote() {
                       {!e.divulgado && <span className="badge badge-gray" style={{ fontSize: 11 }}>🔒 {t('lote.no_divulgado')}</span>}
                     </div>
                     {e.divulgado ? (
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
                         {(e.nombre_empresa || e.rut_empresa) && (
                           <span>{[e.nombre_empresa, e.rut_empresa].filter(Boolean).join(' · ')} · </span>
                         )}
                         {e.cantidad != null && <span>{fmt(e.cantidad, 3)} {data.lote.unidad} · </span>}
                         {Number(e.co2e_aportado) > 0 && <span>{fmt(e.co2e_aportado, 4)} t CO2e {t('lote.aportadas')} · </span>}
                         {e.datos?.punto_control && <span>{e.datos.punto_control} · </span>}
-                        <span style={{ fontFamily: 'monospace' }}>{String(e.hash_cadena).slice(0, 16)}…</span>
+                        <span className="mono">{String(e.hash_cadena).slice(0, 16)}…</span>
                       </div>
                     ) : (
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                      <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
                         {t('lote.no_divulgado_nota')}<br />
-                        <span style={{ fontFamily: 'monospace' }}>{String(e.hash_cadena).slice(0, 16)}…</span>
+                        <span className="mono">{String(e.hash_cadena).slice(0, 16)}…</span>
                       </div>
                     )}
                   </div>
@@ -143,9 +145,9 @@ export default function PasaporteLote() {
             {/* Emisiones incorporadas */}
             <div className="pasaporte-sec">
               <h3>{t('lote.sec_emisiones')}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 14 }}>
+              <div className="pas-grid">
                 <div>
-                  <span className="muted">{t('lote.declaradas')}</span><br />
+                  <span className="pas-lbl">{t('lote.declaradas')}</span>
                   {data.emisiones.declarado_t != null ? (
                     <b>{fmt(data.emisiones.declarado_t, 4)} {t('lote.por_tonelada')}
                       <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>
@@ -155,7 +157,7 @@ export default function PasaporteLote() {
                   ) : <b>—</b>}
                 </div>
                 <div>
-                  <span className="muted">{t('lote.trazadas')}</span><br />
+                  <span className="pas-lbl">{t('lote.trazadas')}</span>
                   <b>{data.emisiones.trazado_t != null ? `${fmt(data.emisiones.trazado_t, 4)} ${t('lote.por_tonelada')}` : '—'}</b>
                 </div>
               </div>

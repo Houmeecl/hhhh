@@ -69,11 +69,11 @@ export default function Pasaporte() {
         {data && (
           <div className="card card-pad pasaporte-doc">
             {/* Encabezado tipo documento: título + badges + QR */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div className="pas-head">
               <div style={{ minWidth: 0 }}>
-                <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>sicr3p</div>
-                <h1 style={{ fontSize: 26, margin: '4px 0 2px' }}>{t('pas.titulo')}</h1>
-                <p className="muted" style={{ margin: '0 0 10px' }}>{t('pas.subtitulo')}</p>
+                <div className="pas-kicker">sicr3p</div>
+                <h1 style={{ fontSize: 26, margin: '10px 0 4px' }}>{t('pas.titulo')}</h1>
+                <p className="muted" style={{ margin: '0 0 12px', fontSize: 14 }}>{t('pas.subtitulo')}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span className="badge badge-green" style={{ fontSize: 13, padding: '5px 12px' }}>✓ {t('pas.vigente')}</span>
                   {data.integridad && (
@@ -84,25 +84,26 @@ export default function Pasaporte() {
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <img src={data.pasaporte.qr_png} alt={t('pas.qr_alt')} width={104} height={104}
-                  style={{ borderRadius: 8, border: '1px solid var(--border)' }} />
-                <div className="muted" style={{ fontSize: 11, maxWidth: 120, marginTop: 4 }}>{t('pas.escanea')}</div>
+                <div className="pas-qr">
+                  <img src={data.pasaporte.qr_png} alt={t('pas.qr_alt')} width={104} height={104} />
+                </div>
+                <div className="muted" style={{ fontSize: 11, maxWidth: 128, margin: '6px auto 0' }}>{t('pas.escanea')}</div>
               </div>
             </div>
 
             {/* Identificación */}
-            <div className="pasaporte-sec" style={{ marginTop: 18 }}>
+            <div className="pasaporte-sec">
               <h3>{t('pas.sec_producto')}</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 14 }}>
-                <div><span className="muted">{t('pas.documento')}</span><br /><b>{data.producto.documento}</b></div>
-                <div><span className="muted">{t('pas.fecha_doc')}</span><br /><b>{data.producto.fecha ? fmtFecha(data.producto.fecha) : '—'}</b></div>
-                <div><span className="muted">{t('pas.titular')}</span><br /><b>{data.titular.nombre || '—'}</b></div>
-                <div><span className="muted">{t('pas.rut')}</span><br /><b>{data.titular.rut || '—'}</b></div>
-                <div><span className="muted">{t('pas.categoria')}</span><br /><b>{data.producto.categoria}</b></div>
-                <div><span className="muted">{t('ver.estado')}</span><br /><span className="badge badge-green">{data.producto.status}</span></div>
+              <div className="pas-grid">
+                <div><span className="pas-lbl">{t('pas.documento')}</span><b>{data.producto.documento}</b></div>
+                <div><span className="pas-lbl">{t('pas.fecha_doc')}</span><b>{data.producto.fecha ? fmtFecha(data.producto.fecha) : '—'}</b></div>
+                <div><span className="pas-lbl">{t('pas.titular')}</span><b>{data.titular.nombre || '—'}</b></div>
+                <div><span className="pas-lbl">{t('pas.rut')}</span><b>{data.titular.rut || '—'}</b></div>
+                <div><span className="pas-lbl">{t('pas.categoria')}</span><b>{data.producto.categoria}</b></div>
+                <div><span className="pas-lbl">{t('ver.estado')}</span><span className="badge badge-green">{data.producto.status}</span></div>
                 {data.producto.clasificacion_ghg && (
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <span className="muted">{t('pas.clasificacion')}</span><br /><b>{data.producto.clasificacion_ghg}</b>
+                    <span className="pas-lbl">{t('pas.clasificacion')}</span><b>{data.producto.clasificacion_ghg}</b>
                   </div>
                 )}
               </div>
@@ -112,7 +113,7 @@ export default function Pasaporte() {
             <div className="pasaporte-sec">
               <h3>{t('pas.sec_clima')}</h3>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 30, fontWeight: 800 }}>{fmt(data.clima.total_co2e, 3)}</span>
+                <span className="pas-big">{fmt(data.clima.total_co2e, 3)}</span>
                 <span className="muted">t CO2e · {t('pas.total_incorporado')}</span>
               </div>
               <div className="muted" style={{ fontSize: 12, margin: '4px 0 10px' }}>
@@ -176,12 +177,12 @@ export default function Pasaporte() {
             {/* Trazabilidad (hitos reales del registro) */}
             <div className="pasaporte-sec">
               <h3>{t('pas.sec_trazabilidad')}</h3>
-              <div style={{ borderLeft: '2px solid var(--border)', paddingLeft: 14, display: 'grid', gap: 10 }}>
+              <div className="tl">
                 {hitos.map((h, i) => (
-                  <div key={i} style={{ fontSize: 13 }}>
+                  <div key={i} className="tl-item">
                     <b>{h.label}</b>
                     {h.fecha && <span className="muted"> · {fmtFecha(h.fecha)}</span>}
-                    {h.detalle && <div className="muted" style={{ fontSize: 12 }}>{h.detalle}</div>}
+                    {h.detalle && <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{h.detalle}</div>}
                   </div>
                 ))}
               </div>
@@ -192,10 +193,10 @@ export default function Pasaporte() {
               <div className="pasaporte-sec">
                 <h3>{t('pas.sec_integridad')}</h3>
                 <div style={{ fontSize: 12 }}>
-                  <span className="muted">{t('ver.eslabon')} #{data.integridad.eslabon} · {t('pas.hash_doc')}</span>
-                  <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', margin: '2px 0 8px' }}>{data.integridad.hash_documento}</div>
-                  <span className="muted">{t('ver.hash_cadena')}</span>
-                  <div style={{ fontFamily: 'monospace', wordBreak: 'break-all', marginTop: 2 }}>{data.integridad.hash_cadena}</div>
+                  <span className="pas-lbl">{t('ver.eslabon')} #{data.integridad.eslabon} · {t('pas.hash_doc')}</span>
+                  <div className="pas-hash">{data.integridad.hash_documento}</div>
+                  <span className="pas-lbl">{t('ver.hash_cadena')}</span>
+                  <div className="pas-hash" style={{ marginBottom: 0 }}>{data.integridad.hash_cadena}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap', fontSize: 13 }}>
                   <Link to="/cadena">{t('pas.ver_cadena')}</Link>
