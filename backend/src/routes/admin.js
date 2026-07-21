@@ -119,7 +119,33 @@ router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Envía (o reenvía) el correo de activación para un usuario ya insertado.
+// No lanza si el correo falla: registra el error y avisa al llamador, para
+// que la cuenta no quede "atascada" sin ningún enlace visible en ninguna parte.
+async function enviarActivacion({ usuarioId, email, nombre }) {
+  const raw = crypto.randomBytes(32).toString('hex');
+  const expira = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+  await query(
+    `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
+    [usuarioId, hashToken(raw), expira]
+  );
+  const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
+  let correoEnviado = true;
+  try {
+    await sendMail({ to: email, ...activationEmail({ nombre, link }) });
+  } catch (err) {
+    correoEnviado = false;
+    console.error('[activacion] no se pudo enviar el correo:', err.message);
+  }
+  // Sin Resend (dev) o si el envío real falló: devolvemos el link para que
+  // el admin lo pueda compartir a mano en vez de perderlo.
+  const mostrarLink = !config.resend.apiKey || !correoEnviado;
+  return { link, correoEnviado, dev_activation_link: mostrarLink ? link : undefined };
+}
+
 // CREAR CUENTA: genera usuario + envía link de activación (must_reset_password=true).
+// Si ya existe un usuario "pendiente" con ese correo (p.ej. porque el envío
+// anterior falló), reintenta el envío en vez de bloquear con un 409.
 router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
   try {
     const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
@@ -129,27 +155,25 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
     if (!email) return res.status(400).json({ error: 'Se requiere un correo de contacto' });
 
     const nombre = req.body.nombre || cliente.nombre_empresa;
-    const { rows: uRows } = await query(
+    let { rows: uRows } = await query(
       `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
        VALUES ($1,$2,'cliente',$3,'pendiente',true)
        ON CONFLICT (email) DO NOTHING RETURNING *`,
       [email, nombre, cliente.id]
     );
-    if (!uRows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
+    if (!uRows[0]) {
+      const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [email]);
+      const existente = existentes[0];
+      if (!existente || existente.estado !== 'pendiente') {
+        return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
+      }
+      uRows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
+    }
 
-    const raw = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
-    await query(
-      `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
-      [uRows[0].id, hashToken(raw), expira]
-    );
-    const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
-    await sendMail({ to: email, ...activationEmail({ nombre, link }) });
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email }, ip: req.ip });
+    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: uRows[0].id, email, nombre });
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email, correo_enviado: correoEnviado }, ip: req.ip });
 
-    // En modo dev (sin Resend) devolvemos el link para poder probar la activación.
-    const devLink = config.resend.apiKey ? undefined : link;
-    res.status(201).json({ ok: true, usuario_id: uRows[0].id, dev_activation_link: devLink });
+    res.status(201).json({ ok: true, usuario_id: uRows[0].id, correo_enviado: correoEnviado, dev_activation_link });
   } catch (err) { next(err); }
 });
 
@@ -309,24 +333,49 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { email, nombre, rol, cliente_id } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
-    const { rows } = await query(
+    const emailNorm = String(email).toLowerCase();
+    let { rows } = await query(
       `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
        VALUES ($1,$2,COALESCE($3,'operador'),$4,'pendiente',true)
        ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [String(email).toLowerCase(), nombre, rol, cliente_id || null]
+      [emailNorm, nombre, rol, cliente_id || null]
     );
-    if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
-    const raw = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    await query(
-      `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
-      [rows[0].id, hashToken(raw), expira]
-    );
-    const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
-    await sendMail({ to: rows[0].email, ...activationEmail({ nombre, link }) });
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, ip: req.ip });
-    const devLink = config.resend.apiKey ? undefined : link;
-    res.status(201).json({ usuario: { id: rows[0].id, email: rows[0].email, nombre, rol: rows[0].rol }, dev_activation_link: devLink });
+    if (!rows[0]) {
+      const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [emailNorm]);
+      const existente = existentes[0];
+      if (!existente || existente.estado !== 'pendiente') {
+        return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
+      }
+      rows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
+    }
+
+    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: rows[0].id, email: rows[0].email, nombre });
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
+
+    res.status(201).json({
+      usuario: { id: rows[0].id, email: rows[0].email, nombre, rol: rows[0].rol },
+      correo_enviado: correoEnviado,
+      dev_activation_link,
+    });
+  } catch (err) { next(err); }
+});
+
+// Reenvía el correo de activación a un usuario "pendiente" (invitación creada
+// pero el envío falló o se perdió) — sin esto quedaba un usuario atascado
+// sin ningún enlace visible para activarlo.
+router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT * FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (usuario.estado !== 'pendiente') {
+      return res.status(400).json({ error: 'Este usuario ya activó su cuenta.' });
+    }
+    const { correoEnviado, dev_activation_link } = await enviarActivacion({
+      usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre,
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'reenviar_activacion', entidad: 'usuario', entidadId: usuario.id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
+    res.json({ ok: true, correo_enviado: correoEnviado, dev_activation_link });
   } catch (err) { next(err); }
 });
 

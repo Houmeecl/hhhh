@@ -29,8 +29,10 @@ export default function Clientes({ rol }) {
     try {
       const r = await api.crearCuenta(cuenta.id, { email: cuenta.email });
       setCuenta(null);
-      flash(r.dev_activation_link ? 'Cuenta creada. Link de activación (dev) copiado abajo.' : 'Cuenta creada. Enviamos el correo de activación.');
-      if (r.dev_activation_link) setToast({ msg: `Link activación: ${r.dev_activation_link}`, err: false, persist: true });
+      if (r.dev_activation_link) {
+        const motivo = r.correo_enviado === false ? 'No se pudo enviar el correo. Comparte este link a mano' : 'Link activación (dev)';
+        setToast({ msg: `${motivo}: ${r.dev_activation_link}`, err: r.correo_enviado === false, persist: true });
+      } else flash('Cuenta creada. Enviamos el correo de activación.');
     } catch (e) { flash(e.message, true); }
   }
 

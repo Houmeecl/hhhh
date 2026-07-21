@@ -16,12 +16,23 @@ export default function Usuarios() {
     try {
       const r = await api.crearUsuario(modal);
       setModal(null); cargar();
-      if (r.dev_activation_link) flash(`Usuario creado. Link activación (dev): ${r.dev_activation_link}`, false, true);
-      else flash('Usuario creado. Enviamos el correo de activación.');
+      if (r.dev_activation_link) {
+        const motivo = r.correo_enviado === false ? 'No se pudo enviar el correo. Comparte este link a mano' : 'Link activación (dev)';
+        flash(`Usuario creado. ${motivo}: ${r.dev_activation_link}`, r.correo_enviado === false, true);
+      } else flash('Usuario creado. Enviamos el correo de activación.');
     } catch (e) { flash(e.message, true); }
   }
   async function cambiar(u, campo, valor) {
     try { await api.editarUsuario(u.id, { [campo]: valor }); cargar(); } catch (e) { flash(e.message, true); }
+  }
+  async function reenviar(u) {
+    try {
+      const r = await api.reenviarActivacion(u.id);
+      if (r.dev_activation_link) {
+        const motivo = r.correo_enviado === false ? 'No se pudo enviar el correo. Comparte este link a mano' : 'Link activación (dev)';
+        flash(`${motivo}: ${r.dev_activation_link}`, r.correo_enviado === false, true);
+      } else flash('Reenviamos el correo de activación.');
+    } catch (e) { flash(e.message, true); }
   }
 
   const badge = (e) => e === 'activo' ? 'badge-green' : e === 'pendiente' ? 'badge-amber' : 'badge-red';
@@ -36,7 +47,7 @@ export default function Usuarios() {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Cliente</th><th>Último acceso</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th></th></tr></thead>
           <tbody>
             {usuarios.map((u) => (
               <tr key={u.id}>
@@ -54,6 +65,11 @@ export default function Usuarios() {
                 </td>
                 <td className="muted">{u.cliente || '—'}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{u.ultimo_login ? fmtFecha(u.ultimo_login) : 'Nunca'}</td>
+                <td>
+                  {u.estado === 'pendiente' && (
+                    <button className="btn btn-sm btn-outline" onClick={() => reenviar(u)}>Reenviar activación</button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
