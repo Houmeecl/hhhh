@@ -1,8 +1,58 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 import { useIdioma } from '../lib/i18n.js';
+
+// Aparición al hacer scroll (estilo landing moderna): los elementos con
+// .av2-reveal entran cuando cruzan el viewport. Con prefers-reduced-motion
+// el CSS los muestra fijos y este hook no molesta.
+function useRevelar() {
+  useEffect(() => {
+    if (!('IntersectionObserver' in window)) return undefined;
+    const io = new IntersectionObserver(
+      (entradas) => entradas.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } }),
+      { threshold: 0.15 }
+    );
+    document.querySelectorAll('.av2-reveal').forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+}
+
+// Mock del Pasaporte Digital que flota en el hero: una miniatura fiel de
+// /pasaporte/:id (kicker, empresa, cifras, QR estilizado, hash). Es
+// escenografía: los datos son de ejemplo y el QR es decorativo.
+function PasaporteMock() {
+  return (
+    <div className="av2-pas-card" aria-hidden="true">
+      <div className="av2-pas-kicker">sicr3p · PASAPORTE DIGITAL</div>
+      <div className="av2-pas-emp">Comercial Andina SpA</div>
+      <div className="av2-pas-grid">
+        <div><span className="av2-pas-l">Emisiones</span><b>0,440 <small>t CO2e</small></b></div>
+        <div><span className="av2-pas-l">REP 20.920</span><b>78% <small>· Alta</small></b></div>
+        <div><span className="av2-pas-l">Eslabón</span><b>#12</b></div>
+      </div>
+      <div className="av2-pas-qr">
+        <svg viewBox="0 0 44 44" width="86" height="86" role="presentation">
+          <rect width="44" height="44" rx="4" fill="#fff" />
+          <g fill="#0f1f2e">
+            <rect x="4" y="4" width="12" height="12" rx="2" /><rect x="7" y="7" width="6" height="6" fill="#fff" rx="1" />
+            <rect x="28" y="4" width="12" height="12" rx="2" /><rect x="31" y="7" width="6" height="6" fill="#fff" rx="1" />
+            <rect x="4" y="28" width="12" height="12" rx="2" /><rect x="7" y="31" width="6" height="6" fill="#fff" rx="1" />
+            <rect x="20" y="6" width="4" height="4" /><rect x="20" y="14" width="4" height="4" />
+            <rect x="6" y="20" width="4" height="4" /><rect x="14" y="20" width="4" height="4" /><rect x="22" y="20" width="4" height="4" />
+            <rect x="30" y="22" width="4" height="4" /><rect x="36" y="20" width="4" height="4" />
+            <rect x="20" y="28" width="4" height="4" /><rect x="26" y="32" width="4" height="4" />
+            <rect x="34" y="30" width="6" height="6" rx="1" /><rect x="20" y="36" width="4" height="4" />
+          </g>
+        </svg>
+      </div>
+      <div className="av2-pas-hash">a3f9c1…8e2b74 ✓</div>
+      <span className="av2-pas-chip">✓ cadena de integridad</span>
+    </div>
+  );
+}
 
 // Landing pública de Aduana Verde: la red de oficinas físicas de tramitación
 // verde que opera con la plataforma sicr3p por dentro. Marca de dos capas:
@@ -93,53 +143,73 @@ function StandAduanaVerde() {
 
 export default function AduanaVerde() {
   const { t } = useIdioma();
+  useRevelar();
   return (
     <PublicLayout>
-      {/* Hero con gradiente radial verde sutil */}
-      <div className="av-hero">
+      {/* HERO oscuro estilo producto moderno: navy con brillos verdes,
+          grilla de fondo y el Pasaporte Digital flotando como resultado. */}
+      <div className="av2-hero">
         <div className="container">
-          <section className="hero">
+          <section className="av2-hero-grid">
             <div className="fade-up">
-              <span className="badge badge-amber">{t('av.badge_red')}</span>
-              <h1 style={{ marginTop: 14, marginBottom: 10 }}>
-                Aduana<br />
-                Verde<span style={{ color: 'var(--green)' }}>.</span>
+              <span className="av2-eyebrow"><span className="av-led" /> {t('av.hero_eyebrow')}</span>
+              <h1 className="av2-h1">
+                Aduana Verde<span style={{ color: 'var(--green)' }}>.</span>
               </h1>
-              <p className="av-kicker">
-                {t('av.kicker')}{' '}
-                <Link to="/" className="av-brand">sicr3p<span className="av-dot">.</span></Link>
+              <p className="av2-t2">
+                {t('av.hero_t1')} <span className="av2-grad">{t('av.hero_t2')}</span>
               </p>
-              <p className="lead-green">{t('av.lead')}</p>
-              <p className="sub">{t('av.sub')}</p>
+              <p className="av2-sub">{t('av.hero_sub')}</p>
               <div className="hero-actions">
-                <Link to="/pos" className="btn btn-primary">{t('av.cta_terminal')}</Link>
-                <a href="mailto:contacto@sicr3p.cl?subject=Cupo%20fundador%20Aduana%20Verde" className="btn btn-outline">{t('av.cta_escribenos')}</a>
+                <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
+                  {t('av.hero_cta_pas')}
+                </Link>
+                <a href="#calculadora" className="btn av2-btn-ghost">{t('av.hero_cta_calc')}</a>
               </div>
-              <p className="muted" style={{ marginTop: 22, fontSize: 14 }}>
-                {t('av.nota_qr')}
-              </p>
-              <div className="trust-bar">
-                <span className="item"><Icon.Building size={17} /> {t('av.trust_oficinas')}</span>
-                <span className="item"><Icon.Qr size={17} /> {t('av.trust_qr')}</span>
-                <span className="item"><Icon.Shield size={17} /> {t('av.trust_hash')}</span>
+              <div className="av2-trust">
+                <span><Icon.Shield size={15} /> {t('av.trust_hash')}</span>
+                <span><Icon.Qr size={15} /> {t('av.trust_qr')}</span>
+                <span><Icon.Building size={15} /> {t('av.trust_oficinas')}</span>
               </div>
             </div>
-
-            {/* La oficina: ilustración del stand físico Aduana Verde.
-                El texto del SVG queda en español: es escenografía del local. */}
-            <div className="av-stand-wrap fade-up d2">
-              <StandAduanaVerde />
-              <div className="av-stand-note">
-                <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
-                <span>
-                  <b>{t('av.stand_nota_b')}</b>{' '}
-                  <span className="muted">{t('av.stand_nota')}</span>
-                </span>
-              </div>
+            <div className="av2-pas-wrap fade-up d2">
+              <PasaporteMock />
             </div>
           </section>
         </div>
       </div>
+
+      {/* Bento: los 4 entregables de una visita */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.bento_titulo')}</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
+            {t('av.bento_sub')}
+          </p>
+          <div className="av2-bento">
+            <div className="av2-bento-card av2-bento-a av2-reveal">
+              <div className="av2-bento-ico"><Icon.Cog size={24} /></div>
+              <h3>{t('av.bento_1t')}</h3>
+              <p>{t('av.bento_1d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.List size={24} /></div>
+              <h3>{t('av.bento_2t')}</h3>
+              <p>{t('av.bento_2d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Qr size={24} /></div>
+              <h3>{t('av.bento_3t')}</h3>
+              <p>{t('av.bento_3d')}</p>
+            </div>
+            <div className="av2-bento-card av2-bento-b av2-reveal">
+              <div className="av2-bento-ico"><Icon.Shield size={24} /></div>
+              <h3>{t('av.bento_4t')}</h3>
+              <p>{t('av.bento_4d')}</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Franja "terminal físico": el flujo de la oficina como diagrama */}
       <section className="av-terminal">
@@ -235,8 +305,9 @@ export default function AduanaVerde() {
       </section>
 
       {/* Calculadora pública: el mismo motor del terminal, para sacar la
-          cuenta antes de pisar la oficina. */}
-      <section className="sec-alt sec-pad">
+          cuenta antes de pisar la oficina. El DISEÑO y el cálculo no
+          cambian: mismos factores del servidor. */}
+      <section className="sec-alt sec-pad" id="calculadora">
         <div className="container">
           <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.calc_titulo')}</h2>
           <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
@@ -278,9 +349,43 @@ export default function AduanaVerde() {
         </div>
       </section>
 
-      {/* Estado honesto: pre-lanzamiento */}
+      {/* El resultado: el Pasaporte Digital como protagonista */}
+      <section className="av2-pasaporte sec-pad">
+        <div className="container">
+          <div className="av2-pas-secgrid">
+            <div className="av2-reveal">
+              <h2 style={{ fontSize: 30, margin: '0 0 10px', color: '#fff' }}>{t('av.pas_titulo')}</h2>
+              <p style={{ color: '#cbd5e1', fontSize: 15, lineHeight: 1.7, maxWidth: 480 }}>{t('av.pas_sub')}</p>
+              <ol className="av2-pas-pasos">
+                <li><span>1</span>{t('av.pas_p1')}</li>
+                <li><span>2</span>{t('av.pas_p2')}</li>
+                <li><span>3</span>{t('av.pas_p3')}</li>
+              </ol>
+              <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
+                {t('av.pas_cta')}
+              </Link>
+              <span className="badge badge-green" style={{ marginLeft: 12 }}>{t('av.pas_chip')}</span>
+            </div>
+            <div className="av2-pas-wrap av2-reveal" style={{ justifyContent: 'center' }}>
+              <PasaporteMock />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Estado honesto: pre-lanzamiento + la red física */}
       <section className="pasos">
         <div className="container">
+          <div className="av-stand-wrap" style={{ maxWidth: 560, margin: '0 auto 28px' }}>
+            <StandAduanaVerde />
+            <div className="av-stand-note">
+              <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
+              <span>
+                <b>{t('av.stand_nota_b')}</b>{' '}
+                <span className="muted">{t('av.stand_nota')}</span>
+              </span>
+            </div>
+          </div>
           <div className="card card-pad av-card-hover" style={{ textAlign: 'center' }}>
             <span className="badge badge-amber">{t('av.badge_red')}</span>
             <h2 style={{ margin: '14px 0 10px', fontSize: 26 }}>{t('av.pre_titulo')}</h2>

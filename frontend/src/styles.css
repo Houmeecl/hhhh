@@ -864,3 +864,173 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 .pos-detalle > summary:hover { color: var(--green-600); }
 .pos-detalle[open] > summary { margin-bottom: 4px; }
+
+/* ============================================================
+   Aduana Verde v2 — landing estilo producto moderno.
+   Hero oscuro con brillos, bento de entregables, mock del
+   Pasaporte Digital y aparición al hacer scroll.
+   ============================================================ */
+.av2-hero {
+  position: relative;
+  background:
+    radial-gradient(720px 420px at 82% 8%, rgba(40, 167, 69, 0.22), transparent 62%),
+    radial-gradient(560px 380px at 8% 92%, rgba(40, 167, 69, 0.12), transparent 60%),
+    linear-gradient(160deg, #0f1f2e 0%, #14293c 60%, #0f1f2e 100%);
+  color: #fff;
+  overflow: hidden;
+}
+.av2-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(75% 75% at 50% 40%, #000 30%, transparent 100%);
+  pointer-events: none;
+}
+.av2-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 40px;
+  align-items: center;
+  padding: 72px 0 84px;
+}
+.av2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #b9e8c6;
+  background: rgba(40, 167, 69, 0.14);
+  border: 1px solid rgba(40, 167, 69, 0.45);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.av2-h1 { font-size: 56px; line-height: 1.02; letter-spacing: -0.03em; margin: 18px 0 8px; color: #fff; }
+.av2-t2 { font-size: 24px; font-weight: 700; margin: 0 0 14px; color: #e2e8f0; font-family: var(--font-head); }
+.av2-grad {
+  background: linear-gradient(90deg, #4ade80, #28a745 60%, #b9e8c6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.av2-sub { color: #94a3b8; font-size: 16px; line-height: 1.65; max-width: 460px; margin: 0 0 26px; }
+.av2-btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.av2-btn-ghost:hover { background: rgba(255, 255, 255, 0.12); color: #fff; text-decoration: none; }
+.av2-trust { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 26px; }
+.av2-trust span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: #94a3b8; }
+.av2-trust svg { color: #4ade80; }
+
+/* Mock del Pasaporte Digital (hero y sección resultado) */
+.av2-pas-wrap { display: flex; justify-content: flex-end; }
+.av2-pas-card {
+  width: min(340px, 100%);
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-top: 4px solid var(--green);
+  border-radius: 18px;
+  padding: 22px 24px;
+  color: var(--navy);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.25);
+  transform: rotate(2.5deg);
+  animation: av2Flotar 7s ease-in-out infinite;
+  text-align: left;
+}
+@keyframes av2Flotar {
+  0%, 100% { transform: rotate(2.5deg) translateY(0); }
+  50% { transform: rotate(1.6deg) translateY(-10px); }
+}
+.av2-pas-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 0.16em; color: var(--green-600); }
+.av2-pas-emp { font-size: 20px; font-weight: 800; margin: 6px 0 12px; font-family: var(--font-head); }
+.av2-pas-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.av2-pas-grid b { display: block; font-size: 15px; }
+.av2-pas-grid small { font-size: 10px; color: var(--gray); font-weight: 600; }
+.av2-pas-l { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--gray); text-transform: uppercase; }
+.av2-pas-qr { display: flex; justify-content: center; padding: 8px 0 4px; }
+.av2-pas-qr svg { border: 1px solid var(--border); border-radius: 8px; }
+.av2-pas-hash { text-align: center; font-family: monospace; font-size: 11px; color: var(--gray); margin: 6px 0 10px; }
+.av2-pas-chip {
+  display: block;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--green-600);
+  background: var(--green-50);
+  border: 1px solid var(--green-100);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+/* Bento de entregables */
+.av2-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.av2-bento-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 26px 26px 22px;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.av2-bento-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--green-100); }
+.av2-bento-card h3 { margin: 12px 0 6px; font-size: 17px; }
+.av2-bento-card p { margin: 0; color: var(--gray); font-size: 13.5px; line-height: 1.6; }
+.av2-bento-ico {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--green-600);
+  background: var(--green-50);
+  border: 1px solid var(--green-100);
+}
+.av2-bento-a { background: linear-gradient(150deg, #ffffff 55%, var(--green-50)); }
+.av2-bento-b { background: linear-gradient(330deg, #ffffff 55%, #f2f9ff); }
+
+/* Sección "el resultado: tu Pasaporte Digital" (fondo navy) */
+.av2-pasaporte {
+  background:
+    radial-gradient(560px 360px at 88% 20%, rgba(40, 167, 69, 0.18), transparent 60%),
+    var(--navy);
+}
+.av2-pas-secgrid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center; }
+.av2-pas-pasos { list-style: none; margin: 18px 0 24px; padding: 0; display: grid; gap: 10px; }
+.av2-pas-pasos li { display: flex; align-items: center; gap: 12px; color: #e2e8f0; font-size: 14.5px; font-weight: 600; }
+.av2-pas-pasos li span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* Aparición al hacer scroll */
+.av2-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.av2-reveal.on { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .av2-reveal { opacity: 1; transform: none; transition: none; }
+  .av2-pas-card { animation: none; }
+}
+
+@media (max-width: 900px) {
+  .av2-hero-grid { grid-template-columns: 1fr; padding: 48px 0 56px; }
+  .av2-h1 { font-size: 40px; }
+  .av2-t2 { font-size: 20px; }
+  .av2-pas-wrap { justify-content: center; }
+  .av2-pas-card { transform: rotate(0); }
+  .av2-bento { grid-template-columns: 1fr; }
+  .av2-pas-secgrid { grid-template-columns: 1fr; }
+}
