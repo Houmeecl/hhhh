@@ -1034,3 +1034,61 @@ table.data tr:hover td { background: #f3f8f5; }
   .av2-bento { grid-template-columns: 1fr; }
   .av2-pas-secgrid { grid-template-columns: 1fr; }
 }
+
+/* Header y footer propios de Aduana Verde (marca de dos capas). */
+.av2-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 16px 40px;
+  background: var(--navy);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.av2-logo { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.av2-logo-hoja {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: #4ade80;
+  background: rgba(40, 167, 69, 0.16);
+  border: 1px solid rgba(40, 167, 69, 0.4);
+  flex-shrink: 0;
+}
+.av2-footer .av2-logo-hoja { width: 28px; height: 28px; }
+.av2-logo-nombre {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 20px;
+  color: #fff;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.av2-logo-by { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12px; font-weight: 600; color: #94a3b8; }
+.av2-logo-by:hover { text-decoration: none; color: #cbd5e1; }
+.av2-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.av2-nav-link { color: #cbd5e1; font-weight: 600; font-size: 14px; }
+.av2-nav-link:hover { color: #fff; text-decoration: none; }
+.av2-header .lang-switch button { color: #64748b; }
+.av2-header .lang-switch button:hover { color: #cbd5e1; }
+.av2-header .lang-switch button.on { color: #4ade80; }
+.av2-footer {
+  background: var(--navy);
+  color: #cbd5e1;
+  padding: 26px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+@media (max-width: 700px) {
+  .av2-header { padding: 14px 18px; }
+  .av2-footer { padding: 22px 18px; justify-content: center; text-align: center; }
+}

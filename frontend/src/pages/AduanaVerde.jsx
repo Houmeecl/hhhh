@@ -1,9 +1,43 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import PublicLayout from '../components/PublicLayout.jsx';
+import { SelectorIdioma } from '../components/PublicLayout.jsx';
+import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 import { useIdioma } from '../lib/i18n.js';
+
+// Layout PROPIO de Aduana Verde: la marca de la red es "Aduana Verde."
+// con "by sicr3p" pequeño (dos capas, igual que el terminal). El header
+// y el footer NO son los del sitio sicr3p — cada marca tiene su landing.
+function AvLayout({ children, t }) {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <header className="av2-header">
+        <span className="av2-logo">
+          <span className="av2-logo-hoja"><Icon.Leaf size={24} /></span>
+          <span className="av2-logo-nombre">Aduana Verde<span style={{ color: 'var(--green)' }}>.</span></span>
+          <Link to="/" className="av2-logo-by">by <Logo size={13} light /></Link>
+        </span>
+        <nav className="av2-nav">
+          <SelectorIdioma />
+          <Link to="/pos" className="av2-nav-link">{t('av.cta_terminal')}</Link>
+          <Link to="/cargar" className="btn btn-primary btn-sm">{t('av.hero_cta_pas')}</Link>
+        </nav>
+      </header>
+
+      <main style={{ flex: 1 }}>{children}</main>
+
+      <footer className="av2-footer">
+        <span className="av2-logo" style={{ gap: 8 }}>
+          <span className="av2-logo-hoja"><Icon.Leaf size={18} /></span>
+          <span className="av2-logo-nombre" style={{ fontSize: 16 }}>Aduana Verde<span style={{ color: 'var(--green)' }}>.</span></span>
+        </span>
+        <span>{t('av.footer_red')} <Link to="/" style={{ color: '#4ade80', fontWeight: 700 }}>sicr3p</Link> · Antofagasta, Chile</span>
+        <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
+      </footer>
+    </div>
+  );
+}
 
 // Aparición al hacer scroll (estilo landing moderna): los elementos con
 // .av2-reveal entran cuando cruzan el viewport. Con prefers-reduced-motion
@@ -145,7 +179,7 @@ export default function AduanaVerde() {
   const { t } = useIdioma();
   useRevelar();
   return (
-    <PublicLayout>
+    <AvLayout t={t}>
       {/* HERO oscuro estilo producto moderno: navy con brillos verdes,
           grilla de fondo y el Pasaporte Digital flotando como resultado. */}
       <div className="av2-hero">
@@ -416,6 +450,6 @@ export default function AduanaVerde() {
           </div>
         </div>
       </section>
-    </PublicLayout>
+    </AvLayout>
   );
 }

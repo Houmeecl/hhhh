@@ -154,6 +154,7 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Tu pasaporte queda público con QR',
     'av.pas_cta': 'Generar el mío ahora',
     'av.pas_chip': 'Verificable por cualquiera',
+    'av.footer_red': 'Una red operada por',
 
     // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
     'pos.tramite_registrado': 'Trámite registrado',
@@ -524,6 +525,7 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Your passport goes public with a QR',
     'av.pas_cta': 'Generate mine now',
     'av.pas_chip': 'Verifiable by anyone',
+    'av.footer_red': 'A network operated by',
 
     'pos.tramite_registrado': 'Transaction recorded',
     'pos.comprobante_sub': 'Aduana Verde receipt · sicr3p platform',
@@ -889,6 +891,7 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Seu passaporte fica público com QR',
     'av.pas_cta': 'Gerar o meu agora',
     'av.pas_chip': 'Verificável por qualquer pessoa',
+    'av.footer_red': 'Uma rede operada por',
 
     // Passaporte Digital de Produto (/pasaporte/:id)
     'pas.titulo': 'Passaporte Digital de Produto',

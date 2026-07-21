@@ -6,10 +6,9 @@ import { IDIOMAS, useIdioma } from '../lib/i18n.js';
 // Nombre legible de cada idioma para el aria-label de los botones.
 const NOMBRE_IDIOMA = { es: 'Español', en: 'English', pt: 'Português' };
 
-// Selector discreto "ES · EN · PT". Vive solo en este layout, que se usa
-// únicamente en las rutas públicas (el admin tiene su propio shell), así
-// que jamás aparece en /admin.
-function SelectorIdioma() {
+// Selector discreto "ES · EN · PT". Se usa en este layout y en el layout
+// propio de Aduana Verde (marca de dos capas); jamás aparece en /admin.
+export function SelectorIdioma() {
   const { idioma, setIdioma, t } = useIdioma();
   return (
     <span className="lang-switch" role="group" aria-label={t('layout.idioma')}>
