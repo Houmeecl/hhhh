@@ -127,6 +127,12 @@ export default function TarjetaViaje() {
                 <div className="field">
                   <label>{t('tv.clave')}</label>
                   <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" />
+                  <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                    {t('tv.perdiste_clave')}{' '}
+                    <a href={`mailto:contacto@sicr3p.cl?subject=Recuperar%20clave%20de%20tarjeta%20${info?.serial || ''}`}>
+                      {t('tv.perdiste_clave_link')}
+                    </a>
+                  </p>
                 </div>
                 <div className="field">
                   <label>{t('tv.punto_sel')}</label>

@@ -54,36 +54,14 @@ function useRevelar() {
   }, []);
 }
 
-// Mock del Pasaporte Digital que flota en el hero: una miniatura fiel de
-// /pasaporte/:id (kicker, empresa, cifras, QR estilizado, hash). Es
-// escenografía: los datos son de ejemplo y el QR es decorativo.
-function PasaporteMock() {
+// Captura REAL del Pasaporte Digital que flota en el hero — no un mock
+// dibujado: es la pantalla /pasaporte/:id tal como la ve cualquiera que
+// escanee el QR (datos de una operación de demostración).
+function PasaportePreview() {
   return (
-    <div className="av2-pas-card" aria-hidden="true">
-      <div className="av2-pas-kicker">sicr3p · PASAPORTE DIGITAL</div>
-      <div className="av2-pas-emp">Comercial Andina SpA</div>
-      <div className="av2-pas-grid">
-        <div><span className="av2-pas-l">Emisiones</span><b>0,440 <small>t CO2e</small></b></div>
-        <div><span className="av2-pas-l">REP 20.920</span><b>78% <small>· Alta</small></b></div>
-        <div><span className="av2-pas-l">Eslabón</span><b>#12</b></div>
-      </div>
-      <div className="av2-pas-qr">
-        <svg viewBox="0 0 44 44" width="86" height="86" role="presentation">
-          <rect width="44" height="44" rx="4" fill="#fff" />
-          <g fill="#0f1f2e">
-            <rect x="4" y="4" width="12" height="12" rx="2" /><rect x="7" y="7" width="6" height="6" fill="#fff" rx="1" />
-            <rect x="28" y="4" width="12" height="12" rx="2" /><rect x="31" y="7" width="6" height="6" fill="#fff" rx="1" />
-            <rect x="4" y="28" width="12" height="12" rx="2" /><rect x="7" y="31" width="6" height="6" fill="#fff" rx="1" />
-            <rect x="20" y="6" width="4" height="4" /><rect x="20" y="14" width="4" height="4" />
-            <rect x="6" y="20" width="4" height="4" /><rect x="14" y="20" width="4" height="4" /><rect x="22" y="20" width="4" height="4" />
-            <rect x="30" y="22" width="4" height="4" /><rect x="36" y="20" width="4" height="4" />
-            <rect x="20" y="28" width="4" height="4" /><rect x="26" y="32" width="4" height="4" />
-            <rect x="34" y="30" width="6" height="6" rx="1" /><rect x="20" y="36" width="4" height="4" />
-          </g>
-        </svg>
-      </div>
-      <div className="av2-pas-hash">a3f9c1…8e2b74 ✓</div>
-      <span className="av2-pas-chip">✓ cadena de integridad</span>
+    <div className="av2-pas-card av2-pas-shot" aria-hidden="true">
+      <img src="/img/aduana-verde/pasaporte-real.png" alt="" loading="lazy" />
+      <span className="av2-pas-chip">✓ pantalla real de la plataforma</span>
     </div>
   );
 }
@@ -207,7 +185,7 @@ export default function AduanaVerde() {
               </div>
             </div>
             <div className="av2-pas-wrap fade-up d2">
-              <PasaporteMock />
+              <PasaportePreview />
             </div>
           </section>
         </div>
@@ -383,6 +361,33 @@ export default function AduanaVerde() {
         </div>
       </section>
 
+      {/* Para quién es: 3 disparadores concretos y honestos */}
+      <section className="sec-pad sec-alt">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.quien_titulo')}</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.6 }}>
+            {t('av.quien_sub')}
+          </p>
+          <div className="av2-bento" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Users size={24} /></div>
+              <h3>{t('av.quien_1t')}</h3>
+              <p>{t('av.quien_1d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Package size={24} /></div>
+              <h3>{t('av.quien_2t')}</h3>
+              <p>{t('av.quien_2d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Target size={24} /></div>
+              <h3>{t('av.quien_3t')}</h3>
+              <p>{t('av.quien_3d')}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* El resultado: el Pasaporte Digital como protagonista */}
       <section className="av2-pasaporte sec-pad">
         <div className="container">
@@ -401,8 +406,23 @@ export default function AduanaVerde() {
               <span className="badge badge-green" style={{ marginLeft: 12 }}>{t('av.pas_chip')}</span>
             </div>
             <div className="av2-pas-wrap av2-reveal" style={{ justifyContent: 'center' }}>
-              <PasaporteMock />
+              <PasaportePreview />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Preguntas frecuentes — honestas, sin evasivas */}
+      <section className="sec-pad">
+        <div className="container" style={{ maxWidth: 760 }}>
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 28px' }}>{t('av.faq_titulo')}</h2>
+          <div className="av2-faq">
+            {[1, 2, 3, 4].map((n) => (
+              <details key={n} className="av2-faq-item">
+                <summary>{t(`av.faq_q${n}`)}</summary>
+                <p>{t(`av.faq_a${n}`)}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

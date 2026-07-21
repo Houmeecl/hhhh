@@ -442,6 +442,10 @@ function Conexion({ onVolver, onConectado, onDemo }) {
             {cargando ? <span className="spinner" /> : 'Conectar'}
           </button>
         </form>
+        <p className="muted" style={{ fontSize: 12, textAlign: 'center', marginTop: 12, marginBottom: 0 }}>
+          ¿Perdiste la clave del terminal?{' '}
+          <a href="mailto:contacto@sicr3p.cl?subject=Recuperar%20clave%20de%20terminal%20Aduana%20Verde">Escríbenos y la regeneramos</a>.
+        </p>
       </div>
 
       <div className="card card-pad" style={{ marginTop: 16, textAlign: 'center' }}>

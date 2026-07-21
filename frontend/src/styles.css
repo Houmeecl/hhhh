@@ -1092,3 +1092,75 @@ table.data tr:hover td { background: #f3f8f5; }
   .av2-header { padding: 14px 18px; }
   .av2-footer { padding: 22px 18px; justify-content: center; text-align: center; }
 }
+
+/* Pasaporte real embebido en el hero/sección resultado (av2-pas-shot):
+   la tarjeta pasa a ser un marco fino para la captura, sin el padding
+   interno del mock anterior; el chip queda pegado abajo, fuera de la
+   imagen, para no taparla. */
+.av2-pas-shot { padding: 0; overflow: hidden; }
+.av2-pas-shot img { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: cover; object-position: top; }
+.av2-pas-shot .av2-pas-chip { margin: 10px 14px 14px; border-radius: 0 0 10px 10px; }
+
+/* Preguntas frecuentes: acordeón nativo <details>, sin JS. */
+.av2-faq { display: grid; gap: 10px; }
+.av2-faq-item {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.av2-faq-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--navy);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.av2-faq-item summary::-webkit-details-marker { display: none; }
+.av2-faq-item summary::after {
+  content: '+';
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--green-600);
+  transition: transform 0.2s var(--ease);
+}
+.av2-faq-item[open] summary::after { transform: rotate(45deg); }
+.av2-faq-item p { margin: 12px 0 0; color: var(--gray); font-size: 14px; line-height: 1.65; }
+
+/* ============================================================
+   Landing del Corredor Bioceánico (/corredor) — captura real de la
+   Torre de Control en el hero, y de la Tarjeta de Viaje más abajo.
+   ============================================================ */
+.cor-shot {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cor-shot img { display: block; width: 100%; height: auto; }
+.cor-shot-chip {
+  display: block;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #b9e8c6;
+  background: rgba(40, 167, 69, 0.16);
+  border-top: 1px solid rgba(40, 167, 69, 0.35);
+  padding: 8px 10px;
+}
+.cor-tarjeta-shot {
+  max-width: 300px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  border: 1px solid var(--border);
+}
+.cor-tarjeta-shot img { display: block; width: 100%; height: auto; }
+@media (max-width: 900px) {
+  .cor-tarjeta-shot { max-width: 240px; margin: 0 auto; }
+}

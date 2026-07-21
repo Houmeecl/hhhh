@@ -12,6 +12,7 @@ import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import AduanaVerde from './pages/AduanaVerde.jsx';
+import CorredorLanding from './pages/CorredorLanding.jsx';
 import Cadena from './pages/Cadena.jsx';
 import Login from './admin/Login.jsx';
 import Activar from './admin/Activar.jsx';
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/pos" element={<PosTerminal />} />
       <Route path="/pos-demo" element={<Navigate to="/pos" replace />} />
       <Route path="/aduana-verde" element={<AduanaVerde />} />
+      <Route path="/corredor" element={<CorredorLanding />} />
       <Route path="/cadena" element={<Cadena />} />
 
       {/* Admin */}

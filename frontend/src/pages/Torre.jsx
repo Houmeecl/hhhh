@@ -313,6 +313,10 @@ function Operador({ codigo, t, onEnviado }) {
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={entrar} disabled={ocupado}>
             {ocupado ? <span className="spinner" /> : t('torre.entrar')}
           </button>
+          <p className="muted" style={{ fontSize: 11, textAlign: 'center', marginTop: 10 }}>
+            {t('torre.perdiste_clave')}{' '}
+            <a href="mailto:contacto@sicr3p.cl?subject=Recuperar%20clave%20de%20terminal%20torre">{t('torre.perdiste_clave_link')}</a>
+          </p>
         </>
       ) : (
         <>
