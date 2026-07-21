@@ -175,7 +175,76 @@ function ListaLotes({ lotes, flash, onAbrir, onCreado }) {
           </div>
         )}
       </div>
+
+      <DemoTorre flash={flash} />
     </>
+  );
+}
+
+// ---------- Demo torre de control (mapa + camión + mensajes) ----------
+// Un clic arma la demo completa: lote documental del Corredor con su
+// eslabón de origen, la credencial del camión (tarjeta de viaje) y la
+// credencial del operador de torre (terminal rol pos). Las claves se
+// muestran UNA sola vez. Guion completo: docs/TORRE-DE-CONTROL.md.
+function DemoTorre({ flash }) {
+  const [demo, setDemo] = useState(null);
+  const [creando, setCreando] = useState(false);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const r = await api.origenDemoTorre();
+      setDemo(r);
+      flash(`Demo lista: lote ${r.lote.codigo}.`);
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 14 }}>
+      <h3 style={{ marginTop: 0 }}>🗼 Demo torre de control</h3>
+      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+        Crea en un clic la demo del Corredor: mapa en <span className="mono">/torre/…</span> donde el camión
+        avanza con cada paso escaneado por QR, y mensajes de la torre ("puerto seco" / "puerto") que el
+        portador ve en su credencial. Dos credenciales de prueba: camión y torre.
+      </p>
+      {!demo && (
+        <button className="btn btn-primary" onClick={crear} disabled={creando}>
+          {creando ? <span className="spinner" /> : 'Crear demo'}
+        </button>
+      )}
+      {demo && (
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div className="badge badge-red" style={{ justifySelf: 'start' }}>
+            Estas claves se muestran UNA sola vez — anótalas ahora.
+          </div>
+          <div className="table-scroll">
+            <table className="data">
+              <thead><tr><th>Rol</th><th>Dónde entra</th><th>Credencial</th><th>Clave</th></tr></thead>
+              <tbody>
+                <tr>
+                  <td><strong>Camión</strong> (portador)</td>
+                  <td><a href={demo.urls.credencial} target="_blank" rel="noreferrer" className="mono">{demo.urls.credencial}</a></td>
+                  <td className="mono">{demo.tarjeta.serial}</td>
+                  <td className="mono">{demo.tarjeta.clave}</td>
+                </tr>
+                <tr>
+                  <td><strong>Torre</strong> (operador)</td>
+                  <td><a href={demo.urls.torre} target="_blank" rel="noreferrer" className="mono">{demo.urls.torre}</a></td>
+                  <td className="mono">{demo.torre.serial}</td>
+                  <td className="mono">{demo.torre.clave}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+            Proyecta <a href={demo.urls.torre} target="_blank" rel="noreferrer">la torre</a> en pantalla grande,
+            abre la credencial del camión en un teléfono, registra un paso… y míralo moverse en el mapa (~5 s).
+            El guion completo está en <span className="mono">docs/TORRE-DE-CONTROL.md</span>.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

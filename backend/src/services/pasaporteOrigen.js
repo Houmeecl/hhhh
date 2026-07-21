@@ -109,12 +109,15 @@ export function validarEslabon(input, lote, eslabonesPrevios = []) {
   const pais = String(e.pais || '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(pais)) errores.push('País debe ser código ISO-2 (ej: CL, AR).');
 
-  // RUT: obligatorio solo para actores chilenos; extranjeros usan
-  // datos.tax_id_extranjero. Módulo 11 SOLO si el país es CL.
+  // RUT: obligatorio para actores chilenos, SALVO el rol 'transporte':
+  // esos pasos los registra el portador de la tarjeta de viaje y su
+  // identidad la da la clave de la tarjeta (queda en datos.tarjeta_serial),
+  // no un RUT que el chofer no tiene por qué portar. Si el RUT viene,
+  // se valida módulo 11 igual. Extranjeros usan datos.tax_id_extranjero.
   const rut = NORM(e.rut_empresa);
   if (pais === 'CL') {
-    if (!rut) errores.push('Actor chileno requiere RUT.');
-    else if (!rutNormalizadoValido(rut)) errores.push('RUT inválido (dígito verificador).');
+    if (!rut && e.rol !== 'transporte') errores.push('Actor chileno requiere RUT.');
+    else if (rut && !rutNormalizadoValido(rut)) errores.push('RUT inválido (dígito verificador).');
   } else if (rut && !rutNormalizadoValido(rut)) {
     advertencias.push('El RUT informado no valida módulo 11 (actor no chileno: se acepta como identificador).');
   }
@@ -346,6 +349,24 @@ export function serialTarjetaValido(s) {
 export function hashAnclajeLote({ codigo, ultimo_hash, n_eslabones }) {
   const canonico = ['anclaje-lote', codigo || '', ultimo_hash || '', String(n_eslabones || 0)].join('|');
   return sha256(canonico);
+}
+
+// ---------- Torre de control (migración 024) ----------
+// Instrucciones operativas de la torre al portador: dirigirse al puerto
+// seco (interior) o al puerto (terminal marítimo). NO son eslabones:
+// no entran en la cadena de hash del lote.
+export const DESTINOS_TORRE = ['puerto_seco', 'puerto'];
+
+export function destinoTorreValido(d) {
+  return DESTINOS_TORRE.includes(d);
+}
+
+// Sanea el identificador de punto de control declarado por el portador
+// (catálogo del corredor en el frontend): slug [a-z0-9-] de hasta 40.
+// Devuelve null si no queda nada utilizable.
+export function sanearPuntoId(v) {
+  const s = String(v || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40);
+  return s || null;
 }
 
 // Re-export de las primitivas de cadena que la ruta necesita junto a

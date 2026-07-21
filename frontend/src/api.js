@@ -72,6 +72,19 @@ export const api = {
   // --- Tarjeta de viaje (pública / portador) ---
   tarjetaResolver: (serial) => request(`/v/${serial}`),
   tarjetaAuth: (b) => request('/tarjeta/auth', { method: 'POST', body: b }),
+  // --- Torre de control (mapa público + operador con credencial pos) ---
+  loteMensajes: (codigo) => request(`/lote/${codigo}/mensajes`),
+  posAuth: (b) => request('/pos/auth', { method: 'POST', body: b }),
+  torreMensaje: async (token, b) => {
+    const res = await fetch('/api/torre/mensaje', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(b),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al enviar la instrucción');
+    return data;
+  },
   tarjetaPaso: async (token, b) => {
     const res = await fetch('/api/tarjeta/paso', {
       method: 'POST',
@@ -96,6 +109,7 @@ export const api = {
   origenTarjetas: (loteId) => request(`/admin/origen/lotes/${loteId}/tarjetas`, { authed: true }),
   origenEmitirTarjeta: (loteId, b) => request(`/admin/origen/lotes/${loteId}/tarjetas`, { method: 'POST', body: b, authed: true }),
   origenEditarTarjeta: (id, b) => request(`/admin/origen/tarjetas/${id}`, { method: 'PUT', body: b, authed: true }),
+  origenDemoTorre: () => request('/admin/origen/demo-torre', { method: 'POST', authed: true }),
   abrirCredencialTarjeta: (loteId, tarjetaId) =>
     abrirPdfAuth(`/api/admin/origen/lotes/${loteId}/tarjetas/${tarjetaId}/credencial.pdf`),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),

@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
+import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 
 // Tarjeta de Viaje: la URL grabada en el NDEF de la tarjeta NFC/RFID
 // que acompaña a la carga es /v/{serial}. Cualquiera que la lea llega
@@ -19,15 +20,30 @@ export default function TarjetaViaje() {
   // Formulario del portador
   const [abierto, setAbierto] = useState(false);
   const [clave, setClave] = useState('');
-  const [punto, setPunto] = useState('');
+  const [puntoId, setPuntoId] = useState('');   // punto del catálogo del corredor
+  const [punto, setPunto] = useState('');       // texto libre (si no es del catálogo)
   const [pais, setPais] = useState('CL');
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [errPaso, setErrPaso] = useState('');
 
+  // La credencial se refresca sola: así el portador ve la instrucción de
+  // la torre ("puerto seco" / "puerto") apenas la envían, sin recargar.
   useEffect(() => {
-    api.tarjetaResolver(serial).then(setInfo).catch((e) => setError(e.message));
+    const cargar = () => {
+      if (document.hidden) return;
+      api.tarjetaResolver(serial).then(setInfo).catch((e) => setError(e.message));
+    };
+    cargar();
+    const timer = setInterval(cargar, 10000);
+    return () => clearInterval(timer);
   }, [serial]);
+
+  const elegirPunto = (id) => {
+    setPuntoId(id);
+    const p = PUNTOS_CORREDOR.find((x) => x.id === id);
+    if (p) { setPais(p.pais); setPunto(''); }
+  };
 
   async function registrarPaso() {
     setErrPaso('');
@@ -35,14 +51,17 @@ export default function TarjetaViaje() {
     if (!clave.trim()) { setErrPaso(t('tv.falta_clave')); return; }
     setEnviando(true);
     try {
+      const sel = PUNTOS_CORREDOR.find((x) => x.id === puntoId) || null;
       const { token } = await api.tarjetaAuth({ serial, clave: clave.trim() });
       const r = await api.tarjetaPaso(token, {
-        punto_control: punto.trim() || null,
+        punto_control: sel ? sel.nombre : (punto.trim() || null),
+        punto_id: sel ? sel.id : undefined,
         pais: pais.trim().toUpperCase() || 'CL',
       });
       setResultado(r.eslabon);
       setClave('');
       setPunto('');
+      setPuntoId('');
     } catch (e) { setErrPaso(e.message); }
     finally { setEnviando(false); }
   }
@@ -68,6 +87,22 @@ export default function TarjetaViaje() {
               {t('tv.serial')}: <span className="mono">{info.serial}</span>
             </p>
 
+            {/* Instrucción vigente de la torre de control (se refresca sola). */}
+            {info.instruccion && (
+              <div className="torre-banner" style={{ textAlign: 'left', marginBottom: 14 }}>
+                <span className="torre-banner-icono">📢</span>
+                <div>
+                  <div className="torre-banner-titulo">
+                    {t('tv.instr_torre')}: {info.instruccion.destino === 'puerto_seco' ? t('torre.puerto_seco') : t('torre.puerto')}
+                  </div>
+                  <div className="muted" style={{ fontSize: 11 }}>
+                    {info.instruccion.nota ? `${info.instruccion.nota} · ` : ''}
+                    {info.instruccion.emisor} · {new Date(info.instruccion.creado).toLocaleString('es-CL')}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* QR de la propia credencial: el portador muestra la pantalla
                 y otro la escanea — la tarjeta ES el teléfono. */}
             <div className="pas-qr" style={{ marginBottom: 16 }}>
@@ -76,6 +111,10 @@ export default function TarjetaViaje() {
 
             <Link className="btn btn-primary" style={{ width: '100%', marginBottom: 10 }} to={`/lote/${info.codigo}`}>
               {t('tv.ver_pasaporte')}
+            </Link>
+
+            <Link className="btn btn-outline" style={{ width: '100%', marginBottom: 10 }} to={`/torre/${info.codigo}`}>
+              🗼 {t('tv.ver_torre')}
             </Link>
 
             <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setAbierto(!abierto)}>
@@ -90,9 +129,20 @@ export default function TarjetaViaje() {
                   <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" />
                 </div>
                 <div className="field">
-                  <label>{t('tv.punto')}</label>
-                  <input value={punto} placeholder={t('tv.punto_ej')} onChange={(e) => setPunto(e.target.value)} />
+                  <label>{t('tv.punto_sel')}</label>
+                  <select value={puntoId} onChange={(e) => elegirPunto(e.target.value)}>
+                    <option value="">{t('tv.punto_otro')}</option>
+                    {PUNTOS_CORREDOR.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre} ({p.pais})</option>
+                    ))}
+                  </select>
                 </div>
+                {!puntoId && (
+                  <div className="field">
+                    <label>{t('tv.punto')}</label>
+                    <input value={punto} placeholder={t('tv.punto_ej')} onChange={(e) => setPunto(e.target.value)} />
+                  </div>
+                )}
                 <div className="field">
                   <label>{t('tv.pais')}</label>
                   <input value={pais} maxLength={2} style={{ width: 90 }}

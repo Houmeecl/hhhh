@@ -19,7 +19,7 @@ import accesosRoutes from './routes/accesos.js';
 import motorRoutes from './routes/motor.js';
 import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
-import origenRoutes, { tarjetaRouter } from './routes/origen.js';
+import origenRoutes, { tarjetaRouter, torreRouter } from './routes/origen.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 
 const app = express();
@@ -59,6 +59,7 @@ app.use('/api/pos', apiLimiter, posRoutes);
 app.use('/api/admin/pos', posAdminRoutes);
 app.use('/api/admin/origen', origenRoutes);
 app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
+app.use('/api/torre', apiLimiter, torreRouter);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));

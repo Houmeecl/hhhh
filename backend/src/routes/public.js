@@ -1089,7 +1089,17 @@ router.get('/v/:serial', async (req, res, next) => {
       [String(req.params.serial || '').trim().toUpperCase()]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
-    res.json({ serial: rows[0].serial, codigo: rows[0].codigo });
+    // Instrucción vigente de la torre de control (migración 024): la ve
+    // quien porta la credencial, sin clave — leerla no escribe nada.
+    const { rows: mRows } = await query(
+      `SELECT m.destino, m.nota, m.emisor, m.creado
+       FROM torre_mensajes m
+       JOIN tarjetas_viaje t ON t.lote_id = m.lote_id
+       WHERE t.serial = $1
+       ORDER BY m.creado DESC LIMIT 1`,
+      [rows[0].serial]
+    );
+    res.json({ serial: rows[0].serial, codigo: rows[0].codigo, instruccion: mRows[0] || null });
   } catch (err) { next(err); }
 });
 
@@ -1105,6 +1115,27 @@ router.get('/v/:serial/qr.png', async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
     res.type('png').send(await qrBufferDe(tarjetaUrl(rows[0].serial)));
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/lote/:codigo/mensajes — historial de la torre ----------
+// Instrucciones operativas enviadas por la torre de control (últimas 10).
+// Público: quien tiene el código del lote ya ve su pasaporte; la torre
+// /torre/{codigo} pollea esto para pintar el historial. No expone RUT
+// ni datos comerciales — solo destino, nota corta, emisor y fecha.
+router.get('/lote/:codigo/mensajes', async (req, res, next) => {
+  try {
+    const { rows: lRows } = await query(
+      `SELECT id FROM lotes_minerales WHERE codigo = $1`,
+      [String(req.params.codigo || '').toUpperCase()]
+    );
+    if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    const { rows } = await query(
+      `SELECT destino, nota, emisor, creado FROM torre_mensajes
+       WHERE lote_id = $1 ORDER BY creado DESC LIMIT 10`,
+      [lRows[0].id]
+    );
+    res.json({ mensajes: rows });
   } catch (err) { next(err); }
 });
 

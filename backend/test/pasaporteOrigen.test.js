@@ -340,3 +340,42 @@ test('resumenNormativo: OECD minerales SOLO para tipo mineral', () => {
   assert.ok(resumenNormativo({ ...LOTE, tipo: 'producto' }, declar).cbam);
   assert.ok(resumenNormativo({ ...LOTE, tipo: 'documental' }, declar).dpp);
 });
+
+// ---------- Torre de control (migración 024) ----------
+
+test('destinoTorreValido acepta solo puerto_seco y puerto', async () => {
+  const { destinoTorreValido, DESTINOS_TORRE } = await import('../src/services/pasaporteOrigen.js');
+  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto']);
+  assert.equal(destinoTorreValido('puerto_seco'), true);
+  assert.equal(destinoTorreValido('puerto'), true);
+  assert.equal(destinoTorreValido('aeropuerto'), false);
+  assert.equal(destinoTorreValido(''), false);
+  assert.equal(destinoTorreValido(undefined), false);
+  assert.equal(destinoTorreValido('PUERTO'), false); // sensible a mayúsculas: el frontend manda el código exacto
+});
+
+test('sanearPuntoId deja slugs [a-z0-9-] de hasta 40 y devuelve null si no queda nada', async () => {
+  const { sanearPuntoId } = await import('../src/services/pasaporteOrigen.js');
+  assert.equal(sanearPuntoId('paso-de-jama'), 'paso-de-jama');
+  assert.equal(sanearPuntoId('Paso-De-JAMA'), 'paso-de-jama');
+  assert.equal(sanearPuntoId('puerto seco (la negra)'), 'puertosecolanegra');
+  assert.equal(sanearPuntoId('  '), null);
+  assert.equal(sanearPuntoId(null), null);
+  assert.equal(sanearPuntoId(undefined), null);
+  assert.equal(sanearPuntoId('<script>alert(1)</script>'), 'scriptalert1script');
+  assert.equal(sanearPuntoId('x'.repeat(80)).length, 40);
+});
+
+test('paso de transporte chileno SIN RUT pasa (la tarjeta es la identidad); otros roles CL siguen exigiendo RUT', () => {
+  const lote = { estado: 'abierto', tipo: 'documental', cantidad: 28, codigo: 'LM-2026-000001' };
+  const base = { pais: 'CL', fecha: '2026-07-21', co2e_aportado: 0 };
+  const conTransporte = validarEslabon({ ...base, rol: 'transporte' }, lote, []);
+  assert.equal(conTransporte.ok, true);
+  const sinRutFrontera = validarEslabon({ ...base, rol: 'frontera' }, lote, []);
+  assert.equal(sinRutFrontera.ok, false);
+  assert.ok(sinRutFrontera.errores.join(' ').includes('RUT'));
+  // Si el transporte SÍ informa RUT, el módulo 11 se exige igual
+  // (12345678-9 tiene DV malo; el DV correcto de ese cuerpo es 5).
+  const rutMalo = validarEslabon({ ...base, rol: 'transporte', rut_empresa: '12345678-9' }, lote, []);
+  assert.equal(rutMalo.ok, false);
+});
