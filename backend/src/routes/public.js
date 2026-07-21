@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel, generateExpedienteLote } from '../services/pdf.js';
-import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl } from '../services/qr.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
   filtrarPorVisibilidad, enmascararRut, balanceMasas,
@@ -1066,6 +1066,21 @@ router.get('/v/:serial', async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
     res.json({ serial: rows[0].serial, codigo: rows[0].codigo });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/v/:serial/qr.png — QR de la propia credencial ----------
+// La página /v/:serial muestra su propio QR: el portador enseña la
+// pantalla y otro la escanea (comportamiento de credencial en el
+// teléfono, sin chip físico).
+router.get('/v/:serial/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT serial FROM tarjetas_viaje WHERE serial = $1 AND activo = true`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
+    res.type('png').send(await qrBufferDe(tarjetaUrl(rows[0].serial)));
   } catch (err) { next(err); }
 });
 

@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { qrBuffer, qrBufferDe, loteUrl } from './qr.js';
+import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
 
@@ -758,4 +758,56 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
   );
 
   return salida;
+}
+
+// ---------- CREDENCIAL VIRTUAL — Tarjeta de Viaje (solo QR, sin chip) ----------
+// La "tarjeta" es esta credencial: un PDF tamaño tarjeta que el admin
+// descarga y envía al transportista (WhatsApp o impresa). El QR apunta a
+// /v/{serial} — la credencial VIVA del lote. La clave del portador NUNCA
+// va impresa aquí: viaja aparte y se muestra una sola vez al emitir.
+export async function generateCredencialTarjeta({ tarjeta, lote }) {
+  const doc = new PDFDocument({ size: [420, 260], margin: 0 });
+  const qr = await qrBufferDe(tarjetaUrl(tarjeta.serial));
+
+  // Fondo
+  doc.rect(0, 0, 420, 260).fill('#ffffff');
+  doc.roundedRect(8, 8, 404, 244, 12).lineWidth(1.5).stroke(BORDER);
+
+  // Encabezado
+  drawLogo(doc, 24, 24, 20);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(GREEN)
+    .text('TARJETA DE VIAJE', 24, 50, { lineBreak: false });
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+    .text(' · Pasaporte de Origen', doc.x, 51, { lineBreak: false });
+
+  // Serial protagonista
+  doc.font('Courier-Bold').fontSize(26).fillColor(NAVY).text(tarjeta.serial, 24, 74);
+
+  // Datos del lote
+  let y = 116;
+  const fila = (label, value) => {
+    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(label.toUpperCase(), 24, y);
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(NAVY)
+      .text(String(value || '—').slice(0, 40), 24, y + 9, { width: 235 });
+    y += 27;
+  };
+  fila('Lote', lote.codigo);
+  fila('Material', MATERIAL_EXPEDIENTE[lote.material] || lote.material);
+  fila('Portador', tarjeta.portador);
+
+  // QR grande — el corazón de la credencial
+  doc.image(qr, 282, 62, { width: 118, height: 118 });
+  doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+    .text('Escanee para abrir el pasaporte del lote', 274, 184, { width: 134, align: 'center' });
+
+  // Pie
+  doc.roundedRect(24, 200, 372, 40, 8).fill(LIGHT);
+  doc.font('Helvetica').fontSize(7).fillColor(NAVY).text(
+    'Cualquiera que escanee este QR ve el pasaporte público del lote. Solo el portador, ' +
+    'con su clave (entregada por separado), registra pasos — cada paso queda sellado con ' +
+    'hash, fecha y punto de control en la cadena del lote.',
+    34, 207, { width: 352 }
+  );
+
+  return bufferDoc(doc);
 }

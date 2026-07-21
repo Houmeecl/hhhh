@@ -5,6 +5,7 @@ import { requireAuth, requireRole, logActividad, signAccess } from '../middlewar
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 import { generarClave } from '../services/posTerminal.js';
+import { generateCredencialTarjeta } from '../services/pdf.js';
 import {
   ROLES,
   hashEslabonLote,
@@ -408,6 +409,28 @@ router.post('/lotes/:id/tarjetas', adminOnly, async (req, res, next) => {
     });
     // `clave` en claro SOLO aquí: se entrega impresa junto con la tarjeta.
     res.status(201).json({ tarjeta, clave });
+  } catch (err) { next(err); }
+});
+
+// Credencial virtual PDF de la tarjeta (tamaño tarjeta, con QR a /v/serial).
+// La descarga el admin y se la envía al transportista — WhatsApp o impresa.
+router.get('/lotes/:id/tarjetas/:tarjetaId/credencial.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT t.*, l.codigo AS lote_codigo, l.material AS lote_material
+       FROM tarjetas_viaje t JOIN lotes_minerales l ON l.id = t.lote_id
+       WHERE t.id = $1 AND t.lote_id = $2`,
+      [req.params.tarjetaId, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+    const t = rows[0];
+    const pdf = await generateCredencialTarjeta({
+      tarjeta: t,
+      lote: { codigo: t.lote_codigo, material: t.lote_material },
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-credencial-${t.serial}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

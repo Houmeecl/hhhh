@@ -365,11 +365,12 @@ function Tarjetas({ lote, abierto, flash }) {
 
   return (
     <div className="card card-pad" style={{ marginBottom: 14 }}>
-      <h3 style={{ marginTop: 0 }}>Tarjetas de viaje (NFC/RFID)</h3>
+      <h3 style={{ marginTop: 0 }}>Tarjetas de viaje (credencial virtual con QR)</h3>
       <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-        Graba en la tarjeta la URL <b style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/v/{SERIAL}`}</b> (app
-        "NFC Tools" → Escribir → URL). Quien la lea ve el pasaporte; solo el portador con clave registra pasos.
-        Guía completa: docs/TARJETA-VIAJE.md.
+        Sin chip: emite la tarjeta, descarga la <b>credencial PDF con QR</b> y envíasela al transportista
+        (WhatsApp o impresa). Quien escanee el QR ve el pasaporte del lote; solo el portador con su clave
+        registra pasos. La página <b style={{ fontFamily: 'monospace' }}>/v/SERIAL</b> es la credencial viva
+        en el teléfono. Guía: docs/TARJETA-VIAJE.md.
       </p>
 
       {nueva && (
@@ -379,10 +380,15 @@ function Tarjetas({ lote, abierto, flash }) {
             Clave del portador (visible SOLO ahora — entrégala impresa junto con la tarjeta):
             <div style={{ fontFamily: 'monospace', fontSize: 18, marginTop: 4 }}>{nueva.clave}</div>
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              URL para grabar: <span style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/v/${nueva.tarjeta.serial}`}</span>
+              Credencial viva: <span style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/v/${nueva.tarjeta.serial}`}</span>
             </div>
           </div>
-          <button className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={() => setNueva(null)}>Entendido, ocultar clave</button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-sm btn-primary" onClick={() => api.abrirCredencialTarjeta(lote.id, nueva.tarjeta.id).catch((e) => flash(e.message, true))}>
+              Descargar credencial PDF
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={() => setNueva(null)}>Entendido, ocultar clave</button>
+          </div>
         </div>
       )}
 
@@ -416,7 +422,13 @@ function Tarjetas({ lote, abierto, flash }) {
                   <td className="num">{fmtInt(t.pasos_registrados)}</td>
                   <td>{t.ultima_actividad ? fmtFecha(t.ultima_actividad) : '—'}</td>
                   <td><span className={`badge ${t.activo ? 'badge-green' : 'badge-gray'}`}>{t.activo ? 'activa' : 'inactiva'}</span></td>
-                  <td><button className="btn btn-sm btn-outline" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Reactivar'}</button></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-sm btn-outline" style={{ marginRight: 6 }}
+                      onClick={() => api.abrirCredencialTarjeta(lote.id, t.id).catch((e) => flash(e.message, true))}>
+                      Credencial
+                    </button>
+                    <button className="btn btn-sm btn-outline" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Reactivar'}</button>
+                  </td>
                 </tr>
               ))}
             </tbody>

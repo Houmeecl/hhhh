@@ -65,9 +65,14 @@ export default function TarjetaViaje() {
             <p className="muted" style={{ margin: '0 0 6px' }}>
               {t('tv.serial')}: <b style={{ fontFamily: 'monospace' }}>{info.serial}</b>
             </p>
-            <p style={{ margin: '0 0 18px' }}>
+            <p style={{ margin: '0 0 14px' }}>
               {t('tv.lote')}: <b style={{ fontFamily: 'monospace' }}>{info.codigo}</b>
             </p>
+
+            {/* QR de la propia credencial: el portador muestra la pantalla
+                y otro la escanea — la tarjeta ES el teléfono. */}
+            <img src={`/api/v/${info.serial}/qr.png`} alt={t('tv.qr_alt')} width={132} height={132}
+              style={{ borderRadius: 10, border: '1px solid var(--border)', marginBottom: 14 }} />
 
             <Link className="btn btn-primary" style={{ width: '100%', marginBottom: 10 }} to={`/lote/${info.codigo}`}>
               {t('tv.ver_pasaporte')}

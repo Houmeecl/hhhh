@@ -288,6 +288,7 @@ const DICCIONARIOS = {
     'tv.nota': 'Esta tarjeta abre el pasaporte público del lote. Solo el portador autorizado puede registrar pasos; ninguna lectura anónima queda registrada.',
     'tv.error_titulo': 'Tarjeta no encontrada',
     'tv.error_texto': 'La tarjeta no existe, está inactiva o no tiene un lote asignado.',
+    'tv.qr_alt': 'QR de esta credencial — muestra la pantalla para que la escaneen',
   },
 
   // ---------- Inglés ----------
@@ -561,6 +562,7 @@ const DICCIONARIOS = {
     'tv.nota': 'This card opens the public batch passport. Only the authorized carrier can record waypoints; anonymous reads are never logged.',
     'tv.error_titulo': 'Card not found',
     'tv.error_texto': 'The card does not exist, is inactive or has no batch assigned.',
+    'tv.qr_alt': 'This credential’s QR — show your screen so others can scan it',
   },
 
   // ---------- Portugués ----------
@@ -801,6 +803,7 @@ const DICCIONARIOS = {
     'tv.nota': 'Este cartão abre o passaporte público do lote. Somente o portador autorizado pode registrar passagens; leituras anônimas nunca são registradas.',
     'tv.error_titulo': 'Cartão não encontrado',
     'tv.error_texto': 'O cartão não existe, está inativo ou não tem lote atribuído.',
+    'tv.qr_alt': 'QR desta credencial — mostre a tela para que outros a escaneiem',
   },
 };
 

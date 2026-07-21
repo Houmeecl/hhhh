@@ -36,6 +36,11 @@ export function loteUrl(codigo) {
   return `${config.publicAppUrl}/lote/${codigo}`;
 }
 
+// URL pública de la tarjeta de viaje (credencial virtual con QR).
+export function tarjetaUrl(serial) {
+  return `${config.publicAppUrl}/v/${serial}`;
+}
+
 // Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
 export async function qrBufferDe(url) {
   return QRCode.toBuffer(url, {
