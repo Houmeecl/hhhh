@@ -1019,6 +1019,7 @@ router.get('/lote/:codigo', async (req, res, next) => {
         qr_png: `/api/lote/${lote.codigo}/qr.png`,
       },
       lote: {
+        tipo: lote.tipo || 'mineral',
         material: lote.material,
         descripcion: lote.descripcion,
         codigo_nc: lote.codigo_nc,

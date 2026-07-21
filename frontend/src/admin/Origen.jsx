@@ -11,13 +11,36 @@ import { validarRut, formatearRut } from '../lib/rut.js';
 // declaraciones — no certifica.
 // ============================================================
 
+const TIPO_LABEL = {
+  mineral: 'Mineral (minería)',
+  producto: 'Producto (ciudad / Aduana Verde)',
+  documental: 'Documental (Corredor Bioceánico)',
+};
 const ROL_LABEL = {
   mina: 'Mina', planta: 'Planta', refineria: 'Refinería', transporte: 'Transporte',
   comerciante: 'Comerciante', exportador: 'Exportador', comprador: 'Comprador',
+  productor: 'Productor', proveedor: 'Proveedor', comercio: 'Comercio',
+  punto_aduana_verde: 'Punto Aduana Verde',
+  origen: 'Origen', deposito: 'Depósito', frontera: 'Frontera', puerto: 'Puerto', destino: 'Destino',
 };
 const MATERIAL_LABEL = {
   cobre_catodo: 'Cátodos de cobre', concentrado_cobre: 'Concentrado de cobre',
-  litio_carbonato: 'Carbonato de litio', oro: 'Oro', otro: 'Otro mineral',
+  litio_carbonato: 'Carbonato de litio', oro: 'Oro', otro: 'Otro',
+  alimentos: 'Alimentos', bebidas: 'Bebidas', textil: 'Textil', embalajes: 'Embalajes',
+  manufactura: 'Manufactura', quimicos: 'Químicos',
+  carga_general: 'Carga general', carga_refrigerada: 'Carga refrigerada',
+  granel: 'Granel', contenedor: 'Contenedor', documentos: 'Documentos',
+};
+// Catálogos por tipo (espejo del servicio backend; el servidor valida igual).
+const MATERIALES_POR_TIPO = {
+  mineral: ['cobre_catodo', 'concentrado_cobre', 'litio_carbonato', 'oro', 'otro'],
+  producto: ['alimentos', 'bebidas', 'textil', 'embalajes', 'manufactura', 'quimicos', 'otro'],
+  documental: ['carga_general', 'carga_refrigerada', 'granel', 'contenedor', 'documentos'],
+};
+const ROLES_POR_TIPO = {
+  mineral: ['mina', 'planta', 'refineria', 'transporte', 'comerciante', 'exportador', 'comprador'],
+  producto: ['productor', 'proveedor', 'transporte', 'comercio', 'punto_aduana_verde', 'comprador'],
+  documental: ['origen', 'transporte', 'deposito', 'frontera', 'puerto', 'destino'],
 };
 const DECLARACIONES = [
   { codigo: 'oecd_p1', label: 'OECD P1 — Sistema de gestión y política de cadena' },
@@ -66,9 +89,13 @@ export default function Origen() {
 
 // ---------- Lista + creación ----------
 function ListaLotes({ lotes, flash, onAbrir, onCreado }) {
-  const [form, setForm] = useState({ material: 'cobre_catodo', cantidad: '', unidad: 't', pais_origen: 'CL', faena_origen: '', rut_titular: '', codigo_nc: '' });
+  const [form, setForm] = useState({ tipo: 'producto', material: 'alimentos', cantidad: '', unidad: 't', pais_origen: 'CL', faena_origen: '', rut_titular: '', codigo_nc: '' });
   const [creando, setCreando] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const cambiarTipo = (e) => {
+    const tipo = e.target.value;
+    setForm((f) => ({ ...f, tipo, material: MATERIALES_POR_TIPO[tipo][0] }));
+  };
 
   async function crear() {
     const n = Number(form.cantidad);
@@ -86,11 +113,16 @@ function ListaLotes({ lotes, flash, onAbrir, onCreado }) {
   return (
     <>
       <div className="card card-pad" style={{ margin: '14px 0' }}>
-        <h3 style={{ marginTop: 0 }}>Nuevo lote mineral</h3>
+        <h3 style={{ marginTop: 0 }}>Nuevo lote</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
-          <div className="field"><label>Material</label>
+          <div className="field"><label>Tipo de pasaporte</label>
+            <select value={form.tipo} onChange={cambiarTipo}>
+              {Object.entries(TIPO_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>{form.tipo === 'documental' ? 'Tipo de carga' : 'Material / rubro'}</label>
             <select value={form.material} onChange={set('material')}>
-              {Object.entries(MATERIAL_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              {MATERIALES_POR_TIPO[form.tipo].map((v) => <option key={v} value={v}>{MATERIAL_LABEL[v] || v}</option>)}
             </select>
           </div>
           <div className="field"><label>Cantidad</label>
@@ -124,11 +156,12 @@ function ListaLotes({ lotes, flash, onAbrir, onCreado }) {
         ) : (
           <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>Código</th><th>Material</th><th className="num">Cantidad</th><th>Origen</th><th>Estado</th><th className="num">Eslabones</th><th></th></tr></thead>
+              <thead><tr><th>Código</th><th>Tipo</th><th>Material</th><th className="num">Cantidad</th><th>Origen</th><th>Estado</th><th className="num">Eslabones</th><th></th></tr></thead>
               <tbody>
                 {lotes.map((l) => (
                   <tr key={l.id}>
                     <td style={{ fontFamily: 'monospace' }}>{l.codigo}</td>
+                    <td><span className="badge badge-gray" style={{ fontSize: 11 }}>{l.tipo || 'mineral'}</span></td>
                     <td>{MATERIAL_LABEL[l.material] || l.material}</td>
                     <td className="num">{fmt(l.cantidad, 3)} {l.unidad}</td>
                     <td>{l.pais_origen}{l.faena_origen ? ` · ${l.faena_origen}` : ''}</td>
@@ -150,7 +183,8 @@ function ListaLotes({ lotes, flash, onAbrir, onCreado }) {
 function DetalleLote({ data, flash, onVolver, onRefrescar }) {
   const { lote, eslabones, declaraciones, balance, emisiones, normativo, integridad } = data;
   const abierto = lote.estado === 'abierto';
-  const [e, setE] = useState({ rol: 'mina', rut_empresa: '', nombre_empresa: '', pais: 'CL', fecha: '', cantidad: '', co2e_aportado: '', visibilidad: 'publico', punto_control: '' });
+  const rolesDelTipo = ROLES_POR_TIPO[lote.tipo || 'mineral'] || ROLES_POR_TIPO.mineral;
+  const [e, setE] = useState({ rol: rolesDelTipo[0], rut_empresa: '', nombre_empresa: '', pais: 'CL', fecha: '', cantidad: '', co2e_aportado: '', visibilidad: 'publico', punto_control: '' });
   const [guardando, setGuardando] = useState(false);
   const setF = (k) => (ev) => setE((f) => ({ ...f, [k]: ev.target.value }));
   const declPor = new Map(declaraciones.map((d) => [d.codigo, d]));
@@ -200,6 +234,7 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0', flexWrap: 'wrap' }}>
         <button className="btn btn-sm btn-outline" onClick={onVolver}>← Volver</button>
         <b style={{ fontFamily: 'monospace' }}>{lote.codigo}</b>
+        <span className="badge badge-gray">{TIPO_LABEL[lote.tipo || 'mineral']}</span>
         <span className={`badge ${integridad.valido ? 'badge-green' : 'badge-red'}`}>
           {integridad.valido ? '✓ Cadena íntegra' : '⚠ Cadena alterada'}
         </span>
@@ -243,7 +278,7 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
               <div className="field"><label>Rol</label>
                 <select value={e.rol} onChange={setF('rol')}>
-                  {Object.entries(ROL_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {rolesDelTipo.map((v) => <option key={v} value={v}>{ROL_LABEL[v] || v}</option>)}
                 </select>
               </div>
               <div className="field"><label>País (ISO-2)</label>
@@ -290,8 +325,10 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       <div className="card card-pad" style={{ marginBottom: 14 }}>
         <h3 style={{ marginTop: 0 }}>Checklist normativo</h3>
         <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-          OECD {normativo.oecd.pasos_cubiertos}/{normativo.oecd.pasos_total} pasos ·
-          Anexo II {normativo.oecd.anexo2_cubiertas}/{normativo.oecd.anexo2_total} ·
+          {normativo.oecd && (
+            <>OECD {normativo.oecd.pasos_cubiertos}/{normativo.oecd.pasos_total} pasos ·{' '}
+            Anexo II {normativo.oecd.anexo2_cubiertas}/{normativo.oecd.anexo2_total} ·{' '}</>
+          )}
           CBAM {normativo.cbam.listo ? 'datos completos' : `faltan: ${normativo.cbam.faltantes.join(', ')}`}
           {!normativo.cbam.aplicable && ' (material fuera del Anexo I vigente)'} ·
           DPP {normativo.dpp.listo ? 'completo' : `faltan: ${normativo.dpp.faltantes.join(', ')}`}
@@ -300,7 +337,7 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
           <table className="data">
             <thead><tr><th>Declaración</th><th>Estado</th></tr></thead>
             <tbody>
-              {DECLARACIONES.map((d) => (
+              {(normativo.oecd ? DECLARACIONES : DECLARACIONES.filter((d) => d.codigo.startsWith('dpp_'))).map((d) => (
                 <tr key={d.codigo}>
                   <td>{d.label}</td>
                   <td>

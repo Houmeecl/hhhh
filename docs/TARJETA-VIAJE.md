@@ -5,6 +5,23 @@ el modelo se invierte: **la credencial viaja con la carga** — pero no es un
 chip: es una **credencial virtual con QR**, que el transportista lleva en su
 teléfono (o impresa en papel). Costo por unidad: **cero**.
 
+## Tres tipos de pasaporte — NO todos son minería
+
+El módulo "Pasaporte de Origen" sirve a tres destinos distintos, cada uno
+con su propio catálogo de rubros/materiales y de roles de la cadena:
+
+| Tipo | Para qué | Ejemplos de rubro | Roles de la cadena |
+|---|---|---|---|
+| **`documental`** | **Corredor Bioceánico**: trazabilidad de la CARGA y sus DOCUMENTOS por tramos (no del mineral en sí) | carga general, refrigerada, granel, contenedor, documentos | origen, transporte, depósito, frontera, puerto, destino |
+| **`producto`** | **Ciudad → Aduana Verde**: productos de comercios urbanos de **cualquier rubro** | alimentos, bebidas, textil, embalajes, manufactura, químicos | productor, proveedor, transporte, comercio, punto Aduana Verde, comprador |
+| **`mineral`** | Cadena minera (cobre, litio, oro…) | cátodos de cobre, concentrado, litio, oro | mina, planta, refinería, transporte, comerciante, exportador, comprador |
+
+**Importante**: el tipo `producto` (Aduana Verde) NUNCA usa materiales ni
+roles de minería — es deliberadamente genérico para cualquier comercio de la
+ciudad. El checklist normativo OECD Due Diligence de minerales solo aparece
+en pasaportes tipo `mineral`; los otros dos tipos muestran CBAM y DPP (que
+aplican de forma más general) pero omiten la tarjeta OECD por honestidad.
+
 ## Cómo funciona
 
 1. **Emitir** (panel admin → Pasaporte de Origen → lote → Tarjetas de viaje):

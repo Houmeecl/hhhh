@@ -231,9 +231,12 @@ test('generarCodigoLote formatea LM-AAAA-NNNNNN', () => {
   assert.equal(generarCodigoLote(2026, 123456), 'LM-2026-123456');
 });
 
-test('ROLES contiene los 7 roles de la cadena', () => {
-  assert.equal(ROLES.length, 7);
-  assert.ok(ROLES.includes('mina') && ROLES.includes('comprador'));
+test('ROLES es el superset de los roles de los 3 tipos, sin duplicados', () => {
+  assert.equal(new Set(ROLES).size, ROLES.length);
+  // roles representativos de cada tipo
+  assert.ok(ROLES.includes('mina') && ROLES.includes('comprador'));       // mineral
+  assert.ok(ROLES.includes('comercio') && ROLES.includes('punto_aduana_verde')); // producto
+  assert.ok(ROLES.includes('frontera') && ROLES.includes('destino'));     // documental
 });
 
 // ---------- Tarjeta de Viaje ----------
@@ -281,4 +284,59 @@ test('la cadena global mixta (facturas + anclaje) verifica de punta a punta', as
   const r = verificarCadenaCompleta(eslabones);
   assert.equal(r.valido, true);
   assert.equal(r.total_eslabones, 4);
+});
+
+// ---------- Tipos de pasaporte (migración 023) ----------
+
+test('materialValido respeta el catálogo de cada tipo', async () => {
+  const { materialValido, TIPOS, CATALOGO_MATERIALES } = await import('../src/services/pasaporteOrigen.js');
+  assert.deepEqual(TIPOS, ['mineral', 'producto', 'documental']);
+  assert.equal(materialValido('mineral', 'cobre_catodo'), true);
+  assert.equal(materialValido('producto', 'alimentos'), true);
+  assert.equal(materialValido('documental', 'contenedor'), true);
+  // cruces inválidos: el cobre NO es un producto de ciudad, etc.
+  assert.equal(materialValido('producto', 'cobre_catodo'), false);
+  assert.equal(materialValido('documental', 'alimentos'), false);
+  assert.equal(materialValido('mineral', 'textil'), false);
+  assert.equal(materialValido('inexistente', 'otro'), false);
+  assert.ok(CATALOGO_MATERIALES.producto.includes('embalajes'));
+});
+
+test('validarEslabon exige roles del tipo del lote', () => {
+  const loteProducto = { ...LOTE, tipo: 'producto' };
+  // 'mina' no existe en un pasaporte de producto
+  assert.equal(validarEslabon({ ...ESLABON_BASE, rut_empresa: RUT_VALIDO, rol: 'mina' }, loteProducto).ok, false);
+  // 'comercio' sí
+  assert.equal(validarEslabon({ ...ESLABON_BASE, rut_empresa: RUT_VALIDO, rol: 'comercio' }, loteProducto).ok, true);
+  // documental: 'frontera' válido, 'refineria' no
+  const loteDoc = { ...LOTE, tipo: 'documental' };
+  assert.equal(validarEslabon({ ...ESLABON_BASE, rut_empresa: RUT_VALIDO, rol: 'frontera' }, loteDoc).ok, true);
+  assert.equal(validarEslabon({ ...ESLABON_BASE, rut_empresa: RUT_VALIDO, rol: 'refineria' }, loteDoc).ok, false);
+  // sin tipo = mineral (compatibilidad con lotes de la 021)
+  assert.equal(validarEslabon({ ...ESLABON_BASE, rut_empresa: RUT_VALIDO, rol: 'mina' }, LOTE).ok, true);
+});
+
+test('validarSecuenciaRoles por tipo: documental acepta frontera/puerto intercalados', () => {
+  const ok = validarSecuenciaRoles([
+    { eslabon: 1, rol: 'origen' }, { eslabon: 2, rol: 'frontera' },
+    { eslabon: 3, rol: 'puerto' }, { eslabon: 4, rol: 'destino' },
+  ], 'documental');
+  assert.equal(ok.length, 0);
+  const mal = validarSecuenciaRoles([
+    { eslabon: 1, rol: 'destino' }, { eslabon: 2, rol: 'origen' },
+  ], 'documental');
+  assert.equal(mal.length, 1);
+});
+
+test('resumenNormativo: OECD minerales SOLO para tipo mineral', () => {
+  const declar = ['oecd_p1'].map((c) => ({ codigo: c, estado: 'declarado' }));
+  // mineral (o sin tipo): bloque OECD presente
+  assert.ok(resumenNormativo(LOTE, declar).oecd);
+  assert.ok(resumenNormativo({ ...LOTE, tipo: 'mineral' }, declar).oecd);
+  // producto y documental: null (un lote de alimentos no declara due diligence de minerales)
+  assert.equal(resumenNormativo({ ...LOTE, tipo: 'producto' }, declar).oecd, null);
+  assert.equal(resumenNormativo({ ...LOTE, tipo: 'documental' }, declar).oecd, null);
+  // CBAM y DPP siguen presentes en todos los tipos
+  assert.ok(resumenNormativo({ ...LOTE, tipo: 'producto' }, declar).cbam);
+  assert.ok(resumenNormativo({ ...LOTE, tipo: 'documental' }, declar).dpp);
 });

@@ -32,6 +32,13 @@ export default function PasaporteLote() {
   const nombreMaterial = (m) => t(`lote.m.${m}`);
   const nombreRol = (r) => t(`lote.rol.${r}`);
   const copperMark = data?.lote?.estandar_externo?.copper_mark;
+  // Título e identidad según el tipo de pasaporte (migración 023):
+  // documental (Corredor) / producto (ciudad-Aduana Verde) / mineral.
+  const tipo = data?.lote?.tipo || 'mineral';
+  const tituloPas = tipo === 'producto' ? t('lote.titulo_producto')
+    : tipo === 'documental' ? t('lote.titulo_documental') : t('lote.titulo');
+  const subPas = tipo === 'producto' ? t('lote.sub_producto')
+    : tipo === 'documental' ? t('lote.sub_documental') : t('lote.subtitulo');
 
   return (
     <PublicLayout>
@@ -50,8 +57,8 @@ export default function PasaporteLote() {
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ minWidth: 0 }}>
                 <div className="muted" style={{ fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase' }}>sicr3p</div>
-                <h1 style={{ fontSize: 26, margin: '4px 0 2px' }}>{t('lote.titulo')} · {data.pasaporte.codigo}</h1>
-                <p className="muted" style={{ margin: '0 0 10px' }}>{t('lote.subtitulo')}</p>
+                <h1 style={{ fontSize: 26, margin: '4px 0 2px' }}>{tituloPas} · {data.pasaporte.codigo}</h1>
+                <p className="muted" style={{ margin: '0 0 10px' }}>{subPas}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span className={`badge ${data.cadena.integra ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
                     {data.cadena.integra ? `✓ ${t('lote.cadena_integra')}` : `⚠ ${t('lote.cadena_alterada')}`}
@@ -169,12 +176,14 @@ export default function PasaporteLote() {
             <div className="pasaporte-sec">
               <h3>{t('lote.sec_normativo')}</h3>
               <div style={{ display: 'grid', gap: 10, fontSize: 13 }}>
-                <div>
-                  <b>{t('lote.norm_alineado')} {t('lote.norm_oecd')}</b>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {data.normativo.oecd.pasos_cubiertos}/{data.normativo.oecd.pasos_total} {t('lote.norm_oecd_pasos')} · {data.normativo.oecd.anexo2_cubiertas}/{data.normativo.oecd.anexo2_total} {t('lote.norm_oecd_anexo2')}
+                {data.normativo.oecd && (
+                  <div>
+                    <b>{t('lote.norm_alineado')} {t('lote.norm_oecd')}</b>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {data.normativo.oecd.pasos_cubiertos}/{data.normativo.oecd.pasos_total} {t('lote.norm_oecd_pasos')} · {data.normativo.oecd.anexo2_cubiertas}/{data.normativo.oecd.anexo2_total} {t('lote.norm_oecd_anexo2')}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div>
                   <b>{t('lote.norm_alineado')} {t('lote.norm_cbam')}</b>
                   <div className="muted" style={{ fontSize: 12 }}>

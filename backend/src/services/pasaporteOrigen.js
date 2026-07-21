@@ -19,25 +19,55 @@ const NORM = (rut) => String(rut || '').replace(/[^0-9kK]/g, '').toLowerCase();
 const rutNormalizadoValido = (rutNorm) =>
   rutNorm.length >= 2 && rutValido(`${rutNorm.slice(0, -1)}-${rutNorm.slice(-1)}`);
 
-// ---------- Roles de la cadena de custodia ----------
-export const ROLES = ['mina', 'planta', 'refineria', 'transporte', 'comerciante', 'exportador', 'comprador'];
-// Orden esperado aguas abajo; 'transporte' es comodín intercalable (0).
-export const ORDEN_ROL = {
-  mina: 1, planta: 2, refineria: 3, comerciante: 4, exportador: 5, comprador: 6, transporte: 0,
+// ---------- Tipos de pasaporte (migración 023) ----------
+// 'mineral'    → cadena minera (lo original de 021).
+// 'producto'   → productos de comercios de ciudad (Aduana Verde) —
+//                cualquier rubro, jamás amarrado a minería.
+// 'documental' → Corredor Bioceánico: trazabilidad de carga/documentos
+//                por tramos (vinculable a documentos_corredor).
+export const TIPOS = ['mineral', 'producto', 'documental'];
+
+export const CATALOGO_MATERIALES = {
+  mineral: ['cobre_catodo', 'concentrado_cobre', 'litio_carbonato', 'oro', 'otro'],
+  producto: ['alimentos', 'bebidas', 'textil', 'embalajes', 'manufactura', 'quimicos', 'otro'],
+  documental: ['carga_general', 'carga_refrigerada', 'granel', 'contenedor', 'documentos'],
 };
+
+export function materialValido(tipo, material) {
+  return (CATALOGO_MATERIALES[tipo] || []).includes(material);
+}
+
+// ---------- Roles de la cadena de custodia (por tipo) ----------
+export const ROLES_POR_TIPO = {
+  mineral: ['mina', 'planta', 'refineria', 'transporte', 'comerciante', 'exportador', 'comprador'],
+  producto: ['productor', 'proveedor', 'transporte', 'comercio', 'punto_aduana_verde', 'comprador'],
+  documental: ['origen', 'transporte', 'deposito', 'frontera', 'puerto', 'destino'],
+};
+// Compatibilidad: superset de todos los roles (usado por el catálogo).
+export const ROLES = [...new Set(Object.values(ROLES_POR_TIPO).flat())];
+
+// Orden esperado aguas abajo por tipo; orden 0 = comodín intercalable.
+export const ORDEN_ROL_POR_TIPO = {
+  mineral: { mina: 1, planta: 2, refineria: 3, comerciante: 4, exportador: 5, comprador: 6, transporte: 0 },
+  producto: { productor: 1, proveedor: 2, comercio: 3, punto_aduana_verde: 4, comprador: 5, transporte: 0 },
+  documental: { origen: 1, deposito: 0, frontera: 0, puerto: 0, destino: 2, transporte: 0 },
+};
+// Compatibilidad con llamadas antiguas (tipo mineral).
+export const ORDEN_ROL = ORDEN_ROL_POR_TIPO.mineral;
 
 // Advierte (nunca bloquea) si la secuencia de roles retrocede — una
 // refinería antes que la planta puede ser legítimo pero merece revisión.
-export function validarSecuenciaRoles(eslabones) {
+export function validarSecuenciaRoles(eslabones, tipo = 'mineral') {
+  const orden = ORDEN_ROL_POR_TIPO[tipo] || ORDEN_ROL_POR_TIPO.mineral;
   const advertencias = [];
   let max = 0;
   for (const e of eslabones || []) {
-    const orden = ORDEN_ROL[e.rol] ?? 0;
-    if (orden === 0) continue; // transporte se intercala donde sea
-    if (orden < max) {
+    const o = orden[e.rol] ?? 0;
+    if (o === 0) continue; // comodines se intercalan donde sea
+    if (o < max) {
       advertencias.push(`El eslabón #${e.eslabon} (${e.rol}) va después de un rol más avanzado en la cadena.`);
     }
-    max = Math.max(max, orden);
+    max = Math.max(max, o);
   }
   return advertencias;
 }
@@ -70,7 +100,11 @@ export function validarEslabon(input, lote, eslabonesPrevios = []) {
   if (!lote) errores.push('Lote inexistente.');
   else if (lote.estado !== 'abierto') errores.push('El lote está cerrado: no se pueden agregar eslabones.');
 
-  if (!ROLES.includes(e.rol)) errores.push(`Rol inválido. Debe ser uno de: ${ROLES.join(', ')}.`);
+  const tipo = lote?.tipo || 'mineral';
+  const rolesPermitidos = ROLES_POR_TIPO[tipo] || ROLES_POR_TIPO.mineral;
+  if (!rolesPermitidos.includes(e.rol)) {
+    errores.push(`Rol inválido para un pasaporte ${tipo}. Debe ser uno de: ${rolesPermitidos.join(', ')}.`);
+  }
 
   const pais = String(e.pais || '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(pais)) errores.push('País debe ser código ISO-2 (ej: CL, AR).');
@@ -104,7 +138,10 @@ export function validarEslabon(input, lote, eslabonesPrevios = []) {
     errores.push('Visibilidad inválida (publico | cadena | privado).');
   }
 
-  advertencias.push(...validarSecuenciaRoles([...(eslabonesPrevios || []), { ...e, eslabon: (eslabonesPrevios?.length || 0) + 1 }]));
+  advertencias.push(...validarSecuenciaRoles(
+    [...(eslabonesPrevios || []), { ...e, eslabon: (eslabonesPrevios?.length || 0) + 1 }],
+    tipo
+  ));
 
   return { ok: errores.length === 0, errores, advertencias, rut_normalizado: rut || null, pais };
 }
@@ -264,7 +301,10 @@ export function resumenNormativo(lote, declaraciones = []) {
   if ((lote?.n_eslabones ?? 0) === 0) faltantesDpp.push('actores');
 
   return {
-    oecd: {
+    // Honestidad: la due diligence OECD de MINERALES solo aplica a lotes
+    // minerales — un lote de alimentos o una carga documental no la
+    // declara. Para otros tipos va null y el frontend/PDF la omiten.
+    oecd: (lote?.tipo || 'mineral') !== 'mineral' ? null : {
       pasos_cubiertos: pasos.filter(cubierto).length,
       pasos_total: pasos.length,
       pasos_con_evidencia: pasos.filter(conEvidencia).length,

@@ -599,10 +599,29 @@ export async function generateLabel({ sesion, factura, declaracion }) {
 const ROL_EXPEDIENTE = {
   mina: 'Mina', planta: 'Planta', refineria: 'Refinería', transporte: 'Transporte',
   comerciante: 'Comerciante', exportador: 'Exportador', comprador: 'Comprador',
+  // tipo producto (ciudad / Aduana Verde)
+  productor: 'Productor', proveedor: 'Proveedor', comercio: 'Comercio',
+  punto_aduana_verde: 'Punto Aduana Verde',
+  // tipo documental (Corredor)
+  origen: 'Origen', deposito: 'Depósito', frontera: 'Frontera', puerto: 'Puerto', destino: 'Destino',
 };
 const MATERIAL_EXPEDIENTE = {
   cobre_catodo: 'Cátodos de cobre', concentrado_cobre: 'Concentrado de cobre',
-  litio_carbonato: 'Carbonato de litio', oro: 'Oro', otro: 'Otro mineral',
+  litio_carbonato: 'Carbonato de litio', oro: 'Oro', otro: 'Otro',
+  alimentos: 'Alimentos', bebidas: 'Bebidas', textil: 'Textil', embalajes: 'Embalajes',
+  manufactura: 'Manufactura', quimicos: 'Químicos',
+  carga_general: 'Carga general', carga_refrigerada: 'Carga refrigerada',
+  granel: 'Granel', contenedor: 'Contenedor', documentos: 'Documentos',
+};
+const TITULO_EXPEDIENTE = {
+  mineral: 'EXPEDIENTE DE TRAZABILIDAD',
+  producto: 'EXPEDIENTE DE TRAZABILIDAD DE PRODUCTO',
+  documental: 'EXPEDIENTE DE TRAZABILIDAD DOCUMENTAL',
+};
+const SUBTITULO_EXPEDIENTE = {
+  mineral: 'Pasaporte de Origen · cadena de custodia del lote mineral',
+  producto: 'Pasaporte de Producto · cadena de custodia del lote',
+  documental: 'Pasaporte Documental · cadena de custodia de la carga (Corredor)',
 };
 
 export async function generateExpedienteLote({ lote, eslabones, declaraciones, normativo, balance, emisiones, anclaje, integra }) {
@@ -617,10 +636,11 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
     .text(`Emitido: ${fechaCorta(new Date())}`, 380, 48, { width: 167, align: 'right' });
   doc.moveTo(48, 78).lineTo(547, 78).strokeColor(BORDER).stroke();
 
+  const tipoLote = lote.tipo || 'mineral';
   doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
-    .text('EXPEDIENTE DE TRAZABILIDAD', 48, 96);
+    .text(TITULO_EXPEDIENTE[tipoLote] || TITULO_EXPEDIENTE.mineral, 48, 96);
   doc.font('Helvetica').fontSize(11).fillColor(GRAY)
-    .text('Pasaporte de Origen · cadena de custodia del lote mineral', 48, 118);
+    .text(SUBTITULO_EXPEDIENTE[tipoLote] || SUBTITULO_EXPEDIENTE.mineral, 48, 118);
 
   // Código gigante + estado + QR
   doc.font('Courier-Bold').fontSize(24).fillColor(NAVY).text(lote.codigo, 48, 150);
@@ -725,7 +745,10 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
   doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('ALINEACIÓN NORMATIVA', 48, y);
   y += 16;
   const lineasNorm = [
-    `OECD Due Diligence (minerales): ${normativo.oecd.pasos_cubiertos}/${normativo.oecd.pasos_total} pasos declarados · ${normativo.oecd.anexo2_cubiertas}/${normativo.oecd.anexo2_total} banderas Anexo II`,
+    // OECD minerales SOLO aplica a lotes minerales (normativo.oecd null en otros tipos).
+    ...(normativo.oecd ? [
+      `OECD Due Diligence (minerales): ${normativo.oecd.pasos_cubiertos}/${normativo.oecd.pasos_total} pasos declarados · ${normativo.oecd.anexo2_cubiertas}/${normativo.oecd.anexo2_total} banderas Anexo II`,
+    ] : []),
     `CBAM (Reglamento UE 2023/956): ${normativo.cbam.listo ? 'datos estructurados completos' : `faltan: ${normativo.cbam.faltantes.join(', ')}`}${normativo.cbam.aplicable ? '' : ' — material fuera del Anexo I vigente (la declaración CBAM la presenta el importador UE)'}`,
     `Pasaporte Digital de Producto (ESPR): ${normativo.dpp.listo ? 'formato completo' : `faltan: ${normativo.dpp.faltantes.join(', ')}`}`,
   ];
@@ -750,9 +773,12 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
   }
   y += (anclaje ? 96 : 72) + 12;
 
+  const marcos = normativo.oecd
+    ? 'la Guía de Debida Diligencia OCDE para minerales, al Reglamento CBAM (UE) 2023/956 y al concepto de Pasaporte Digital de Producto (ESPR)'
+    : 'el Reglamento CBAM (UE) 2023/956 y el concepto de Pasaporte Digital de Producto (ESPR)';
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
     `Verificación en línea: ${loteUrl(lote.codigo)} — la cadena pública de sicr3p permite comprobar que este expediente no fue alterado. ` +
-    'Formato alineado a la Guía de Debida Diligencia OCDE para minerales, al Reglamento CBAM (UE) 2023/956 y al concepto de Pasaporte Digital de Producto (ESPR). ' +
+    `Formato alineado a ${marcos}. ` +
     'sicr3p no es certificador, auditor ni autoridad: registra y estructura declaraciones y documentos verificables de los actores de la cadena.',
     48, y, { width: W }
   );

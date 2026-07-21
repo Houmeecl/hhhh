@@ -8,6 +8,10 @@ import { generarClave } from '../services/posTerminal.js';
 import { generateCredencialTarjeta } from '../services/pdf.js';
 import {
   ROLES,
+  TIPOS,
+  CATALOGO_MATERIALES,
+  ROLES_POR_TIPO,
+  materialValido,
   hashEslabonLote,
   generarNonce,
   validarEslabon,
@@ -41,14 +45,16 @@ router.use(requireAuth);
 const adminOnly = requireRole('admin', 'operador');
 
 const NORM_SQL = `regexp_replace(COALESCE($1,''), '[^0-9kK]', '', 'g')`;
-const MATERIALES = ['cobre_catodo', 'concentrado_cobre', 'litio_carbonato', 'oro', 'otro'];
+// Superset de materiales de todos los tipos (para filtros de lista).
+const MATERIALES = [...new Set(Object.values(CATALOGO_MATERIALES).flat())];
 
 // ---------- GET /lotes — lista con filtros ----------
 router.get('/lotes', async (req, res, next) => {
   try {
-    const { material, estado, rut } = req.query;
+    const { material, estado, rut, tipo } = req.query;
     const cond = [];
     const params = [];
+    if (tipo && TIPOS.includes(tipo)) { params.push(tipo); cond.push(`tipo = $${params.length}`); }
     if (material && MATERIALES.includes(material)) { params.push(material); cond.push(`material = $${params.length}`); }
     if (estado && ['abierto', 'cerrado'].includes(estado)) { params.push(estado); cond.push(`estado = $${params.length}`); }
     if (rut) {
@@ -57,7 +63,7 @@ router.get('/lotes', async (req, res, next) => {
     }
     const where = cond.length ? `WHERE ${cond.join(' AND ')}` : '';
     const { rows } = await query(
-      `SELECT id, codigo, material, cantidad, unidad, pais_origen, faena_origen,
+      `SELECT id, codigo, tipo, material, cantidad, unidad, pais_origen, faena_origen,
               rut_titular, estado, n_eslabones, ultimo_hash, created_at, updated_at
        FROM lotes_minerales ${where}
        ORDER BY created_at DESC LIMIT 200`,
@@ -71,8 +77,12 @@ router.get('/lotes', async (req, res, next) => {
 router.post('/lotes', adminOnly, async (req, res, next) => {
   try {
     const b = req.body || {};
-    if (!MATERIALES.includes(b.material)) {
-      return res.status(400).json({ error: `Material inválido. Uno de: ${MATERIALES.join(', ')}.` });
+    const tipo = b.tipo || 'mineral';
+    if (!TIPOS.includes(tipo)) {
+      return res.status(400).json({ error: `Tipo inválido. Uno de: ${TIPOS.join(', ')}.` });
+    }
+    if (!materialValido(tipo, b.material)) {
+      return res.status(400).json({ error: `Material inválido para tipo ${tipo}. Uno de: ${CATALOGO_MATERIALES[tipo].join(', ')}.` });
     }
     const cantidad = Number(b.cantidad);
     if (!Number.isFinite(cantidad) || cantidad <= 0) {
@@ -94,12 +104,12 @@ router.post('/lotes', adminOnly, async (req, res, next) => {
       const codigo = generarCodigoLote(anio, cRows[0].n);
       const { rows } = await client.query(
         `INSERT INTO lotes_minerales
-           (codigo, material, descripcion, codigo_nc, cantidad, unidad, pais_origen,
+           (codigo, tipo, material, descripcion, codigo_nc, cantidad, unidad, pais_origen,
             faena_origen, rut_titular, composicion, estandar_externo, creado_por)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
-          codigo, b.material, b.descripcion || null, b.codigo_nc || null, cantidad,
+          codigo, tipo, b.material, b.descripcion || null, b.codigo_nc || null, cantidad,
           b.unidad || 't', pais, b.faena_origen || null, b.rut_titular || null,
           JSON.stringify(b.composicion || {}), JSON.stringify(b.estandar_externo || {}),
           req.user.sub,
@@ -215,6 +225,21 @@ async function anexarEslabonTx(client, lote, b) {
     }
   }
 
+  // Vínculo opcional a un documento del Corredor (MIC/DTA, manifiesto —
+  // el ancla natural del pasaporte DOCUMENTAL, migración 023).
+  if (b.documento_corredor_id) {
+    const { rows: dRows } = await client.query(
+      `SELECT id, numero_documento, rut_emisor, rut_receptor FROM documentos_corredor WHERE id = $1`,
+      [b.documento_corredor_id]
+    );
+    if (!dRows[0]) return { status: 400, body: { error: 'documento_corredor_id no existe.' } };
+    const rutsDoc = [dRows[0].rut_emisor, dRows[0].rut_receptor]
+      .map((r) => String(r || '').replace(/[^0-9kK]/g, '').toLowerCase());
+    if (val.rut_normalizado && rutsDoc.some(Boolean) && !rutsDoc.includes(val.rut_normalizado)) {
+      advertencias.push('El RUT del eslabón no aparece en el documento del corredor vinculado.');
+    }
+  }
+
   const eslabonN = Number(lote.n_eslabones) + 1;
   const nonce = generarNonce();
   const hashDoc = hashEslabonLote({
@@ -227,13 +252,14 @@ async function anexarEslabonTx(client, lote, b) {
   const { rows: eRows } = await client.query(
     `INSERT INTO lote_eslabones
        (lote_id, eslabon, rol, rut_empresa, nombre_empresa, pais, fecha, cantidad,
-        factura_id, co2e_aportado, visibilidad, datos, nonce,
+        factura_id, documento_corredor_id, co2e_aportado, visibilidad, datos, nonce,
         hash_documento, hash_anterior, hash_cadena)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      RETURNING *`,
     [
       lote.id, eslabonN, b.rol, val.rut_normalizado, b.nombre_empresa || null, val.pais,
-      b.fecha, b.cantidad ?? null, b.factura_id || null, Number(b.co2e_aportado ?? 0),
+      b.fecha, b.cantidad ?? null, b.factura_id || null, b.documento_corredor_id || null,
+      Number(b.co2e_aportado ?? 0),
       b.visibilidad || 'publico', JSON.stringify(b.datos || {}), nonce,
       hashDoc, lote.ultimo_hash, hashEnc,
     ]
@@ -465,9 +491,16 @@ router.get('/lotes/:id/verificar', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- GET /catalogo — roles y materiales para el frontend ----------
+// ---------- GET /catalogo — tipos, roles y materiales para el frontend ----------
 router.get('/catalogo', (req, res) => {
-  res.json({ roles: ROLES, materiales: MATERIALES });
+  res.json({
+    tipos: TIPOS,
+    materiales_por_tipo: CATALOGO_MATERIALES,
+    roles_por_tipo: ROLES_POR_TIPO,
+    // Compatibilidad con clientes antiguos:
+    roles: ROLES,
+    materiales: MATERIALES,
+  });
 });
 
 // ============================================================
