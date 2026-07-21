@@ -25,6 +25,17 @@ function useRevelar() {
   }, []);
 }
 
+// Captura real del Pasaporte de Trazabilidad Documental de un lote, tal
+// como se ve en /lote/:codigo — así se ve el documento, no un mockup dibujado.
+function CorPasaportePreview() {
+  return (
+    <div className="av2-pas-card av2-pas-shot" aria-hidden="true">
+      <img src="/img/corredor/pasaporte-real.png" alt="" loading="lazy" />
+      <span className="av2-pas-chip">✓ así se ve el Pasaporte de Trazabilidad</span>
+    </div>
+  );
+}
+
 // Captura real de la Torre de Control (mapa + panel del operador), tal
 // como se ve en /torre/:codigo — no un mockup dibujado.
 function TorrePreview() {
@@ -63,8 +74,8 @@ export default function CorredorLanding() {
                 <span><Icon.Qr size={15} /> {t('cor.trust_3')}</span>
               </div>
             </div>
-            <div className="fade-up d2">
-              <TorrePreview />
+            <div className="av2-pas-wrap fade-up d2">
+              <CorPasaportePreview />
             </div>
           </section>
         </div>
@@ -165,6 +176,9 @@ export default function CorredorLanding() {
               <Link to="/torre" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16, marginTop: 8 }}>
                 {t('cor.cta_torre')}
               </Link>
+            </div>
+            <div className="av2-reveal" style={{ display: 'flex', justifyContent: 'center' }}>
+              <TorrePreview />
             </div>
           </div>
         </div>

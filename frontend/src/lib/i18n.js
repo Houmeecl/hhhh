@@ -152,8 +152,8 @@ const DICCIONARIOS = {
 
     // Landing del Corredor Bioceánico (/corredor)
     'cor.eyebrow': 'TRAZABILIDAD PARA EL CORREDOR BIOCEÁNICO',
-    'cor.h1': 'La carga cruza 4 países.',
-    'cor.h1_grad': 'Su historia, la pruebas tú.',
+    'cor.h1': 'El Pasaporte de tu carga,',
+    'cor.h1_grad': 'así se verá.',
     'cor.sub': 'Pasaporte de Trazabilidad Documental, Tarjeta de Viaje con QR y Torre de Control en vivo — para generadores de carga, transporte, depósitos y terminales del corredor Brasil–Paraguay–Argentina–Chile.',
     'cor.cta_piloto': 'Solicitar piloto',
     'cor.cta_torre': 'Ver la Torre de Control',
@@ -587,8 +587,8 @@ const DICCIONARIOS = {
 
     // Corredor Bioceánico landing (/corredor)
     'cor.eyebrow': 'TRACEABILITY FOR THE BIOCEANIC CORRIDOR',
-    'cor.h1': 'The cargo crosses 4 countries.',
-    'cor.h1_grad': 'You prove its history.',
+    'cor.h1': 'The Passport of your cargo,',
+    'cor.h1_grad': 'this is what it looks like.',
     'cor.sub': 'Documentary Traceability Passport, QR Travel Card and live Control Tower \u2014 for cargo generators, carriers, warehouses and terminals along the Brazil\u2013Paraguay\u2013Argentina\u2013Chile corridor.',
     'cor.cta_piloto': 'Request a pilot',
     'cor.cta_torre': 'See the Control Tower',
@@ -1017,8 +1017,8 @@ const DICCIONARIOS = {
 
     // Landing do Corredor Bioceânico (/corredor)
     'cor.eyebrow': 'RASTREABILIDADE PARA O CORREDOR BIOCEÂNICO',
-    'cor.h1': 'A carga cruza 4 países.',
-    'cor.h1_grad': 'Você prova sua história.',
+    'cor.h1': 'O Passaporte da sua carga,',
+    'cor.h1_grad': 'é assim que vai ficar.',
     'cor.sub': 'Passaporte de Rastreabilidade Documental, Cartão de Viagem com QR e Torre de Controle ao vivo — para geradores de carga, transportadoras, depósitos e terminais do corredor Brasil–Paraguai–Argentina–Chile.',
     'cor.cta_piloto': 'Solicitar piloto',
     'cor.cta_torre': 'Ver a Torre de Controle',
