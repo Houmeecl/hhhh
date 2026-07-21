@@ -1,7 +1,10 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, logActividad, signAccess } from '../middleware/auth.js';
+import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
+import { generarClave } from '../services/posTerminal.js';
 import {
   ROLES,
   hashEslabonLote,
@@ -14,6 +17,8 @@ import {
   resumenNormativo,
   validarNc,
   generarCodigoLote,
+  generarSerialTarjeta,
+  hashAnclajeLote,
   hashCadena,
 } from '../services/pasaporteOrigen.js';
 
@@ -183,6 +188,62 @@ router.patch('/lotes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Anexa un eslabón a un lote YA BLOQUEADO (SELECT ... FOR UPDATE) dentro
+// de una transacción. Compartido entre el POST admin y el paso del
+// portador de la tarjeta de viaje (tarjetaRouter). Devuelve {status, body}.
+async function anexarEslabonTx(client, lote, b) {
+  const { rows: prevRows } = await client.query(
+    `SELECT eslabon, rol FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]
+  );
+  const val = validarEslabon(b, lote, prevRows);
+  if (!val.ok) return { status: 400, body: { error: val.errores.join(' ') } };
+
+  // Vínculo opcional al DTE real: existe, y su RUT debiera coincidir.
+  let facturaNumero = null;
+  const advertencias = [...val.advertencias];
+  if (b.factura_id) {
+    const { rows: fRows } = await client.query(
+      `SELECT id, numero_venta, rut_emisor, rut_receptor FROM facturas WHERE id = $1`, [b.factura_id]
+    );
+    if (!fRows[0]) return { status: 400, body: { error: 'factura_id no existe.' } };
+    facturaNumero = fRows[0].numero_venta;
+    const ruts = [fRows[0].rut_emisor, fRows[0].rut_receptor]
+      .map((r) => String(r || '').replace(/[^0-9kK]/g, '').toLowerCase());
+    if (val.rut_normalizado && !ruts.includes(val.rut_normalizado)) {
+      advertencias.push('El RUT del eslabón no aparece como emisor ni receptor del DTE vinculado.');
+    }
+  }
+
+  const eslabonN = Number(lote.n_eslabones) + 1;
+  const nonce = generarNonce();
+  const hashDoc = hashEslabonLote({
+    lote_codigo: lote.codigo, eslabon: eslabonN, rol: b.rol,
+    rut_empresa: val.rut_normalizado, pais: val.pais, fecha: b.fecha,
+    cantidad: b.cantidad, co2e_aportado: b.co2e_aportado, factura_numero: facturaNumero, nonce,
+  });
+  const hashEnc = hashCadena(lote.ultimo_hash, hashDoc);
+
+  const { rows: eRows } = await client.query(
+    `INSERT INTO lote_eslabones
+       (lote_id, eslabon, rol, rut_empresa, nombre_empresa, pais, fecha, cantidad,
+        factura_id, co2e_aportado, visibilidad, datos, nonce,
+        hash_documento, hash_anterior, hash_cadena)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     RETURNING *`,
+    [
+      lote.id, eslabonN, b.rol, val.rut_normalizado, b.nombre_empresa || null, val.pais,
+      b.fecha, b.cantidad ?? null, b.factura_id || null, Number(b.co2e_aportado ?? 0),
+      b.visibilidad || 'publico', JSON.stringify(b.datos || {}), nonce,
+      hashDoc, lote.ultimo_hash, hashEnc,
+    ]
+  );
+  await client.query(
+    `UPDATE lotes_minerales SET ultimo_hash = $2, n_eslabones = $3, updated_at = now() WHERE id = $1`,
+    [lote.id, hashEnc, eslabonN]
+  );
+  return { status: 201, body: { eslabon: eRows[0], advertencias } };
+}
+
 // ---------- POST /lotes/:id/eslabones — anexar eslabón (append-only) ----------
 router.post('/lotes/:id/eslabones', adminOnly, async (req, res, next) => {
   try {
@@ -195,57 +256,7 @@ router.post('/lotes/:id/eslabones', adminOnly, async (req, res, next) => {
       );
       const lote = lRows[0];
       if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
-
-      const { rows: prevRows } = await client.query(
-        `SELECT eslabon, rol FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]
-      );
-      const val = validarEslabon(b, lote, prevRows);
-      if (!val.ok) return { status: 400, body: { error: val.errores.join(' ') } };
-
-      // Vínculo opcional al DTE real: existe, y su RUT debiera coincidir.
-      let facturaNumero = null;
-      const advertencias = [...val.advertencias];
-      if (b.factura_id) {
-        const { rows: fRows } = await client.query(
-          `SELECT id, numero_venta, rut_emisor, rut_receptor FROM facturas WHERE id = $1`, [b.factura_id]
-        );
-        if (!fRows[0]) return { status: 400, body: { error: 'factura_id no existe.' } };
-        facturaNumero = fRows[0].numero_venta;
-        const ruts = [fRows[0].rut_emisor, fRows[0].rut_receptor]
-          .map((r) => String(r || '').replace(/[^0-9kK]/g, '').toLowerCase());
-        if (val.rut_normalizado && !ruts.includes(val.rut_normalizado)) {
-          advertencias.push('El RUT del eslabón no aparece como emisor ni receptor del DTE vinculado.');
-        }
-      }
-
-      const eslabonN = Number(lote.n_eslabones) + 1;
-      const nonce = generarNonce();
-      const hashDoc = hashEslabonLote({
-        lote_codigo: lote.codigo, eslabon: eslabonN, rol: b.rol,
-        rut_empresa: val.rut_normalizado, pais: val.pais, fecha: b.fecha,
-        cantidad: b.cantidad, co2e_aportado: b.co2e_aportado, factura_numero: facturaNumero, nonce,
-      });
-      const hashEnc = hashCadena(lote.ultimo_hash, hashDoc);
-
-      const { rows: eRows } = await client.query(
-        `INSERT INTO lote_eslabones
-           (lote_id, eslabon, rol, rut_empresa, nombre_empresa, pais, fecha, cantidad,
-            factura_id, co2e_aportado, visibilidad, datos, nonce,
-            hash_documento, hash_anterior, hash_cadena)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-         RETURNING *`,
-        [
-          lote.id, eslabonN, b.rol, val.rut_normalizado, b.nombre_empresa || null, val.pais,
-          b.fecha, b.cantidad ?? null, b.factura_id || null, Number(b.co2e_aportado ?? 0),
-          b.visibilidad || 'publico', JSON.stringify(b.datos || {}), nonce,
-          hashDoc, lote.ultimo_hash, hashEnc,
-        ]
-      );
-      await client.query(
-        `UPDATE lotes_minerales SET ultimo_hash = $2, n_eslabones = $3, updated_at = now() WHERE id = $1`,
-        [lote.id, hashEnc, eslabonN]
-      );
-      return { status: 201, body: { eslabon: eRows[0], advertencias } };
+      return anexarEslabonTx(client, lote, b);
     });
 
     if (resultado.status === 201) {
@@ -288,20 +299,135 @@ router.put('/lotes/:id/declaraciones/:codigo', adminOnly, async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// ---------- POST /lotes/:id/cerrar ----------
+// ---------- POST /lotes/:id/cerrar — sella el lote y lo ANCLA en la cadena global ----------
+// El hash final del lote queda como eslabón de la cadena global de
+// sicr3p (cadena_anclajes comparte la secuencia de cadena_estado con
+// las facturas — por eso las verificaciones globales leen la unión).
 router.post('/lotes/:id/cerrar', adminOnly, async (req, res, next) => {
   try {
+    const resultado = await withTx(async (client) => {
+      const { rows: lRows } = await client.query(
+        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const lote = lRows[0];
+      if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
+      if (lote.estado !== 'abierto') return { status: 409, body: { error: 'El lote ya está cerrado.' } };
+
+      // Mismo lock global que el encadenado de facturas (public.js).
+      const { rows: eRows } = await client.query(`SELECT * FROM cadena_estado WHERE id = 1 FOR UPDATE`);
+      const estadoGlobal = eRows[0];
+      let anclaje = null;
+      if (estadoGlobal) {
+        const hashDoc = hashAnclajeLote({
+          codigo: lote.codigo, ultimo_hash: lote.ultimo_hash, n_eslabones: lote.n_eslabones,
+        });
+        const hashEnc = hashCadena(estadoGlobal.ultimo_hash, hashDoc);
+        const eslabonGlobal = Number(estadoGlobal.n_eslabones) + 1;
+        const { rows: aRows } = await client.query(
+          `INSERT INTO cadena_anclajes (lote_id, eslabon, hash_documento, hash_anterior, hash_cadena)
+           VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+          [lote.id, eslabonGlobal, hashDoc, estadoGlobal.ultimo_hash, hashEnc]
+        );
+        anclaje = aRows[0];
+        await client.query(
+          `UPDATE cadena_estado SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1`,
+          [hashEnc, eslabonGlobal]
+        );
+      }
+
+      const { rows: uRows } = await client.query(
+        `UPDATE lotes_minerales SET estado = 'cerrado', updated_at = now()
+         WHERE id = $1 RETURNING id, codigo, estado, ultimo_hash, n_eslabones`,
+        [lote.id]
+      );
+      return { status: 200, body: { lote: uRows[0], anclaje } };
+    });
+
+    if (resultado.status === 200) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'cerrar_lote_origen', entidad: 'lote_mineral',
+        entidadId: resultado.body.lote.id,
+        detalle: {
+          codigo: resultado.body.lote.codigo,
+          n_eslabones: resultado.body.lote.n_eslabones,
+          anclaje_global: resultado.body.anclaje?.eslabon ?? null,
+        },
+        ip: req.ip,
+      });
+    }
+    res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
+});
+
+// ---------- Tarjetas de viaje (NFC/RFID que acompañan a la carga) ----------
+router.get('/lotes/:id/tarjetas', async (req, res, next) => {
+  try {
     const { rows } = await query(
-      `UPDATE lotes_minerales SET estado = 'cerrado', updated_at = now()
-       WHERE id = $1 AND estado = 'abierto' RETURNING id, codigo, estado, ultimo_hash, n_eslabones`,
+      `SELECT id, serial, uid_fisico, portador, activo, ultima_actividad, pasos_registrados, created_at
+       FROM tarjetas_viaje WHERE lote_id = $1 ORDER BY created_at DESC`,
       [req.params.id]
     );
-    if (!rows[0]) return res.status(409).json({ error: 'Lote inexistente o ya cerrado.' });
+    res.json({ tarjetas: rows });
+  } catch (err) { next(err); }
+});
+
+// Emite una tarjeta para el lote: serial TV-XXXX + clave del portador
+// (bcrypt; en claro SOLO en esta respuesta — patrón POS/mandantes).
+router.post('/lotes/:id/tarjetas', adminOnly, async (req, res, next) => {
+  try {
+    const { rows: lRows } = await query(`SELECT id, codigo, estado FROM lotes_minerales WHERE id = $1`, [req.params.id]);
+    if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    if (lRows[0].estado !== 'abierto') return res.status(409).json({ error: 'El lote está cerrado.' });
+
+    const b = req.body || {};
+    const clave = generarClave();
+    const claveHash = await bcrypt.hash(clave, 10);
+
+    let tarjeta = null;
+    for (let intento = 0; intento < 5 && !tarjeta; intento++) {
+      try {
+        const { rows } = await query(
+          `INSERT INTO tarjetas_viaje (serial, uid_fisico, lote_id, portador, clave_hash)
+           VALUES ($1,$2,$3,$4,$5)
+           RETURNING id, serial, uid_fisico, portador, activo, created_at`,
+          [generarSerialTarjeta(), b.uid_fisico || null, lRows[0].id, b.portador || null, claveHash]
+        );
+        tarjeta = rows[0];
+      } catch (e) {
+        if (e.code !== '23505') throw e; // colisión de serial: reintenta
+        if (String(e.detail || '').includes('uid_fisico')) {
+          return res.status(409).json({ error: 'Ese UID físico ya está registrado en otra tarjeta.' });
+        }
+      }
+    }
+    if (!tarjeta) return res.status(500).json({ error: 'No se pudo generar un serial único.' });
+
     await logActividad({
-      usuarioId: req.user.sub, accion: 'cerrar_lote_origen', entidad: 'lote_mineral',
-      entidadId: rows[0].id, detalle: { codigo: rows[0].codigo, n_eslabones: rows[0].n_eslabones }, ip: req.ip,
+      usuarioId: req.user.sub, accion: 'emitir_tarjeta_viaje', entidad: 'tarjeta_viaje',
+      entidadId: tarjeta.id, detalle: { serial: tarjeta.serial, lote: lRows[0].codigo }, ip: req.ip,
     });
-    res.json({ lote: rows[0] });
+    // `clave` en claro SOLO aquí: se entrega impresa junto con la tarjeta.
+    res.status(201).json({ tarjeta, clave });
+  } catch (err) { next(err); }
+});
+
+router.put('/tarjetas/:id', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const { rows } = await query(
+      `UPDATE tarjetas_viaje SET
+         activo = COALESCE($2, activo),
+         portador = COALESCE($3, portador)
+       WHERE id = $1
+       RETURNING id, serial, portador, activo, pasos_registrados`,
+      [req.params.id, typeof b.activo === 'boolean' ? b.activo : null, b.portador ?? null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada' });
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'editar_tarjeta_viaje', entidad: 'tarjeta_viaje',
+      entidadId: rows[0].id, detalle: { serial: rows[0].serial, activo: rows[0].activo }, ip: req.ip,
+    });
+    res.json({ tarjeta: rows[0] });
   } catch (err) { next(err); }
 });
 
@@ -319,6 +445,91 @@ router.get('/lotes/:id/verificar', async (req, res, next) => {
 // ---------- GET /catalogo — roles y materiales para el frontend ----------
 router.get('/catalogo', (req, res) => {
   res.json({ roles: ROLES, materiales: MATERIALES });
+});
+
+// ============================================================
+// Router del PORTADOR de la tarjeta de viaje — montado SIN requireAuth
+// de admin en /api/tarjeta. La tarjeta abre el pasaporte a cualquiera
+// (solo lectura); registrar un paso exige la clave entregada junto con
+// la tarjeta (decisión del usuario: sin registros anónimos).
+// ============================================================
+export const tarjetaRouter = express.Router();
+
+const MENSAJE_TARJETA = 'Serial o clave incorrectos';
+
+// POST /api/tarjeta/auth — login del portador (patrón login POS).
+tarjetaRouter.post('/auth', loginLimiter, async (req, res, next) => {
+  try {
+    const { serial, clave } = req.body || {};
+    if (!serial || !clave) return res.status(401).json({ error: MENSAJE_TARJETA });
+    const { rows } = await query(
+      `SELECT t.*, l.codigo AS lote_codigo, l.estado AS lote_estado
+       FROM tarjetas_viaje t LEFT JOIN lotes_minerales l ON l.id = t.lote_id
+       WHERE t.serial = $1`,
+      [String(serial).trim().toUpperCase()]
+    );
+    const tarjeta = rows[0];
+    if (!tarjeta || !tarjeta.activo || !tarjeta.lote_id) return res.status(401).json({ error: MENSAJE_TARJETA });
+    const ok = await bcrypt.compare(String(clave), tarjeta.clave_hash);
+    if (!ok) return res.status(401).json({ error: MENSAJE_TARJETA });
+
+    await query(`UPDATE tarjetas_viaje SET ultima_actividad = now() WHERE id = $1`, [tarjeta.id]);
+    await logActividad({ accion: 'tarjeta_login', entidad: 'tarjeta_viaje', entidadId: tarjeta.id, ip: req.ip });
+    res.json({
+      tarjeta: { serial: tarjeta.serial, portador: tarjeta.portador, lote_codigo: tarjeta.lote_codigo },
+      token: signAccess({ id: tarjeta.id, rol: 'tarjeta', email: null }),
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/tarjeta/paso — el portador registra un paso en ruta.
+// Entra como eslabón 'transporte' sellado en la cadena del lote: la
+// secuencia de pasos ES la ruta (sin GPS).
+tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const resultado = await withTx(async (client) => {
+      const { rows: tRows } = await client.query(
+        `SELECT * FROM tarjetas_viaje WHERE id = $1 AND activo = true`, [req.user.sub]
+      );
+      const tarjeta = tRows[0];
+      if (!tarjeta || !tarjeta.lote_id) return { status: 404, body: { error: 'Tarjeta inválida o sin lote asignado' } };
+
+      const { rows: lRows } = await client.query(
+        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [tarjeta.lote_id]
+      );
+      const lote = lRows[0];
+      if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
+
+      const r = await anexarEslabonTx(client, lote, {
+        rol: 'transporte',
+        pais: b.pais || 'CL',
+        fecha: b.fecha || new Date().toISOString().slice(0, 10),
+        nombre_empresa: b.nombre_empresa || tarjeta.portador || null,
+        co2e_aportado: 0,
+        visibilidad: 'publico',
+        datos: {
+          punto_control: String(b.punto_control || '').slice(0, 120) || null,
+          tarjeta_serial: tarjeta.serial,
+        },
+      });
+      if (r.status === 201) {
+        await client.query(
+          `UPDATE tarjetas_viaje SET pasos_registrados = pasos_registrados + 1, ultima_actividad = now() WHERE id = $1`,
+          [tarjeta.id]
+        );
+      }
+      return r;
+    });
+
+    if (resultado.status === 201) {
+      await logActividad({
+        accion: 'tarjeta_paso', entidad: 'lote_eslabon', entidadId: resultado.body.eslabon.id,
+        detalle: { eslabon: resultado.body.eslabon.eslabon, punto: b.punto_control || null }, ip: req.ip,
+      });
+    }
+    res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
 });
 
 export default router;

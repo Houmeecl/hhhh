@@ -171,20 +171,29 @@ export default function Cadena() {
                   </div>
 
                   <a
-                    href={`/verificar/${e.factura_id}`}
+                    href={e.tipo === 'anclaje' ? undefined : `/verificar/${e.factura_id}`}
                     className="card"
-                    aria-label={`Eslabón ${e.eslabon}: ver verificación pública del documento`}
+                    aria-label={e.tipo === 'anclaje'
+                      ? `Eslabón ${e.eslabon}: anclaje de lote (Pasaporte de Origen)`
+                      : `Eslabón ${e.eslabon}: ver verificación pública del documento`}
                     style={{
                       flex: 1, minWidth: 0, display: 'block', padding: '12px 16px',
                       marginBottom: 12, color: 'inherit', textDecoration: 'none',
+                      cursor: e.tipo === 'anclaje' ? 'default' : 'pointer',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
                       <b style={{ fontSize: 15, whiteSpace: 'nowrap' }}>Eslabón #{fmtInt(e.eslabon)}</b>
                       <span className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{fmtFecha(e.fecha)}</span>
-                      <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 13, color: 'var(--green-600)', whiteSpace: 'nowrap' }}>
-                        {fmtCo2e(e.t_co2e)} t CO2e
-                      </span>
+                      {e.tipo === 'anclaje' ? (
+                        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 13, color: 'var(--navy)', whiteSpace: 'nowrap' }}>
+                          Anclaje de lote sellado
+                        </span>
+                      ) : (
+                        <span style={{ marginLeft: 'auto', fontWeight: 700, fontSize: 13, color: 'var(--green-600)', whiteSpace: 'nowrap' }}>
+                          {fmtCo2e(e.t_co2e)} t CO2e
+                        </span>
+                      )}
                     </div>
                     <div style={{
                       fontFamily: 'monospace', fontSize: 12, color: 'var(--gray)', marginTop: 4,

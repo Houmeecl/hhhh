@@ -185,9 +185,14 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
   }
 
   async function cerrar() {
-    if (!window.confirm(`¿Cerrar el lote ${lote.codigo}? No se podrán agregar más eslabones.`)) return;
-    try { await api.origenCerrar(lote.id); flash('Lote cerrado.'); onRefrescar(); }
-    catch (err) { flash(err.message, true); }
+    if (!window.confirm(`¿Cerrar el lote ${lote.codigo}? No se podrán agregar más eslabones y el hash final quedará anclado en la cadena pública global.`)) return;
+    try {
+      const r = await api.origenCerrar(lote.id);
+      flash(r.anclaje
+        ? `Lote cerrado y anclado en la cadena global (eslabón #${r.anclaje.eslabon}).`
+        : 'Lote cerrado.');
+      onRefrescar();
+    } catch (err) { flash(err.message, true); }
   }
 
   return (
@@ -201,8 +206,11 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
         <span className={`badge ${lote.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{lote.estado}</span>
         {balance.alerta && <span className="badge badge-amber">⚠ Merma {fmt(balance.merma_pct, 1)}%</span>}
         <a className="btn btn-sm btn-outline" href={`/lote/${lote.codigo}`} target="_blank" rel="noreferrer">Ver pasaporte público ↗</a>
+        <a className="btn btn-sm btn-outline" href={api.expedienteLoteUrl(lote.codigo)} target="_blank" rel="noreferrer">Expediente PDF ↗</a>
         {abierto && <button className="btn btn-sm btn-outline" onClick={cerrar}>Cerrar lote</button>}
       </div>
+
+      <Tarjetas lote={lote} abierto={abierto} flash={flash} />
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
         <h3 style={{ marginTop: 0 }}>Cadena de custodia ({fmtInt(lote.n_eslabones)} eslabones)</h3>
@@ -320,5 +328,101 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
         </p>
       </div>
     </>
+  );
+}
+
+// ---------- Tarjetas de viaje del lote ----------
+// La tarjeta NFC/RFID viaja con la carga: cualquiera que la lea abre el
+// pasaporte (/v/SERIAL); el portador, con su clave, registra pasos.
+function Tarjetas({ lote, abierto, flash }) {
+  const [items, setItems] = useState(null);
+  const [portador, setPortador] = useState('');
+  const [uid, setUid] = useState('');
+  const [emitiendo, setEmitiendo] = useState(false);
+  const [nueva, setNueva] = useState(null); // { tarjeta, clave } — clave visible UNA vez
+
+  const cargar = () => api.origenTarjetas(lote.id).then((r) => setItems(r.tarjetas)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, [lote.id]);
+
+  async function emitir() {
+    setEmitiendo(true);
+    try {
+      const r = await api.origenEmitirTarjeta(lote.id, { portador: portador || null, uid_fisico: uid || null });
+      setNueva(r);
+      setPortador('');
+      setUid('');
+      cargar();
+    } catch (e) { flash(e.message, true); }
+    finally { setEmitiendo(false); }
+  }
+
+  async function toggleActivo(t) {
+    try {
+      await api.origenEditarTarjeta(t.id, { activo: !t.activo });
+      cargar();
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Tarjetas de viaje (NFC/RFID)</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        Graba en la tarjeta la URL <b style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/v/{SERIAL}`}</b> (app
+        "NFC Tools" → Escribir → URL). Quien la lea ve el pasaporte; solo el portador con clave registra pasos.
+        Guía completa: docs/TARJETA-VIAJE.md.
+      </p>
+
+      {nueva && (
+        <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 12, marginBottom: 12 }}>
+          <b>Tarjeta {nueva.tarjeta.serial} emitida.</b>
+          <div style={{ fontSize: 13, marginTop: 4 }}>
+            Clave del portador (visible SOLO ahora — entrégala impresa junto con la tarjeta):
+            <div style={{ fontFamily: 'monospace', fontSize: 18, marginTop: 4 }}>{nueva.clave}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              URL para grabar: <span style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/v/${nueva.tarjeta.serial}`}</span>
+            </div>
+          </div>
+          <button className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={() => setNueva(null)}>Entendido, ocultar clave</button>
+        </div>
+      )}
+
+      {abierto && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+            <label>Portador (transportista)</label>
+            <input value={portador} placeholder="Transportes Andinos Ltda." onChange={(e) => setPortador(e.target.value)} />
+          </div>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+            <label>UID físico del chip (opcional)</label>
+            <input value={uid} placeholder="04:A3:2B:..." onChange={(e) => setUid(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" onClick={emitir} disabled={emitiendo}>
+            {emitiendo ? <span className="spinner" /> : 'Emitir tarjeta'}
+          </button>
+        </div>
+      )}
+
+      {!items ? <div className="skeleton" style={{ height: 40 }} /> : !items.length ? (
+        <p className="muted" style={{ fontSize: 13 }}>Sin tarjetas emitidas para este lote.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Serial</th><th>Portador</th><th className="num">Pasos</th><th>Última actividad</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {items.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ fontFamily: 'monospace' }}>{t.serial}</td>
+                  <td>{t.portador || '—'}</td>
+                  <td className="num">{fmtInt(t.pasos_registrados)}</td>
+                  <td>{t.ultima_actividad ? fmtFecha(t.ultima_actividad) : '—'}</td>
+                  <td><span className={`badge ${t.activo ? 'badge-green' : 'badge-gray'}`}>{t.activo ? 'activa' : 'inactiva'}</span></td>
+                  <td><button className="btn btn-sm btn-outline" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Reactivar'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

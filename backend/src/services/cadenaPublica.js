@@ -12,15 +12,19 @@ export function hashCorto(hash) {
   return `${h.slice(0, 10)}…${h.slice(-8)}`;
 }
 
-// Mapea una fila de `facturas` a su versión pública. SOLO estas cinco
-// claves: eslabon, factura_id, fecha, hash_corto, t_co2e. Cualquier
-// campo nuevo debe pasar por aquí a propósito (y por su test).
-export function filaEslabonPublico(factura) {
+// Mapea una fila de la cadena global (facturas o cadena_anclajes) a su
+// versión pública. SOLO estas seis claves: eslabon, factura_id, fecha,
+// hash_corto, t_co2e, tipo. Cualquier campo nuevo debe pasar por aquí
+// a propósito (y por su test). Los anclajes de lote (migración 022) no
+// tienen factura ni t CO2e: factura_id null, t_co2e 0, tipo 'anclaje'.
+export function filaEslabonPublico(fila) {
+  const esAnclaje = fila.tipo === 'anclaje';
   return {
-    eslabon: Number(factura.eslabon),
-    factura_id: factura.id,
-    fecha: factura.created_at ? new Date(factura.created_at).toISOString().slice(0, 10) : null,
-    hash_corto: hashCorto(factura.hash_cadena),
-    t_co2e: Number(factura.total_co2e || 0),
+    eslabon: Number(fila.eslabon),
+    factura_id: esAnclaje ? null : fila.id,
+    fecha: fila.created_at ? new Date(fila.created_at).toISOString().slice(0, 10) : null,
+    hash_corto: hashCorto(fila.hash_cadena),
+    t_co2e: Number(fila.total_co2e || 0),
+    tipo: esAnclaje ? 'anclaje' : 'documento',
   };
 }

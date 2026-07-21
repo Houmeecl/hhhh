@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
-import { qrBuffer } from './qr.js';
+import { qrBuffer, qrBufferDe, loteUrl } from './qr.js';
 import { query } from '../lib/db.js';
+import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -587,4 +588,174 @@ export async function generateLabel({ sesion, factura, declaracion }) {
     .text(`·  ${factura.categoria || 'Sin categoría'}  ·  ${nItems} ítems`, 150, 222, { width: 240 });
 
   return bufferDoc(doc);
+}
+
+// ---------- EXPEDIENTE DE TRAZABILIDAD — Pasaporte de Origen ----------
+// El respaldo FÍSICO de un lote mineral: se imprime, se archiva junto a
+// la tarjeta de viaje NFC/RFID y acompaña a la carga. Divulgación
+// selectiva nivel PÚBLICO (lo ven terceros): eslabones reservados
+// muestran su hash pero no su contenido. "SELLADO" solo si el lote está
+// cerrado; si además fue anclado, se imprime su eslabón global.
+const ROL_EXPEDIENTE = {
+  mina: 'Mina', planta: 'Planta', refineria: 'Refinería', transporte: 'Transporte',
+  comerciante: 'Comerciante', exportador: 'Exportador', comprador: 'Comprador',
+};
+const MATERIAL_EXPEDIENTE = {
+  cobre_catodo: 'Cátodos de cobre', concentrado_cobre: 'Concentrado de cobre',
+  litio_carbonato: 'Carbonato de litio', oro: 'Oro', otro: 'Otro mineral',
+};
+
+export async function generateExpedienteLote({ lote, eslabones, declaraciones, normativo, balance, emisiones, anclaje, integra }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const salida = bufferDoc(doc);
+  const W = doc.page.width - 96;
+  const sellado = lote.estado === 'cerrado';
+
+  // ---- Carátula ----
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`Emitido: ${fechaCorta(new Date())}`, 380, 48, { width: 167, align: 'right' });
+  doc.moveTo(48, 78).lineTo(547, 78).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
+    .text('EXPEDIENTE DE TRAZABILIDAD', 48, 96);
+  doc.font('Helvetica').fontSize(11).fillColor(GRAY)
+    .text('Pasaporte de Origen · cadena de custodia del lote mineral', 48, 118);
+
+  // Código gigante + estado + QR
+  doc.font('Courier-Bold').fontSize(24).fillColor(NAVY).text(lote.codigo, 48, 150);
+  const chip = sellado ? 'SELLADO' : 'PARCIAL — LOTE ABIERTO';
+  const chipColor = sellado ? GREEN : '#b45309';
+  doc.roundedRect(48, 186, doc.widthOfString(chip) + 60, 22, 4).fillAndStroke(LIGHT, chipColor);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(chipColor).text(chip, 60, 192);
+  if (!integra) {
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#b91c1c')
+      .text('⚠ CADENA DE CUSTODIA ALTERADA (verificación fallida)', 48, 214);
+  }
+  try {
+    const qr = await qrBufferDe(loteUrl(lote.codigo));
+    doc.image(qr, 437, 96, { width: 110, height: 110 });
+    doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+      .text('Escanee para verificar en línea', 437, 210, { width: 110, align: 'center' });
+  } catch { /* sin QR el expediente sigue siendo válido */ }
+
+  // ---- Identificación del lote ----
+  let y = 245;
+  doc.roundedRect(48, y, W, 92, 6).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('IDENTIFICACIÓN DEL LOTE', 60, y + 10);
+  const filasId = [
+    ['Material', MATERIAL_EXPEDIENTE[lote.material] || lote.material,
+      'Cantidad', `${nf(lote.cantidad, 3)} ${lote.unidad}`],
+    ['País de origen', lote.pais_origen, 'Faena / instalación', lote.faena_origen || '—'],
+    ['Código NC (UE)', lote.codigo_nc || '—', 'Titular (RUT)', lote.rut_titular ? (enmascararRut(lote.rut_titular) || '—') : '—'],
+  ];
+  let fy = y + 28;
+  for (const [l1, v1, l2, v2] of filasId) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(l1, 60, fy).text(l2, 310, fy);
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(NAVY)
+      .text(String(v1), 150, fy - 1).text(String(v2), 420, fy - 1);
+    fy += 20;
+  }
+
+  // ---- Cadena de custodia ----
+  y = 355;
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('CADENA DE CUSTODIA', 48, y);
+  if (balance?.alerta) {
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#b45309')
+      .text(`⚠ Merma acumulada ${nfp(balance.merma_pct)}% (sobre tolerancia)`, 300, y + 1, { width: 247, align: 'right' });
+  }
+  y += 18;
+  // Cabecera de tabla
+  doc.rect(48, y, W, 18).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+  doc.text('#', 54, y + 5).text('Rol', 72, y + 5).text('Actor', 140, y + 5)
+    .text('País', 285, y + 5).text('Fecha', 318, y + 5)
+    .text('Punto de control', 372, y + 5).text('Hash (inicio)', 470, y + 5);
+  y += 18;
+  const publicos = filtrarPorVisibilidad(eslabones || [], 'publico');
+  doc.font('Helvetica').fontSize(8).fillColor(NAVY);
+  let zebra = false;
+  for (const e of publicos) {
+    if (y > 760) { doc.addPage(); y = 60; }
+    if (zebra) { doc.rect(48, y, W, 16).fill(LIGHT); doc.fillColor(NAVY); }
+    zebra = !zebra;
+    const actor = e.divulgado
+      ? (e.nombre_empresa || (e.rut_empresa ? enmascararRut(e.rut_empresa) : '—') || '—')
+      : 'No divulgado (reservado)';
+    const punto = e.divulgado ? (e.datos?.punto_control || '—') : '—';
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(String(e.eslabon), 54, y + 4)
+      .text(ROL_EXPEDIENTE[e.rol] || e.rol, 72, y + 4, { width: 64 })
+      .text(String(actor).slice(0, 34), 140, y + 4, { width: 140 })
+      .text(e.pais || '', 285, y + 4)
+      .text(e.fecha ? fechaCorta(e.fecha) : '', 318, y + 4, { width: 52 })
+      .text(String(punto).slice(0, 22), 372, y + 4, { width: 94 });
+    doc.font('Courier').fontSize(7).text(String(e.hash_cadena).slice(0, 12) + '…', 470, y + 4);
+    y += 16;
+  }
+  if (!publicos.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin eslabones registrados.', 54, y + 4);
+    y += 20;
+  }
+
+  // ---- Emisiones incorporadas ----
+  y += 14;
+  if (y > 700) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('EMISIONES INCORPORADAS', 48, y);
+  y += 16;
+  const declarado = emisiones?.declarado_t != null ? `${nf(emisiones.declarado_t, 4)} t CO2e/t (declarado por el titular)` : 'Sin declaración del titular';
+  const trazado = emisiones?.trazado_t != null ? `${nf(emisiones.trazado_t, 4)} t CO2e/t (trazado en la cadena)` : 'Sin aportes trazados';
+  doc.font('Helvetica').fontSize(9).fillColor(NAVY).text(`Declarado: ${declarado}`, 48, y);
+  y += 14;
+  doc.text(`Trazado:   ${trazado}`, 48, y);
+  y += 14;
+  if (emisiones?.advertencia) {
+    doc.font('Helvetica-Bold').fillColor('#b45309')
+      .text(`⚠ Declarado y trazado difieren en ${nfp(emisiones.divergencia_pct)}%`, 48, y);
+    y += 14;
+  }
+  if (emisiones?.fuente) {
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`Fuente metodológica: ${citaFuente(emisiones.fuente)}`, 48, y);
+    y += 14;
+  }
+
+  // ---- Alineación normativa ----
+  y += 8;
+  if (y > 680) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('ALINEACIÓN NORMATIVA', 48, y);
+  y += 16;
+  const lineasNorm = [
+    `OECD Due Diligence (minerales): ${normativo.oecd.pasos_cubiertos}/${normativo.oecd.pasos_total} pasos declarados · ${normativo.oecd.anexo2_cubiertas}/${normativo.oecd.anexo2_total} banderas Anexo II`,
+    `CBAM (Reglamento UE 2023/956): ${normativo.cbam.listo ? 'datos estructurados completos' : `faltan: ${normativo.cbam.faltantes.join(', ')}`}${normativo.cbam.aplicable ? '' : ' — material fuera del Anexo I vigente (la declaración CBAM la presenta el importador UE)'}`,
+    `Pasaporte Digital de Producto (ESPR): ${normativo.dpp.listo ? 'formato completo' : `faltan: ${normativo.dpp.faltantes.join(', ')}`}`,
+  ];
+  doc.font('Helvetica').fontSize(8.5).fillColor(NAVY);
+  for (const linea of lineasNorm) {
+    doc.text(`·  ${linea}`, 48, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  // ---- Sello de integridad ----
+  y += 8;
+  if (y > 640) { doc.addPage(); y = 60; }
+  doc.roundedRect(48, y, W, anclaje ? 96 : 72, 6).fillAndStroke(LIGHT, sellado ? GREEN : BORDER);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('SELLO DE INTEGRIDAD', 60, y + 10);
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text(`Hash final del lote (${lote.n_eslabones} eslabones):`, 60, y + 26);
+  doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(lote.ultimo_hash), 60, y + 38, { width: W - 24 });
+  if (anclaje) {
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text(`Anclado en la cadena pública sicr3p — eslabón global #${anclaje.eslabon} (${fechaCorta(anclaje.created_at)}):`, 60, y + 56);
+    doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(anclaje.hash_cadena), 60, y + 68, { width: W - 24 });
+  }
+  y += (anclaje ? 96 : 72) + 12;
+
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+    `Verificación en línea: ${loteUrl(lote.codigo)} — la cadena pública de sicr3p permite comprobar que este expediente no fue alterado. ` +
+    'Formato alineado a la Guía de Debida Diligencia OCDE para minerales, al Reglamento CBAM (UE) 2023/956 y al concepto de Pasaporte Digital de Producto (ESPR). ' +
+    'sicr3p no es certificador, auditor ni autoridad: registra y estructura declaraciones y documentos verificables de los actores de la cadena.',
+    48, y, { width: W }
+  );
+
+  return salida;
 }

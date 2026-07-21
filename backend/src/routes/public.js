@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generateReport, generateLabel } from '../services/pdf.js';
+import { generateReport, generateLabel, generateExpedienteLote } from '../services/pdf.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
@@ -151,10 +151,17 @@ let cadenaCache = { resultado: null, n: 0, ultimoHash: '', ts: 0 };
 
 router.get('/publico/cadena', async (req, res, next) => {
   try {
+    // La cadena global = facturas + anclajes de lotes cerrados (022),
+    // que comparten la secuencia de cadena_estado.
     if (!cadenaCache.resultado || Date.now() - cadenaCache.ts > CADENA_CACHE_TTL_MS) {
       const { rows } = await query(
-        `SELECT id, hash_anterior, hash_documento, hash_cadena
-         FROM facturas WHERE hash_cadena IS NOT NULL ORDER BY eslabon ASC`
+        `SELECT id::text AS id, eslabon, hash_anterior, hash_documento, hash_cadena FROM (
+           SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
+           FROM facturas WHERE hash_cadena IS NOT NULL
+           UNION ALL
+           SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
+           FROM cadena_anclajes
+         ) t ORDER BY eslabon ASC`
       );
       cadenaCache = {
         resultado: verificarCadenaCompleta(rows),
@@ -165,8 +172,13 @@ router.get('/publico/cadena', async (req, res, next) => {
     }
 
     const { rows: ultimos } = await query(
-      `SELECT id, eslabon, created_at, hash_cadena, total_co2e
-       FROM facturas WHERE hash_cadena IS NOT NULL ORDER BY eslabon DESC LIMIT 20`
+      `SELECT id::text AS id, eslabon, created_at, hash_cadena, total_co2e, tipo FROM (
+         SELECT id, eslabon, created_at, hash_cadena, total_co2e, 'documento' AS tipo
+         FROM facturas WHERE hash_cadena IS NOT NULL
+         UNION ALL
+         SELECT id, eslabon, created_at, hash_cadena, NULL AS total_co2e, 'anclaje' AS tipo
+         FROM cadena_anclajes
+       ) t ORDER BY eslabon DESC LIMIT 20`
     );
 
     const r = cadenaCache.resultado;
@@ -1037,6 +1049,62 @@ router.get('/lote/:codigo', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---------- GET /api/v/:serial — resolución de tarjeta de viaje ----------
+// La tarjeta NFC/RFID lleva grabada la URL /v/{serial}. Cualquiera que
+// la lea llega aquí y es dirigido al pasaporte del lote (SOLO lectura;
+// por decisión de diseño no se registra ninguna lectura anónima).
+// Registrar un paso exige la clave del portador (/api/tarjeta).
+router.get('/v/:serial', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT t.serial, t.portador, l.codigo
+       FROM tarjetas_viaje t JOIN lotes_minerales l ON l.id = t.lote_id
+       WHERE t.serial = $1 AND t.activo = true`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
+    res.json({ serial: rows[0].serial, codigo: rows[0].codigo });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/lote/:codigo/expediente.pdf — expediente sellado ----------
+// El respaldo FÍSICO del lote: se imprime y se archiva junto a la
+// tarjeta de viaje. Contenido con divulgación selectiva nivel público
+// (el expediente lo ven terceros). "SELLADO" solo si el lote está
+// cerrado y anclado en la cadena global.
+router.get('/lote/:codigo/expediente.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM lotes_minerales WHERE codigo = $1`,
+      [String(req.params.codigo || '').toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    const lote = rows[0];
+    const [{ rows: eslabones }, { rows: declaraciones }, { rows: aRows }, { rows: fRows }] = await Promise.all([
+      query(`SELECT * FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]),
+      query(`SELECT codigo, estado FROM lote_declaraciones WHERE lote_id = $1`, [lote.id]),
+      query(`SELECT eslabon, hash_cadena, created_at FROM cadena_anclajes WHERE lote_id = $1`, [lote.id]),
+      lote.fuente_metodologica_id
+        ? query(`SELECT organismo, documento, version_anio FROM fuentes_metodologicas WHERE id = $1`, [lote.fuente_metodologica_id])
+        : Promise.resolve({ rows: [] }),
+    ]);
+
+    const pdf = await generateExpedienteLote({
+      lote,
+      eslabones,
+      declaraciones,
+      normativo: resumenNormativo(lote, declaraciones),
+      balance: balanceMasas(lote, eslabones),
+      emisiones: { ...emisionesIncorporadasPorTonelada(lote, eslabones), fuente: fRows[0] || null },
+      anclaje: aRows[0] || null,
+      integra: verificarCadenaCompleta(eslabones).valido,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-expediente-${lote.codigo}.pdf"`);
+    res.send(pdf);
+  } catch (err) { next(err); }
 });
 
 // ---------- GET /api/lote/:codigo/qr.png — QR del pasaporte de origen ----------

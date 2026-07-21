@@ -67,6 +67,21 @@ export const api = {
   verificar: (id) => request(`/verificar/${id}`),
   pasaporte: (id) => request(`/pasaporte/${id}`),
   lotePublico: (codigo) => request(`/lote/${codigo}`),
+  expedienteLoteUrl: (codigo) => `/api/lote/${codigo}/expediente.pdf`,
+
+  // --- Tarjeta de viaje (pública / portador) ---
+  tarjetaResolver: (serial) => request(`/v/${serial}`),
+  tarjetaAuth: (b) => request('/tarjeta/auth', { method: 'POST', body: b }),
+  tarjetaPaso: async (token, b) => {
+    const res = await fetch('/api/tarjeta/paso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(b),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al registrar el paso');
+    return data;
+  },
 
   // --- Pasaporte de Origen (admin) ---
   origenCatalogo: () => request('/admin/origen/catalogo', { authed: true }),
@@ -78,6 +93,9 @@ export const api = {
   origenDeclarar: (id, codigo, b) => request(`/admin/origen/lotes/${id}/declaraciones/${codigo}`, { method: 'PUT', body: b, authed: true }),
   origenCerrar: (id) => request(`/admin/origen/lotes/${id}/cerrar`, { method: 'POST', authed: true }),
   origenVerificar: (id) => request(`/admin/origen/lotes/${id}/verificar`, { authed: true }),
+  origenTarjetas: (loteId) => request(`/admin/origen/lotes/${loteId}/tarjetas`, { authed: true }),
+  origenEmitirTarjeta: (loteId, b) => request(`/admin/origen/lotes/${loteId}/tarjetas`, { method: 'POST', body: b, authed: true }),
+  origenEditarTarjeta: (id, b) => request(`/admin/origen/tarjetas/${id}`, { method: 'PUT', body: b, authed: true }),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el

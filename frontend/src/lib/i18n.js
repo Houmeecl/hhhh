@@ -269,6 +269,25 @@ const DICCIONARIOS = {
     'lote.error_titulo': 'Lote no encontrado',
     'lote.error_texto': 'No existe un pasaporte de origen para este código.',
     'lote.eslabones': 'eslabones',
+    'lote.expediente': 'Expediente PDF',
+
+    // Tarjeta de viaje (/v/:serial)
+    'tv.titulo': 'Tarjeta de Viaje',
+    'tv.serial': 'Tarjeta',
+    'tv.lote': 'Lote',
+    'tv.ver_pasaporte': 'Ver pasaporte del lote →',
+    'tv.soy_portador': 'Soy el portador — registrar paso',
+    'tv.instruccion': 'Ingresa la clave que recibiste junto con la tarjeta. El paso queda sellado en la cadena del lote con fecha y punto de control.',
+    'tv.clave': 'Clave del portador',
+    'tv.falta_clave': 'Ingresa la clave.',
+    'tv.punto': 'Punto de control (opcional)',
+    'tv.punto_ej': 'Paso Sico / Báscula km 45 / Puerto Antofagasta',
+    'tv.pais': 'País (ISO-2)',
+    'tv.registrar': 'Registrar paso',
+    'tv.paso_ok': 'Paso sellado en la cadena — eslabón',
+    'tv.nota': 'Esta tarjeta abre el pasaporte público del lote. Solo el portador autorizado puede registrar pasos; ninguna lectura anónima queda registrada.',
+    'tv.error_titulo': 'Tarjeta no encontrada',
+    'tv.error_texto': 'La tarjeta no existe, está inactiva o no tiene un lote asignado.',
   },
 
   // ---------- Inglés ----------
@@ -523,6 +542,25 @@ const DICCIONARIOS = {
     'lote.error_titulo': 'Batch not found',
     'lote.error_texto': 'There is no origin passport for this code.',
     'lote.eslabones': 'links',
+    'lote.expediente': 'Dossier PDF',
+
+    // Travel card (/v/:serial)
+    'tv.titulo': 'Travel Card',
+    'tv.serial': 'Card',
+    'tv.lote': 'Batch',
+    'tv.ver_pasaporte': 'View batch passport →',
+    'tv.soy_portador': 'I am the carrier — record a waypoint',
+    'tv.instruccion': 'Enter the key you received with the card. The waypoint is sealed into the batch chain with date and control point.',
+    'tv.clave': 'Carrier key',
+    'tv.falta_clave': 'Enter the key.',
+    'tv.punto': 'Control point (optional)',
+    'tv.punto_ej': 'Sico Pass / Weighbridge km 45 / Port of Antofagasta',
+    'tv.pais': 'Country (ISO-2)',
+    'tv.registrar': 'Record waypoint',
+    'tv.paso_ok': 'Waypoint sealed into the chain — link',
+    'tv.nota': 'This card opens the public batch passport. Only the authorized carrier can record waypoints; anonymous reads are never logged.',
+    'tv.error_titulo': 'Card not found',
+    'tv.error_texto': 'The card does not exist, is inactive or has no batch assigned.',
   },
 
   // ---------- Portugués ----------
@@ -744,6 +782,25 @@ const DICCIONARIOS = {
     'lote.error_titulo': 'Lote não encontrado',
     'lote.error_texto': 'Não existe um passaporte de origem para este código.',
     'lote.eslabones': 'elos',
+    'lote.expediente': 'Dossiê PDF',
+
+    // Cartão de viagem (/v/:serial)
+    'tv.titulo': 'Cartão de Viagem',
+    'tv.serial': 'Cartão',
+    'tv.lote': 'Lote',
+    'tv.ver_pasaporte': 'Ver passaporte do lote →',
+    'tv.soy_portador': 'Sou o portador — registrar passagem',
+    'tv.instruccion': 'Digite a chave recebida com o cartão. A passagem fica selada na cadeia do lote com data e ponto de controle.',
+    'tv.clave': 'Chave do portador',
+    'tv.falta_clave': 'Digite a chave.',
+    'tv.punto': 'Ponto de controle (opcional)',
+    'tv.punto_ej': 'Passo Sico / Balança km 45 / Porto de Antofagasta',
+    'tv.pais': 'País (ISO-2)',
+    'tv.registrar': 'Registrar passagem',
+    'tv.paso_ok': 'Passagem selada na cadeia — elo',
+    'tv.nota': 'Este cartão abre o passaporte público do lote. Somente o portador autorizado pode registrar passagens; leituras anônimas nunca são registradas.',
+    'tv.error_titulo': 'Cartão não encontrado',
+    'tv.error_texto': 'O cartão não existe, está inativo ou não tem lote atribuído.',
   },
 };
 

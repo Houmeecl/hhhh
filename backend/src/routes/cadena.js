@@ -20,11 +20,19 @@ router.get('/estado', async (req, res, next) => {
 });
 
 // Recalcula la cadena completa desde el génesis (auditoría bajo demanda).
+// La cadena global incluye facturas Y anclajes de lotes cerrados
+// (cadena_anclajes, migración 022): comparten la secuencia de
+// cadena_estado, por eso se verifica la unión ordenada por eslabón.
 router.get('/verificar', async (req, res, next) => {
   try {
     const { rows: eslabones } = await query(
-      `SELECT id, hash_anterior, hash_documento, hash_cadena
-       FROM facturas WHERE eslabon IS NOT NULL ORDER BY eslabon ASC`
+      `SELECT id::text AS id, eslabon, hash_anterior, hash_documento, hash_cadena FROM (
+         SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
+         FROM facturas WHERE eslabon IS NOT NULL
+         UNION ALL
+         SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
+         FROM cadena_anclajes
+       ) t ORDER BY eslabon ASC`
     );
     const resultado = verificarCadenaCompleta(eslabones);
     res.json(resultado);

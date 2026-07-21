@@ -27,8 +27,20 @@ test('filaEslabonPublico: SOLO las claves permitidas (Object.keys estricto)', ()
   const fila = filaEslabonPublico(FACTURA);
   assert.deepEqual(
     Object.keys(fila).sort(),
-    ['eslabon', 'factura_id', 'fecha', 'hash_corto', 't_co2e']
+    ['eslabon', 'factura_id', 'fecha', 'hash_corto', 't_co2e', 'tipo']
   );
+  assert.equal(fila.tipo, 'documento');
+});
+
+test('filaEslabonPublico: un anclaje de lote no expone id de factura ni CO2e', () => {
+  const fila = filaEslabonPublico({
+    id: 'anclaje-uuid', tipo: 'anclaje', eslabon: '9',
+    hash_cadena: 'c'.repeat(64), created_at: '2026-07-21T10:00:00.000Z',
+  });
+  assert.equal(fila.tipo, 'anclaje');
+  assert.equal(fila.factura_id, null);
+  assert.equal(fila.t_co2e, 0);
+  assert.equal(fila.eslabon, 9);
 });
 
 test('filaEslabonPublico: no filtra rut, empresa, folio ni archivo', () => {

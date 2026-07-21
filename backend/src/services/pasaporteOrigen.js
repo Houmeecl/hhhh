@@ -288,6 +288,26 @@ export function generarCodigoLote(anio, correlativo) {
   return `LM-${anio}-${String(correlativo).padStart(6, '0')}`;
 }
 
+// ---------- Tarjeta de Viaje (NFC/RFID que acompaña a la carga) ----------
+// Serial corto imprimible/grabable en el NDEF de la tarjeta: TV-XXXX.
+// Mismo espíritu que generarSerial() de posTerminal.js (AV-XXXX).
+export function generarSerialTarjeta() {
+  return `TV-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+}
+
+export function serialTarjetaValido(s) {
+  return /^TV-[0-9A-F]{4}$/.test(String(s || ''));
+}
+
+// ---------- Anclaje del lote en la cadena GLOBAL ----------
+// Al cerrar un lote, su hash final se sella como eslabón de la cadena
+// global (junto a las facturas). Preimage canónico con prefijo literal
+// para que jamás colisione con el de un documento.
+export function hashAnclajeLote({ codigo, ultimo_hash, n_eslabones }) {
+  const canonico = ['anclaje-lote', codigo || '', ultimo_hash || '', String(n_eslabones || 0)].join('|');
+  return sha256(canonico);
+}
+
 // Re-export de las primitivas de cadena que la ruta necesita junto a
 // este servicio (una sola importación en routes/origen.js).
 export { GENESIS, hashCadena };

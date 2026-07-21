@@ -199,6 +199,9 @@ export default function PasaporteLote() {
 
             <div className="no-print" style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
               <button className="btn btn-primary" onClick={() => window.print()}>{t('pas.imprimir')}</button>
+              <a className="btn btn-outline" href={api.expedienteLoteUrl(data.pasaporte.codigo)} target="_blank" rel="noreferrer">
+                {t('lote.expediente')}
+              </a>
               <button className="btn btn-outline" onClick={copiarEnlace}>
                 {copiado ? t('pos.copiado') : t('pas.copiar_enlace')}
               </button>

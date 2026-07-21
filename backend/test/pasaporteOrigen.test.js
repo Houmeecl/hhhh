@@ -235,3 +235,50 @@ test('ROLES contiene los 7 roles de la cadena', () => {
   assert.equal(ROLES.length, 7);
   assert.ok(ROLES.includes('mina') && ROLES.includes('comprador'));
 });
+
+// ---------- Tarjeta de Viaje ----------
+
+test('generarSerialTarjeta produce TV-XXXX válidos y variados', async () => {
+  const { generarSerialTarjeta, serialTarjetaValido } = await import('../src/services/pasaporteOrigen.js');
+  const muestras = new Set();
+  for (let i = 0; i < 60; i++) {
+    const s = generarSerialTarjeta();
+    assert.equal(serialTarjetaValido(s), true, s);
+    muestras.add(s);
+  }
+  assert.ok(muestras.size >= 55, 'demasiadas colisiones');
+  assert.equal(serialTarjetaValido('AV-1234'), false);
+  assert.equal(serialTarjetaValido('TV-12G4'), false);
+  assert.equal(serialTarjetaValido(''), false);
+});
+
+// ---------- Anclaje en la cadena global ----------
+
+test('hashAnclajeLote es determinista, sensible y distinto a hashEslabonLote', async () => {
+  const { hashAnclajeLote } = await import('../src/services/pasaporteOrigen.js');
+  const base = { codigo: 'LM-2026-000001', ultimo_hash: 'a'.repeat(64), n_eslabones: 4 };
+  const h = hashAnclajeLote(base);
+  assert.match(h, /^[0-9a-f]{64}$/);
+  assert.equal(h, hashAnclajeLote({ ...base }));
+  assert.notEqual(h, hashAnclajeLote({ ...base, n_eslabones: 5 }));
+  assert.notEqual(h, hashAnclajeLote({ ...base, ultimo_hash: 'b'.repeat(64) }));
+});
+
+test('la cadena global mixta (facturas + anclaje) verifica de punta a punta', async () => {
+  const { hashAnclajeLote } = await import('../src/services/pasaporteOrigen.js');
+  // factura 1 → factura 2 → ANCLAJE de lote → factura 3
+  let anterior = GENESIS;
+  const eslabones = [];
+  const empujar = (id, hashDoc) => {
+    const hc = hashCadena(anterior, hashDoc);
+    eslabones.push({ id, eslabon: eslabones.length + 1, hash_documento: hashDoc, hash_anterior: anterior, hash_cadena: hc });
+    anterior = hc;
+  };
+  empujar('f1', 'd'.repeat(64));
+  empujar('f2', 'e'.repeat(64));
+  empujar('anclaje-1', hashAnclajeLote({ codigo: 'LM-2026-000001', ultimo_hash: 'a'.repeat(64), n_eslabones: 3 }));
+  empujar('f3', 'f'.repeat(64));
+  const r = verificarCadenaCompleta(eslabones);
+  assert.equal(r.valido, true);
+  assert.equal(r.total_eslabones, 4);
+});
