@@ -28,6 +28,31 @@ import { t } from '../lib/i18n.js';
 // ============================================================
 
 const STORAGE_KEY = 'av_terminal';
+
+// Wake Lock: mientras el terminal tiene sesión de dispositivo, la tablet
+// de mostrador no se duerme. Detección de característica con fallo
+// silencioso (sin soporte, todo sigue igual); se re-adquiere al volver
+// la pestaña a primer plano (el sistema lo libera al minimizar).
+function useWakeLock(activo) {
+  useEffect(() => {
+    if (!activo || !('wakeLock' in navigator)) return undefined;
+    let lock = null;
+    let vivo = true;
+    const pedir = async () => {
+      try {
+        lock = await navigator.wakeLock.request('screen');
+      } catch { /* batería baja o política del sistema: no bloquear */ }
+    };
+    const alVolver = () => { if (vivo && document.visibilityState === 'visible') pedir(); };
+    pedir();
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      vivo = false;
+      document.removeEventListener('visibilitychange', alVolver);
+      lock?.release?.().catch(() => {});
+    };
+  }, [activo]);
+}
 const MAX_ARCHIVOS = 5;
 const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
 
@@ -142,6 +167,9 @@ export default function PosTerminal() {
   // paso (resultado → cobro → comprobante y de vuelta).
   const [embComponentes, setEmbComponentes] = useState([]);
   const [embalajeGuardado, setEmbalajeGuardado] = useState(null); // declaracion del servidor | null
+
+  // Tablet de mostrador: pantalla despierta mientras hay terminal conectado.
+  useWakeLock(Boolean(pos?.token));
 
   // Al montar: si hay una sesión de terminal guardada, se reutiliza.
   useEffect(() => {

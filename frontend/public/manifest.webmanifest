@@ -1,0 +1,17 @@
+{
+  "name": "Aduana Verde · sicr3p",
+  "short_name": "sicr3p",
+  "description": "Terminal Aduana Verde — tramitación verde de documentos comerciales sobre la plataforma sicr3p.",
+  "lang": "es-CL",
+  "start_url": "/pos",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1f2e",
+  "theme_color": "#0f1f2e",
+  "icons": [
+    { "src": "/icons/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

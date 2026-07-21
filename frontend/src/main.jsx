@@ -18,3 +18,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>
 );
+
+// PWA: el service worker solo corre en producción y sobre HTTPS (el
+// navegador lo exige). Fallo silencioso: sin SW el sitio funciona igual.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
