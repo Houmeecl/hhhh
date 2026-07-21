@@ -32,6 +32,7 @@ http://<tu-dominio-o-IP>/docs/comercial/06-informe-financiamiento.pdf
 http://<tu-dominio-o-IP>/docs/comercial/07-propuesta-puertos-antofagasta.pdf
 http://<tu-dominio-o-IP>/docs/comercial/08-brochure-plataforma.pdf
 http://<tu-dominio-o-IP>/docs/comercial/09-brochure-corredor.pdf
+http://<tu-dominio-o-IP>/docs/comercial/10-manual-beneficios.pdf
 http://<tu-dominio-o-IP>/docs/libro/            ← El Libro del proyecto (web con menú)
 http://<tu-dominio-o-IP>/docs/libro/el-libro-sicr3p.pdf
 ```

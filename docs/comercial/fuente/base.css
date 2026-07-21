@@ -142,3 +142,47 @@ tr:nth-child(even) td { background: #f8fafc; }
 }
 .faq dt { font-weight: 700; color: var(--navy); margin-top: 3.5mm; page-break-after: avoid; }
 .faq dd { margin: 1mm 0 0 0; }
+
+/* ---------- Pantallazos enmarcados (manuales con capturas reales) ---------- */
+.captura {
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(15, 31, 46, 0.10);
+  overflow: hidden;
+  margin: 3mm 0 2mm;
+  page-break-inside: avoid;
+}
+.captura img { display: block; width: 100%; height: auto; }
+.captura-tablet img { max-width: 62mm; margin: 0 auto; }
+.captura-movil img { max-width: 46mm; margin: 0 auto; }
+.paso-manual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6mm;
+  align-items: start;
+  margin: 3mm 0 5mm;
+  page-break-inside: avoid;
+}
+.paso-manual .txt h4 { margin-top: 0; }
+.paso-manual .num-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 7mm;
+  height: 7mm;
+  border-radius: 50%;
+  background: var(--verde);
+  color: #fff;
+  font-weight: 800;
+  font-size: 9pt;
+  margin-right: 2mm;
+}
+.beneficio {
+  background: var(--menta);
+  border-left: 3px solid var(--verde);
+  border-radius: 3px;
+  padding: 2.5mm 3.5mm;
+  margin-top: 2mm;
+  font-size: 9pt;
+}
+.beneficio b { color: var(--verde-oscuro); }
