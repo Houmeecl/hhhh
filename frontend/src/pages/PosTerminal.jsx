@@ -889,6 +889,7 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
   const notificado = useRef(false);
   // Envío del comprobante por correo: null | 'enviando' | 'ok' | 'error'
   const [envio, setEnvio] = useState(null);
+  const [mandanteCarpeta, setMandanteCarpeta] = useState('');
   // Feedback del botón "Copiar código del sello": null | 'ok' | 'error'
   const [selloCopia, setSelloCopia] = useState(null);
   // Idioma del comprobante (solo etiquetas): false = español, true = inglés.
@@ -1045,7 +1046,23 @@ function Comprobante({ pos, cliente, resultado, pago, embalaje, onNuevo }) {
         </div>
       )}
 
-      <div className="two-col-grid" style={{ marginTop: 18 }}>
+      {/* Carpeta física para el mandante: mineras y grandes empresas piden
+          la evidencia en papel — un solo PDF imprimible con portada, QRs
+          por documento, REP y hoja de verificación. */}
+      <div style={{ marginTop: 18, padding: '14px 16px', background: 'var(--bg)', borderRadius: 12, textAlign: 'left' }}>
+        <b style={{ fontSize: 14 }}>{lr('pos.carpeta_titulo')}</b>
+        <p className="muted" style={{ fontSize: 12, margin: '4px 0 10px' }}>{lr('pos.carpeta_texto')}</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input value={mandanteCarpeta} placeholder={lr('pos.carpeta_mandante_ej')}
+            onChange={(e) => setMandanteCarpeta(e.target.value)} style={{ flex: 1, minWidth: 180 }} />
+          <a className="btn btn-primary" style={{ display: 'inline-flex' }}
+            href={api.carpetaUrl(sesion.id, mandanteCarpeta.trim())} target="_blank" rel="noreferrer">
+            <Icon.Download size={16} /> {lr('pos.carpeta_imprimir')}
+          </a>
+        </div>
+      </div>
+
+      <div className="two-col-grid" style={{ marginTop: 14 }}>
         <a className="btn btn-outline" href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"
           style={{ display: 'inline-flex' }}>
           <Icon.Download size={16} /> {lr('pos.informe_pdf')}

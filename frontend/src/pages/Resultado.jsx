@@ -270,6 +270,7 @@ export default function Resultado() {
               <b>PDF de informe</b>
               <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>Informe consolidado con libro mayor de carbono y metodología.</p>
               <a className="btn btn-primary" style={{ width: '100%' }} href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer"><Icon.Download size={17} /> Generar PDF</a>
+              <a className="btn btn-outline" style={{ width: '100%', marginTop: 8 }} href={api.carpetaUrl(sesion.id)} target="_blank" rel="noreferrer"><Icon.Download size={17} /> Carpeta para tu mandante</a>
             </div>
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
               <b>Etiqueta / adhesivo</b>

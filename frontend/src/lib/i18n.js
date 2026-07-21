@@ -161,6 +161,10 @@ const DICCIONARIOS = {
     'pos.envio_error': 'No se pudo enviar el correo. Intenta de nuevo.',
     'pos.informe_pdf': 'Informe PDF',
     'pos.nuevo_tramite': 'Nuevo trámite',
+    'pos.carpeta_titulo': 'Carpeta física para el mandante',
+    'pos.carpeta_texto': '¿Tu mandante pide la evidencia en papel? Imprime la carpeta completa: portada, resumen, QR de verificación por documento, declaración REP y hoja de comprobación.',
+    'pos.carpeta_mandante_ej': 'Nombre del mandante (opcional)',
+    'pos.carpeta_imprimir': 'Imprimir carpeta',
 
     // Pasaporte Digital de Producto (/pasaporte/:id)
     'pas.titulo': 'Pasaporte Digital de Producto',
@@ -459,6 +463,10 @@ const DICCIONARIOS = {
     'pos.envio_error': 'The email could not be sent. Try again.',
     'pos.informe_pdf': 'PDF report',
     'pos.nuevo_tramite': 'New transaction',
+    'pos.carpeta_titulo': 'Physical folder for your client company',
+    'pos.carpeta_texto': 'Does your client company require paper evidence? Print the full folder: cover, summary, per-document verification QR, EPR declaration and checking sheet.',
+    'pos.carpeta_mandante_ej': 'Client company name (optional)',
+    'pos.carpeta_imprimir': 'Print folder',
 
     // Digital Product Passport (/pasaporte/:id)
     'pas.titulo': 'Digital Product Passport',

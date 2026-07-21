@@ -48,6 +48,25 @@ pesado ocurre en el servidor, la tablet solo captura y muestra. Un soporte
 de mostrador con carga permanente + el Wake Lock de la app mantienen el
 terminal siempre listo.
 
+## Impresión en el punto (la carpeta para el mandante)
+
+Cuando el mandante del cliente exige la evidencia **en papel**, el paso
+"comprobante" del terminal tiene el botón **"Imprimir carpeta"**: un solo
+PDF con portada dirigida al mandante, resumen del trámite, QR de
+verificación por documento, declaración REP y la hoja que le explica al
+receptor cómo comprobar la carpeta en 30 segundos. Cualquier impresora
+WiFi/USB común sirve: la tablet imprime con el diálogo nativo de
+Android/iPad. El papel se autovalida: si las cifras impresas no coinciden
+con lo que muestra el QR, el papel fue alterado.
+
+## Consejos de cámara en el mostrador
+
+- Factura plana sobre el mesón, sin dobleces.
+- Luz de frente (no por detrás del documento — evita contraluz).
+- Llenar el encuadre con el documento; enfocar tocando la pantalla.
+- Documentos de varias páginas: una foto por página.
+- Un soporte de tablet articulado permite fotografiar sin sacarla del pedestal.
+
 ## Qué pasa sin internet
 
 El cascarón de la app abre igual (queda en caché), pero **las operaciones

@@ -110,6 +110,8 @@ export const api = {
   calculadora: () => request('/publico/calculadora'),
   cadenaPublica: () => request('/publico/cadena'),
   informeUrl: (id) => `/api/sesiones/${id}/informe.pdf`,
+  carpetaUrl: (id, mandante) =>
+    `/api/sesiones/${id}/carpeta.pdf${mandante ? `?mandante=${encodeURIComponent(mandante)}` : ''}`,
   etiquetaUrl: (id) => `/api/facturas/${id}/etiqueta.pdf`,
   qrUrl: (id) => `/api/facturas/${id}/qr.png`,
 

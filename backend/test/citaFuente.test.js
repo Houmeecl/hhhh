@@ -39,3 +39,13 @@ test('citaFuente sin fuente vinculada devuelve vacío (render idéntico al actua
   assert.equal(citaFuente({ organismo: null, documento: null, version_anio: '2024' }), '');
   assert.equal(citaFuente({ organismo: '  ', documento: '' }), '');
 });
+
+// ---------- sanearNombreMandante (carpeta física para el mandante) ----------
+test('sanearNombreMandante recorta, colapsa espacios y limita a 80', async () => {
+  const { sanearNombreMandante } = await import('../src/services/pdf.js');
+  assert.equal(sanearNombreMandante('  Minera   Los  Andes  SpA '), 'Minera Los Andes SpA');
+  assert.equal(sanearNombreMandante(''), null);
+  assert.equal(sanearNombreMandante(null), null);
+  assert.equal(sanearNombreMandante(undefined), null);
+  assert.equal(sanearNombreMandante('x'.repeat(200)).length, 80);
+});

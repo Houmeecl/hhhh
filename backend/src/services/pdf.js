@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
+import { eslabonValido } from './cadenaHash.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -626,7 +627,6 @@ const SUBTITULO_EXPEDIENTE = {
 
 export async function generateExpedienteLote({ lote, eslabones, declaraciones, normativo, balance, emisiones, anclaje, integra }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
-  const salida = bufferDoc(doc);
   const W = doc.page.width - 96;
   const sellado = lote.estado === 'cerrado';
 
@@ -783,7 +783,7 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
     48, y, { width: W }
   );
 
-  return salida;
+  return bufferDoc(doc);
 }
 
 // ---------- CREDENCIAL VIRTUAL — Tarjeta de Viaje (solo QR, sin chip) ----------
@@ -833,6 +833,177 @@ export async function generateCredencialTarjeta({ tarjeta, lote }) {
     'con su clave (entregada por separado), registra pasos — cada paso queda sellado con ' +
     'hash, fecha y punto de control en la cadena del lote.',
     34, 207, { width: 352 }
+  );
+
+  return bufferDoc(doc);
+}
+
+// ---------- CARPETA PARA EL MANDANTE — evidencia física por trámite ----------
+// Las mineras y grandes empresas piden la evidencia EN PAPEL. Esta carpeta
+// es el entregable único imprimible del trámite: portada dirigida al
+// mandante, resumen, un QR de verificación POR DOCUMENTO y la hoja que le
+// dice al receptor cómo comprobar en 30 segundos que el papel es veraz.
+// El papel y el registro digital se validan mutuamente (mismo principio
+// del expediente de lotes).
+
+// Saneo del nombre del mandante (viene por query, solo texto de portada,
+// jamás se persiste). PURO y exportado para test.
+export function sanearNombreMandante(v) {
+  const limpio = String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, 80).trim();
+  return limpio || null;
+}
+
+export async function generateCarpetaMandante({ sesion, facturas, declaracion, alcances, mandante }) {
+  const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const W = doc.page.width - 96;
+  const destinatario = sanearNombreMandante(mandante) || 'su empresa mandante';
+  const totalCo2e = (facturas || []).reduce((a, f) => a + Number(f.total_co2e || 0), 0);
+
+  // ---- Portada ----
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`Folio ${folio(sesion)} · ${fechaCorta(new Date())}`, 340, 48, { width: 207, align: 'right' });
+  doc.moveTo(48, 78).lineTo(547, 78).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY)
+    .text('CARPETA DE EVIDENCIA AMBIENTAL', 48, 110);
+  doc.font('Helvetica').fontSize(11).fillColor(GRAY)
+    .text('Contabilidad de carbono y declaración REP, verificables por QR', 48, 134);
+
+  doc.roundedRect(48, 165, W, 96, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('PRESENTADA POR', 64, 180);
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY)
+    .text(String(sesion.nombre_cliente || '—').slice(0, 60), 64, 193);
+  doc.font('Helvetica').fontSize(10).fillColor(GRAY)
+    .text(`RUT ${sesion.rut_cliente || '—'}`, 64, 211);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('PREPARADA PARA', 64, 231);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text(destinatario, 64, 244);
+
+  try {
+    const qrPortada = await qrBuffer(facturas?.[0]?.id);
+    doc.image(qrPortada, 437, 175, { width: 76, height: 76 });
+    doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+      .text('Verificación en línea', 427, 253, { width: 96, align: 'center' });
+  } catch { /* sin facturas: portada sin QR */ }
+
+  // ---- Resumen ejecutivo ----
+  let y = 285;
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('RESUMEN DEL TRÁMITE', 48, y);
+  y += 20;
+  const tarjetas = [
+    [`${nf(totalCo2e, 3)} t CO2e`, 'Emisiones incorporadas'],
+    [`${(facturas || []).length}`, 'Documentos verificables'],
+    [decl?.nivel ? `${nfp(decl.porcentaje)}% · ${decl.nivel}` : 'Sin declaración', 'Reciclabilidad REP'],
+  ];
+  let x = 48;
+  for (const [cifra, etiqueta] of tarjetas) {
+    doc.roundedRect(x, y, 158, 54, 8).fillAndStroke('#eaf6ef', GREEN);
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text(cifra, x + 12, y + 12, { width: 138 });
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(etiqueta, x + 12, y + 34, { width: 138 });
+    x += 170;
+  }
+  y += 72;
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
+    'Cada documento de esta carpeta tiene su propia página pública de verificación (QR en la sección ' +
+    'siguiente). Las cifras impresas deben coincidir con las cifras en línea: si no coinciden, el papel fue alterado.',
+    48, y, { width: W }
+  );
+
+  // ---- Detalle por documento (2 columnas × 3 filas por página) ----
+  doc.addPage();
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('DOCUMENTOS VERIFICABLES', 48, 48);
+  let col = 0;
+  let fila = 0;
+  const CAJA_W = 243;
+  const CAJA_H = 148;
+  for (const f of facturas || []) {
+    if (fila === 3) { doc.addPage(); fila = 0; col = 0; }
+    const bx = 48 + col * (CAJA_W + 13);
+    const by = 74 + fila * (CAJA_H + 14);
+    doc.roundedRect(bx, by, CAJA_W, CAJA_H, 8).fillAndStroke('#ffffff', BORDER);
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY)
+      .text(String(f.numero_venta || '—').slice(0, 24), bx + 12, by + 12, { width: CAJA_W - 110 });
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text(String(f.categoria || 'Sin categoría').slice(0, 40), bx + 12, by + 28, { width: CAJA_W - 110 })
+      .text(`Estado: ${f.status || '—'}`, bx + 12, by + 42, { width: CAJA_W - 110 });
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(GREEN)
+      .text(`${nf(f.total_co2e, 3)}`, bx + 12, by + 66, { lineBreak: false });
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(' t CO2e', doc.x, by + 69);
+    if (f.hash_cadena) {
+      doc.font('Courier').fontSize(6.5).fillColor(GRAY)
+        .text(`eslabón #${f.eslabon} · ${String(f.hash_cadena).slice(0, 18)}…`, bx + 12, by + 126, { width: CAJA_W - 24 });
+    }
+    try {
+      const qr = await qrBuffer(f.id);
+      doc.image(qr, bx + CAJA_W - 96, by + 12, { width: 84, height: 84 });
+      doc.font('Helvetica').fontSize(6).fillColor(GRAY)
+        .text('Escanear para verificar', bx + CAJA_W - 100, by + 99, { width: 92, align: 'center' });
+    } catch { /* QR opcional */ }
+    col = (col + 1) % 2;
+    if (col === 0) fila += 1;
+  }
+
+  // ---- Declaración REP (si existe) ----
+  if (decl) {
+    doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+      .text('DECLARACIÓN DE ENVASES Y EMBALAJES — LEY REP 20.920', 48, 48);
+    let ry = 76;
+    doc.roundedRect(48, ry, W, 46, 8).fillAndStroke('#eaf6ef', GREEN);
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY)
+      .text(`${nfp(decl.porcentaje)}% de reciclabilidad · nivel ${decl.nivel}`, 64, ry + 10);
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+      .text(`${nf(Number(decl.peso_reciclable_gr || 0), 0)} g reciclables de ${nf(Number(decl.peso_total_gr || 0), 0)} g totales · porcentaje calculado por el servidor`, 64, ry + 28);
+    ry += 64;
+    const comps = componentesDe(decl);
+    if (comps.length) {
+      doc.rect(48, ry, W, 18).fill(NAVY);
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#ffffff')
+        .text('Componente', 56, ry + 5).text('Material', 250, ry + 5).text('Peso (g)', 420, ry + 5).text('Reciclable', 480, ry + 5);
+      ry += 18;
+      doc.font('Helvetica').fontSize(8.5).fillColor(NAVY);
+      for (const c of comps) {
+        if (ry > 770) { doc.addPage(); ry = 60; }
+        doc.text(String(c.nombre || '—').slice(0, 38), 56, ry + 4, { width: 186 })
+          .text(MATERIALES_EMBALAJE[c.material] || c.material || '—', 250, ry + 4, { width: 160 })
+          .text(nf(Number(c.peso_gr || 0), 0), 420, ry + 4)
+          .text(c.reciclable ? 'Sí' : 'No', 480, ry + 4);
+        ry += 16;
+      }
+    }
+  }
+
+  // ---- Hoja de verificación para el receptor ----
+  doc.addPage();
+  doc.font('Helvetica-Bold').fontSize(14).fillColor(NAVY)
+    .text('CÓMO COMPROBAR ESTA CARPETA EN 30 SEGUNDOS', 48, 48);
+  const pasos = [
+    ['1', 'Escanee cualquier QR de esta carpeta con la cámara de su teléfono. Se abre la página pública de verificación — sin cuentas ni claves.'],
+    ['2', `Compare: el folio (${folio(sesion)}), la empresa y las toneladas de CO2e impresas deben coincidir con lo que muestra la pantalla.`],
+    ['3', 'Revise el estado de la cadena de integridad en la misma página: "intacta" significa que el registro no fue alterado desde su emisión.'],
+  ];
+  let py = 84;
+  for (const [n, texto] of pasos) {
+    doc.circle(60, py + 8, 10).fill(GREEN);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff').text(n, 56, py + 2);
+    doc.font('Helvetica').fontSize(10).fillColor(NAVY).text(texto, 84, py, { width: W - 40 });
+    py = doc.y + 14;
+  }
+  const primera = (facturas || [])[0];
+  if (primera?.hash_cadena) {
+    py += 6;
+    doc.roundedRect(48, py, W, 64, 8).fillAndStroke(LIGHT, eslabonValido(primera) ? GREEN : BORDER);
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('SELLO DE INTEGRIDAD (primer documento de la carpeta)', 60, py + 10);
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`Eslabón #${primera.eslabon} de la cadena pública sicr3p:`, 60, py + 26);
+    doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(primera.hash_cadena), 60, py + 38, { width: W - 24 });
+    py += 78;
+  }
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+    'sicr3p no es un organismo certificador ni un verificador de tercera parte acreditado: registra, calcula y ' +
+    'sella datos desde los documentos tributarios reales del presentador, con integridad garantizada por una cadena ' +
+    'de hash pública. Esta carpeta se emitió para acompañar una entrega física; su versión digital siempre prevalece.',
+    48, Math.max(py, 620), { width: W }
   );
 
   return bufferDoc(doc);

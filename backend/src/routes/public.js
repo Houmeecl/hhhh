@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generateReport, generateLabel, generateExpedienteLote } from '../services/pdf.js';
+import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante } from '../services/pdf.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
@@ -717,6 +717,29 @@ router.get('/sesiones/:id', async (req, res, next) => {
       declaracion_embalaje: dRows[0] || null,
       compensacion: cRows[0] || null,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------- GET /api/sesiones/:id/carpeta.pdf — carpeta física para el mandante ----------
+// Las mineras y grandes empresas piden la evidencia en papel: esta es la
+// carpeta única imprimible del trámite (portada dirigida al mandante,
+// resumen, QR por documento, declaración REP y hoja de verificación).
+// `?mandante=` es solo texto de portada (saneado, jamás se persiste).
+router.get('/sesiones/:id/carpeta.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
+    const facturas = await hydrateFacturas(req.params.id);
+    const pdf = await generateCarpetaMandante({
+      sesion: rows[0],
+      facturas,
+      mandante: req.query.mandante,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-carpeta-${req.params.id.slice(0, 8)}.pdf"`);
+    res.send(pdf);
   } catch (err) {
     next(err);
   }
