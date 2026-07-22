@@ -1,20 +1,22 @@
-# Correo para sicr3p.cl — la decisión y las dos rutas
+# Correo para sicr3p.cl — la decisión y las rutas
 
-> **CAMINO RECOMENDADO (decisión de julio 2026): Zoho Mail hosted — sección 7.**
-> Para una operación unipersonal, correo autoalojado es la infraestructura más
-> ingrata de mantener: depende del ticket rDNS de DonWeb, del puerto 25 y de
-> pelear reputación de IP para siempre. Zoho resuelve buzones + webmail + app
-> móvil en ~30 minutos con 4 registros DNS, gratis hasta 5 usuarios.
-> El autoalojado (Poste.io, secciones 2-5) queda como opción de **soberanía
-> total** para el futuro — el script `instalar-webmail.sh` no se pierde.
+> **CAMINO ACTIVO (decisión de julio 2026): 5 casillas compradas directo en
+> Ferozo/DonWeb — sección 9.** Ferozo es la misma empresa que aloja el
+> dominio y el VPS, así que su panel trae wizards de un clic para MX, SPF y
+> DKIM (nada de armar registros a mano ni de depender de un ticket de rDNS).
+> Zoho Mail (sección 7) y Poste.io autoalojado (secciones 1-5, 8) quedan
+> documentados como alternativas descartadas por ahora — no se está usando
+> ninguna de las dos, no se pierden si algún día conviene volver a mirarlas.
 >
 > Comprobación en un comando, sirva el camino que sirva:
 > `bash deploy/verificar-correo.sh sicr3p.cl` (solo lectura: reporta ✓/✗ de
-> MX, SPF único, DKIM Zoho/Resend y DMARC).
+> MX, SPF único, DKIM Zoho/Resend y DMARC — con correo nativo de Ferozo el
+> selector DKIM real puede no ser el de Zoho; el script lo indica sin marcar
+> falso error).
 
-Guía completa de ambas rutas: **Poste.io autoalojado** (secciones 1-5, 8) y
-**Zoho hosted** (sección 7). El transaccional de la plataforma (Resend) va en
-la sección 6.
+Guía completa de las tres rutas: **Ferozo/DonWeb nativo** (sección 9, activo
+hoy), **Poste.io autoalojado** (secciones 1-5, 8) y **Zoho hosted**
+(sección 7). El transaccional de la plataforma (Resend) va en la sección 6.
 
 ---
 
@@ -273,3 +275,58 @@ tar czf /root/backups/posteio-$(date +%F).tar.gz -C /opt posteio-data
 
 (Se puede agregar al cron junto al respaldo de la BD que instala
 `deploy/instalar-vps.sh`.)
+
+---
+
+## 9. CAMINO ACTIVO: Ferozo/DonWeb nativo (5 casillas ya compradas)
+
+Ferozo es la misma empresa que aloja el dominio `sicr3p.cl` y el VPS —
+como administra la zona DNS y el correo a la vez, su panel trae wizards de
+un clic para MX, SPF y DKIM. No hay que armar registros a mano ni adivinar
+valores; el panel los genera. (Fuentes: soporte.donweb.com — artículos
+"Crear una cuenta de correo desde Ferozo", "Usar Webmail", "Cómo restaurar
+los MX por defecto en DonWeb", "Cómo configurar el registro SPF/DKIM desde
+Ferozo".)
+
+### 9.1 Crear las casillas
+Panel Ferozo → ícono **Email** → **Cuentas** → **Crear nueva**, una por
+cada buzón (mínimo `contacto@sicr3p.cl` y `postmaster@sicr3p.cl`; el plan
+comprado trae 5). Clave: mínimo 8 caracteres, mayúscula + minúscula +
+números no consecutivos + uno de `@ * /`.
+
+### 9.2 Apuntar el DNS al correo de Ferozo
+Panel Ferozo → **Dominios** → **Zonas de DNS** → elegir `sicr3p.cl` →
+**Configurar MX** → **Restaurar MX por defecto** → Aceptar. Esto
+crea/corrige automáticamente el **A** de `mail.sicr3p.cl` y el **MX** de
+`sicr3p.cl` apuntando al servidor de correo de Ferozo — **no** al IP del
+VPS (138.36.237.61, donde apuntaba para el plan de Poste.io descartado).
+
+### 9.3 SPF y DKIM (mismo panel, un clic cada uno)
+- **Configurar SPF** → Aceptar. Reemplaza el SPF roto actual
+  (`v=spf1 include:spf.hostmar.com -all`, que hoy rechaza cualquier envío
+  que no sea de Hostmar) por el que corresponde al correo nativo de
+  Ferozo.
+- **Configurar DKIM** → Aceptar. Genera el par de claves y el TXT solo.
+- **DMARC**: si el panel trae wizard (hay artículo de soporte específico),
+  usarlo; si no, crear a mano el TXT `_dmarc` con
+  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`.
+
+### 9.4 Webmail
+<https://ferozo.email/> — usuario = la casilla completa
+(`contacto@sicr3p.cl`), clave = la del paso 9.1.
+
+### 9.5 Verificar
+El DNS puede tardar hasta 24 h en propagar. `bash deploy/verificar-correo.sh
+sicr3p.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) pero
+no conoce el selector DKIM exacto que use el panel de Ferozo — si marca el
+DKIM como pendiente, confirmar a mano:
+```bash
+dig MX sicr3p.cl +short
+dig TXT sicr3p.cl +short              # un solo v=spf1
+dig TXT default._domainkey.sicr3p.cl +short   # ajustar selector si el panel usó otro
+dig TXT _dmarc.sicr3p.cl +short
+```
+Prueba final igual que la sección 5: mail-tester.com ≥ 9/10 con un correo
+real desde `contacto@sicr3p.cl`.
+
+Resend (sección 6) no se toca en ningún paso de esta sección.

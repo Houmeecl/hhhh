@@ -5,9 +5,13 @@
 # Uso:  bash deploy/verificar-correo.sh sicr3p.cl
 #
 # Interroga el DNS real y reporta ✓/✗ para cada registro que el
-# correo necesita, reconociendo los dos caminos posibles:
-#   A) Zoho hosted (recomendado): MX de zoho.com + SPF include:zoho.com
-#   B) Poste.io autoalojado:      MX mail.<dominio>
+# correo necesita, reconociendo los caminos posibles:
+#   A) Zoho hosted:                MX de zoho.com + SPF include:zoho.com
+#   B) Poste.io autoalojado o
+#      Ferozo/DonWeb nativo:       MX mail.<dominio> (misma forma en DNS;
+#      Ferozo configura A/MX/SPF/DKIM con sus propios wizards del panel,
+#      así que el selector DKIM real puede no ser zmail._domainkey — este
+#      script no lo puede adivinar sin la doc exacta del panel).
 # También chequea el DKIM de Resend (transaccional de la plataforma).
 #
 # No escribe ni cambia NADA: se puede correr las veces que sea.
@@ -41,10 +45,12 @@ echo
 
 # ---------- MX ----------
 MX="$(consulta MX "$DOMINIO" || true)"
+ES_ZOHO=0
 if echo "$MX" | grep -qi 'zoho\.com'; then
-  echo "$OK MX → Zoho (camino A, recomendado):"
+  ES_ZOHO=1
+  echo "$OK MX → Zoho (camino A):"
 elif echo "$MX" | grep -qi "mail\.$DOMINIO"; then
-  echo "$OK MX → mail.$DOMINIO (camino B, autoalojado Poste.io):"
+  echo "$OK MX → mail.$DOMINIO (camino B: Poste.io autoalojado o Ferozo/DonWeb nativo):"
 elif [ -n "$MX" ]; then
   echo "$NO MX apunta a otro proveedor (revisa si es intencional):"
   FALTAN+=("MX")
@@ -81,9 +87,13 @@ DKIM_ZOHO="$(consulta TXT "zmail._domainkey.$DOMINIO" || true)"
 DKIM_RESEND="$(consulta TXT "resend._domainkey.$DOMINIO" || true)"
 if [ -n "$DKIM_ZOHO" ]; then
   echo "$OK DKIM Zoho (zmail._domainkey): presente."
-else
+elif [ "$ES_ZOHO" -eq 1 ]; then
   echo "$NO DKIM Zoho (zmail._domainkey): ausente — los correos de buzones pueden caer a spam."
   FALTAN+=("DKIM Zoho")
+else
+  echo "· DKIM Zoho (zmail._domainkey): ausente — normal si no usas Zoho. Si el correo es nativo de"
+  echo "  Ferozo/DonWeb, confirma el DKIM generado por el wizard del panel (\"Configurar DKIM\") con:"
+  echo "  dig TXT default._domainkey.$DOMINIO +short   (ajusta el selector si el panel usó otro)."
 fi
 if [ -n "$DKIM_RESEND" ]; then
   echo "$OK DKIM Resend (resend._domainkey): presente — transaccional de la plataforma firmado."
