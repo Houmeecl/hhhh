@@ -323,7 +323,7 @@ DKIM como pendiente, confirmar a mano:
 ```bash
 dig MX sicr3p.cl +short
 dig TXT sicr3p.cl +short              # un solo v=spf1
-dig TXT default._domainkey.sicr3p.cl +short   # ajustar selector si el panel usó otro
+dig TXT mail._domainkey.sicr3p.cl +short      # selector confirmado por soporte DonWeb
 dig TXT _dmarc.sicr3p.cl +short
 ```
 Prueba final igual que la sección 5: mail-tester.com ≥ 9/10 con un correo

@@ -84,16 +84,19 @@ fi
 
 # ---------- DKIM ----------
 DKIM_ZOHO="$(consulta TXT "zmail._domainkey.$DOMINIO" || true)"
+DKIM_DONWEB="$(consulta TXT "mail._domainkey.$DOMINIO" || true)"
 DKIM_RESEND="$(consulta TXT "resend._domainkey.$DOMINIO" || true)"
 if [ -n "$DKIM_ZOHO" ]; then
   echo "$OK DKIM Zoho (zmail._domainkey): presente."
+elif [ -n "$DKIM_DONWEB" ]; then
+  echo "$OK DKIM DonWeb/Ferozo (mail._domainkey): presente."
 elif [ "$ES_ZOHO" -eq 1 ]; then
   echo "$NO DKIM Zoho (zmail._domainkey): ausente — los correos de buzones pueden caer a spam."
   FALTAN+=("DKIM Zoho")
 else
-  echo "· DKIM Zoho (zmail._domainkey): ausente — normal si no usas Zoho. Si el correo es nativo de"
-  echo "  Ferozo/DonWeb, confirma el DKIM generado por el wizard del panel (\"Configurar DKIM\") con:"
-  echo "  dig TXT default._domainkey.$DOMINIO +short   (ajusta el selector si el panel usó otro)."
+  echo "$NO DKIM (zmail._domainkey ni mail._domainkey): ausente — genera el DKIM con el wizard"
+  echo "  \"Configurar DKIM\" del panel DonWeb/Ferozo (Dominios → Zonas de DNS)."
+  FALTAN+=("DKIM")
 fi
 if [ -n "$DKIM_RESEND" ]; then
   echo "$OK DKIM Resend (resend._domainkey): presente — transaccional de la plataforma firmado."
