@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Valorización del Proyecto · TIR y Proyección Financiera</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">VALORIZACIÓN DEL PROYECTO · TIR Y PROYECCIÓN FINANCIERA · CONFIDENCIAL</div>
+    <h1>Cuánto rinde invertir<br>en distribuir lo que<br>ya está construido</h1>
+    <p class="bajada">Supuestos explícitos, flujo de caja a 5 años y cálculo de TIR/VAN en tres
+    escenarios. Complementa al informe de financiamiento (oportunidad, producto, modelo de
+    ingresos) con el número que un inversionista pide antes de decidir.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicr3p.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. RESUMEN EJECUTIVO -->
+<div class="pagina">
+  <h2>1. Resumen ejecutivo</h2>
+  <p>Este documento muestra la <strong>proyección financiera de sicr3p a 5 años</strong> y el
+  cálculo de <strong>TIR (Tasa Interna de Retorno) y VAN (Valor Actual Neto)</strong> resultante,
+  bajo tres escenarios de adopción. sicr3p está en pre-lanzamiento — <strong>sin ventas facturadas
+  todavía</strong> — así que cada cifra de este informe es una proyección de la administración,
+  no un histórico. Los dos supuestos que más mueven el resultado (el monto de la ronda y la tasa
+  de descuento) están declarados de forma explícita en la sección 2 para que se ajusten con la
+  cifra real de cada conversación de inversión.</p>
+
+  <div class="dos-col">
+    <div class="caja-navy">
+      <h4>Escenario base</h4>
+      <p style="margin:1mm 0 0; text-align:left; color:#e2e8f0;">TIR: <strong style="color:#fff">36,1% anual</strong><br>VAN: <strong style="color:#fff">$120,0 MM CLP</strong></p>
+    </div>
+    <div class="caja-navy">
+      <h4>Escenario conservador</h4>
+      <p style="margin:1mm 0 0; text-align:left; color:#e2e8f0;">TIR: <strong style="color:#fff">5,1% anual</strong><br>VAN: <strong style="color:#fff">-$63,3 MM CLP</strong></p>
+    </div>
+    <div class="caja-navy">
+      <h4>Escenario optimista</h4>
+      <p style="margin:1mm 0 0; text-align:left; color:#e2e8f0;">TIR: <strong style="color:#fff">56,4% anual</strong><br>VAN: <strong style="color:#fff">$303,3 MM CLP</strong></p>
+    </div>
+  </div>
+
+  <p class="ref">Los tres escenarios comparten la misma estructura de costos; solo varía la
+  velocidad de adopción de las 4 líneas de ingreso (sección 3). El escenario conservador muestra
+  honestamente que, si la adopción es lenta, el proyecto rinde poco más que la tasa de descuento
+  — no se oculta el caso adverso.</p>
+</div>
+
+<!-- 2. SUPUESTOS DEL MODELO -->
+<div class="pagina">
+  <h2>2. Supuestos del modelo</h2>
+  <p>Estos son los parámetros de entrada del modelo (script reproducible en
+  <span class="ref">docs/comercial/modelo-financiero/valorizacion.mjs</span>). Cambiarlos cambia
+  el resultado — se listan aquí para que quien revise el informe (o el propio equipo de sicr3p
+  antes de enviarlo) vea exactamente de dónde sale cada número.</p>
+  <table>
+    <tr><th>Supuesto</th><th>Valor usado</th><th>Nota</th></tr>
+    <tr><td><strong>Ronda solicitada</strong></td><td>$150.000.000 CLP</td><td>Ilustrativo — ajustar al monto real de cada instrumento (capital semilla, CORFO, banca)</td></tr>
+    <tr><td><strong>Tasa de descuento anual</strong></td><td>18%</td><td>Referencial para etapa pre-revenue en LatAm; un VC puede pedir una tasa distinta</td></tr>
+    <tr><td><strong>Horizonte de proyección</strong></td><td>5 años</td><td>Mismo horizonte que el resto de los documentos comerciales</td></tr>
+    <tr><td><strong>Costos operativos</strong></td><td>$18 MM → $120 MM CLP/año</td><td>Equipo comercial, infraestructura, soporte — igual en los 3 escenarios</td></tr>
+  </table>
+
+  <div class="caja-alerta">
+    <strong>Honestidad primero:</strong> no hay ventas facturadas aún (así lo declara también el
+    informe de financiamiento). Estas cifras son <strong>estimaciones de la administración</strong>,
+    no un resultado auditado ni una promesa de retorno. Este documento no constituye oferta
+    pública de valores.
+  </div>
+</div>
+
+<!-- 3. PROYECCIÓN DE FLUJO DE CAJA -->
+<div class="pagina">
+  <h2>3. Proyección de flujo de caja — escenario base</h2>
+  <p>Las 4 líneas de ingreso son las mismas del informe de financiamiento (suscripción SaaS,
+  tramitación Aduana Verde, pasaportes de origen, API mandantes). El escenario base asume una
+  curva de adopción moderada; los escenarios conservador y optimista escalan estos mismos montos
+  por 0,6x y 1,4x respectivamente (sección 5).</p>
+  <table>
+    <tr><th>Año</th><th>Ingresos (CLP)</th><th>Costos (CLP)</th><th>Flujo neto (CLP)</th></tr>
+    <tr><td>0</td><td>—</td><td>—</td><td>-$150.000.000 (inversión inicial)</td></tr>
+    <tr><td>1</td><td>$15.000.000</td><td>$18.000.000</td><td>-$3.000.000</td></tr>
+    <tr><td>2</td><td>$62.000.000</td><td>$42.000.000</td><td>$20.000.000</td></tr>
+    <tr><td>3</td><td>$150.000.000</td><td>$68.000.000</td><td>$82.000.000</td></tr>
+    <tr><td>4</td><td>$270.000.000</td><td>$95.000.000</td><td>$175.000.000</td></tr>
+    <tr><td>5</td><td>$390.000.000</td><td>$120.000.000</td><td>$270.000.000</td></tr>
+  </table>
+  <p class="ref">El punto de equilibrio operativo (ingresos ≥ costos) llega en el año 2 en el
+  escenario base; la inversión inicial se recupera en flujo acumulado dentro del año 3.</p>
+</div>
+
+<!-- 4. TIR, VAN Y ESCENARIOS -->
+<div class="pagina">
+  <h2>4. TIR, VAN y los tres escenarios</h2>
+  <p><strong>TIR (Tasa Interna de Retorno):</strong> la tasa de crecimiento anual compuesta que
+  haría que la inversión "empatara" exactamente con los flujos futuros — mientras más alta sobre
+  la tasa de descuento (18%), mejor el retorno relativo. <strong>VAN (Valor Actual Neto):</strong>
+  cuánto vale hoy ese flujo futuro, descontado a la tasa de referencia — positivo significa que el
+  proyecto rinde por sobre esa tasa.</p>
+
+  <table>
+    <tr><th>Escenario</th><th>Factor de adopción</th><th>TIR</th><th>VAN (@ 18%)</th></tr>
+    <tr><td><strong>Conservador</strong></td><td>0,6x</td><td>5,1% anual</td><td>-$63.296.219 CLP</td></tr>
+    <tr><td><strong>Base</strong></td><td>1,0x</td><td>36,1% anual</td><td>$120.011.589 CLP</td></tr>
+    <tr><td><strong>Optimista</strong></td><td>1,4x</td><td>56,4% anual</td><td>$303.319.397 CLP</td></tr>
+  </table>
+
+  <div class="caja">
+    <strong>Lectura honesta:</strong> el escenario conservador rinde por debajo de la tasa de
+    descuento (VAN negativo) — es el caso en que la adopción comercial es más lenta de lo
+    esperado. El escenario base y el optimista sí superan la tasa de referencia. El riesgo
+    principal de este proyecto no es tecnológico (el producto ya está construido y operativo,
+    con más de 220 pruebas automatizadas) sino <strong>comercial: la velocidad de adopción</strong>.
+  </div>
+</div>
+
+<!-- 5. SENSIBILIDAD -->
+<div class="pagina">
+  <h2>5. Sensibilidad — qué mueve más la TIR</h2>
+  <p>El único supuesto que varía entre los tres escenarios es la <strong>velocidad de adopción</strong>
+  de las 4 líneas de ingreso (los costos se mantienen iguales). Eso es intencional: en una empresa
+  pre-revenue con producto ya construido, el riesgo no está en si el sistema funciona — ya funciona,
+  con cadena de integridad pública verificable — sino en cuántas empresas y puntos Aduana Verde se
+  suman por trimestre.</p>
+  <table>
+    <tr><th>Pregunta típica de un inversionista</th><th>Respuesta con este modelo</th></tr>
+    <tr><td>¿Y si la adopción es 40% más lenta de lo esperado?</td><td>Ese es exactamente el escenario conservador: TIR cae de 36,1% a 5,1% — el proyecto deja de superar la tasa de descuento, pero no genera pérdida de capital nominal en el horizonte de 5 años.</td></tr>
+    <tr><td>¿Cuál es la línea de ingreso más determinante?</td><td>Suscripción SaaS y Aduana Verde concentran ~65% del ingreso proyectado en el escenario base — son las dos prioridades 1 y 2 del uso de fondos (sección 6).</td></tr>
+    <tr><td>¿Qué pasa si la tasa de descuento exigida es más alta (ej. 25%)?</td><td>El VAN del escenario base baja pero se mantiene positivo; el conservador se vuelve más negativo. El script de modelo permite recalcular esto en segundos cambiando un solo parámetro.</td></tr>
+  </table>
+</div>
+
+<!-- 6. USO DE LA RONDA -->
+<div class="pagina">
+  <h2>6. Uso de la ronda</h2>
+  <p>Mismas prioridades ya declaradas en el informe de financiamiento, alineadas a los costos
+  operativos proyectados en este modelo:</p>
+  <table>
+    <tr><th>Prioridad</th><th>Destino</th><th>Resultado esperado</th></tr>
+    <tr><td>1</td><td><strong>Comercial y pilotos</strong>: equipo de venta B2B, apertura de los primeros puntos Aduana Verde, piloto con un mandante minero y una ruta del corredor.</td><td>Primeros ingresos recurrentes y casos públicos verificables.</td></tr>
+    <tr><td>2</td><td><strong>Pagos y cumplimiento</strong>: integración de pasarela de pago (VirtualPos), revisión legal final, camino a ISO 27001.</td><td>Cobro real en toda la red y respaldo contractual sólido.</td></tr>
+    <tr><td>3</td><td><strong>Escala tecnológica</strong>: portal del mandante, exportación EPCIS 2.0, pases de billetera móvil, analítica a gran escala.</td><td>Producto enterprise para mandantes y compradores europeos.</td></tr>
+    <tr><td>4</td><td><strong>Expansión corredor</strong>: metodologías AR/PY/BR activadas con contrapartes locales.</td><td>Primer pasaporte documental multi-país de la región con verificación pública.</td></tr>
+  </table>
+</div>
+
+<!-- 7. DOCUMENTOS DE RESPALDO -->
+<div class="pagina">
+  <h2>7. Documentos de respaldo</h2>
+  <p>Este informe se complementa con el resto de la carpeta comercial de sicr3p, según a quién se
+  presente (detalle completo en <span class="ref">docs/comercial/CARPETA-INVERSIONISTAS.md</span>):</p>
+  <table>
+    <tr><th>Documento</th><th>Para qué sirve</th></tr>
+    <tr><td>01 · sicr3p (plataforma)</td><td>Qué es el producto, motor propio, marco normativo — contexto antes de ver números.</td></tr>
+    <tr><td>06 · Informe para financiamiento</td><td>Oportunidad, diferenciación y modelo de ingresos en formato narrativo (sin cifras) — este documento (11) es su complemento numérico.</td></tr>
+    <tr><td>07 · Propuesta de piloto</td><td>Si la conversación es con una contraparte de piloto (puerto, mandante) en vez de un inversionista.</td></tr>
+    <tr><td>08 / 09 · Brochures</td><td>Material visual de una página, para una primera aproximación antes de entrar en detalle.</td></tr>
+  </table>
+
+  <p style="margin-top:8mm; color:var(--gris); font-size:9pt;">Documento confidencial preparado
+  para evaluación de inversión o de piloto. No constituye oferta pública de valores. Las cifras de
+  este informe son proyecciones/estimaciones de la administración, no auditadas — se recomienda
+  ajustar el monto de la ronda y la tasa de descuento a la cifra real de cada conversación antes de
+  compartir el documento.</p>
+</div>
+
+</body>
+</html>
