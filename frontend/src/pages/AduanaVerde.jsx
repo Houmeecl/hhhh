@@ -361,6 +361,39 @@ export default function AduanaVerde() {
         </div>
       </section>
 
+      {/* Diferenciación: la comparación concreta que resuelve la duda antes
+          de que la persona la piense — sin inventar cifras de terceros. */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.dif_titulo')}</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 28px', lineHeight: 1.6 }}>
+            {t('av.dif_sub')}
+          </p>
+          <div className="table-scroll av2-reveal">
+            <table className="data av-dif-table">
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>{t('av.dif_col_av')}</th>
+                  <th>{t('av.dif_col_cons')}</th>
+                  <th>{t('av.dif_col_plan')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <tr key={n}>
+                    <td>{t(`av.dif_r${n}`)}</td>
+                    <td>{t(`av.dif_r${n}_av`)}</td>
+                    <td className="muted">{t(`av.dif_r${n}_cons`)}</td>
+                    <td className="muted">{t(`av.dif_r${n}_plan`)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* Para quién es: 3 disparadores concretos y honestos */}
       <section className="sec-pad sec-alt">
         <div className="container">
