@@ -65,30 +65,29 @@ Si creas el DNS **antes** de correr el script, el HTTPS queda listo de una.
 
 ---
 
-## 3. Registros DNS exactos (panel del dominio sicr3p.cl)
+## 3. Registros DNS exactos (panel del dominio sicr3p.cl) — camino descartado (Poste.io)
 
-> **Estado verificado el 19-07-2026** (consulta DNS en vivo): el **A** y el **MX**
-> ya existen y apuntan bien. El **SPF actual es un problema**: dice
-> `v=spf1 include:spf.hostmar.com -all`, o sea autoriza SOLO a Hostmar con rechazo
-> duro — el correo enviado desde el propio VPS **fallaría SPF**. Hay que
-> REEMPLAZARLO (no agregar un segundo TXT) por la versión fusionada de la tabla.
-> `_dmarc` no existe todavía. El PTR sigue siendo el genérico de DonWeb
-> (`vps-6165621-x.dattaweb.com`), así que el ticket de la sección de rDNS sigue pendiente.
+> Esta sección quedó de cuando el plan era autoalojar Poste.io en el VPS
+> — **descartado, ver sección 9 (Ferozo/DonWeb nativo, camino activo)**.
+> Se deja solo de referencia histórica; no seguir estos pasos.
+>
+> **Corrección importante (confirmada por el artículo oficial de soporte
+> "¿Cómo configurar el registro SPF desde Ferozo?"):** el SPF
+> `v=spf1 include:spf.hostmar.com -all` que decía "es un problema" abajo
+> **en realidad es el valor correcto y recomendado por el propio DonWeb**
+> para su correo nativo (Hostmar es la infraestructura de envío de
+> Ferozo/DonWeb) — no había que reemplazarlo. El error de diagnóstico fue
+> asumir que el correo se enviaría desde el VPS (por eso pedía agregar
+> `mx` al SPF); con casillas nativas de Ferozo el envío es desde Hostmar,
+> no desde el VPS, así que el SPF de abajo nunca debió tocarse.
 
 | Tipo | Nombre / Host          | Valor                                                        | Estado 19-07-2026 |
 |------|------------------------|--------------------------------------------------------------|-------------------|
 | A    | `mail`                 | `138.36.237.61`                                              | ✅ ya creado |
 | MX   | `@` (sicr3p.cl)        | `mail.sicr3p.cl` (prioridad 10)                              | ✅ ya creado |
-| TXT  | `@` (sicr3p.cl)        | `v=spf1 mx include:spf.hostmar.com ~all` (**reemplaza** al actual `v=spf1 include:spf.hostmar.com -all`) | ⚠️ corregir |
+| TXT  | `@` (sicr3p.cl)        | `v=spf1 include:spf.hostmar.com -all` — **correcto tal cual, no tocar** | ✅ correcto |
 | TXT  | `_dmarc`               | `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`    | ❌ crear |
 | TXT  | `<selector>._domainkey`| *(DKIM: se genera después de instalar — ver sección 4)*      | ❌ después de instalar |
-
-> **Por qué esa fusión de SPF**: solo puede existir UN TXT SPF por nombre. La
-> versión fusionada autoriza al VPS (vía `mx`) y conserva a Hostmar por si algo
-> del hosting antiguo aún envía con el dominio; `~all` (softfail) evita rechazos
-> duros mientras se estabiliza. Cuando esté claro que nada envía por Hostmar,
-> simplificar a `v=spf1 mx ~all`. Resend no se toca: usa su propio subdominio
-> de envío con SPF aparte.
 
 ### El paso CRÍTICO: rDNS/PTR
 
@@ -301,12 +300,17 @@ crea/corrige automáticamente el **A** de `mail.sicr3p.cl` y el **MX** de
 `sicr3p.cl` apuntando al servidor de correo de Ferozo — **no** al IP del
 VPS (138.36.237.61, donde apuntaba para el plan de Poste.io descartado).
 
-### 9.3 SPF y DKIM (mismo panel, un clic cada uno)
-- **Configurar SPF** → Aceptar. Reemplaza el SPF roto actual
-  (`v=spf1 include:spf.hostmar.com -all`, que hoy rechaza cualquier envío
-  que no sea de Hostmar) por el que corresponde al correo nativo de
-  Ferozo.
-- **Configurar DKIM** → Aceptar. Genera el par de claves y el TXT solo.
+### 9.3 SPF y DKIM
+- **SPF: no tocar.** El TXT actual (`v=spf1 include:spf.hostmar.com -all`)
+  YA es el valor correcto para el correo nativo de Ferozo/DonWeb —
+  confirmado textual en el artículo de soporte "¿Cómo configurar el
+  registro SPF desde Ferozo?": ese es exactamente el contenido que piden
+  usar. Si el panel muestra un modal de edición para este registro,
+  **Cancelar**, no Guardar.
+- **Configurar DKIM** → Aceptar (mismo panel, Zonas de DNS). Genera el par
+  de claves y el TXT solo. Selector confirmado por soporte DonWeb:
+  `mail._domainkey.sicr3p.cl` (verificar con
+  `dig TXT mail._domainkey.sicr3p.cl +short`).
 - **DMARC**: si el panel trae wizard (hay artículo de soporte específico),
   usarlo; si no, crear a mano el TXT `_dmarc` con
   `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`.
@@ -317,13 +321,12 @@ VPS (138.36.237.61, donde apuntaba para el plan de Poste.io descartado).
 
 ### 9.5 Verificar
 El DNS puede tardar hasta 24 h en propagar. `bash deploy/verificar-correo.sh
-sicr3p.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) pero
-no conoce el selector DKIM exacto que use el panel de Ferozo — si marca el
-DKIM como pendiente, confirmar a mano:
+sicr3p.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) y el
+DKIM nativo de DonWeb (`mail._domainkey`). Chequeo manual equivalente:
 ```bash
 dig MX sicr3p.cl +short
-dig TXT sicr3p.cl +short              # un solo v=spf1
-dig TXT mail._domainkey.sicr3p.cl +short      # selector confirmado por soporte DonWeb
+dig TXT sicr3p.cl +short                      # un solo v=spf1, el de Hostmar (no tocar)
+dig TXT mail._domainkey.sicr3p.cl +short      # DKIM nativo DonWeb
 dig TXT _dmarc.sicr3p.cl +short
 ```
 Prueba final igual que la sección 5: mail-tester.com ≥ 9/10 con un correo
