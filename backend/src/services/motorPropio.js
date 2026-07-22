@@ -32,6 +32,14 @@ export function normalizarUnidad(unidad) {
   return UNIDADES[u] || null;
 }
 
+// Normaliza confusiones típicas de OCR (0/O→o, 1/l→l, rn→m) para que un
+// error de reconocimiento de caracteres no le cueste la categoría a un
+// ítem real (ej. "e1ectricidad" u "0.NEMESA rnaritirno"). Se aplica por
+// igual a la glosa y a la palabra clave, así ambas quedan comparables.
+function normalizarOcr(s) {
+  return s.replace(/[01]/g, (c) => (c === '0' ? 'o' : 'l')).replace(/rn/g, 'm');
+}
+
 // Clasifica un ítem por coincidencia de palabra clave en su glosa.
 // Gana la palabra clave MÁS LARGA (la más específica): "flete maritimo"
 // le gana a "flete" y "agua potable" a "agua", así el resultado no
@@ -40,12 +48,15 @@ export function normalizarUnidad(unidad) {
 // Devuelve el código de categoría (default 'servicios', catch-all).
 export function clasificar(texto, categorias) {
   const t = limpiar(texto);
+  const tOcr = normalizarOcr(t);
   let mejor = null; // { codigo, largo }
   for (const cat of categorias.values()) {
     if (!cat.activo) continue;
     for (const kw of cat.palabras_clave || []) {
       const k = limpiar(kw);
-      if (k && t.includes(k) && (!mejor || k.length > mejor.largo)) {
+      if (!k) continue;
+      const coincide = t.includes(k) || tOcr.includes(normalizarOcr(k));
+      if (coincide && (!mejor || k.length > mejor.largo)) {
         mejor = { codigo: cat.codigo, largo: k.length };
       }
     }

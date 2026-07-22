@@ -35,6 +35,12 @@ test('parsearMontoChileno entiende miles con punto y decimales con coma', () => 
   assert.equal(parsearMontoChileno(''), 0);
 });
 
+test('parsearMontoChileno también entiende el formato inverso (miles con coma, decimal con punto)', () => {
+  assert.equal(parsearMontoChileno('1,190,000.50'), 1190000.5);
+  assert.equal(parsearMontoChileno('1,190,000'), 1190000);
+  assert.equal(parsearMontoChileno('$450,000'), 450000);
+});
+
 // ---------- parsing puro ----------
 
 test('parsearFacturaTexto extrae RUTs validados: primero emisor, segundo receptor', () => {
@@ -88,6 +94,13 @@ test('parsearFacturaTexto ignora montos menores a $1.000 y líneas sin glosa', (
   const p = parsearFacturaTexto('Ajuste menor $ 500\n123 456\nServicio de aseo $ 45.000\nTOTAL $ 53.550');
   assert.equal(p.items.length, 1);
   assert.equal(p.items[0].nombre, 'Servicio de aseo');
+});
+
+test('parsearFacturaTexto excluye líneas de descuento (no son un ítem nuevo)', () => {
+  const p = parsearFacturaTexto('Servicio de flete norte $ 100.000\nDescuento 10% -$ 10.000\nDSCTO pronto pago -$ 5.000\nTOTAL $ 90.000');
+  assert.equal(p.items.length, 1);
+  assert.equal(p.items[0].nombre, 'Servicio de flete norte');
+  assert.equal(p.monto_total, 90000);
 });
 
 test('parsearFacturaTexto no confunde fechas ni dígitos verificadores con montos', () => {

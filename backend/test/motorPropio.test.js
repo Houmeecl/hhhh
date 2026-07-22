@@ -116,6 +116,18 @@ test('clasificar no depende del orden en que la BD devuelva las categorías', ()
   }
 });
 
+test('clasificar tolera confusiones comunes de OCR (0/O, 1/l, rn/m)', () => {
+  const cats = categoriasEjemplo();
+  // "Cargo por p0tencia" (0 en vez de "o") sigue reconociendo "potencia".
+  assert.equal(clasificar('Carg0 p0r p0tencia', cats), 'electricidad');
+  // "e1ectrico" (1 en vez de "l") sigue reconociendo "electric".
+  assert.equal(clasificar('Suministro e1ectrico mensual', cats), 'electricidad');
+  const catsNuevas = categoriasConNuevas();
+  // "rnaritirno" (rn en vez de "m") sigue reconociendo "maritimo", y le
+  // gana a "flete" (transporte terrestre) por ser la palabra más específica.
+  assert.equal(clasificar('Flete rnaritirno Valparaíso-Shanghái', catsNuevas), 'maritimo_contenedor');
+});
+
 test('clasificar cae a "servicios" cuando no hay coincidencia', () => {
   const cats = categoriasEjemplo();
   assert.equal(clasificar('Concepto sin relación aparente', cats), 'servicios');

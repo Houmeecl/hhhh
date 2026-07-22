@@ -24,20 +24,28 @@ const FECHA_RE = /\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b/;
 // Monto al final de una línea, precedido de espacio o inicio (así se
 // descartan colas de fechas «…/2026» y dígitos verificadores «…-0»).
 const MONTO_FINAL_RE = /(?:^|\s)\$?\s*([\d.,]+)\s*$/;
-// Líneas de totales/impuestos/identificación/encabezado: no son ítems
-// (el número final de "FACTURA … N° 4521" es un folio, no un monto).
-const LINEA_EXCLUIDA_RE = /\b(?:SUB)?TOTAL\b|\bIVA\b|\bNETO\b|R\.?U\.?T|\bFACTURA\b|\bFOLIO\b|\bBOLETA\b|\bGU[IÍ]A\b/i;
+// Líneas de totales/impuestos/identificación/encabezado/descuento: no son
+// ítems (el número final de "FACTURA … N° 4521" es un folio, no un monto;
+// una línea de descuento no es un ítem nuevo, es un ajuste del anterior).
+const LINEA_EXCLUIDA_RE = /\b(?:SUB)?TOTAL\b|\bIVA\b|\bNETO\b|R\.?U\.?T|\bFACTURA\b|\bFOLIO\b|\bBOLETA\b|\bGU[IÍ]A\b|\bD?E?SCTO\.?\b|\bDESCUENTO\b/i;
 
 const MONTO_MINIMO_ITEM = 1000; // ≥ $1.000 CLP para considerar la línea un ítem.
 
 // "1.190.000" → 1190000 · "1.190.000,50" → 1190000.5 (formato chileno:
-// punto de miles, coma decimal). Devuelve 0 si no es un número.
+// punto de miles, coma decimal). También tolera el formato inverso
+// ("1,190,000.50", miles con coma y decimal con punto) por si el
+// documento viene de un layout no chileno: el separador DECIMAL es el
+// último que aparece con 1-2 dígitos detrás; el otro se trata como miles.
+// Devuelve 0 si no es un número.
 export function parsearMontoChileno(s) {
   let t = String(s ?? '').trim().replace(/^\$\s*/, '').replace(/[.,]+$/, '');
   if (!t) return 0;
-  const coma = t.lastIndexOf(',');
-  if (coma !== -1 && t.length - coma - 1 <= 2) {
-    t = t.slice(0, coma).replace(/[.,]/g, '') + '.' + t.slice(coma + 1);
+  const iPunto = t.lastIndexOf('.');
+  const iComa = t.lastIndexOf(',');
+  const iDecimal = Math.max(iPunto, iComa);
+  if (iDecimal !== -1 && t.length - iDecimal - 1 >= 1 && t.length - iDecimal - 1 <= 2) {
+    const separadorMiles = t[iDecimal] === ',' ? '.' : ',';
+    t = t.slice(0, iDecimal).split(separadorMiles).join('') + '.' + t.slice(iDecimal + 1);
   } else {
     t = t.replace(/[.,]/g, '');
   }
