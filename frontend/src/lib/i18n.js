@@ -28,7 +28,7 @@ const DICCIONARIOS = {
     'comun.referencial': 'referencial',
     'comun.proximamente': 'Próximamente',
     'comun.socio_ambiental': 'Compensación de carbono vía un socio ambiental acreditado.',
-    'comun.perdiste_clave': '¿Perdiste tu clave? Escríbenos a contacto@sicr3p.cl y la regeneramos.',
+    'comun.perdiste_clave': '¿Perdiste tu clave? Escríbenos a contacto@sicrep.cl y la regeneramos.',
 
     // Calculadora pública de compensación
     'calc.electricidad': 'Electricidad',
@@ -464,7 +464,7 @@ const DICCIONARIOS = {
     'comun.referencial': 'reference only',
     'comun.proximamente': 'Coming soon',
     'comun.socio_ambiental': 'Carbon offsetting through an accredited environmental partner.',
-    'comun.perdiste_clave': 'Lost your key? Email contacto@sicr3p.cl and we\u2019ll regenerate it.',
+    'comun.perdiste_clave': 'Lost your key? Email contacto@sicrep.cl and we\u2019ll regenerate it.',
 
     'calc.electricidad': 'Electricity',
     'calc.combustibles': 'Fuels',
@@ -896,7 +896,7 @@ const DICCIONARIOS = {
     'comun.referencial': 'referencial',
     'comun.proximamente': 'Em breve',
     'comun.socio_ambiental': 'Compensação de carbono por meio de um parceiro ambiental acreditado.',
-    'comun.perdiste_clave': 'Perdeu sua chave? Escreva para contacto@sicr3p.cl e nós a regeneramos.',
+    'comun.perdiste_clave': 'Perdeu sua chave? Escreva para contacto@sicrep.cl e nós a regeneramos.',
 
     'calc.electricidad': 'Eletricidade',
     'calc.combustibles': 'Combustíveis',

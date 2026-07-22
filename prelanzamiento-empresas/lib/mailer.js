@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MAIL_FROM = process.env.MAIL_FROM || 'sicr3p <no-responder@sicr3p.cl>';
+const MAIL_FROM = process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>';
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // El PDF de muestra es siempre el mismo (datos de ejemplo, no de un cliente real);

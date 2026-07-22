@@ -90,7 +90,7 @@ export default function Landing() {
             </p>
             <div className="hero-actions">
               <Link to="/cargar" className="btn btn-primary">Comienza ahora</Link>
-              <a href="mailto:contacto@sicr3p.cl" className="btn btn-outline">Contáctanos</a>
+              <a href="mailto:contacto@sicrep.cl" className="btn btn-outline">Contáctanos</a>
             </div>
             <p className="muted" style={{ marginTop: 22, fontSize: 14 }}>
               Sube tus facturas, descarga tu contabilidad de carbono.
@@ -179,7 +179,7 @@ export default function Landing() {
           </p>
           <div className="hero-actions" style={{ justifyContent: 'center' }}>
             <Link to="/cargar" className="btn btn-primary">Comienza ahora</Link>
-            <a href="mailto:contacto@sicr3p.cl" className="btn btn-outline">Contáctanos</a>
+            <a href="mailto:contacto@sicrep.cl" className="btn btn-outline">Contáctanos</a>
           </div>
         </div>
       </section>

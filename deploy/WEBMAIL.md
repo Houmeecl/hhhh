@@ -8,8 +8,15 @@
 > documentados como alternativas descartadas por ahora — no se está usando
 > ninguna de las dos, no se pierden si algún día conviene volver a mirarlas.
 >
+> **El correo vive en un dominio distinto al sitio: `sicrep.cl`, no
+> `sicr3p.cl`.** El panel de casillas de Ferozo/DonWeb no acepta dominios
+> con dígitos en el nombre — por eso las 5 casillas se crearon sobre
+> `sicrep.cl` (mismo nombre, sin el "3"), que la empresa ya tenía
+> registrado. El sitio, la marca y todas las URLs siguen siendo
+> `sicr3p.cl`; solo cambia el dominio de las direcciones de correo.
+>
 > Comprobación en un comando, sirva el camino que sirva:
-> `bash deploy/verificar-correo.sh sicr3p.cl` (solo lectura: reporta ✓/✗ de
+> `bash deploy/verificar-correo.sh sicrep.cl` (solo lectura: reporta ✓/✗ de
 > MX, SPF único, DKIM Zoho/Resend y DMARC — con correo nativo de Ferozo el
 > selector DKIM real puede no ser el de Zoho; el script lo indica sin marcar
 > falso error).
@@ -191,18 +198,19 @@ envíos reales de la plataforma (informe por correo, magic links, comprobantes
 del POS):
 
 1. Cuenta gratuita en <https://resend.com> (3.000 correos/mes gratis).
-2. Panel Resend → *Domains* → agregar `sicr3p.cl` → Resend te da 2-3
-   registros (un TXT `resend._domainkey` con su DKIM y un registro para
-   rebotes en un subdominio) → pegarlos en el panel DNS de DonWeb.
-   **No tocan el SPF del dominio raíz** (ese es de Zoho): conviven sin
-   conflicto.
+2. Panel Resend → *Domains* → agregar `sicrep.cl` (el dominio de correo,
+   no `sicr3p.cl`) → Resend te da 2-3 registros (un TXT `resend._domainkey`
+   con su DKIM y un registro para rebotes en un subdominio) → pegarlos en
+   el panel DNS de DonWeb, en la zona de `sicrep.cl`.
+   **No tocan el SPF del dominio raíz** (ese es el de Hostmar, sección 9.3):
+   conviven sin conflicto.
 3. Panel Resend → *API Keys* → crear clave → en el VPS:
    ```bash
-   nano /opt/sicr3p/backend/.env    # RESEND_API_KEY=re_...  y  MAIL_FROM="sicr3p <no-responder@sicr3p.cl>"
+   nano /opt/sicr3p/backend/.env    # RESEND_API_KEY=re_...  y  MAIL_FROM="sicr3p <no-responder@sicrep.cl>"
    pm2 restart sicr3p-backend
    ```
 4. Probar: procesar un documento y usar "Enviar informe por correo".
-5. `bash deploy/verificar-correo.sh sicr3p.cl` debe mostrar el DKIM de
+5. `bash deploy/verificar-correo.sh sicrep.cl` debe mostrar el DKIM de
    Resend en ✓.
 
 ---
@@ -277,59 +285,72 @@ tar czf /root/backups/posteio-$(date +%F).tar.gz -C /opt posteio-data
 
 ---
 
-## 9. CAMINO ACTIVO: Ferozo/DonWeb nativo (5 casillas ya compradas)
+## 9. CAMINO ACTIVO: Ferozo/DonWeb nativo, sobre `sicrep.cl` (5 casillas ya compradas)
 
-Ferozo es la misma empresa que aloja el dominio `sicr3p.cl` y el VPS —
-como administra la zona DNS y el correo a la vez, su panel trae wizards de
-un clic para MX, SPF y DKIM. No hay que armar registros a mano ni adivinar
+Ferozo es la misma empresa que aloja el dominio `sicr3p.cl` y el VPS — como
+administra la zona DNS y el correo a la vez, su panel trae wizards de un
+clic para MX, SPF y DKIM. No hay que armar registros a mano ni adivinar
 valores; el panel los genera. (Fuentes: soporte.donweb.com — artículos
 "Crear una cuenta de correo desde Ferozo", "Usar Webmail", "Cómo restaurar
 los MX por defecto en DonWeb", "Cómo configurar el registro SPF/DKIM desde
 Ferozo".)
 
+**El correo vive en `sicrep.cl`, no en `sicr3p.cl`.** El panel de alta de
+casillas de Ferozo rechaza dominios con dígitos en el nombre — el "3" de
+`sicr3p.cl` lo bloquea. La empresa ya tenía registrado `sicrep.cl` (mismo
+nombre sin el dígito) y las 5 casillas se crearon ahí. El sitio y toda la
+marca siguen siendo `sicr3p.cl`; **solo** las direcciones de correo usan
+`sicrep.cl` (`contacto@sicrep.cl`, etc.).
+
 ### 9.1 Crear las casillas
 Panel Ferozo → ícono **Email** → **Cuentas** → **Crear nueva**, una por
-cada buzón (mínimo `contacto@sicr3p.cl` y `postmaster@sicr3p.cl`; el plan
+cada buzón (mínimo `contacto@sicrep.cl` y `postmaster@sicrep.cl`; el plan
 comprado trae 5). Clave: mínimo 8 caracteres, mayúscula + minúscula +
-números no consecutivos + uno de `@ * /`.
+números no consecutivos + uno de `@ * /`. **Ya hecho** — `contacto@sicrep.cl`
+verificado funcionando con el "Diagnosticador de correos" del panel DonWeb.
 
 ### 9.2 Apuntar el DNS al correo de Ferozo
-Panel Ferozo → **Dominios** → **Zonas de DNS** → elegir `sicr3p.cl` →
-**Configurar MX** → **Restaurar MX por defecto** → Aceptar. Esto
-crea/corrige automáticamente el **A** de `mail.sicr3p.cl` y el **MX** de
-`sicr3p.cl` apuntando al servidor de correo de Ferozo — **no** al IP del
-VPS (138.36.237.61, donde apuntaba para el plan de Poste.io descartado).
+Panel Ferozo → **Dominios** → **Zonas de DNS** → elegir `sicrep.cl` (no
+`sicr3p.cl`) → **Configurar MX** → **Restaurar MX por defecto** → Aceptar.
+Esto crea/corrige automáticamente el **A** de `mail.sicrep.cl` y el **MX**
+de `sicrep.cl` apuntando al servidor de correo de Ferozo.
 
-### 9.3 SPF y DKIM
-- **SPF: no tocar.** El TXT actual (`v=spf1 include:spf.hostmar.com -all`)
-  YA es el valor correcto para el correo nativo de Ferozo/DonWeb —
-  confirmado textual en el artículo de soporte "¿Cómo configurar el
-  registro SPF desde Ferozo?": ese es exactamente el contenido que piden
-  usar. Si el panel muestra un modal de edición para este registro,
-  **Cancelar**, no Guardar.
-- **Configurar DKIM** → Aceptar (mismo panel, Zonas de DNS). Genera el par
-  de claves y el TXT solo. Selector confirmado por soporte DonWeb:
-  `mail._domainkey.sicr3p.cl` (verificar con
-  `dig TXT mail._domainkey.sicr3p.cl +short`).
-- **DMARC**: si el panel trae wizard (hay artículo de soporte específico),
-  usarlo; si no, crear a mano el TXT `_dmarc` con
-  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`.
+(El A/MX viejo de `mail.sicr3p.cl` → IP del VPS, del plan de Poste.io
+descartado, queda vestigial y sin uso — no hace daño dejarlo, pero se
+puede limpiar cuando se quiera: nadie escribe a `@sicr3p.cl` para correo.)
+
+### 9.3 SPF y DKIM (sobre sicrep.cl)
+- **SPF**: el TXT `v=spf1 include:spf.hostmar.com -all` es el valor
+  correcto para el correo nativo de Ferozo/DonWeb — confirmado textual en
+  el artículo de soporte "¿Cómo configurar el registro SPF desde Ferozo?":
+  ese es exactamente el contenido que piden usar, en el dominio del
+  correo (`sicrep.cl`). Si ya existe con ese valor en `sicrep.cl`, no
+  tocar; si el panel muestra un modal de edición, **Cancelar**, no Guardar.
+  (Este mismo valor en `sicr3p.cl` es irrelevante ahora — ese dominio no
+  envía correo.)
+- **Configurar DKIM** → Aceptar (mismo panel, Zonas de DNS, sobre
+  `sicrep.cl`). Genera el par de claves y el TXT solo. Selector confirmado
+  por soporte DonWeb: `mail._domainkey.sicrep.cl` (verificar con
+  `dig TXT mail._domainkey.sicrep.cl +short`).
+- **DMARC**: si el panel trae wizard, usarlo; si no, crear a mano el TXT
+  `_dmarc.sicrep.cl` con
+  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicrep.cl`.
 
 ### 9.4 Webmail
 <https://ferozo.email/> — usuario = la casilla completa
-(`contacto@sicr3p.cl`), clave = la del paso 9.1.
+(`contacto@sicrep.cl`), clave = la del paso 9.1.
 
 ### 9.5 Verificar
 El DNS puede tardar hasta 24 h en propagar. `bash deploy/verificar-correo.sh
-sicr3p.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) y el
+sicrep.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) y el
 DKIM nativo de DonWeb (`mail._domainkey`). Chequeo manual equivalente:
 ```bash
-dig MX sicr3p.cl +short
-dig TXT sicr3p.cl +short                      # un solo v=spf1, el de Hostmar (no tocar)
-dig TXT mail._domainkey.sicr3p.cl +short      # DKIM nativo DonWeb
-dig TXT _dmarc.sicr3p.cl +short
+dig MX sicrep.cl +short
+dig TXT sicrep.cl +short                      # un solo v=spf1, el de Hostmar (no tocar)
+dig TXT mail._domainkey.sicrep.cl +short      # DKIM nativo DonWeb
+dig TXT _dmarc.sicrep.cl +short
 ```
 Prueba final igual que la sección 5: mail-tester.com ≥ 9/10 con un correo
-real desde `contacto@sicr3p.cl`.
+real desde `contacto@sicrep.cl`.
 
 Resend (sección 6) no se toca en ningún paso de esta sección.

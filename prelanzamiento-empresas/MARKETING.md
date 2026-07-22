@@ -78,7 +78,7 @@ listo para publicar: español de Chile, sin la palabra prohibida ("huella"; solo
 > El código es personal de tu empresa y de un solo uso.
 >
 > Tu contabilidad, tu trazabilidad.
-> — Equipo sicr3p · Antofagasta, Chile · contacto@sicr3p.cl
+> — Equipo sicr3p · Antofagasta, Chile · contacto@sicrep.cl
 
 ## 4. Guión mini-clip (15 s, redes)
 

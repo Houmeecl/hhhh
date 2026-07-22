@@ -4,7 +4,7 @@
 > Preparado sobre la Ley 19.628 y la Ley 21.719 (vigencia diciembre 2026).
 > Los puntos marcados `[REVISAR ABOGADO]` requieren decisión o validación jurídica.
 
-**Responsable del tratamiento:** sicr3p SpA, Antofagasta, Chile · contacto@sicr3p.cl
+**Responsable del tratamiento:** sicr3p SpA, Antofagasta, Chile · contacto@sicrep.cl
 **Última actualización:** [FECHA AL PUBLICAR]
 
 ---
@@ -98,7 +98,7 @@ sicr3p **no vende datos** ni los cede para publicidad.
 
 Para RUTs de personas naturales y datos de contacto: acceso, rectificación,
 supresión, oposición y portabilidad (esta última desde la vigencia de la Ley
-21.719), escribiendo a **contacto@sicr3p.cl**. Plazo de respuesta:
+21.719), escribiendo a **contacto@sicrep.cl**. Plazo de respuesta:
 `[REVISAR ABOGADO: fijar plazo conforme a la 21.719]`.
 
 ## 8. Transferencias internacionales

@@ -194,7 +194,7 @@ function LoginTorre({ t, onEntrar }) {
       </button>
       <p className="muted" style={{ fontSize: 11, textAlign: 'center', marginTop: 10 }}>
         {t('torre.perdiste_clave')}{' '}
-        <a href="mailto:contacto@sicr3p.cl?subject=Recuperar%20clave%20de%20terminal%20torre">{t('torre.perdiste_clave_link')}</a>
+        <a href="mailto:contacto@sicrep.cl?subject=Recuperar%20clave%20de%20terminal%20torre">{t('torre.perdiste_clave_link')}</a>
       </p>
     </div>
   );

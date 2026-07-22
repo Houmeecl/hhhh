@@ -57,7 +57,7 @@ export default function Prueba() {
           </form>
         </div>
         <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>
-          ¿No tienes código? Escríbenos a <a href="mailto:contacto@sicr3p.cl">contacto@sicr3p.cl</a>
+          ¿No tienes código? Escríbenos a <a href="mailto:contacto@sicrep.cl">contacto@sicrep.cl</a>
         </p>
       </div>
     </PublicLayout>

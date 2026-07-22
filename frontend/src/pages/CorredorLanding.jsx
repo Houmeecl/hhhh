@@ -63,7 +63,7 @@ export default function CorredorLanding() {
               <p className="av2-t2"><span className="av2-grad">{t('cor.h1_grad')}</span></p>
               <p className="av2-sub">{t('cor.sub')}</p>
               <div className="hero-actions">
-                <a href="mailto:contacto@sicr3p.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
+                <a href="mailto:contacto@sicrep.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
                   {t('cor.cta_piloto')}
                 </a>
                 <Link to="/torre" className="btn av2-btn-ghost">{t('cor.cta_torre')}</Link>
@@ -193,8 +193,8 @@ export default function CorredorLanding() {
               {t('cor.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicr3p.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary">{t('cor.pre_cta1')}</a>
-              <a href="mailto:contacto@sicr3p.cl?subject=Quiero%20ser%20punto%20del%20corredor" className="btn btn-outline">{t('cor.pre_cta2')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary">{t('cor.pre_cta1')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20del%20corredor" className="btn btn-outline">{t('cor.pre_cta2')}</a>
             </div>
             <p className="muted" style={{ fontSize: 12, marginTop: 20, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
               {t('cor.disclaimer')}

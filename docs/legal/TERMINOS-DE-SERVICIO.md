@@ -3,7 +3,7 @@
 > **BORRADOR PARA REVISIÓN LEGAL — NO PUBLICAR SIN ABOGADO.**
 > Los puntos `[REVISAR ABOGADO]` requieren decisión o validación jurídica.
 
-**Prestador:** sicr3p SpA, Antofagasta, Chile · contacto@sicr3p.cl
+**Prestador:** sicr3p SpA, Antofagasta, Chile · contacto@sicrep.cl
 **Última actualización:** [FECHA AL PUBLICAR]
 
 ---

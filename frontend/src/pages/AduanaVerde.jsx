@@ -355,7 +355,7 @@ export default function AduanaVerde() {
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
               {t('av.prov_texto')}
             </p>
-            <a href="mailto:contacto@sicr3p.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('av.prov_cta')}</a>
+            <a href="mailto:contacto@sicrep.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('av.prov_cta')}</a>
           </div>
         </div>
         </div>
@@ -447,8 +447,8 @@ export default function AduanaVerde() {
               {t('av.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicr3p.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">{t('av.pre_cta1')}</a>
-              <a href="mailto:contacto@sicr3p.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">{t('av.pre_cta2')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">{t('av.pre_cta1')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">{t('av.pre_cta2')}</a>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
               {t('av.pre_mirar')}{' '}

@@ -44,7 +44,7 @@ export default function Login() {
           <h2>Acceso</h2>
           <div className="field" style={{ marginBottom: 14 }}>
             <label>Usuario / Correo</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@sicr3p.cl" autoFocus />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@sicrep.cl" autoFocus />
           </div>
           <div className="field" style={{ marginBottom: 10 }}>
             <label>Contraseña</label>

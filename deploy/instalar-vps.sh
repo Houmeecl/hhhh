@@ -63,8 +63,8 @@ JWT_ACCESS_TTL=15m
 JWT_REFRESH_TTL=7d
 BCRYPT_ROUNDS=12
 RESEND_API_KEY=
-MAIL_FROM="sicr3p <no-responder@sicr3p.cl>"
-ADMIN_EMAIL=admin@sicr3p.cl
+MAIL_FROM="sicr3p <no-responder@sicrep.cl>"
+ADMIN_EMAIL=admin@sicrep.cl
 ADMIN_PASSWORD=$ADMIN_PASS
 BIGQUERY_EXPORT=false
 ENV
@@ -162,7 +162,7 @@ cat > /root/sicr3p-credenciales.txt <<CRED
 sicr3p — credenciales del despliegue ($(date))
 URL:            $ORIGEN
 Panel admin:    $ORIGEN/admin
-Admin email:    admin@sicr3p.cl
+Admin email:    admin@sicrep.cl
 Admin clave:    $ADMIN_PASS
 BD:             postgresql://sicr3p:$DB_PASS@localhost:5432/sicr3p
 Motor:          MOCK (para pasar a producción: MOCK_SIMPLE=false + SIMPLE_API_KEY

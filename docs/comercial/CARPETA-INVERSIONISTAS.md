@@ -32,7 +32,7 @@ las que trae por defecto son ilustrativas.
 | 01 | sicr3p (plataforma) | Todas |
 | 02 | Aduana Verde | Comercios y pymes |
 | 03 | REP · Ley 20.920 | Empresas obligadas a declarar REP |
-| 04 | Correo corporativo | Interno (activación de contacto@sicr3p.cl) |
+| 04 | Correo corporativo | Interno (activación de contacto@sicrep.cl) |
 | 05 | Informe para autoridades | Reguladores, municipios |
 | 06 | Informe para financiamiento | Inversionistas, CORFO, banca |
 | 07 | Propuesta piloto (puertos Antofagasta) | Puertos, terminales, empresas regionales |

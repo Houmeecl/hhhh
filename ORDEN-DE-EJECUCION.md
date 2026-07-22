@@ -69,40 +69,38 @@ completa de instalación y modo kiosco: `docs/TABLET.md`.
 
 ---
 
-## 3. Sistema de correo (contacto@sicr3p.cl + correos de la plataforma)
-**Acceso:** panel DNS de DonWeb + navegador; en paralelo con 1-2. ~30 min.
+## 3. Sistema de correo (contacto@sicrep.cl + correos de la plataforma)
+**Acceso:** panel DNS de DonWeb + navegador; en paralelo con 1-2. ~15 min restantes.
 
-Camino recomendado (decisión de julio 2026): **Zoho Mail gratuito** para los
-buzones humanos + **Resend** para los correos que envía la plataforma
-(informes, comprobantes). Sin servidor de correo propio que mantener.
+Camino activo (decisión de julio 2026, revisado): **casillas nativas de
+Ferozo/DonWeb** — la misma empresa que aloja el dominio y el VPS resuelve
+MX/SPF/DKIM con wizards de un clic. El correo vive en **`sicrep.cl`**, no
+en `sicr3p.cl`: el panel de alta de casillas de Ferozo no acepta dominios
+con dígitos, así que se usó `sicrep.cl` (mismo nombre sin el "3"), ya
+registrado por la empresa. El sitio y la marca siguen siendo `sicr3p.cl`.
 
-- [ ] Crear cuenta en **zoho.com/mail** (plan Forever Free) y agregar el
-  dominio `sicr3p.cl`. Zoho entrega un TXT `zoho-verification=…`: pegarlo
-  en el panel DNS de DonWeb y verificar. Crear los usuarios `contacto@`
-  y `postmaster@`.
-- [ ] Pegar en el panel DNS de DonWeb estos registros exactos:
-  - **MX** (los tres): `mx.zoho.com` prioridad 10, `mx2.zoho.com`
-    prioridad 20, `mx3.zoho.com` prioridad 50.
-  - **TXT @** (REEMPLAZA al SPF actual — jamás dos `v=spf1`):
-    `v=spf1 include:zoho.com ~all`
-  - **TXT `zmail._domainkey`**: el valor DKIM que muestra el panel de Zoho.
-  - **TXT `_dmarc`**:
-    `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`
-- [ ] Comprobar desde cualquier terminal del repo (se puede correr mil
-  veces, no cambia nada): `bash deploy/verificar-correo.sh sicr3p.cl`
-  hasta ver todo ✓ (el DNS puede tardar minutos u horas en propagar).
-- [ ] Enviar un correo desde `contacto@sicr3p.cl` a **mail-tester.com**
+- [x] Crear las 5 casillas en el panel Ferozo (Email → Cuentas → Crear
+  nueva), sobre `sicrep.cl`. `contacto@sicrep.cl` verificado funcionando
+  con el "Diagnosticador de correos" del panel DonWeb.
+- [ ] Confirmar DKIM y crear DMARC si falta (Dominios → Zonas de DNS →
+  `sicrep.cl` → **Configurar DKIM**; TXT `_dmarc` con
+  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicrep.cl` si no hay
+  wizard). El SPF (`v=spf1 include:spf.hostmar.com -all`) ya es correcto
+  tal cual, no tocar.
+- [ ] Comprobar: `bash deploy/verificar-correo.sh sicrep.cl` hasta ver
+  todo ✓ (el DNS puede tardar minutos u horas en propagar).
+- [ ] Enviar un correo desde `contacto@sicrep.cl` a **mail-tester.com**
   hasta lograr nota ≥ 9/10.
 - [ ] Activar **Resend** (transaccional de la plataforma, hoy en modo
-  consola): cuenta en resend.com → verificar el dominio (sus registros
-  van en subdominio propio, NO tocan el SPF raíz de Zoho) →
-  `RESEND_API_KEY` y `MAIL_FROM` en `backend/.env` del VPS →
-  `pm2 restart sicr3p-backend`. Paso a paso: `deploy/WEBMAIL.md` §6.1.
+  consola): cuenta en resend.com → agregar el dominio `sicrep.cl` (sus
+  registros van en subdominio propio, NO tocan el SPF raíz) →
+  `RESEND_API_KEY` y `MAIL_FROM="sicr3p <no-responder@sicrep.cl>"` en
+  `backend/.env` del VPS → `pm2 restart sicr3p-backend`. Paso a paso:
+  `deploy/WEBMAIL.md` §6.1. Esto también hace que "¿Olvidaste tu
+  contraseña?" del login admin llegue de verdad (hoy solo se logea).
 
-Alternativa autoalojada (soberanía total, más mantención): Poste.io —
-`deploy/WEBMAIL.md` camino B. El ticket a DonWeb pidiendo rDNS de
-138.36.237.61 → mail.sicr3p.cl y puerto 25 saliente abierto SOLO aplica
-si se elige ese camino.
+Detalle completo, incluidas las alternativas descartadas (Zoho, Poste.io
+autoalojado): `deploy/WEBMAIL.md` §9.
 
 ---
 

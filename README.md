@@ -60,7 +60,7 @@ El frontend hace proxy de `/api` al backend (`vite.config.js`). Abre
 
 ### Credenciales de administrador
 
-`npm run seed` crea el usuario **admin@sicr3p.cl** y, si `ADMIN_PASSWORD` está vacío en
+`npm run seed` crea el usuario **admin@sicrep.cl** y, si `ADMIN_PASSWORD` está vacío en
 `.env`, **genera una contraseña segura y la imprime en consola**. Guárdala (el proyecto
 también escribe `CREDENCIALES.md`, que está en `.gitignore`).
 

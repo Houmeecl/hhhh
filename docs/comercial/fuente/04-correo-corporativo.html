@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Correo corporativo sicr3p — Guía de activación del webmail</title>
+<title>Correo corporativo sicr3p — Estado y verificación</title>
 <link rel="stylesheet" href="base.css">
 </head>
 <body>
@@ -12,168 +12,116 @@
   <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Guía interna de operación</span></div>
   <div>
     <div class="tipo-doc">GUÍA DE ACTIVACIÓN · USO INTERNO</div>
-    <h1>Correo corporativo<br>contacto@sicr3p.cl</h1>
-    <p class="bajada">Cómo dejar operativo el correo con webmail del dominio sicr3p.cl,
-    paso a paso y sin tecnicismos. Dos caminos posibles, con recomendación franca.</p>
+    <h1>Correo corporativo<br>contacto@sicrep.cl</h1>
+    <p class="bajada">Buzones nativos de Ferozo/DonWeb — por qué el correo vive en un dominio
+    distinto al sitio, qué ya está activo y qué falta verificar.</p>
   </div>
   <div class="pie">
     <span>sicr3p SpA · Uso interno</span>
-    <span>Versión 1.0 · Julio 2026</span>
+    <span>Versión 2.0 · Julio 2026</span>
   </div>
 </div>
 
 <!-- DECISIÓN -->
 <div class="pagina">
-  <h2>1. Estado real verificado (19-07-2026) y la decisión</h2>
+  <h2>1. Por qué el correo usa sicrep.cl y no sicr3p.cl</h2>
 
   <div class="caja">
-    <strong>Chequeo en vivo del DNS de sicr3p.cl</strong> — esto es lo que ya existe y lo que falta:
+    <strong>El dominio del sitio no cambia.</strong> sicr3p.cl sigue siendo la marca, la
+    plataforma y todas las URLs — <strong>solo el correo</strong> vive en <code>sicrep.cl</code>
+    (mismo nombre, sin el número). El panel de creación de casillas de Ferozo/DonWeb no acepta
+    dominios con dígitos en el nombre, así que las 5 casillas se crearon directamente sobre
+    <code>sicrep.cl</code>, que la empresa ya tenía registrado para este uso.
+  </div>
+
+  <p>Esto reemplaza dos planes anteriores que se evaluaron y quedaron descartados: <strong>Poste.io
+  autoalojado</strong> en el VPS (dependía de un ticket de rDNS a DonWeb y de mantener un servidor
+  de correo) y <strong>Zoho Mail hosted</strong> (alternativa considerada antes de resolver el
+  problema del dígito). El camino activo es más simple que ambos: Ferozo/DonWeb aloja el dominio
+  <em>y</em> el correo con la misma cuenta, así que su panel resuelve MX, SPF y DKIM con wizards de
+  un clic — no hay que administrar ningún servidor ni depender de un proveedor externo.</p>
+
+  <h2 style="margin-top:8mm;">2. Estado verificado</h2>
+
+  <div class="caja">
+    <strong>Confirmado en vivo</strong> con el "Diagnosticador de correos" del panel DonWeb:
     <table style="margin-bottom:0;">
-      <tr><th>Registro</th><th>Estado hoy</th></tr>
-      <tr><td>A &nbsp;mail.sicr3p.cl → 138.36.237.61</td><td class="ok">✓ Ya creado</td></tr>
-      <tr><td>MX &nbsp;sicr3p.cl → mail.sicr3p.cl</td><td class="ok">✓ Ya creado</td></tr>
-      <tr><td>TXT SPF</td><td><strong style="color:#d97706;">⚠ Conflicto</strong> — hoy dice <code>v=spf1 include:spf.hostmar.com -all</code>: el <code>-all</code> duro hará <strong>rechazar</strong> el correo enviado desde el propio VPS. Corregir según 2.2.</td></tr>
-      <tr><td>TXT _dmarc</td><td class="no">✗ Falta</td></tr>
-      <tr><td>rDNS/PTR de la IP</td><td class="no">✗ Falta — sigue el genérico de DonWeb (vps-6165621-x.dattaweb.com); el ticket de la sección 2.1 aún no se hace</td></tr>
-      <tr><td>TXT DKIM</td><td class="no">✗ Falta — se genera al instalar Poste.io (sección 2.4)</td></tr>
+      <tr><th>Elemento</th><th>Estado</th></tr>
+      <tr><td>Casillas creadas en sicrep.cl</td><td class="ok">✓ contacto@sicrep.cl activa y funcionando</td></tr>
+      <tr><td>MX de sicrep.cl</td><td class="ok">✓ apunta al correo nativo de Ferozo/DonWeb</td></tr>
+      <tr><td>TXT SPF de sicrep.cl</td><td class="ok">✓ configurado por el panel (wizard "Configurar SPF")</td></tr>
+      <tr><td>TXT DKIM (mail._domainkey.sicrep.cl)</td><td>Verificar con <code>bash deploy/verificar-correo.sh sicrep.cl</code></td></tr>
+      <tr><td>TXT _dmarc.sicrep.cl</td><td>Verificar / crear si falta (ver sección 3)</td></tr>
     </table>
   </div>
 
-  <p>Con el A y el MX ya creados, el dominio quedó jugado por el <strong>Camino A (servidor
-  propio)</strong>: el correo del dominio ya apunta al VPS. Todo el material técnico está en el
-  repositorio (script <code>deploy/instalar-webmail.sh</code> y guía <code>deploy/WEBMAIL.md</code>).
-  Lo que falta son tres pasos de persona: corregir el SPF, el ticket a DonWeb y correr el
-  instalador. El Camino B (Zoho) sigue disponible como plan B si DonWeb no cumple:</p>
+  <p>El TXT SPF de <strong>sicr3p.cl</strong> (el dominio del sitio) no se toca: sigue siendo
+  <code>v=spf1 include:spf.hostmar.com -all</code>, que es el valor correcto documentado por el
+  propio soporte de Ferozo para su infraestructura de envío — no hay ningún envío de correo desde
+  ese dominio, así que ese registro queda como está.</p>
 
-  <table>
-    <tr><th></th><th>Camino A — Servidor propio (Poste.io en el VPS)</th><th>Camino B — Hosted (Zoho Mail, plan gratuito)</th></tr>
-    <tr><td><strong>Costo</strong></td><td>$0 adicional (usa el VPS actual)</td><td>$0 (hasta 5 buzones de 5 GB)</td></tr>
-    <tr><td><strong>Mantención</strong></td><td>Permanente: actualizaciones, logs, cola de envío</td><td>Ninguna</td></tr>
-    <tr><td><strong>Riesgo de spam</strong></td><td>Real: depende de la reputación de la IP del VPS y de que DonWeb configure dos cosas (ver 2.1)</td><td>Mínimo: la reputación es de Zoho</td></tr>
-    <tr><td><strong>Depende de DonWeb</strong></td><td>Sí — dos requisitos NO negociables</td><td>No</td></tr>
-    <tr><td><strong>Webmail</strong></td><td>mail.sicr3p.cl (Roundcube)</td><td>mail.zoho.com (+ apps móviles)</td></tr>
-  </table>
-
+  <h2 style="margin-top:8mm;">3. Verificación (un comando)</h2>
   <div class="caja">
-    <strong>Recomendación franca:</strong> si quieres el correo funcionando esta semana y sin
-    mantención, elige el <strong>Camino B (Zoho)</strong>. El Camino A tiene sentido si valoras la
-    soberanía total del correo y estás dispuesto a mantener un servidor de correo — y solo si
-    DonWeb cumple los dos requisitos de la sección 2.1. En ambos casos el envío automático de
-    la plataforma (informes, accesos) <strong>sigue saliendo por Resend y no se toca</strong>: esto es
-    solo el correo "humano" de la organización.
+    <code>bash deploy/verificar-correo.sh sicrep.cl</code>
+    <p style="margin:2mm 0 0;">Solo lectura: interroga el DNS real y reporta ✓/✗ de MX, SPF único,
+    DKIM (reconoce el selector nativo de DonWeb, <code>mail._domainkey</code>) y DMARC. Repetir
+    mientras el DNS termina de propagar (hasta 24 h según el propio soporte de Ferozo).</p>
   </div>
 
-  <h2 style="margin-top:8mm;">2. Camino A — Servidor propio en el VPS</h2>
-
-  <h3>2.1 Antes de nada: el ticket a DonWeb (requisitos no negociables)</h3>
-  <p>Abre un ticket a soporte de DonWeb con este texto exacto:</p>
+  <h3>3.1 Si falta el DMARC</h3>
+  <p>Crear en el panel DonWeb (Dominios → Zonas de DNS → Agregar registro) el TXT:</p>
   <div class="caja-navy">
-    <p style="margin:0; text-align:left; font-style:italic;">"Solicito configurar el DNS inverso (rDNS/PTR)
-    de la IP <strong>138.36.237.61</strong> hacia <strong>mail.sicr3p.cl</strong>, y confirmar que el
-    puerto 25 saliente está habilitado para esa IP."</p>
-  </div>
-  <p>Si DonWeb no puede hacer cualquiera de las dos cosas, <strong>no insistas con el Camino A</strong>:
-  sin eso, Gmail y Outlook mandarán casi todo a spam. Pasa al Camino B.</p>
-
-  <h3>2.2 Registros DNS (panel del dominio sicr3p.cl)</h3>
-  <table>
-    <tr><th>Tipo</th><th>Nombre</th><th>Valor</th><th>Estado</th></tr>
-    <tr><td>A</td><td>mail</td><td>138.36.237.61</td><td class="ok">✓ ya creado</td></tr>
-    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mail.sicr3p.cl (prioridad 10)</td><td class="ok">✓ ya creado</td></tr>
-    <tr><td>TXT</td><td>@ (sicr3p.cl)</td><td><strong>REEMPLAZAR el actual por:</strong><br><code>v=spf1 mx include:spf.hostmar.com ~all</code></td><td><strong style="color:#d97706;">⚠ corregir</strong></td></tr>
-    <tr><td>TXT</td><td>_dmarc</td><td>v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl</td><td class="no">✗ crear</td></tr>
-    <tr><td>TXT</td><td>(selector DKIM)</td><td>Se genera después de instalar — el panel de Poste.io lo muestra para copiarlo tal cual</td><td class="no">✗ después de instalar</td></tr>
-  </table>
-
-  <div class="caja-alerta">
-    <strong>Por qué se reemplaza el SPF y no se agrega otro:</strong> solo puede existir UN registro
-    TXT SPF. El actual (<code>include:spf.hostmar.com -all</code>) autoriza únicamente a los
-    servidores de Hostmar y ordena rechazo duro de todo lo demás — incluido tu propio VPS. La
-    versión corregida <code>v=spf1 mx include:spf.hostmar.com ~all</code> autoriza al VPS (vía el
-    MX) <em>y</em> conserva a Hostmar por si algo del hosting antiguo aún envía correo con el
-    dominio; el <code>~all</code> suave evita rechazos duros mientras se estabiliza. Cuando esté
-    claro que nada envía por Hostmar, se puede simplificar a <code>v=spf1 mx ~all</code>.
+    <p style="margin:0; text-align:left; font-family:monospace;">Nombre: _dmarc<br>
+    Contenido: v=DMARC1; p=quarantine; rua=mailto:postmaster@sicrep.cl</p>
   </div>
 
-  <h3>2.3 Instalación (una línea, en el VPS)</h3>
-  <div class="caja">
-    <code>cd /opt/sicr3p && git pull && bash deploy/instalar-webmail.sh</code>
-    <p style="margin:2mm 0 0;">El script es seguro de repetir: verifica el puerto 25 (aborta si está
-    bloqueado), instala lo que falte, levanta el servidor de correo, configura el acceso web en
-    mail.sicr3p.cl y pide el certificado HTTPS si el DNS ya apunta al VPS.</p>
-  </div>
-
-  <h3>2.4 Después de instalar</h3>
-  <ol>
-    <li>Entrar a <strong>https://mail.sicr3p.cl/admin/install</strong> y crear la cuenta administradora (admin@sicr3p.cl, clave larga y guardada).</li>
-    <li>Generar la clave DKIM en el panel (Virtual domains → sicr3p.cl → DKIM → Generate) y copiar el registro TXT resultante al panel DNS.</li>
-    <li>Crear los buzones <strong>contacto@sicr3p.cl</strong> y <strong>postmaster@sicr3p.cl</strong>.</li>
-    <li>Usar el webmail en <strong>https://mail.sicr3p.cl</strong> (usuario = la dirección completa).</li>
-  </ol>
-</div>
-
-<!-- CAMINO B + PRUEBA -->
-<div class="pagina seccion">
-  <h2>3. Camino B — Zoho Mail (recomendado para partir)</h2>
-
-  <div class="flujo">
-    <div class="paso"><div class="num">1</div><div class="txt"><b>Crear la cuenta.</b> En zoho.com/mail, plan <b>Forever Free</b> (está abajo en la página de precios; no pide tarjeta). Agregar el dominio sicr3p.cl.</div></div>
-    <div class="paso"><div class="num">2</div><div class="txt"><b>Verificar el dominio.</b> Zoho entrega un registro TXT de verificación; se crea en el panel DNS del dominio y se confirma.</div></div>
-    <div class="paso"><div class="num">3</div><div class="txt"><b>Crear los buzones.</b> contacto@sicr3p.cl y postmaster@sicr3p.cl.</div></div>
-    <div class="paso"><div class="num">4</div><div class="txt"><b>Configurar el DNS de correo</b> con la tabla siguiente.</div></div>
-  </div>
-
-  <table>
-    <tr><th>Tipo</th><th>Nombre</th><th>Valor</th><th>Prioridad</th></tr>
-    <tr><td>TXT</td><td>@</td><td>(el TXT de verificación que entregue Zoho)</td><td>—</td></tr>
-    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mx.zoho.com</td><td>10</td></tr>
-    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mx2.zoho.com</td><td>20</td></tr>
-    <tr><td>MX</td><td>@ (sicr3p.cl)</td><td>mx3.zoho.com</td><td>50</td></tr>
-    <tr><td>TXT</td><td>@ (sicr3p.cl)</td><td>v=spf1 include:zohomail.com ~all</td><td>—</td></tr>
-    <tr><td>TXT</td><td>zmail._domainkey</td><td>(DKIM: se genera en el panel de Zoho y se copia tal cual)</td><td>—</td></tr>
-    <tr><td>TXT</td><td>_dmarc</td><td>v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl</td><td>—</td></tr>
-  </table>
-
-  <p><strong>Con Zoho no se corre ningún script en el VPS</strong>, no se crea el registro A de
-  "mail" ni importa el rDNS: los servidores que envían son de Zoho, con reputación propia.
-  El webmail queda en <strong>mail.zoho.com</strong> y hay apps móviles oficiales.</p>
-
-  <div class="caja-alerta">
-    <strong>Regla de oro del SPF:</strong> debe existir <strong>UN solo</strong> registro TXT SPF en el dominio
-    raíz. Resend (el envío automático de la plataforma) usa su propio subdominio con SPF aparte,
-    así que no choca. Si algún día dos servicios necesitan SPF en el mismo nombre, se fusionan
-    los "include:" en un único registro — nunca dos TXT SPF separados.
-  </div>
-
-  <h2 style="margin-top:8mm;">4. La prueba final (para cualquiera de los dos caminos)</h2>
+  <h3>3.2 Prueba final de entregabilidad</h3>
   <div class="flujo">
     <div class="paso"><div class="num">1</div><div class="txt">Entrar a <b>mail-tester.com</b> y copiar la dirección de prueba que muestra.</div></div>
-    <div class="paso"><div class="num">2</div><div class="txt">Desde el webmail (contacto@sicr3p.cl), enviar a esa dirección un correo con asunto y cuerpo reales (no "test": los filtros castigan mensajes vacíos).</div></div>
-    <div class="paso"><div class="num">3</div><div class="txt">Apretar "Check your score". <b>Objetivo: 9/10 o más.</b> Si sale menos, el reporte dice exactamente qué corregir (PTR, DKIM o SPF, en ese orden de probabilidad).</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt">Desde el webmail (<b>ferozo.email</b>, usuario contacto@sicrep.cl), enviar a esa dirección un correo con asunto y cuerpo reales (no "test": los filtros castigan mensajes vacíos).</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt">Apretar "Check your score". <b>Objetivo: 9/10 o más.</b></div></div>
     <div class="paso"><div class="num">4</div><div class="txt">Prueba extra: enviarse un correo a un Gmail propio y revisar "Mostrar original" — debe decir SPF: PASS, DKIM: PASS, DMARC: PASS.</div></div>
+  </div>
+</div>
+
+<!-- RESEND -->
+<div class="pagina seccion">
+  <h2>4. Correo automático de la plataforma (Resend) — no se confunde con lo anterior</h2>
+
+  <div class="caja-alerta">
+    <strong>Son dos canales separados a propósito:</strong> las casillas de Ferozo/DonWeb son para
+    que una persona lea y responda <code>contacto@sicrep.cl</code>. <strong>Resend</strong> es el
+    servicio que la plataforma usa para enviar automáticamente (informes, enlaces de acceso,
+    recuperación de contraseña, comprobantes del POS) — hoy <code>RESEND_API_KEY</code> está vacía
+    en producción, así que esos correos solo quedan logueados en la consola del VPS, nunca llegan
+    de verdad.
+  </div>
+
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Cuenta gratis en resend.com</b> (3.000 correos/mes).</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Domains → agregar sicrep.cl.</b> Resend entrega 2-3 registros DNS (TXT DKIM + un registro de rebotes en subdominio) para pegar en el panel DonWeb. No tocan el SPF del dominio raíz.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>API Keys → crear clave</b> y, en el VPS: <code>RESEND_API_KEY=re_...</code> y <code>MAIL_FROM="sicr3p &lt;no-responder@sicrep.cl&gt;"</code> en <code>backend/.env</code>, luego <code>pm2 restart sicr3p-backend</code>.</div></div>
+    <div class="paso"><div class="num">4</div><div class="txt"><b>Probar</b>: "¿Olvidaste tu contraseña?" en el login admin debe llegar de verdad. <code>bash deploy/verificar-correo.sh sicrep.cl</code> debe mostrar el DKIM de Resend en ✓.</div></div>
   </div>
 
   <h3>4.1 Qué NO cambia con nada de esto</h3>
   <ul>
-    <li>Los correos automáticos de la plataforma (informes, enlaces de acceso) siguen saliendo
-    por <strong>Resend</strong>, sin tocar configuración ni reiniciar nada.</li>
-    <li>Los documentos comerciales de sicr3p ya usan <strong>contacto@sicr3p.cl</strong> como contacto:
-    al activar el buzón, ese canal queda vivo.</li>
+    <li>El dominio del sitio (sicr3p.cl) y toda la marca siguen igual — esto es exclusivamente
+    sobre direcciones de correo.</li>
+    <li>Los documentos comerciales de sicr3p ya usan <strong>contacto@sicrep.cl</strong> como
+    contacto de escritura directa.</li>
   </ul>
 
   <div class="caja-navy" style="margin-top:6mm;">
     <h4>Resumen ejecutivo — lo que queda por hacer, en orden</h4>
-    <p style="margin:0; text-align:left;">El A y el MX ya están creados (verificado 19-07-2026).
-    Falta: · 1) <strong>Corregir el TXT SPF</strong> (reemplazar por
-    <code>v=spf1 mx include:spf.hostmar.com ~all</code>) y crear el TXT _dmarc. ·
-    2) <strong>Ticket a DonWeb</strong>: rDNS de 138.36.237.61 → mail.sicr3p.cl + confirmar puerto
-    25 saliente (texto exacto en 2.1). · 3) En el VPS: <code>cd /opt/sicr3p && git pull && bash
-    deploy/instalar-webmail.sh</code>. · 4) Asistente en mail.sicr3p.cl/admin/install, generar
-    DKIM (copiar el TXT al DNS) y crear contacto@ y postmaster@. · 5) Probar en mail-tester
-    hasta ≥9/10. Si DonWeb no cumple el paso 2, cambiar al Camino B (Zoho).</p>
+    <p style="margin:0; text-align:left;">Las casillas ya están activas y funcionando (verificado
+    con el diagnosticador de DonWeb). Falta: · 1) Confirmar DKIM/DMARC con
+    <code>bash deploy/verificar-correo.sh sicrep.cl</code> y crear el TXT _dmarc si falta (sección
+    3.1). · 2) Probar en mail-tester hasta ≥9/10 (sección 3.2). · 3) Activar Resend con el dominio
+    sicrep.cl para que los correos automáticos de la plataforma salgan de verdad (sección 4).</p>
   </div>
 
-  <p class="pie-doc">sicr3p — Guía interna de activación del correo corporativo · Versión 1.0 · Julio 2026 ·
+  <p class="pie-doc">sicr3p — Guía interna de activación del correo corporativo · Versión 2.0 · Julio 2026 ·
   Detalle técnico completo: deploy/WEBMAIL.md en el repositorio.</p>
 </div>
 

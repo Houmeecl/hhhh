@@ -33,11 +33,11 @@ export const config = {
 
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
-    from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicr3p.cl>',
+    from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>',
   },
 
   admin: {
-    email: process.env.ADMIN_EMAIL || 'admin@sicr3p.cl',
+    email: process.env.ADMIN_EMAIL || 'admin@sicrep.cl',
     password: process.env.ADMIN_PASSWORD || '',
   },
 

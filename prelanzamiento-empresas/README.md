@@ -25,7 +25,7 @@ siembra `CUPOS` códigos de piloto (por defecto 100) en `data/prelanzamiento.db`
 Variables de entorno (mismas que el backend principal):
 ```bash
 RESEND_API_KEY=   # vacío = modo dev, el correo se imprime en consola
-MAIL_FROM="sicr3p <no-responder@sicr3p.cl>"
+MAIL_FROM="sicr3p <no-responder@sicrep.cl>"
 ```
 El PDF de muestra ya está generado y committeado (`public/muestra-informe.pdf`).
 Para regenerarlo (p. ej. si cambia el estilo del informe en `backend/src/services/pdf.js`):
