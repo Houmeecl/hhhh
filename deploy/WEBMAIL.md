@@ -319,38 +319,46 @@ de `sicrep.cl` apuntando al servidor de correo de Ferozo.
 descartado, queda vestigial y sin uso — no hace daño dejarlo, pero se
 puede limpiar cuando se quiera: nadie escribe a `@sicr3p.cl` para correo.)
 
-### 9.3 SPF y DKIM (sobre sicrep.cl)
-- **SPF**: el TXT `v=spf1 include:spf.hostmar.com -all` es el valor
-  correcto para el correo nativo de Ferozo/DonWeb — confirmado textual en
-  el artículo de soporte "¿Cómo configurar el registro SPF desde Ferozo?":
-  ese es exactamente el contenido que piden usar, en el dominio del
-  correo (`sicrep.cl`). Si ya existe con ese valor en `sicrep.cl`, no
-  tocar; si el panel muestra un modal de edición, **Cancelar**, no Guardar.
-  (Este mismo valor en `sicr3p.cl` es irrelevante ahora — ese dominio no
-  envía correo.)
-- **Configurar DKIM** → Aceptar (mismo panel, Zonas de DNS, sobre
-  `sicrep.cl`). Genera el par de claves y el TXT solo. Selector confirmado
-  por soporte DonWeb: `mail._domainkey.sicrep.cl` (verificar con
+### 9.3 SPF, DKIM y DMARC — ya configurados, verificado en vivo
+
+`sicrep.cl` está en el producto "Correo profesional" de DonWeb (panel
+propio, con su zona DNS aparte), que auto-generó los tres registros al
+crear las casillas — no hizo falta ningún wizard manual de esta sección.
+Confirmado con `bash deploy/verificar-correo.sh sicrep.cl` (`dig` real,
+no solo pantallazos):
+
+- **SPF**: `v=spf1 include:comp.hostmar.com -all` — nota el subdominio
+  `comp.hostmar.com` (no `spf.hostmar.com`, el genérico del artículo de
+  soporte de Ferozo para hosting compartido; "Correo profesional" usa el
+  suyo propio). **No tocar** — si el panel muestra un modal de edición
+  para este registro, **Cancelar**, no Guardar.
+- **DKIM**: `mail._domainkey.sicrep.cl` presente (verificar con
   `dig TXT mail._domainkey.sicrep.cl +short`).
-- **DMARC**: si el panel trae wizard, usarlo; si no, crear a mano el TXT
-  `_dmarc.sicrep.cl` con
-  `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicrep.cl`.
+- **DMARC**: `v=DMARC1; p=none` — política de solo-monitoreo (no rechaza
+  ni pone en cuarentena, solo reporta). Punto de partida razonable; subir
+  a `p=quarantine` más adelante si se quiere hacer cumplir, no es
+  obligatorio ahora.
 
 ### 9.4 Webmail
 <https://ferozo.email/> — usuario = la casilla completa
 (`contacto@sicrep.cl`), clave = la del paso 9.1.
 
 ### 9.5 Verificar
-El DNS puede tardar hasta 24 h en propagar. `bash deploy/verificar-correo.sh
-sicrep.cl` reconoce el MX (mismo patrón `mail.<dominio>` que Poste.io) y el
-DKIM nativo de DonWeb (`mail._domainkey`). Chequeo manual equivalente:
+
+**Ya verificado** (`bash deploy/verificar-correo.sh sicrep.cl`, `dig` real):
+MX, SPF, DKIM y DMARC en ✓. Comando para volver a confirmar cuando se
+quiera (por ejemplo tras cualquier cambio en el panel):
+```bash
+bash deploy/verificar-correo.sh sicrep.cl
+```
+Equivalente manual:
 ```bash
 dig MX sicrep.cl +short
-dig TXT sicrep.cl +short                      # un solo v=spf1, el de Hostmar (no tocar)
+dig TXT sicrep.cl +short                      # un solo v=spf1 (comp.hostmar.com, no tocar)
 dig TXT mail._domainkey.sicrep.cl +short      # DKIM nativo DonWeb
 dig TXT _dmarc.sicrep.cl +short
 ```
-Prueba final igual que la sección 5: mail-tester.com ≥ 9/10 con un correo
-real desde `contacto@sicrep.cl`.
+Falta solo la prueba de entregabilidad real: mail-tester.com ≥ 9/10 con un
+correo enviado desde `contacto@sicrep.cl` (sección 5, mismo procedimiento).
 
 Resend (sección 6) no se toca en ningún paso de esta sección.
