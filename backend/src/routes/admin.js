@@ -19,24 +19,66 @@ const adminOnly = requireRole('admin');
 // ============================================================
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const [clientes, sesionesMes, facturasMes, co2eAcum, ping, uso] = await Promise.all([
+    const [
+      clientes, sesionesMes, sesionesMesAnt, facturasMes, facturasMesAnt,
+      co2eAcum, co2eMes, co2eMesAnt, ping, uso, serieSesiones, serieFacturas, actividadReciente,
+    ] = await Promise.all([
       query(`SELECT estado_contrato, count(*)::int AS n FROM clientes GROUP BY estado_contrato`),
       query(`SELECT count(*)::int AS n FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT count(*)::int AS n FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       query(`SELECT count(*)::int AS n FROM facturas WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT count(*)::int AS n FROM facturas WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones`),
+      query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       simpleApi.ping(),
       query(`SELECT count(*)::int AS llamadas, COALESCE(sum(costo_estimado),0)::float AS costo
              FROM simple_api_uso WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT date_trunc('month', created_at) AS mes, count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
+             FROM sesiones WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+      query(`SELECT date_trunc('month', created_at) AS mes, count(*)::int AS n
+             FROM facturas WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+      query(`SELECT a.accion, a.entidad, a.entidad_id, a.created_at, u.email AS usuario_email
+             FROM actividad_log a LEFT JOIN usuarios u ON u.id = a.usuario_id
+             ORDER BY a.created_at DESC LIMIT 6`),
     ]);
     const porEstado = { piloto: 0, activo: 0, vencido: 0 };
     for (const r of clientes.rows) porEstado[r.estado_contrato] = r.n;
+
+    // Serie de los últimos 6 meses (incluido el actual), rellenando con 0
+    // los meses sin datos — para que el gráfico siempre tenga 6 puntos.
+    const mapaSesiones = new Map(serieSesiones.rows.map((r) => [r.mes.toISOString().slice(0, 7), r]));
+    const mapaFacturas = new Map(serieFacturas.rows.map((r) => [r.mes.toISOString().slice(0, 7), r.n]));
+    const serieMensual = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
+      const clave = d.toISOString().slice(0, 7);
+      const s = mapaSesiones.get(clave);
+      serieMensual.push({
+        mes: clave,
+        sesiones: s?.n || 0,
+        co2e: s?.co2e || 0,
+        facturas: mapaFacturas.get(clave) || 0,
+      });
+    }
+
+    // Variación % vs. mes anterior (null si el mes anterior fue 0, para no
+    // mostrar un falso "+infinito%").
+    const variacion = (actual, anterior) => (anterior > 0 ? Math.round(((actual - anterior) / anterior) * 1000) / 10 : null);
+
     res.json({
       clientes_por_estado: porEstado,
       sesiones_mes: sesionesMes.rows[0].n,
+      sesiones_mes_var: variacion(sesionesMes.rows[0].n, sesionesMesAnt.rows[0].n),
       facturas_mes: facturasMes.rows[0].n,
+      facturas_mes_var: variacion(facturasMes.rows[0].n, facturasMesAnt.rows[0].n),
       co2e_acumulado: co2eAcum.rows[0].total,
+      co2e_mes: co2eMes.rows[0].total,
+      co2e_mes_var: variacion(co2eMes.rows[0].total, co2eMesAnt.rows[0].total),
       simple_api: { ...ping, mock: simpleApi.mock },
       consumo_api_mes: uso.rows[0],
+      serie_mensual: serieMensual,
+      actividad_reciente: actividadReciente.rows,
     });
   } catch (err) {
     next(err);
