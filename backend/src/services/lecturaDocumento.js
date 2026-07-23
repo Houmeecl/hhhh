@@ -5,6 +5,7 @@ import {
   extraerTextoPdfEscaneado, extraerTextoHeicBuffer,
 } from './extractorTexto.js';
 import { parsearFacturaTexto } from './facturaTexto.js';
+import { evaluarItems } from './motorPropio.js';
 
 // ============================================================
 // Lectura automática de un documento — la cascada de decisión
@@ -30,13 +31,28 @@ export function sha256Hex(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
 
+// Valida los ítems ya extraídos: un monto sobre el tope del motor es
+// lectura corrupta → rechazo duro (aunque el motor externo esté activo);
+// si TODOS los ítems quedan descartados (negativos / sin datos), el
+// documento no tiene señal calculable.
+function validarItems(items, base) {
+  const { calculables, fueraDeRango } = evaluarItems(items);
+  if (fueraDeRango) return { tipo: 'rechazo', motivo: 'monto_fuera_de_rango', etapa: base.etapa, dte: base.dte || null };
+  if (calculables.length === 0) return { tipo: 'sin_senal', etapa: base.etapa, dte: base.dte || null };
+  return null; // válido
+}
+
 export async function leerDocumento(buffer, nombreArchivo) {
   // 1) DTE XML: datos reales del documento (folio, RUT, ítems). Un XML
   //    sin ítems no tiene señal propia, pero conserva el dte parseado
   //    (folio/RUTs) por si el motor externo completa el cálculo.
   if (/\.xml$/i.test(nombreArchivo)) {
     const dte = parseDte(buffer.toString('utf8'));
-    if (dte && dte.items?.length) return { tipo: 'xml', dte, etapa: 'xml' };
+    if (dte && dte.items?.length) {
+      const invalido = validarItems(dte.items, { etapa: 'xml', dte });
+      if (invalido) return invalido;
+      return { tipo: 'xml', dte, etapa: 'xml' };
+    }
     return { tipo: 'sin_senal', dte: dte || null, etapa: 'xml' };
   }
 
@@ -46,23 +62,31 @@ export async function leerDocumento(buffer, nombreArchivo) {
       etapa = 'pdf_texto';
       let texto = await extraerTextoPdf(buffer);
       let p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) return { tipo: 'texto', textoParseado: p, motor: 'propio_texto', etapa };
+      if (p.senal_suficiente) {
+        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_texto', etapa };
+      }
       // PDF sin capa de texto útil: rasterizar y leer con OCR.
       etapa = 'pdf_ocr';
       texto = await extraerTextoPdfEscaneado(buffer);
       p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) return { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      if (p.senal_suficiente) {
+        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      }
     } else if (/\.(jpe?g|png)$/i.test(nombreArchivo) && ocrDisponible()) {
       etapa = 'imagen_ocr';
       const ext = nombreArchivo.split('.').pop();
       const texto = await extraerTextoImagenBuffer(buffer, ext);
       const p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) return { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      if (p.senal_suficiente) {
+        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      }
     } else if (/\.heic$/i.test(nombreArchivo)) {
       etapa = 'heic_ocr';
       const texto = await extraerTextoHeicBuffer(buffer);
       const p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) return { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      if (p.senal_suficiente) {
+        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      }
     }
   } catch {
     // Cualquier falla de extracción → sin señal; el llamador decide.

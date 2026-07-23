@@ -235,23 +235,27 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       lecturas.push(await leerDocumento(file.buffer, file.originalname));
     }
 
-    // Con el motor externo apagado, lo sin señal se rechaza — TODOS los
-    // ilegibles del lote de una vez (el operador re-escanea solo esos) y
-    // con registro en la bitácora, que sobrevive porque la sesión ni
-    // siquiera se intenta.
-    if (!motorExternoActivo()) {
-      const indicesRechazados = lecturas
-        .map((l, i) => (l.tipo === 'sin_senal' ? i : -1))
-        .filter((i) => i >= 0);
-      if (indicesRechazados.length > 0) {
-        await registrarRechazos(indicesRechazados.map((i) => filaRechazo(files[i], lecturas[i], rut)));
-        const nombres = indicesRechazados.map((i) => files[i].originalname);
-        const plural = nombres.length > 1;
-        return res.status(422).json({
-          error: `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`,
-          rechazados: nombres,
-        });
-      }
+    // Rechazos del lote — TODOS de una vez (el operador re-escanea solo
+    // esos) y con registro en la bitácora, que sobrevive porque la sesión
+    // ni siquiera se intenta. Dos causas:
+    //  - tipo 'rechazo' (ej. monto fuera de rango = lectura corrupta):
+    //    SIEMPRE se rechaza, con o sin motor externo.
+    //  - tipo 'sin_senal': se rechaza solo con el motor externo apagado
+    //    (encendido, ese documento va al motor externo dentro de la tx).
+    const externoActivo = motorExternoActivo();
+    const indicesRechazados = lecturas
+      .map((l, i) => (l.tipo === 'rechazo' || (l.tipo === 'sin_senal' && !externoActivo) ? i : -1))
+      .filter((i) => i >= 0);
+    if (indicesRechazados.length > 0) {
+      await registrarRechazos(
+        indicesRechazados.map((i) => filaRechazo(files[i], lecturas[i], rut, lecturas[i].motivo || 'sin_senal'))
+      );
+      const nombres = indicesRechazados.map((i) => files[i].originalname);
+      const plural = nombres.length > 1;
+      return res.status(422).json({
+        error: `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`,
+        rechazados: nombres,
+      });
     }
 
     const result = await withTx(async (client) => {
@@ -314,7 +318,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           // Motor propio: cálculo real a partir de los datos del DTE, sin
           // depender del motor externo.
           const { dte } = lectura;
-          const calc = calcularFactura(dte.items, categoriasMotor);
+          const calc = calcularFactura(dte.items, categoriasMotor, { origen: 'xml' });
           analysis = {
             invoice_id_simple: null,
             numero_venta: dte.folio ? `F-${dte.folio}` : null,
@@ -329,7 +333,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           // Motor propio sobre texto extraído (PDF con capa de texto u OCR):
           // los montos reales del documento alimentan el método por gasto.
           const { textoParseado } = lectura;
-          const calc = calcularFactura(textoParseado.items, categoriasMotor);
+          const calc = calcularFactura(textoParseado.items, categoriasMotor, { origen: 'texto' });
           analysis = {
             invoice_id_simple: null,
             numero_venta: textoParseado.folio ? `F-${textoParseado.folio}` : null,

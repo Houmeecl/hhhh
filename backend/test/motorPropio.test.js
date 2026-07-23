@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizarUnidad, clasificar, calcularItem, calcularFactura } from '../src/services/motorPropio.js';
+import { normalizarUnidad, clasificar, calcularItem, calcularFactura, evaluarItems, MONTO_MAX_CLP_ITEM } from '../src/services/motorPropio.js';
 import { parseDte } from '../src/services/dte.js';
 
 // Mismas categorías/seed de migrations/010_motor_propio.sql, en memoria (sin BD).
@@ -174,7 +174,7 @@ test('calcularFactura suma total, calcula % por ítem y elige la categoría domi
     { nombre: 'Suministro eléctrico SEN', cantidad: 2500, unidad: 'kWh', monto: 70000 },
     { nombre: 'Cargo por potencia', cantidad: 1, unidad: null, monto: 30000 },
   ];
-  const f = calcularFactura(items, cats);
+  const f = calcularFactura(items, cats, { origen: 'xml' });
   // 0.6053 (2500 kWh físico) + 0.018 (30000 CLP gasto, clasificado electricidad) = 0.6233
   assert.equal(f.total_co2e, 0.6233);
   assert.equal(f.categoria, 'Energía eléctrica');
@@ -201,8 +201,77 @@ test('calcularFactura con datos reales de un DTE XML parseado (dte-ejemplo)', ()
   const dte = parseDte(DTE_EJEMPLO);
   assert.equal(dte.items.length, 2);
   const cats = categoriasEjemplo();
-  const f = calcularFactura(dte.items, cats);
+  const f = calcularFactura(dte.items, cats, { origen: 'xml' });
   assert.ok(f.total_co2e > 0);
   // El ítem "Suministro eléctrico" (sin acento en NmbItem) se clasifica igual como eléctrico.
   assert.equal(f.categoria, 'Energía eléctrica');
+});
+
+// ---------- Endurecimiento del motor (F3: guardias y descartes) ----------
+
+test('calcularFactura con categorías vacías lanza error de configuración, no crashea', () => {
+  assert.throws(() => calcularFactura([{ nombre: 'x', monto: 1000 }], new Map()), /sin categorías activas/);
+  const inactivas = new Map([['servicios', { codigo: 'servicios', nombre: 'Servicios', activo: false, palabras_clave: [], factor_gasto_kgco2e_clp1000: 0.25 }]]);
+  assert.throws(() => calcularFactura([{ nombre: 'x', monto: 1000 }], inactivas), /sin categorías activas/);
+});
+
+test('origen texto NUNCA usa método físico aunque el ítem traiga unidad', () => {
+  const cats = categoriasEjemplo();
+  // Mismo ítem del test físico, pero con origen 'texto' (default): gasto.
+  const f = calcularFactura([{ nombre: 'Suministro eléctrico SEN', cantidad: 2500, unidad: 'kWh', monto: 70000 }], cats);
+  // 70000 / 1_000_000 * 0.60 = 0.042 t (gasto), no 0.6053 (físico)
+  assert.equal(f.total_co2e, 0.042);
+});
+
+test('ítems con monto negativo (descuentos / notas de crédito) se descartan', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([
+    { nombre: 'Servicio principal', monto: 100000 },
+    { nombre: 'Descuento comercial', monto: -20000 },
+  ], cats);
+  assert.equal(f.items.length, 1);
+  assert.equal(f.items_descartados, 1);
+  assert.ok(f.total_co2e > 0, 'el CO2e jamás baja por un monto negativo');
+});
+
+test('ítem sin cantidad ni monto se descarta ("No se calcula", Figura 2 de la guía)', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([
+    { nombre: 'Glosa sin datos', monto: 0, cantidad: 0 },
+    { nombre: 'Servicio real', monto: 50000 },
+  ], cats);
+  assert.equal(f.items.length, 1);
+  assert.equal(f.items_descartados, 1);
+});
+
+test('monto sobre el tope lanza error tipificado monto_fuera_de_rango', () => {
+  const cats = categoriasEjemplo();
+  assert.throws(
+    () => calcularFactura([{ nombre: 'Lectura corrupta', monto: MONTO_MAX_CLP_ITEM + 1 }], cats),
+    (e) => e.code === 'monto_fuera_de_rango'
+  );
+});
+
+test('evaluarItems separa calculables, descartados y fuera de rango', () => {
+  const r = evaluarItems([
+    { nombre: 'ok', monto: 1000 },
+    { nombre: 'fisico sin monto', monto: 0, cantidad: 10 }, // calculable por cantidad
+    { nombre: 'negativo', monto: -5 },
+    { nombre: 'vacio', monto: 0, cantidad: 0 },
+  ]);
+  assert.equal(r.calculables.length, 2);
+  assert.equal(r.descartados, 2);
+  assert.equal(r.fueraDeRango, false);
+  assert.equal(evaluarItems([{ monto: MONTO_MAX_CLP_ITEM + 1 }]).fueraDeRango, true);
+  assert.deepEqual(evaluarItems(null), { calculables: [], descartados: 0, fueraDeRango: false });
+});
+
+test('calcularFactura vacía o toda descartada devuelve total 0 y Sin categoría', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([], cats);
+  assert.equal(f.total_co2e, 0);
+  assert.equal(f.categoria, 'Sin categoría');
+  const g = calcularFactura([{ nombre: 'solo descuento', monto: -1 }], cats);
+  assert.equal(g.total_co2e, 0);
+  assert.equal(g.items_descartados, 1);
 });
