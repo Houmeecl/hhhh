@@ -1,6 +1,8 @@
 import express from 'express';
 import { query } from '../lib/db.js';
 import { hashApiKey, normalizarRut } from '../services/mandante.js';
+import { logActividad } from '../middleware/auth.js';
+import { bigquery } from '../services/bigquery.js';
 
 // ============================================================
 // API pública para MANDANTES (auth por header X-Api-Key).
@@ -61,6 +63,16 @@ router.get('/proveedores', async (req, res, next) => {
        GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 200`, params
     );
     res.json({ mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa }, proveedores: rows });
+
+    // Auditoría del cruce: el mandante ve datos de terceros (sus
+    // proveedores) — no es un usuario de `usuarios`, así que queda sin
+    // usuarioId, identificado por entidad/entidadId.
+    const detalle = { rut_mandante: req.mandante.rut, n_proveedores: rows.length };
+    logActividad({
+      usuarioId: null, accion: 'consulta_proveedores_mandante',
+      entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip,
+    });
+    bigquery.exportAcceso({ tipo: 'consulta_proveedores_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
   } catch (err) { next(err); }
 });
 
@@ -97,6 +109,15 @@ router.get('/proveedor/:rut/resumen', async (req, res, next) => {
       por_categoria: porCategoria,
       documentos: docs,
     });
+
+    {
+      const detalle = { rut_mandante: req.mandante.rut, rut_proveedor: req.params.rut, n_documentos: docs.length };
+      logActividad({
+        usuarioId: null, accion: 'consulta_proveedor_mandante',
+        entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip,
+      });
+      bigquery.exportAcceso({ tipo: 'consulta_proveedor_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.params.rut, detalle });
+    }
   } catch (err) { next(err); }
 });
 

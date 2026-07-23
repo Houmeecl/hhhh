@@ -3,6 +3,8 @@ import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
+import { verificarCadenaGlobal } from './cadenaGlobal.js';
+import { hashCorto } from './cadenaPublica.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -234,6 +236,20 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   let saldo = 0;
   let zebra = false;
   for (const f of facturas) {
+    // Cabecera de hash del documento (una sola vez por factura, no por
+    // ítem): mismo dato que ya se usa en la etiqueta/carpeta, ahora
+    // también visible en el informe consolidado.
+    if (f.hash_cadena) {
+      if (y > 755) { doc.addPage(); y = 48; }
+      const intacta = eslabonValido(f);
+      doc.font('Courier').fontSize(7).fillColor(intacta === false ? '#b91c1c' : GRAY)
+        .text(
+          `Doc. ${String(f.numero_venta || '—').slice(0, 16)} · hash ${hashCorto(f.hash_cadena)} · eslabón #${f.eslabon}` +
+          (intacta === false ? ' · ⚠ ALTERADO' : ''),
+          cols.doc, y + 2, { lineBreak: false }
+        );
+      y += 11;
+    }
     for (const it of f.items || []) {
       if (y > 760) { doc.addPage(); y = 48; }
       saldo += Number(it.co2e || 0);
@@ -254,6 +270,28 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   doc.text('SALDO DEL PERÍODO', cols.glosa - 90, y + 6, { lineBreak: false });
   doc.fillColor(GREEN).text(`${nf(saldo, 4)} tCO2e`, cols.cargo - 60, y + 6, { width: 137, align: 'right' });
   y += 34;
+
+  // --- Verificación de integridad ---
+  // Cuenta cuántas de las facturas de ESTE informe son internamente
+  // consistentes (eslabonValido) y, aparte, el estado de la cadena
+  // GLOBAL completa (facturas + anclajes de lote + declaraciones REP).
+  const facturasHasheadas = facturas.filter((f) => f.hash_cadena);
+  if (facturasHasheadas.length) {
+    if (y > 700) { doc.addPage(); y = 48; }
+    const intactas = facturasHasheadas.filter((f) => eslabonValido(f)).length;
+    const cadenaGlobal = await verificarCadenaGlobal();
+    doc.roundedRect(48, y, 499, 56, 6).fillAndStroke(LIGHT, cadenaGlobal.valido ? GREEN : '#b91c1c');
+    doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('VERIFICACIÓN DE INTEGRIDAD', 60, y + 10);
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+      `${intactas}/${facturasHasheadas.length} documento${facturasHasheadas.length === 1 ? '' : 's'} de este informe verificado${facturasHasheadas.length === 1 ? '' : 's'} individualmente. ` +
+      `Cadena global sicr3p: ${cadenaGlobal.valido ? 'íntegra' : 'ALTERADA'} (${cadenaGlobal.total_eslabones ?? '—'} eslabones totales).`,
+      60, y + 26, { width: 475 }
+    );
+    if (!cadenaGlobal.valido) {
+      doc.font('Helvetica-Bold').fillColor('#b91c1c').text('⚠ La cadena global presenta una alteración detectada.', 60, y + 40);
+    }
+    y += 68;
+  }
 
   // Alcances GHG de las categorías presentes en el período (nota bajo la tabla,
   // solo si hay categorías con alcance declarado).
@@ -383,7 +421,7 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
 
 // ---------- ESTADO DE CAPITAL NATURAL ----------
 // Balance por cuenta ambiental (flujos del período + activos naturales).
-export async function generateBalanceNatural({ balance, movimientos, activos, periodo = {} }) {
+export async function generateBalanceNatural({ balance, movimientos, activos, integridad, periodo = {} }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const year = new Date().getFullYear();
   const folioN = `N-${year}-${String(((movimientos?.length || 0) + (activos?.length || 0) + 1) % 10000).padStart(4, '0')}`;
@@ -494,6 +532,27 @@ export async function generateBalanceNatural({ balance, movimientos, activos, pe
       y += 15;
     }
     y += 10;
+  }
+
+  // --- Sello de integridad por cuenta ---
+  // Cada cuenta tiene su propia mini-cadena de hash (migración 029): se
+  // omite silenciosamente si aún no tiene movimientos hasheados (cuentas
+  // creadas antes de esta migración, o sin actividad) — no se inventa nada.
+  if ((integridad || []).some((i) => i.total_eslabones)) {
+    if (y > 640) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Sello de integridad por cuenta', 48, y);
+    y += 18;
+    for (const i of integridad) {
+      if (!i.total_eslabones) continue;
+      if (y > 745) { doc.addPage(); y = 48; }
+      doc.roundedRect(48, y, 499, 34, 6).fillAndStroke(LIGHT, i.valido ? GREEN : '#b91c1c');
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text(i.codigo, 60, y + 8);
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+        .text(`${i.total_eslabones} movimiento${i.total_eslabones === 1 ? '' : 's'} hasheado${i.total_eslabones === 1 ? '' : 's'} · ${i.valido ? 'cadena íntegra' : 'ALTERACIÓN detectada'} · hash actual:`, 130, y + 8, { width: 340 });
+      doc.font('Courier').fontSize(7).fillColor(NAVY).text(String(i.ultimo_hash || ''), 60, y + 20, { width: 475 });
+      y += 40;
+    }
+    y += 8;
   }
 
   // --- Metodología ---
@@ -853,7 +912,7 @@ export function sanearNombreMandante(v) {
   return limpio || null;
 }
 
-export async function generateCarpetaMandante({ sesion, facturas, declaracion, alcances, mandante }) {
+export async function generateCarpetaMandante({ sesion, facturas, declaracion, alcances, mandante, contrapartes }) {
   const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const W = doc.page.width - 96;
@@ -972,6 +1031,44 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
         ry += 16;
       }
     }
+  }
+
+  // ---- Contrapartes relacionadas (reusa GET /informes/cadena, sin
+  // inventar ningún cálculo nuevo) ----
+  const nProv = contrapartes?.proveedores?.length || 0;
+  const nComp = contrapartes?.compradores?.length || 0;
+  if (nProv || nComp) {
+    doc.addPage();
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('CONTRAPARTES RELACIONADAS', 48, 48);
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+      .text(`Otras empresas que le emitieron documentos a ${sesion.rut_cliente || 'este RUT'} (proveedores) o que recibieron documentos de este RUT (compradores), según los documentos ya procesados por sicr3p — no incluye relaciones fuera de la plataforma.`, 48, 68, { width: W });
+    let cy = doc.y + 14;
+
+    const tablaContraparte = (titulo, filas) => {
+      if (!filas.length) return;
+      if (cy > 700) { doc.addPage(); cy = 48; }
+      doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text(titulo, 48, cy);
+      cy += 16;
+      doc.rect(48, cy, W, 16).fill(NAVY);
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff')
+        .text('RUT', 56, cy + 4).text('Documentos', 260, cy + 4).text('t CO2e', 360, cy + 4).text('Último documento', 440, cy + 4);
+      cy += 16;
+      doc.font('Helvetica').fontSize(8).fillColor(NAVY);
+      for (const p of filas.slice(0, 10)) {
+        if (cy > 760) { doc.addPage(); cy = 48; }
+        doc.text(p.rut || '—', 56, cy + 4, { width: 190 })
+          .text(String(p.n_documentos), 260, cy + 4)
+          .text(nf(p.total_co2e, 3), 360, cy + 4)
+          .text(p.ultimo_documento ? fechaCorta(p.ultimo_documento) : '—', 440, cy + 4);
+        cy += 15;
+      }
+      cy += 12;
+    };
+    tablaContraparte('Proveedores (le emitieron documentos a este RUT)', contrapartes.proveedores || []);
+    tablaContraparte('Compradores (recibieron documentos de este RUT)', contrapartes.compradores || []);
+
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
+      .text('Datos derivados de documentos ya procesados por sicr3p; no constituye una verificación de tercera parte acreditada.', 48, cy, { width: W });
   }
 
   // ---- Hoja de verificación para el receptor ----

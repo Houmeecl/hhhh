@@ -5,6 +5,7 @@ import {
   MAX_COMPONENTES,
   validarComponentes,
   calcularReciclabilidad,
+  hashDeclaracionEmbalaje,
 } from '../src/services/rep.js';
 
 // Componente válido de referencia para armar variaciones.
@@ -191,4 +192,36 @@ test('sin componentes (o peso total 0) → nivel null (paridad con el frontend)'
   });
   const r = calcularReciclabilidad([{ material: 'vidrio', peso_gr: 0, cantidad: 5, reciclable: true }]);
   assert.equal(r.nivel, null);
+});
+
+// ---------- hashDeclaracionEmbalaje (cadena de hash de la migración 028) ----------
+
+const DECL_A = {
+  sesion_id: 'sesion-1',
+  componentes: [{ material: 'papel_carton', peso_gr: 100, cantidad: 2, reciclable: true }],
+  peso_total_gr: 200, peso_reciclable_gr: 200, porcentaje: 100, nivel: 'Alto',
+};
+
+test('hashDeclaracionEmbalaje es determinista (mismo contenido → mismo hash)', () => {
+  assert.equal(hashDeclaracionEmbalaje(DECL_A), hashDeclaracionEmbalaje({ ...DECL_A, componentes: [...DECL_A.componentes] }));
+});
+
+test('hashDeclaracionEmbalaje es sensible a cada campo', () => {
+  const base = hashDeclaracionEmbalaje(DECL_A);
+  assert.notEqual(base, hashDeclaracionEmbalaje({ ...DECL_A, sesion_id: 'sesion-2' }));
+  assert.notEqual(base, hashDeclaracionEmbalaje({ ...DECL_A, porcentaje: 99 }));
+  assert.notEqual(base, hashDeclaracionEmbalaje({ ...DECL_A, nivel: 'Medio' }));
+  assert.notEqual(base, hashDeclaracionEmbalaje({
+    ...DECL_A,
+    componentes: [{ material: 'vidrio', peso_gr: 100, cantidad: 2, reciclable: true }],
+  }));
+});
+
+test('hashDeclaracionEmbalaje distingue el orden/composición de componentes', () => {
+  const dos = { ...DECL_A, componentes: [
+    { material: 'papel_carton', peso_gr: 100, cantidad: 1, reciclable: true },
+    { material: 'vidrio', peso_gr: 50, cantidad: 1, reciclable: false },
+  ] };
+  const invertido = { ...dos, componentes: [...dos.componentes].reverse() };
+  assert.notEqual(hashDeclaracionEmbalaje(dos), hashDeclaracionEmbalaje(invertido));
 });

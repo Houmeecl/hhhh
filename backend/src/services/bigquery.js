@@ -166,6 +166,20 @@ export function rowDocumentoCorredor(doc) {
   };
 }
 
+// Evento de auditoría: alguien (staff o mandante) cruzó datos de una
+// contraparte. `actor` = { tipo: 'usuario'|'mandante', id }.
+export function rowAcceso({ tipo, actor, rut_consultado, detalle }) {
+  return {
+    id: crypto.randomUUID(),
+    tipo,
+    actor_tipo: actor?.tipo || 'usuario',
+    actor_id: actor?.id || null,
+    rut_consultado: rut_consultado || null,
+    detalle: detalle ? JSON.stringify(detalle) : null,
+    created_at: new Date().toISOString(),
+  };
+}
+
 // ---------- API del servicio (fire-and-forget, nunca lanza) ----------
 async function exportar(table, rows) {
   if (!config.bigquery.enabled || !rows.length) return false;
@@ -206,5 +220,11 @@ export const bigquery = {
     const row = rowCompensacion(comp, sesion);
     row.insertId = `${row.id}-${row.created_at}`;
     return exportar('compensaciones', [row]);
+  },
+
+  // Auditoría de cruces de datos (routes/buscar.js, routes/mandante.js).
+  // Copia externa opt-in del mismo evento que ya queda en actividad_log.
+  exportAcceso({ tipo, actor, rut_consultado, detalle }) {
+    return exportar('accesos_cruce', [rowAcceso({ tipo, actor, rut_consultado, detalle })]);
   },
 };

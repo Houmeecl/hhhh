@@ -1,8 +1,9 @@
 import express from 'express';
-import { query } from '../lib/db.js';
+import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { generateBalanceNatural } from '../services/pdf.js';
-import { valorizarActivo } from '../services/capitalNatural.js';
+import { valorizarActivo, anexarMovimiento } from '../services/capitalNatural.js';
+import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 
 // ============================================================
 // Capital Natural — plan de cuentas ambiental, activos (stock),
@@ -152,14 +153,31 @@ router.post('/movimientos', adminOnly, async (req, res, next) => {
     if (!cuenta_codigo || !glosa || !Number(cantidad)) {
       return res.status(400).json({ error: 'Cuenta, glosa y cantidad son obligatorios.' });
     }
+    const codigo = String(cuenta_codigo).toUpperCase();
+    const { rows: existe } = await query(`SELECT 1 FROM cuentas_naturales WHERE codigo = $1`, [codigo]);
+    if (!existe[0]) return res.status(404).json({ error: 'Cuenta no encontrada' });
+
+    const movimiento = await withTx((client) => anexarMovimiento(client, {
+      cuenta_codigo: codigo, fecha: fecha ? new Date(fecha) : new Date(), glosa,
+      cantidad: Number(cantidad), unidad: unidad || '', tipo: tipo === 'abono' ? 'abono' : 'cargo',
+      origen: 'manual', factura_id: null,
+    }));
+    await logActividad({ usuarioId: req.user.sub, accion: 'movimiento_natural_manual', entidad: 'movimiento_natural', entidadId: movimiento.id, ip: req.ip });
+    res.status(201).json({ movimiento });
+  } catch (err) { next(err); }
+});
+
+// Verifica la mini-cadena de UNA cuenta (todos sus movimientos hasheados,
+// no solo un rango de fechas) — mismo espíritu que GET /api/cadena/verificar.
+router.get('/cuentas/:codigo/verificar', async (req, res, next) => {
+  try {
+    const codigo = String(req.params.codigo).toUpperCase();
     const { rows } = await query(
-      `INSERT INTO movimientos_naturales (cuenta_codigo, fecha, glosa, cantidad, unidad, tipo, origen)
-       VALUES ($1, COALESCE($2::date, CURRENT_DATE), $3, $4, $5, $6, 'manual') RETURNING *`,
-      [String(cuenta_codigo).toUpperCase(), fecha || null, glosa, Number(cantidad),
-       unidad || '', tipo === 'abono' ? 'abono' : 'cargo']
+      `SELECT id::text AS id, eslabon, hash_anterior, hash_documento, hash_cadena
+       FROM movimientos_naturales WHERE cuenta_codigo = $1 AND eslabon IS NOT NULL ORDER BY eslabon`,
+      [codigo]
     );
-    await logActividad({ usuarioId: req.user.sub, accion: 'movimiento_natural_manual', entidad: 'movimiento_natural', entidadId: rows[0].id, ip: req.ip });
-    res.status(201).json({ movimiento: rows[0] });
+    res.json(verificarCadenaCompleta(rows));
   } catch (err) { next(err); }
 });
 
@@ -235,8 +253,24 @@ router.get('/balance.pdf', async (req, res, next) => {
        JOIN cuentas_naturales c ON c.codigo = a.cuenta_codigo ORDER BY a.cuenta_codigo, a.nombre`
     );
     const activos = activosRaw.map((a) => ({ ...a, ...valorizarActivo(a) }));
+
+    // Sello de integridad por cuenta: se verifica la cadena COMPLETA de
+    // cada cuenta (todos sus movimientos hasheados), no solo el rango de
+    // fechas del balance mostrado — igual que el expediente de lote no
+    // filtra sus eslabones.
+    const { rows: todosHasheados } = await query(
+      `SELECT cuenta_codigo, id::text AS id, eslabon, hash_anterior, hash_documento, hash_cadena
+       FROM movimientos_naturales WHERE eslabon IS NOT NULL ORDER BY cuenta_codigo, eslabon`
+    );
+    const porCuenta = new Map();
+    for (const r of todosHasheados) {
+      if (!porCuenta.has(r.cuenta_codigo)) porCuenta.set(r.cuenta_codigo, []);
+      porCuenta.get(r.cuenta_codigo).push(r);
+    }
+    const integridad = balance.map((b) => ({ codigo: b.codigo, ...verificarCadenaCompleta(porCuenta.get(b.codigo) || []) }));
+
     const pdf = await generateBalanceNatural({
-      balance, movimientos, activos,
+      balance, movimientos, activos, integridad,
       periodo: { desde: req.query.desde, hasta: req.query.hasta },
     });
     res.setHeader('Content-Type', 'application/pdf');

@@ -23,8 +23,9 @@ import {
 
 import { parsearFacturaTexto } from '../services/facturaTexto.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
-import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta } from '../services/cadenaHash.js';
-import { validarComponentes, calcularReciclabilidad } from '../services/rep.js';
+import { contrapartesDeRut } from '../services/trazabilidad.js';
+import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta, siguienteEslabon } from '../services/cadenaHash.js';
+import { validarComponentes, calcularReciclabilidad, hashDeclaracionEmbalaje } from '../services/rep.js';
 import { validarCompensacion, calcularMonto } from '../services/compensacion.js';
 import { generarSelloSvg } from '../services/sello.js';
 import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
@@ -541,6 +542,11 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 // y el nivel se recalculan SIEMPRE en el servidor (fórmula SICREP); nunca se
 // aceptan valores calculados por el cliente. Una declaración por sesión:
 // un nuevo POST reemplaza la anterior.
+// Cada versión (creación o reemplazo) se encadena contra la cadena GLOBAL
+// (misma secuencia/lock que las facturas, cadena_estado). Antes de
+// sobreescribir, la versión anterior se copia íntegra a
+// declaraciones_embalaje_historial (append-only) — "reemplazar" ya no
+// borra evidencia legal (migración 028).
 router.post('/sesiones/:id/embalaje', async (req, res, next) => {
   try {
     const { rows: sRows } = await query(`SELECT id, rut_cliente FROM sesiones WHERE id = $1`, [req.params.id]);
@@ -559,30 +565,66 @@ router.post('/sesiones/:id/embalaje', async (req, res, next) => {
     }));
     const calc = calcularReciclabilidad(limpios);
 
-    const { rows } = await query(
-      `INSERT INTO declaraciones_embalaje
-         (sesion_id, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel)
-       VALUES ($1, $2::jsonb, $3, $4, $5, $6)
-       ON CONFLICT (sesion_id) DO UPDATE SET
-         componentes        = EXCLUDED.componentes,
-         peso_total_gr      = EXCLUDED.peso_total_gr,
-         peso_reciclable_gr = EXCLUDED.peso_reciclable_gr,
-         porcentaje         = EXCLUDED.porcentaje,
-         nivel              = EXCLUDED.nivel,
-         created_at         = now()
-       RETURNING *`,
-      [
-        req.params.id,
-        JSON.stringify(limpios),
-        calc.peso_total_gr,
-        calc.peso_reciclable_gr,
-        calc.porcentaje,
-        calc.nivel,
-      ]
-    );
-    res.status(201).json({ declaracion: rows[0] });
+    const declaracion = await withTx(async (client) => {
+      // Lock de la declaración anterior de ESTA sesión primero (si existe),
+      // recién después cadena_estado — orden fijo para no chocar con el
+      // flujo de subida de facturas (que solo toca cadena_estado).
+      const { rows: prevRows } = await client.query(
+        `SELECT * FROM declaraciones_embalaje WHERE sesion_id = $1 FOR UPDATE`,
+        [req.params.id]
+      );
+      const previa = prevRows[0] || null;
+
+      const { rows: eRows } = await client.query(`SELECT * FROM cadena_estado WHERE id = 1 FOR UPDATE`);
+      const estado = eRows[0];
+      const hDoc = hashDeclaracionEmbalaje({ sesion_id: req.params.id, componentes: limpios, ...calc });
+      const { hash_cadena: hCad, eslabon } = siguienteEslabon(estado, hDoc);
+
+      if (previa) {
+        await client.query(
+          `INSERT INTO declaraciones_embalaje_historial
+             (declaracion_id, sesion_id, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel,
+              hash_documento, hash_anterior, hash_cadena, eslabon, vigente_desde)
+           VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [previa.id, previa.sesion_id, JSON.stringify(previa.componentes), previa.peso_total_gr, previa.peso_reciclable_gr,
+           previa.porcentaje, previa.nivel, previa.hash_documento, previa.hash_anterior, previa.hash_cadena,
+           previa.eslabon, previa.created_at]
+        );
+      }
+
+      const { rows } = await client.query(
+        `INSERT INTO declaraciones_embalaje
+           (sesion_id, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel,
+            hash_documento, hash_anterior, hash_cadena, eslabon)
+         VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (sesion_id) DO UPDATE SET
+           componentes        = EXCLUDED.componentes,
+           peso_total_gr      = EXCLUDED.peso_total_gr,
+           peso_reciclable_gr = EXCLUDED.peso_reciclable_gr,
+           porcentaje         = EXCLUDED.porcentaje,
+           nivel              = EXCLUDED.nivel,
+           hash_documento     = EXCLUDED.hash_documento,
+           hash_anterior      = EXCLUDED.hash_anterior,
+           hash_cadena        = EXCLUDED.hash_cadena,
+           eslabon            = EXCLUDED.eslabon,
+           created_at         = now()
+         RETURNING *`,
+        [
+          req.params.id, JSON.stringify(limpios), calc.peso_total_gr, calc.peso_reciclable_gr,
+          calc.porcentaje, calc.nivel, hDoc, estado.ultimo_hash, hCad, eslabon,
+        ]
+      );
+
+      await client.query(
+        `UPDATE cadena_estado SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1`,
+        [hCad, eslabon]
+      );
+      return rows[0];
+    });
+
+    res.status(201).json({ declaracion });
     // Export al warehouse (no bloqueante; cada versión queda como fila propia).
-    bigquery.exportDeclaracionEmbalaje(rows[0], sRows[0]);
+    bigquery.exportDeclaracionEmbalaje(declaracion, sRows[0]);
   } catch (err) {
     next(err);
   }
@@ -732,10 +774,14 @@ router.get('/sesiones/:id/carpeta.pdf', async (req, res, next) => {
     const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
     const facturas = await hydrateFacturas(req.params.id);
+    // Contrapartes relacionadas: mismo cálculo ya expuesto en
+    // GET /admin/informes/cadena, reexpuesto dentro de la carpeta.
+    const contrapartes = rows[0].rut_cliente ? await contrapartesDeRut(rows[0].rut_cliente) : null;
     const pdf = await generateCarpetaMandante({
       sesion: rows[0],
       facturas,
       mandante: req.query.mandante,
+      contrapartes,
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-carpeta-${req.params.id.slice(0, 8)}.pdf"`);

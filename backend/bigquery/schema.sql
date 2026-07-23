@@ -91,3 +91,19 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.compensaciones` (
   estado           STRING,             -- simulado | omitido | pendiente | pagado
   created_at       TIMESTAMP NOT NULL
 );
+
+-- Auditoría de CRUCES de datos: cuándo alguien (staff sicrep vía
+-- routes/buscar.js, o un mandante vía routes/mandante.js) consultó datos
+-- de una contraparte. En Postgres el mismo evento vive en actividad_log
+-- (fuente de verdad); acá queda como copia externa consultable a escala.
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.accesos_cruce` (
+  id               STRING NOT NULL,
+  tipo             STRING NOT NULL,    -- consulta_cruce_rut | consulta_proveedores_mandante | consulta_proveedor_mandante
+  actor_tipo       STRING NOT NULL,    -- usuario | mandante
+  actor_id         STRING,
+  rut_consultado   STRING,
+  detalle          STRING,            -- JSON con el detalle del cruce (n_documentos, etc.)
+  created_at       TIMESTAMP NOT NULL
+)
+PARTITION BY DATE(created_at)
+CLUSTER BY rut_consultado, actor_id;

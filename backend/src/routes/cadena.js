@@ -1,7 +1,7 @@
 import express from 'express';
 import { query } from '../lib/db.js';
 import { requireAuth, requireHomePanel } from '../middleware/auth.js';
-import { verificarCadenaCompleta } from '../services/cadenaHash.js';
+import { verificarCadenaGlobal } from '../services/cadenaGlobal.js';
 
 // ============================================================
 // Cadena de hash tipo blockchain (interna) — estado y verificación.
@@ -20,22 +20,13 @@ router.get('/estado', async (req, res, next) => {
 });
 
 // Recalcula la cadena completa desde el génesis (auditoría bajo demanda).
-// La cadena global incluye facturas Y anclajes de lotes cerrados
-// (cadena_anclajes, migración 022): comparten la secuencia de
-// cadena_estado, por eso se verifica la unión ordenada por eslabón.
+// La cadena global incluye facturas, anclajes de lotes cerrados
+// (cadena_anclajes, migración 022) y declaraciones REP vigentes +
+// históricas (migración 028): comparten la secuencia de cadena_estado,
+// por eso se verifica la unión ordenada por eslabón.
 router.get('/verificar', async (req, res, next) => {
   try {
-    const { rows: eslabones } = await query(
-      `SELECT id::text AS id, eslabon, hash_anterior, hash_documento, hash_cadena FROM (
-         SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
-         FROM facturas WHERE eslabon IS NOT NULL
-         UNION ALL
-         SELECT id, eslabon, hash_anterior, hash_documento, hash_cadena
-         FROM cadena_anclajes
-       ) t ORDER BY eslabon ASC`
-    );
-    const resultado = verificarCadenaCompleta(eslabones);
-    res.json(resultado);
+    res.json(await verificarCadenaGlobal());
   } catch (err) { next(err); }
 });
 

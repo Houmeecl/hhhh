@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GENESIS, hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta } from '../src/services/cadenaHash.js';
+import { GENESIS, hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta, siguienteEslabon } from '../src/services/cadenaHash.js';
 
 const DOC_A = { numero_venta: 'F-1', rut_emisor: '76123456-0', rut_receptor: '11111111-1', total_co2e: 1.2345, categoria: 'Energía eléctrica', archivo_original: 'a.xml' };
 const DOC_B = { numero_venta: 'F-2', rut_emisor: '76123456-0', rut_receptor: '11111111-1', total_co2e: 2.5, categoria: 'Agua', archivo_original: 'b.xml' };
@@ -98,4 +98,27 @@ test('verificarCadenaCompleta: detecta un hash_anterior que no enlaza con el esl
 test('verificarCadenaCompleta: cadena vacía es válida (0 eslabones)', () => {
   const r = verificarCadenaCompleta([]);
   assert.deepEqual(r, { valido: true, total_eslabones: 0, ultimo_hash: GENESIS });
+});
+
+// ---------- siguienteEslabon (usado por declaraciones_embalaje y Capital Natural) ----------
+
+test('siguienteEslabon arma hash_cadena = hashCadena(ultimo_hash, hashDoc) y eslabon = n_eslabones + 1', () => {
+  const hDoc = hashDocumento({ numero_venta: 'X', rut_emisor: '1', rut_receptor: '2', total_co2e: 1, categoria: 'c', archivo_original: 'a' });
+  const estado = { ultimo_hash: 'abc123', n_eslabones: 4 };
+  const r = siguienteEslabon(estado, hDoc);
+  assert.equal(r.hash_cadena, hashCadena('abc123', hDoc));
+  assert.equal(r.eslabon, 5);
+});
+
+test('siguienteEslabon funciona con estado null/undefined (primer eslabón, génesis)', () => {
+  const hDoc = hashDocumento({ numero_venta: 'X', rut_emisor: '1', rut_receptor: '2', total_co2e: 1, categoria: 'c', archivo_original: 'a' });
+  const r = siguienteEslabon(null, hDoc);
+  assert.equal(r.hash_cadena, hashCadena(GENESIS, hDoc));
+  assert.equal(r.eslabon, 1);
+});
+
+test('siguienteEslabon con n_eslabones ausente en el estado asume 0', () => {
+  const hDoc = 'hash-cualquiera';
+  const r = siguienteEslabon({ ultimo_hash: GENESIS }, hDoc);
+  assert.equal(r.eslabon, 1);
 });

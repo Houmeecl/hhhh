@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { derivarMovimientos, valorizarActivo } from '../src/services/capitalNatural.js';
+import { derivarMovimientos, valorizarActivo, hashMovimientoNatural } from '../src/services/capitalNatural.js';
 
 function cuentas(overrides = {}) {
   const base = {
@@ -118,4 +118,31 @@ test('valorizarActivo: unidad del activo igual a la de la cuenta sí calcula (ca
 test('valorizarActivo: sin unidad propia en el activo, se asume compatible con la cuenta', () => {
   const r = valorizarActivo({ valor_clp: null, extension: 1000, unidad: null, cuenta_unidad: 'm3', precio_clp_unidad: 344 });
   assert.deepEqual(r, { valor_clp_efectivo: 344000, valor_origen: 'automatico' });
+});
+
+// ---------- hashMovimientoNatural (mini-cadena por cuenta, migración 029) ----------
+
+const MOV_A = {
+  cuenta_codigo: 'ENER', fecha: '2026-07-01', glosa: 'Suministro eléctrico', cantidad: 2500,
+  unidad: 'kWh', tipo: 'cargo', origen: 'documento', factura_id: 'f-1',
+};
+
+test('hashMovimientoNatural es determinista (mismo contenido → mismo hash)', () => {
+  assert.equal(hashMovimientoNatural(MOV_A), hashMovimientoNatural({ ...MOV_A }));
+});
+
+test('hashMovimientoNatural es sensible a cada campo', () => {
+  const base = hashMovimientoNatural(MOV_A);
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, cuenta_codigo: 'AGUA' }));
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, cantidad: 2501 }));
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, tipo: 'abono' }));
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, origen: 'manual' }));
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, factura_id: 'f-2' }));
+  assert.notEqual(base, hashMovimientoNatural({ ...MOV_A, fecha: '2026-07-02' }));
+});
+
+test('hashMovimientoNatural no depende de la hora del día, solo de la fecha', () => {
+  const a = hashMovimientoNatural({ ...MOV_A, fecha: new Date('2026-07-01T08:00:00Z') });
+  const b = hashMovimientoNatural({ ...MOV_A, fecha: new Date('2026-07-01T23:00:00Z') });
+  assert.equal(a, b);
 });

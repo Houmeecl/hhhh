@@ -36,6 +36,16 @@ export function eslabonValido({ hash_anterior, hash_documento, hash_cadena }) {
   return hashCadena(hash_anterior, hash_documento) === hash_cadena;
 }
 
+// Boilerplate repetido cada vez que se anexa un eslabón nuevo a una
+// cadena (global o propia de una entidad): dado el estado actual
+// (ultimo_hash/n_eslabones) y el hash del documento ya calculado por
+// el llamador, arma el siguiente hash_cadena y número de eslabón.
+export function siguienteEslabon(estado, hashDoc) {
+  const hash_cadena = hashCadena(estado?.ultimo_hash, hashDoc);
+  const eslabon = Number(estado?.n_eslabones || 0) + 1;
+  return { hash_cadena, eslabon };
+}
+
 // Recalcula la cadena completa desde el génesis y confirma que no se
 // rompió en ningún punto. `eslabones` debe venir ordenado por `eslabon` asc.
 export function verificarCadenaCompleta(eslabones) {

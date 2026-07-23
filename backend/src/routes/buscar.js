@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireHomePanel } from '../middleware/auth.js';
+import { requireAuth, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { bigquery } from '../services/bigquery.js';
 
 // ============================================================
 // Búsqueda unificada por RUT / texto con CRUCES de clientes.
@@ -99,6 +100,23 @@ router.get('/', async (req, res, next) => {
       documentos: documentos.rows,
       cruces,
     });
+
+    // Auditoría del cruce de datos: quién consultó qué RUT y qué encontró.
+    // Solo se registra cuando hubo cruce real (esRut) — una búsqueda de
+    // texto libre sin coincidencias de RUT no cruza datos entre partes.
+    if (cruces) {
+      const detalle = {
+        query: q,
+        n_como_cliente: cruces.como_cliente?.n_sesiones || 0,
+        n_recibe_de: cruces.recibe_de.length,
+        n_emite_a: cruces.emite_a.length,
+      };
+      logActividad({
+        usuarioId: req.user.sub, accion: 'consulta_cruce_rut',
+        entidad: 'busqueda', entidadId: rn, detalle, ip: req.ip,
+      });
+      bigquery.exportAcceso({ tipo: 'consulta_cruce_rut', actor: { tipo: 'usuario', id: req.user.sub }, rut_consultado: rn, detalle });
+    }
   } catch (err) { next(err); }
 });
 

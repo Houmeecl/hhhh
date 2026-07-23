@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 // ============================================================
 // Servicio REP — Ley 20.920 (Responsabilidad Extendida del Productor).
 // Funciones PURAS (sin BD, sin red) para validar y recalcular en el
@@ -106,4 +108,22 @@ export function calcularReciclabilidad(componentes) {
     porcentaje,
     nivel,
   };
+}
+
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
+
+// Hash canónico de UNA versión de la declaración (determinista: mismo
+// orden de campos siempre). Se usa para encadenarla contra la cadena
+// GLOBAL (services/cadenaGlobal.js) — la misma que ya usan las
+// facturas — antes de persistirla en routes/public.js.
+export function hashDeclaracionEmbalaje({ sesion_id, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel }) {
+  const comp = (componentes || [])
+    .map((c) => `${c.material}:${Number(c.peso_gr || 0)}:${Number(c.cantidad || 0)}:${c.reciclable ? 1 : 0}`)
+    .join(';');
+  const canonico = [
+    sesion_id || '', comp,
+    Number(peso_total_gr || 0).toFixed(2), Number(peso_reciclable_gr || 0).toFixed(2),
+    Number(porcentaje || 0).toFixed(1), nivel || '',
+  ].join('|');
+  return sha256(canonico);
 }

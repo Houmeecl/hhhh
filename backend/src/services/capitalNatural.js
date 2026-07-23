@@ -4,9 +4,18 @@
 // en las cuentas ambientales activas (flujos del período).
 // Los factores de conversión viven en cuentas_naturales.factores
 // y son editables desde el panel admin.
+//
+// Cada cuenta (AGUA, ENER, CO2E, MATR, SUEL, BIOD) tiene su PROPIA
+// mini-cadena de hash (migración 029) — mismo patrón que los lotes de
+// pasaporte de origen: un conjunto acotado y autocontenido, con su
+// propio génesis, en vez de mezclarse con la cadena global de facturas.
 // ============================================================
 
+import crypto from 'crypto';
+import { siguienteEslabon } from './cadenaHash.js';
+
 const round4 = (n) => Math.round(n * 10000) / 10000;
+const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
 // Factores por defecto si la cuenta no define el suyo.
 const DEFAULTS = {
@@ -107,15 +116,51 @@ export async function cargarCuentas(run) {
   return new Map(rows.map((r) => [r.codigo, r]));
 }
 
+// Hash canónico de UN movimiento (determinista). No incluye el orden de
+// inserción ni ids autogenerados — solo el contenido verificable.
+export function hashMovimientoNatural({ cuenta_codigo, fecha, glosa, cantidad, unidad, tipo, origen, factura_id }) {
+  const canonico = [
+    cuenta_codigo || '',
+    fecha ? new Date(fecha).toISOString().slice(0, 10) : '',
+    glosa || '', Number(cantidad || 0).toFixed(4), unidad || '', tipo || '', origen || '', factura_id || '',
+  ].join('|');
+  return sha256(canonico);
+}
+
+// Anexa UN movimiento ya calculado a la mini-cadena de SU cuenta (lock
+// FOR UPDATE de esa fila de cuentas_naturales — serializa movimientos
+// concurrentes de la misma cuenta, igual que cadena_estado con facturas).
+export async function anexarMovimiento(client, { cuenta_codigo, fecha, glosa, cantidad, unidad, tipo, origen, factura_id }) {
+  const { rows: cRows } = await client.query(
+    `SELECT ultimo_hash, n_eslabones FROM cuentas_naturales WHERE codigo = $1 FOR UPDATE`,
+    [cuenta_codigo]
+  );
+  const estado = cRows[0];
+  const hDoc = hashMovimientoNatural({ cuenta_codigo, fecha, glosa, cantidad, unidad, tipo, origen, factura_id });
+  const { hash_cadena: hCad, eslabon } = siguienteEslabon(estado, hDoc);
+  const { rows } = await client.query(
+    `INSERT INTO movimientos_naturales
+       (cuenta_codigo, fecha, glosa, factura_id, cantidad, unidad, tipo, origen,
+        hash_documento, hash_anterior, hash_cadena, eslabon)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [cuenta_codigo, fecha || new Date(), glosa, factura_id || null, cantidad, unidad, tipo || 'cargo', origen || 'documento',
+     hDoc, estado.ultimo_hash, hCad, eslabon]
+  );
+  await client.query(`UPDATE cuentas_naturales SET ultimo_hash = $2, n_eslabones = $3 WHERE codigo = $1`, [cuenta_codigo, hCad, eslabon]);
+  return rows[0];
+}
+
 /** Inserta los movimientos derivados de una factura, con la conexión dada. */
 export async function registrarMovimientos({ client, factura, fecha, cuentas }) {
-  const movs = derivarMovimientos(factura, cuentas);
+  // Orden fijo (alfabético por código de cuenta): si una factura toca 2+
+  // cuentas, todas las sesiones concurrentes las bloquean en el mismo
+  // orden y no hay riesgo de deadlock entre ellas.
+  const movs = derivarMovimientos(factura, cuentas).slice().sort((a, b) => a.cuenta_codigo.localeCompare(b.cuenta_codigo));
   for (const m of movs) {
-    await client.query(
-      `INSERT INTO movimientos_naturales (cuenta_codigo, fecha, glosa, factura_id, cantidad, unidad, tipo, origen)
-       VALUES ($1,$2,$3,$4,$5,$6,'cargo','documento')`,
-      [m.cuenta_codigo, fecha || new Date(), m.glosa, factura.id || null, m.cantidad, m.unidad]
-    );
+    await anexarMovimiento(client, {
+      cuenta_codigo: m.cuenta_codigo, fecha: fecha || new Date(), glosa: m.glosa,
+      cantidad: m.cantidad, unidad: m.unidad, tipo: 'cargo', origen: 'documento', factura_id: factura.id || null,
+    });
   }
   return movs.length;
 }
