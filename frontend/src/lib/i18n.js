@@ -75,6 +75,7 @@ const DICCIONARIOS = {
     'ver.col_descripcion': 'Descripción',
     'ver.col_pct': '% del total',
     'ver.nota_legal': 'Esta página confirma la trazabilidad del documento registrado en sicr3p. No constituye una verificación de tercera parte acreditada.',
+    'ver.descargar_carpeta': 'Descargar carpeta de evidencia',
 
     // Landing Aduana Verde
     'av.badge_red': 'Red de oficinas en preparación',
@@ -534,6 +535,7 @@ const DICCIONARIOS = {
     'ver.col_descripcion': 'Description',
     'ver.col_pct': '% of total',
     'ver.nota_legal': 'This page confirms the traceability of the document registered in sicr3p. It does not constitute an accredited third-party verification.',
+    'ver.descargar_carpeta': 'Download evidence folder',
 
     'av.badge_red': 'Office network in preparation',
     'av.kicker': 'Green document processing · physical offices · by',
@@ -991,6 +993,7 @@ const DICCIONARIOS = {
     'ver.col_descripcion': 'Descrição',
     'ver.col_pct': '% do total',
     'ver.nota_legal': 'Esta página confirma a rastreabilidade do documento registrado no sicr3p. Não constitui uma verificação de terceira parte acreditada.',
+    'ver.descargar_carpeta': 'Baixar pasta de evidências',
 
     'av.badge_red': 'Rede de escritórios em preparação',
     'av.kicker': 'Processamento verde de documentos · escritórios físicos · by',

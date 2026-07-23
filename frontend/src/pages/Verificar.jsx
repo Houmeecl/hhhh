@@ -108,8 +108,18 @@ export default function Verificar() {
               </table>
             </div>
 
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 16, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Link className="btn btn-primary" to={`/pasaporte/${id}`}>{t('pas.ver_pasaporte')}</Link>
+              {data.factura.sesion_id && (
+                <a
+                  className="btn btn-outline"
+                  href={api.carpetaUrl(data.factura.sesion_id)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Icon.Download size={17} /> {t('ver.descargar_carpeta')}
+                </a>
+              )}
             </div>
 
             <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>

@@ -910,6 +910,7 @@ router.get('/verificar/:id', async (req, res, next) => {
       valido: true,
       factura: {
         id: factura.id,
+        sesion_id: factura.sesion_id,
         numero_venta: factura.numero_venta,
         categoria: factura.categoria,
         total_co2e: factura.total_co2e,
