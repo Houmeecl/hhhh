@@ -31,6 +31,12 @@
 
 h1, h2, h3, .logo { font-family: var(--font-head); }
 
+/* Tokens del panel Aduana Verde — scope .theme-av, no toca --navy/--green
+   globales (compartidos con la landing pública ni con el panel sicrep).
+   Solo repinta el sidebar del shell admin ya existente, mismo layout. */
+.theme-av .admin-side { background: #0f2e1f; }
+.theme-av .admin-side nav a.active { background: var(--green); color: #fff; }
+
 /* Animaciones de entrada */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

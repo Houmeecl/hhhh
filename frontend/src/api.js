@@ -12,6 +12,20 @@ export const auth = {
   clear() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
 };
 
+// Sesión del panel Aduana Verde — storage separado del panel sicrep, para
+// que ambas puedan estar logueadas a la vez en el mismo navegador.
+const TOKEN_AV_KEY = 'sicr3p_av_access';
+const REFRESH_AV_KEY = 'sicr3p_av_refresh';
+export const authAv = {
+  get access() { return localStorage.getItem(TOKEN_AV_KEY); },
+  get refresh() { return localStorage.getItem(REFRESH_AV_KEY); },
+  set(access, refresh) {
+    if (access) localStorage.setItem(TOKEN_AV_KEY, access);
+    if (refresh) localStorage.setItem(REFRESH_AV_KEY, refresh);
+  },
+  clear() { localStorage.removeItem(TOKEN_AV_KEY); localStorage.removeItem(REFRESH_AV_KEY); },
+};
+
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
 const CLIENTE_EMAIL_KEY = 'sicr3p_cliente_email';
@@ -25,10 +39,11 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, cliente = false } = {}) {
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : auth;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
-  if (authed && auth.access) headers['Authorization'] = `Bearer ${auth.access}`;
+  if ((authed || authedAv) && store.access) headers['Authorization'] = `Bearer ${store.access}`;
   if (cliente && clienteAuth.token) headers['Authorization'] = `Bearer ${clienteAuth.token}`;
 
   let res = await fetch(`/api${path}`, {
@@ -38,15 +53,15 @@ async function request(path, { method = 'GET', body, formData, authed = false, c
   });
 
   // Reintento con refresh si el token expiró.
-  if (res.status === 401 && authed && auth.refresh) {
+  if (res.status === 401 && (authed || authedAv) && store.refresh) {
     const r = await fetch('/api/auth/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: auth.refresh }),
+      body: JSON.stringify({ refreshToken: store.refresh }),
     });
     if (r.ok) {
       const { accessToken } = await r.json();
-      auth.set(accessToken);
+      store.set(accessToken);
       headers['Authorization'] = `Bearer ${accessToken}`;
       res = await fetch(`/api${path}`, {
         method, headers,
@@ -136,8 +151,9 @@ export const api = {
   qrUrl: (id) => `/api/facturas/${id}/qr.png`,
 
   // Auth
-  login: (email, password) => request('/auth/login', { method: 'POST', body: { email, password } }),
+  login: (email, password, panel) => request('/auth/login', { method: 'POST', body: { email, password, panel } }),
   me: () => request('/auth/me', { authed: true }),
+  meAv: () => request('/auth/me', { authedAv: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
 
@@ -219,12 +235,12 @@ export const api = {
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
 
-  // Terminales POS "Aduana Verde"
-  posTerminales: () => request('/admin/pos/terminales', { authed: true }),
-  crearPosTerminal: (b) => request('/admin/pos/terminales', { method: 'POST', body: b, authed: true }),
-  editarPosTerminal: (id, b) => request(`/admin/pos/terminales/${id}`, { method: 'PUT', body: b, authed: true }),
-  editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authed: true }),
-  compensacionesResumen: () => request('/admin/pos/compensaciones/resumen', { authed: true }),
+  // Panel Aduana Verde (authedAv: sesión propia, separada del panel sicrep)
+  editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
+  compensacionesResumen: () => request('/admin/pos/compensaciones/resumen', { authedAv: true }),
+  compensacionesAv: (qs = '') => request(`/admin/pos/compensaciones${qs}`, { authedAv: true }),
+  embalajeAv: (qs = '') => request(`/admin/pos/embalaje${qs}`, { authedAv: true }),
+  embalajeResumenAv: () => request('/admin/pos/embalaje/resumen', { authedAv: true }),
 
   // Motor propio de cálculo
   motorCategorias: () => request('/admin/motor-propio/categorias', { authed: true }),

@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { sendMail, activationEmail } from '../services/mailer.js';
 
@@ -11,7 +11,7 @@ const router = express.Router();
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 // Todas las rutas de admin requieren sesión.
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin');
 
 // ============================================================
@@ -362,7 +362,7 @@ router.get('/simple-api', async (req, res, next) => {
 router.get('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT u.id, u.email, u.nombre, u.rol, u.estado, u.must_reset_password, u.ultimo_login,
+      `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
               u.created_at, c.nombre_empresa AS cliente
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
        ORDER BY u.created_at DESC`
@@ -373,14 +373,14 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
 
 router.post('/usuarios', adminOnly, async (req, res, next) => {
   try {
-    const { email, nombre, rol, cliente_id } = req.body;
+    const { email, nombre, rol, cliente_id, panel } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
     const emailNorm = String(email).toLowerCase();
     let { rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
-       VALUES ($1,$2,COALESCE($3,'operador'),$4,'pendiente',true)
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, estado, must_reset_password)
+       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),'pendiente',true)
        ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [emailNorm, nombre, rol, cliente_id || null]
+      [emailNorm, nombre, rol, cliente_id || null, panel]
     );
     if (!rows[0]) {
       const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [emailNorm]);
@@ -423,11 +423,12 @@ router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, nex
 
 router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
   try {
-    const { rol, estado, nombre } = req.body;
+    const { rol, estado, nombre, panel } = req.body;
     const { rows } = await query(
-      `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre)
-       WHERE id = $1 RETURNING id, email, nombre, rol, estado`,
-      [req.params.id, rol, estado, nombre]
+      `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
+              panel = COALESCE($5,panel)
+       WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado`,
+      [req.params.id, rol, estado, nombre, panel]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     await logActividad({ usuarioId: req.user.sub, accion: 'editar_usuario', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });

@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { calcularCo2eViaje } from '../services/transporte.js';
 
 // ============================================================
@@ -10,7 +10,7 @@ import { calcularCo2eViaje } from '../services/transporte.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin', 'operador');
 
 // ---------- Modos y factores ----------

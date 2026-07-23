@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
 
 const ROLES = ['admin', 'operador', 'cliente'];
+const PANELES = ['sicrep', 'aduana_verde'];
+const PANEL_LABEL = { sicrep: 'sicrep', aduana_verde: 'Aduana Verde' };
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
@@ -41,13 +43,13 @@ export default function Usuarios() {
     <div>
       <div className="admin-head">
         <h1>Usuarios y roles</h1>
-        <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador' })}>+ Nuevo usuario</button>
+        <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador', panel: 'sicrep' })}>+ Nuevo usuario</button>
       </div>
 
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th></th></tr></thead>
           <tbody>
             {usuarios.map((u) => (
               <tr key={u.id}>
@@ -56,6 +58,11 @@ export default function Usuarios() {
                 <td>
                   <select value={u.rol} onChange={(e) => cambiar(u, 'rol', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
                     {ROLES.map((r) => <option key={r}>{r}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <select value={u.panel || 'sicrep'} onChange={(e) => cambiar(u, 'panel', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                    {PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
                   </select>
                 </td>
                 <td>
@@ -86,6 +93,7 @@ export default function Usuarios() {
               <div className="field"><label>Nombre</label><input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} /></div>
               <div className="field"><label>Email</label><input value={modal.email} onChange={(e) => setModal({ ...modal, email: e.target.value })} /></div>
               <div className="field"><label>Rol</label><select value={modal.rol} onChange={(e) => setModal({ ...modal, rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></div>
+              <div className="field"><label>Panel</label><select value={modal.panel} onChange={(e) => setModal({ ...modal, panel: e.target.value })}>{PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}</select></div>
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setModal(null)}>Cancelar</button>

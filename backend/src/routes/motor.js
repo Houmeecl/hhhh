@@ -1,6 +1,6 @@
 import express from 'express';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { calcularFactura, cargarCategorias } from '../services/motorPropio.js';
 import { hashDocumento, hashCadena } from '../services/cadenaHash.js';
 
@@ -14,7 +14,7 @@ import { hashDocumento, hashCadena } from '../services/cadenaHash.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin', 'operador');
 
 router.get('/categorias', async (req, res, next) => {

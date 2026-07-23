@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad, signAccess } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad, signAccess } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
@@ -43,7 +43,7 @@ import {
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin', 'operador');
 
 const NORM_SQL = `regexp_replace(COALESCE($1,''), '[^0-9kK]', '', 'g')`;

@@ -4,7 +4,8 @@ import { query } from '../lib/db.js';
 
 export function signAccess(user) {
   return jwt.sign(
-    { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null },
+    { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null,
+      panel: user.panel || 'sicrep' },
     config.jwt.accessSecret,
     { expiresIn: config.jwt.accessTtl }
   );
@@ -34,6 +35,18 @@ export function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.rol)) {
       return res.status(403).json({ error: 'No autorizado' });
+    }
+    next();
+  };
+}
+
+// Exige que la cuenta pertenezca al panel indicado (sicrep | aduana_verde).
+// Se combina con requireAuth/requireRole, no los reemplaza: separa el
+// panel núcleo sicrep del panel Aduana Verde sin tocar el rol interno.
+export function requireHomePanel(panel) {
+  return (req, res, next) => {
+    if (!req.user || req.user.panel !== panel) {
+      return res.status(403).json({ error: 'Esta cuenta no tiene acceso a este panel' });
     }
     next();
   };

@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireHomePanel } from '../middleware/auth.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 
 // ============================================================
@@ -10,7 +10,7 @@ import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 
 router.get('/estado', async (req, res, next) => {
   try {

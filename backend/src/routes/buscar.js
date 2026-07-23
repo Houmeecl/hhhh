@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireHomePanel } from '../middleware/auth.js';
 
 // ============================================================
 // Búsqueda unificada por RUT / texto con CRUCES de clientes.
@@ -10,7 +10,7 @@ import { requireAuth } from '../middleware/auth.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 
 const rutNorm = (r) => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
 const NORM = (col) => `regexp_replace(COALESCE(${col},''), '[^0-9kK]', '', 'g')`;

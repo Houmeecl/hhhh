@@ -16,12 +16,14 @@ import CorredorLanding from './pages/CorredorLanding.jsx';
 import Cadena from './pages/Cadena.jsx';
 import Login from './admin/Login.jsx';
 import Activar from './admin/Activar.jsx';
+import LoginAv from './admin-av/LoginAv.jsx';
 
 // Code-splitting: el panel admin y el terminal POS son la mitad del
 // bundle y solo los usan operadores logueados — se cargan bajo demanda
 // para que las páginas públicas (pasaportes, verificación) abran rápido
 // en el teléfono de un tercero que escanea un QR.
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
+const AdminAvApp = lazy(() => import('./admin-av/AdminAvApp.jsx'));
 const PosTerminal = lazy(() => import('./pages/PosTerminal.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
@@ -57,10 +59,14 @@ export default function App() {
       <Route path="/corredor" element={<CorredorLanding />} />
       <Route path="/cadena" element={<Cadena />} />
 
-      {/* Admin */}
+      {/* Admin — panel sicrep (núcleo/plataforma) */}
       <Route path="/admin/login" element={<Login />} />
       <Route path="/admin/activar" element={<Activar />} />
       <Route path="/admin/*" element={<AdminApp />} />
+
+      {/* Panel Aduana Verde — compensación, tarifa y REP, cuentas propias */}
+      <Route path="/panel-verde/login" element={<LoginAv />} />
+      <Route path="/panel-verde/*" element={<AdminAvApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

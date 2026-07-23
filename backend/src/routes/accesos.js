@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 
 // ============================================================
@@ -11,7 +11,7 @@ import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandant
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin');
 const hashToken = hashApiKey; // misma función que verifica routes/mandante.js — no pueden desincronizarse
 

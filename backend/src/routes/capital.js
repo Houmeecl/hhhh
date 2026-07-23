@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { generateBalanceNatural } from '../services/pdf.js';
 import { valorizarActivo } from '../services/capitalNatural.js';
 
@@ -10,7 +10,7 @@ import { valorizarActivo } from '../services/capitalNatural.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin', 'operador');
 
 const ORDEN = `array_position(ARRAY['AGUA','ENER','CO2E','MATR','SUEL','BIOD'], codigo)`;

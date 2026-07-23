@@ -16,6 +16,9 @@ const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
+    // El frontend de cada panel siempre manda el panel esperado; sin
+    // panel en el body (clientes API viejos) se asume 'sicrep'.
+    const panelEsperado = req.body.panel === 'aduana_verde' ? 'aduana_verde' : 'sicrep';
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios' });
 
     const { rows } = await query(`SELECT * FROM usuarios WHERE email = $1`, [String(email).toLowerCase()]);
@@ -29,6 +32,13 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' });
+    if (user.panel !== panelEsperado) {
+      return res.status(403).json({
+        error: panelEsperado === 'aduana_verde'
+          ? 'Esta cuenta no pertenece al panel Aduana Verde.'
+          : 'Esta cuenta no pertenece al panel sicrep.',
+      });
+    }
 
     await query(`UPDATE usuarios SET ultimo_login = now() WHERE id = $1`, [user.id]);
     await logActividad({ usuarioId: user.id, accion: 'login', entidad: 'usuario', entidadId: user.id, ip: req.ip });
@@ -41,6 +51,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         email: user.email,
         nombre: user.nombre,
         rol: user.rol,
+        panel: user.panel,
         must_reset_password: user.must_reset_password,
       },
     });
@@ -67,7 +78,7 @@ router.post('/refresh', async (req, res) => {
 // ---------- GET /api/auth/me ----------
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT id, email, nombre, rol, cliente_id, must_reset_password FROM usuarios WHERE id = $1`,
+    `SELECT id, email, nombre, rol, panel, cliente_id, must_reset_password FROM usuarios WHERE id = $1`,
     [req.user.sub]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });

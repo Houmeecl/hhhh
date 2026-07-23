@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
-import { signAccess, requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { signAccess, requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { generarSerial, generarClave, clampDocumentos } from '../services/posTerminal.js';
 import { validarTarifa, validarTipoCambio } from '../services/compensacion.js';
 import { actualizarDolar } from '../services/tipoCambio.js';
@@ -126,7 +126,7 @@ router.post('/actividad', requireAuth, requireRole('pos'), async (req, res, next
 // Administración (solo admin) — montado en /api/admin/pos
 // ============================================================
 export const adminRouter = express.Router();
-adminRouter.use(requireAuth, requireRole('admin'));
+adminRouter.use(requireAuth, requireRole('admin'), requireHomePanel('aduana_verde'));
 
 // ---------- PUT /config — editar la tarifa de compensación ----------
 // La fila 1 es única (CHECK id = 1); el upsert cubre bases donde la
@@ -243,6 +243,54 @@ adminRouter.get('/compensaciones/resumen', async (req, res, next) => {
       total_monto_clp: sim.total_monto_clp,
       por_estado: porEstado,
     });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /embalaje — declaraciones REP recientes (solo lectura) ----------
+adminRouter.get('/embalaje', async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const { rows } = await query(
+      `SELECT de.id, de.sesion_id, de.peso_total_gr, de.peso_reciclable_gr,
+              de.porcentaje, de.nivel, de.created_at,
+              s.rut_cliente, s.nombre_cliente, s.fecha
+       FROM declaraciones_embalaje de
+       JOIN sesiones s ON s.id = de.sesion_id
+       ORDER BY de.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({ declaraciones: rows });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /embalaje/resumen — conteo por nivel de reciclabilidad ----------
+adminRouter.get('/embalaje/resumen', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT nivel, COUNT(*)::int AS n FROM declaraciones_embalaje GROUP BY nivel`
+    );
+    const porNivel = { Alto: 0, Medio: 0, Bajo: 0 };
+    for (const r of rows) porNivel[r.nivel] = r.n;
+    const total = porNivel.Alto + porNivel.Medio + porNivel.Bajo;
+    res.json({ total, por_nivel: porNivel });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /compensaciones — últimas compensaciones (solo lectura) ----------
+adminRouter.get('/compensaciones', async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const { rows } = await query(
+      `SELECT c.id, c.sesion_id, c.t_co2e, c.tarifa_clp_tco2e, c.monto_clp, c.metodo, c.estado, c.created_at,
+              s.rut_cliente, s.nombre_cliente
+       FROM compensaciones c
+       JOIN sesiones s ON s.id = c.sesion_id
+       ORDER BY c.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({ compensaciones: rows });
   } catch (err) { next(err); }
 });
 

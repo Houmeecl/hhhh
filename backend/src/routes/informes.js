@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { query } from '../lib/db.js';
-import { requireAuth, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { generateReport } from '../services/pdf.js';
 import { parseDte } from '../services/dte.js';
 
@@ -11,7 +11,7 @@ import { parseDte } from '../services/dte.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];

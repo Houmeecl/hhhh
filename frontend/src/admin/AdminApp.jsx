@@ -63,6 +63,8 @@ export default function AdminApp() {
 
   useManifestAdmin();
 
+  useEffect(() => { document.title = 'sicrep — Panel'; }, []);
+
   useEffect(() => {
     if (!auth.access) { nav('/admin/login'); return; }
     let vigente = true;

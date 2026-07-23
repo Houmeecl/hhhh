@@ -40,7 +40,6 @@ app.get('/api/health', (req, res) => res.json({ ok: true, mock: config.simple.mo
 // Rutas
 app.use('/api', apiLimiter, publicRoutes);
 app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
 app.use('/api/admin/corredor', corredorRoutes);
 app.use('/api/admin/capital', capitalRoutes);
 app.use('/api/admin/informes', informesRoutes);
@@ -60,6 +59,12 @@ app.use('/api/admin/pos', posAdminRoutes);
 app.use('/api/admin/origen', origenRoutes);
 app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
 app.use('/api/torre', apiLimiter, torreRouter);
+// '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
+// hace match de app.use por prefijo en orden de registro, así que si fuera
+// primero, requireHomePanel('sicrep') de este router interceptaría TODAS
+// las rutas /api/admin/pos/* (panel Aduana Verde) antes de que lleguen a
+// su propio router con requireHomePanel('aduana_verde').
+app.use('/api/admin', adminRoutes);
 
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));
