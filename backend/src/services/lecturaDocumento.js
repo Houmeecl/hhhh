@@ -4,7 +4,7 @@ import {
   extraerTextoPdf, extraerTextoImagenBuffer, ocrDisponible,
   extraerTextoPdfEscaneado, extraerTextoHeicBuffer,
 } from './extractorTexto.js';
-import { parsearFacturaTexto } from './facturaTexto.js';
+import { parsearFacturaTexto, detectarTipoNoCalculable } from './facturaTexto.js';
 import { evaluarItems } from './motorPropio.js';
 
 // ============================================================
@@ -17,9 +17,12 @@ import { evaluarItems } from './motorPropio.js';
 //
 // Orden por archivo — cada camino cae al siguiente si no logra
 // señal real:
-//  0) XML de tipo no calculable    → { tipo:'rechazo', motivo:'tipo_documento_no_calculable' }
-//     (nota de crédito/débito, guía de despacho, liquidación: NUNCA se
-//     calculan como factura nueva — duplicarían o distorsionarían el CO2e)
+//  0) Tipo no calculable (XML o encabezado de texto/OCR)
+//                                  → { tipo:'rechazo', motivo:'tipo_documento_no_calculable' }
+//     (orden de compra, cotización, guía de despacho, nota de crédito/
+//     débito, liquidación: NUNCA se calculan como factura nueva —
+//     duplicarían o distorsionarían el CO2e si el cliente entrega varios
+//     documentos del mismo despacho)
 //  1) XML con ítems reales        → { tipo:'xml', dte }
 //  2) PDF con capa de texto       → { tipo:'texto', motor:'propio_texto' }
 //  3) PDF escaneado (raster+OCR)  → { tipo:'texto', motor:'propio_ocr' }
@@ -55,6 +58,16 @@ function validarItems(items, base) {
   return null; // válido
 }
 
+// Orden de compra, cotización, guía de despacho, etc. fotografiadas o en
+// PDF plano no traen TipoDTE (solo el XML lo tiene) — sin este chequeo el
+// parser de texto las leería igual que una factura nueva por tener
+// glosas y montos "válidos". Si el cliente entrega Guía + Orden de Compra
+// + Factura del mismo despacho, solo la Factura debe contar.
+function rechazoPorTipoTexto(texto, etapa) {
+  const tipo = detectarTipoNoCalculable(texto);
+  return tipo ? { tipo: 'rechazo', motivo: 'tipo_documento_no_calculable', etapa, tipo_detectado: tipo } : null;
+}
+
 export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado } = {}) {
   const opts = { rutReceptorEsperado };
 
@@ -83,6 +96,8 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
     if (/\.pdf$/i.test(nombreArchivo)) {
       etapa = 'pdf_texto';
       const texto = await extraerTextoPdf(buffer);
+      const rechazoTipo = rechazoPorTipoTexto(texto, etapa);
+      if (rechazoTipo) return rechazoTipo;
       const p = parsearFacturaTexto(texto, opts);
       if (p.senal_suficiente) {
         return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_texto', etapa };
@@ -91,6 +106,8 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
       etapa = 'pdf_ocr';
       for (const psm of ['6', '3']) {
         const t = await extraerTextoPdfEscaneado(buffer, 2, psm);
+        const rechazoTipoOcr = rechazoPorTipoTexto(t, etapa);
+        if (rechazoTipoOcr) return rechazoTipoOcr;
         const q = parsearFacturaTexto(t, opts);
         if (q.senal_suficiente) {
           return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
@@ -101,6 +118,8 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
       const ext = nombreArchivo.split('.').pop();
       for (const psm of ['6', '3']) {
         const t = await extraerTextoImagenBuffer(buffer, ext, psm);
+        const rechazoTipo = rechazoPorTipoTexto(t, etapa);
+        if (rechazoTipo) return rechazoTipo;
         const q = parsearFacturaTexto(t, opts);
         if (q.senal_suficiente) {
           return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
@@ -110,6 +129,8 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
       etapa = 'heic_ocr';
       for (const psm of ['6', '3']) {
         const t = await extraerTextoHeicBuffer(buffer, psm);
+        const rechazoTipo = rechazoPorTipoTexto(t, etapa);
+        if (rechazoTipo) return rechazoTipo;
         const q = parsearFacturaTexto(t, opts);
         if (q.senal_suficiente) {
           return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };

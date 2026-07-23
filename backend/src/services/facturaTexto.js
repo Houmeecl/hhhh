@@ -10,7 +10,51 @@
 // ============================================================
 
 import { rutValido } from './dte.js';
-import { normalizarDigitosOcr } from './textoOcr.js';
+import { limpiar, normalizarDigitosOcr } from './textoOcr.js';
+
+// ============================================================
+// Detección de tipo de documento en PDF/OCR sin capa DTE (mismo criterio
+// que TIPOS_DTE_NO_CALCULABLES en lecturaDocumento.js, pero para el
+// camino de texto: una Orden de Compra, Cotización o Guía de Despacho
+// fotografiada/escaneada no trae TipoDTE — sin este chequeo, el parser
+// las leería como una factura nueva por tener glosas y montos igual de
+// "válidos". Si el cliente entrega Guía + Orden de Compra + Factura del
+// mismo despacho, solo la Factura debe contar.
+//
+// Ventana de encabezado (primeros 500 caracteres): ahí se declara el
+// tipo real del documento chileno, antes del detalle de ítems. Se
+// rechaza SOLO si la frase no-calculable aparece Y el documento no se
+// declara a sí mismo como factura/boleta en esa misma ventana — así una
+// factura real que cita "Su Orden de Compra: OC-445" como referencia
+// (declarándose igual "FACTURA ELECTRONICA") no se rechaza por error.
+// ============================================================
+const NO_CALCULABLE_RE = /\b(orden de compra|cotizacion|presupuesto|guia de despacho|nota de credito|nota de debito|liquidacion de factura)\b/;
+// (?<!de ) evita que "liquidacion DE FACTURA n° 12" cuente como el
+// documento declarándose factura — "factura" ahí es el objeto de
+// "liquidación de", no el tipo propio del documento.
+const CALCULABLE_RE = /(?<!de )\bfactura\s+(electronica|exenta|de exportacion|de compra|n[°ºo]|#)|\bboleta\s+(electronica|exenta|n[°ºo]|#)/;
+const ETIQUETAS_NO_CALCULABLE = {
+  'orden de compra': 'Orden de compra',
+  cotizacion: 'Cotización',
+  presupuesto: 'Presupuesto',
+  'guia de despacho': 'Guía de despacho',
+  'nota de credito': 'Nota de crédito',
+  'nota de debito': 'Nota de débito',
+  'liquidacion de factura': 'Liquidación de factura',
+};
+
+// Devuelve la etiqueta legible del tipo detectado (ej. "Orden de compra")
+// o null si el encabezado no declara un tipo no-calculable, o si además
+// se declara a sí mismo como factura/boleta (referencia cruzada, no su
+// propio tipo).
+export function detectarTipoNoCalculable(texto) {
+  const enc = limpiar(String(texto || '').slice(0, 500));
+  const m = enc.match(NO_CALCULABLE_RE);
+  if (m && !CALCULABLE_RE.test(enc)) {
+    return ETIQUETAS_NO_CALCULABLE[m[1]] || m[1];
+  }
+  return null;
+}
 
 // RUT chileno con o sin puntos, tolerante a confusiones de OCR en los
 // dígitos (O/o→0, l/I→1): 76.123.456-0 / 76l23456-O. La tolerancia es

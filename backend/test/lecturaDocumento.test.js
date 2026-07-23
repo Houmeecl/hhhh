@@ -169,3 +169,44 @@ test('lote mixto: cada archivo se lee de forma independiente (XML + PDF texto + 
   // El ilegible del lote no contamina a los legibles: sin_senal aislado.
   assert.equal(lecturas[2].tipo, 'sin_senal');
 });
+
+// ---------- Orden de compra / guía / cotización en PDF real (sin XML,
+// sin TipoDTE): mismo rechazo por tipo, esta vez detectado en el texto
+// extraído del PDF con pdf-parse (no un mock — un PDF real generado con
+// pdfkit, igual que los PDFs que produce la propia app). ----------
+async function pdfConTexto(lineas) {
+  const { default: PDFDocument } = await import('pdfkit');
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40 });
+    const chunks = [];
+    doc.on('data', (c) => chunks.push(c));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    for (const linea of lineas) doc.text(linea);
+    doc.end();
+  });
+}
+
+test('orden de compra en PDF real (sin TipoDTE): rechazada por tipo, no se calcula como factura', async () => {
+  const buffer = await pdfConTexto([
+    'ACME SpA', 'R.U.T.: 76.123.456-0', 'ORDEN DE COMPRA N° 445',
+    'Proveedor: Comercial Ejemplo SpA', 'Suministro electrico mensual planta $ 450.000',
+  ]);
+  const r = await leerDocumento(buffer, 'orden-compra.pdf');
+  assert.equal(r.tipo, 'rechazo');
+  assert.equal(r.motivo, 'tipo_documento_no_calculable');
+  assert.equal(r.tipo_detectado, 'Orden de compra');
+  assert.equal(r.etapa, 'pdf_texto');
+});
+
+test('factura real en PDF que cita su Orden de Compra como referencia: SÍ se calcula (no es una OC)', async () => {
+  const buffer = await pdfConTexto([
+    'COMERCIAL EJEMPLO SpA', 'R.U.T.: 76.123.456-0', 'FACTURA ELECTRONICA N° 4521',
+    'Su Orden de Compra: OC-445', 'Señor(es): Prueba Capital SpA', 'R.U.T.: 11.111.111-1',
+    'Suministro electrico mensual planta $ 450.000', 'TOTAL $ 450.000',
+  ]);
+  const r = await leerDocumento(buffer, 'factura-con-oc.pdf');
+  assert.equal(r.tipo, 'texto');
+  assert.equal(r.motor, 'propio_texto');
+  assert.equal(r.textoParseado.senal_suficiente, true);
+});

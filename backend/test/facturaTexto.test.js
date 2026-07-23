@@ -228,3 +228,48 @@ test('verificación cruzada: Σítems ≈ neto (total/1,19) NO colapsa', () => {
   assert.equal(p.verificaciones.cuadra_con_neto, true);
   assert.equal(p.items.length, 2);
 });
+
+// ---------- detectarTipoNoCalculable: evita duplicar el gasto cuando el
+// cliente entrega guía de despacho / orden de compra / factura del mismo
+// despacho (ninguna trae TipoDTE — solo el XML lo tiene) ----------
+import { detectarTipoNoCalculable } from '../src/services/facturaTexto.js';
+
+const casosNoCalculables = [
+  ['ACME SpA\nR.U.T.: 76.123.456-0\nORDEN DE COMPRA N° 445\nProveedor: Comercial Ejemplo\nSuministro eléctrico 450.000', 'Orden de compra'],
+  ['ACME SpA\nR.U.T.: 76.123.456-0\nCOTIZACIÓN N° 12\nSuministro eléctrico 450.000', 'Cotización'],
+  ['ACME SpA\nR.U.T.: 76.123.456-0\nPRESUPUESTO N° 8\nMantención preventiva 230.000', 'Presupuesto'],
+  ['Comercial Ejemplo SpA\nR.U.T.: 76.123.456-0\nGUÍA DE DESPACHO ELECTRÓNICA N° 900\nSuministro eléctrico 450.000', 'Guía de despacho'],
+  ['Comercial Ejemplo SpA\nR.U.T.: 76.123.456-0\nNOTA DE CRÉDITO ELECTRÓNICA N° 890\nAnula suministro eléctrico 450.000', 'Nota de crédito'],
+  ['Comercial Ejemplo SpA\nR.U.T.: 76.123.456-0\nNOTA DE DÉBITO ELECTRÓNICA N° 891\nAjuste suministro eléctrico 20.000', 'Nota de débito'],
+  ['Comercial Ejemplo SpA\nR.U.T.: 76.123.456-0\nLIQUIDACIÓN DE FACTURA N° 12\nComisión venta 30.000', 'Liquidación de factura'],
+];
+
+for (const [texto, etiqueta] of casosNoCalculables) {
+  test(`detectarTipoNoCalculable reconoce "${etiqueta}" en el encabezado`, () => {
+    assert.equal(detectarTipoNoCalculable(texto), etiqueta);
+  });
+}
+
+test('detectarTipoNoCalculable no rechaza una factura real que cita su Orden de Compra como referencia', () => {
+  // Caso exacto del hallazgo: el cliente entrega guía + orden de compra +
+  // factura del mismo despacho — la FACTURA sí debe calcularse aunque
+  // mencione la OC que la originó, porque ella misma se declara factura.
+  const texto = `COMERCIAL EJEMPLO SpA
+R.U.T.: 76.123.456-0
+FACTURA ELECTRONICA N° 4521
+Su Orden de Compra: OC-445
+Señor(es): Prueba Capital SpA
+Suministro eléctrico mensual planta $ 450.000`;
+  assert.equal(detectarTipoNoCalculable(texto), null);
+});
+
+test('detectarTipoNoCalculable no rechaza una factura ni una boleta normales', () => {
+  assert.equal(detectarTipoNoCalculable(TEXTO_FACTURA), null);
+  assert.equal(detectarTipoNoCalculable('BOLETA ELECTRONICA N° 10\nServicio de aseo $ 50.000'), null);
+});
+
+test('detectarTipoNoCalculable ignora coincidencias fuera de la ventana de encabezado (glosas de ítems, no el tipo del documento)', () => {
+  const relleno = 'x'.repeat(500);
+  const texto = `FACTURA ELECTRONICA N° 1\n${relleno}\nServicio de cotización de diseño gráfico $ 80.000`;
+  assert.equal(detectarTipoNoCalculable(texto), null);
+});
