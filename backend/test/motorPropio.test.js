@@ -275,3 +275,15 @@ test('calcularFactura vacía o toda descartada devuelve total 0 y Sin categoría
   assert.equal(g.total_co2e, 0);
   assert.equal(g.items_descartados, 1);
 });
+
+test('t-km nunca entra al método físico, ni siquiera desde XML (gasto-only por diseño)', () => {
+  const cats = categoriasConNuevas();
+  const item = { nombre: 'Flete marítimo contenedor', cantidad: 1200, unidad: 't-km', monto: 800000 };
+  const r = calcularItem(item, cats, 'xml');
+  assert.equal(r.categoria_codigo, 'maritimo_contenedor');
+  // normalizarUnidad no reconoce t-km a propósito (la unidad exige verificar
+  // masa × distancia, dato que una factura no trae): siempre método por gasto.
+  assert.equal(r.metodo, 'gasto');
+  // $800.000 → 800 miles × 0,20 kg/miles = 160 kg = 0,16 t.
+  assert.ok(Math.abs(r.co2e - 0.16) < 1e-9, `co2e esperado 0.16, fue ${r.co2e}`);
+});

@@ -117,3 +117,36 @@ test('migración 019: CHECKs idempotentes con los orígenes y estados nuevos', (
   // Nada en la migración promete certificaciones.
   assert.doesNotMatch(sql, /certificad|acreditad/i);
 });
+
+// ---------- F5: raster degradado (100 dpi) y reintento de PSM ----------
+// Vive en ESTE archivo a propósito: los tests de un mismo archivo corren
+// en serie, así los dos caminos OCR pesados no compiten por CPU (en
+// paralelo, tesseract puede exceder su timeout interno de 30 s).
+
+test('imagen degradada (raster 100 dpi): la cascada recorre los PSM sin lanzar', async (t) => {
+  if (!rasterPdfDisponible() || !ocrDisponible()) {
+    return t.skip('pdftoppm o tesseract no instalados en este entorno');
+  }
+  const { leerDocumento } = await import('../src/services/lecturaDocumento.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sicr3p-degradado-'));
+  try {
+    const base = path.join(dir, 'pagina');
+    fs.writeFileSync(`${base}.pdf`, fs.readFileSync(FIXTURE_PDF));
+    // 100 dpi en escala de grises: calidad de foto mala, no de escáner.
+    execFileSync('pdftoppm', ['-r', '100', '-gray', '-png', '-f', '1', '-l', '1', `${base}.pdf`, base], { timeout: 20000 });
+    const png = fs.readdirSync(dir).find((f) => f.endsWith('.png'));
+    assert.ok(png, 'pdftoppm debe producir un PNG');
+    const r = await leerDocumento(fs.readFileSync(path.join(dir, png)), 'degradada.png');
+    // Ejercita el reintento --psm 3 cuando --psm 6 no da señal. El resultado
+    // depende del OCR: o recupera señal real, o rechaza limpio — nunca inventa.
+    assert.equal(r.etapa, 'imagen_ocr');
+    assert.ok(['texto', 'sin_senal'].includes(r.tipo), r.tipo);
+    if (r.tipo === 'texto') {
+      assert.equal(r.motor, 'propio_ocr');
+      assert.equal(r.textoParseado.senal_suficiente, true);
+      assert.ok(Number(r.textoParseado.monto_total) > 0);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

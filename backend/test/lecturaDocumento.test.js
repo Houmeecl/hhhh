@@ -116,3 +116,34 @@ test('migración 030: idempotente, sin binario, con motivos y etapas del servici
   // Nada en la migración promete certificaciones.
   assert.doesNotMatch(sql, /certificad|acreditad/i);
 });
+
+// ---------- F5: fixtures y cobertura del comportamiento vigente ----------
+
+const FIXTURE_NC = path.join(__dirname, 'fixtures', 'nota-credito.xml');
+
+test('nota de crédito (DTE 61): líneas negativas descartadas → sin_senal, jamás CO2e negativo', async () => {
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_NC), 'nota-credito.xml');
+  // Todas las líneas son reversos en negativo: cero ítems calculables.
+  // Netear la NC contra su factura es una ronda futura; el comportamiento
+  // vigente (F3) es descartar los negativos y quedarse sin señal.
+  assert.equal(r.tipo, 'sin_senal');
+  assert.equal(r.etapa, 'xml');
+  // El dte parseado se conserva (folio/RUTs para el motor externo).
+  assert.equal(r.dte.tipo_dte, 61);
+  assert.equal(r.dte.folio, '889');
+});
+
+test('lote mixto: cada archivo se lee de forma independiente (XML + PDF texto + basura)', async () => {
+  const archivos = [
+    { buffer: Buffer.from(XML_DTE, 'latin1'), nombre: 'factura.xml' },
+    { buffer: fs.readFileSync(FIXTURE_PDF), nombre: 'factura.pdf' },
+    { buffer: Buffer.from('%PDF-1.4\nno soy una factura'), nombre: 'roto.pdf' },
+  ];
+  const lecturas = [];
+  for (const a of archivos) lecturas.push(await leerDocumento(a.buffer, a.nombre));
+  assert.equal(lecturas[0].tipo, 'xml');
+  assert.equal(lecturas[1].tipo, 'texto');
+  assert.equal(lecturas[1].motor, 'propio_texto');
+  // El ilegible del lote no contamina a los legibles: sin_senal aislado.
+  assert.equal(lecturas[2].tipo, 'sin_senal');
+});
