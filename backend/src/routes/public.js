@@ -13,15 +13,9 @@ import {
 } from '../services/pasaporteOrigen.js';
 import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
-import { parseDte } from '../services/dte.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
-import {
-  extraerTextoPdf, extraerTextoImagenBuffer, ocrDisponible,
-  extraerTextoPdfEscaneado, extraerTextoHeicBuffer,
-} from '../services/extractorTexto.js';
-
-import { parsearFacturaTexto } from '../services/facturaTexto.js';
+import { leerDocumento, filaRechazo } from '../services/lecturaDocumento.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { contrapartesDeRut } from '../services/trazabilidad.js';
 import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta, siguienteEslabon } from '../services/cadenaHash.js';
@@ -195,6 +189,24 @@ router.get('/publico/cadena', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Bitácora de rechazos: se escribe con el pool (FUERA de cualquier
+// transacción) para que sobreviva al rollback del envío. Defensiva con
+// la migración 030 sin correr (42P01): jamás rompe la respuesta 422.
+async function registrarRechazos(filas) {
+  for (const f of filas) {
+    try {
+      await query(
+        `INSERT INTO documentos_rechazados
+           (nombre_archivo, extension, tamano_bytes, sha256, motivo, etapa_alcanzada, rut_cliente)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [f.nombre_archivo, f.extension, f.tamano_bytes, f.sha256, f.motivo, f.etapa_alcanzada, f.rut_cliente]
+      );
+    } catch (err) {
+      if (err.code !== '42P01') console.warn('[rechazos] no se pudo registrar:', err.message);
+    }
+  }
+}
+
 // ---------- POST /api/sesiones — procesa hasta 5 facturas ----------
 router.post('/sesiones', uploadArchivos, async (req, res, next) => {
   try {
@@ -212,6 +224,34 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       return res.status(400).json({
         error: 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.',
       });
+    }
+
+    // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
+    // segundos por archivo y antes corría con la fila de cadena_estado
+    // bloqueada, serializando todos los envíos concurrentes. Ahora el lock
+    // se toma recién con las lecturas ya resueltas.
+    const lecturas = [];
+    for (const file of files) {
+      lecturas.push(await leerDocumento(file.buffer, file.originalname));
+    }
+
+    // Con el motor externo apagado, lo sin señal se rechaza — TODOS los
+    // ilegibles del lote de una vez (el operador re-escanea solo esos) y
+    // con registro en la bitácora, que sobrevive porque la sesión ni
+    // siquiera se intenta.
+    if (!motorExternoActivo()) {
+      const indicesRechazados = lecturas
+        .map((l, i) => (l.tipo === 'sin_senal' ? i : -1))
+        .filter((i) => i >= 0);
+      if (indicesRechazados.length > 0) {
+        await registrarRechazos(indicesRechazados.map((i) => filaRechazo(files[i], lecturas[i], rut)));
+        const nombres = indicesRechazados.map((i) => files[i].originalname);
+        const plural = nombres.length > 1;
+        return res.status(422).json({
+          error: `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`,
+          rechazados: nombres,
+        });
+      }
     }
 
     const result = await withTx(async (client) => {
@@ -261,58 +301,19 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       let totalSesion = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-
-        // Si el archivo es un DTE XML, se extraen los datos reales del
-        // documento (folio, RUT, ítems con cantidad/unidad/monto reales).
-        let dte = null;
-        if (/\.xml$/i.test(file.originalname)) {
-          dte = parseDte(file.buffer.toString('utf8'));
-        }
-
-        // Orden de decisión por archivo — cada camino cae al siguiente si
-        // no logra señal real:
-        //  1) XML con ítems reales        → motor propio   (motor='propio')
-        //  2) PDF con capa de texto       → parser propio  (motor='propio_texto')
-        //  3) PDF escaneado (raster+OCR)  → parser propio  (motor='propio_ocr')
-        //  4) JPG/PNG con OCR local       → parser propio  (motor='propio_ocr')
-        //  5) HEIC (heif-convert + OCR)   → parser propio  (motor='propio_ocr')
-        //  6) sin señal → motor externo si está activo; si no, se rechaza
-        //     el documento (jamás se completa a mano).
-        let textoParseado = null;
-        let motorTexto = null;
-        if (!(dte && dte.items?.length)) {
-          try {
-            if (/\.pdf$/i.test(file.originalname)) {
-              let texto = await extraerTextoPdf(file.buffer);
-              let p = parsearFacturaTexto(texto);
-              if (!p.senal_suficiente) {
-                // PDF sin capa de texto útil: rasterizar y leer con OCR.
-                texto = await extraerTextoPdfEscaneado(file.buffer);
-                p = parsearFacturaTexto(texto);
-                if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
-              } else {
-                textoParseado = p; motorTexto = 'propio_texto';
-              }
-            } else if (/\.(jpe?g|png)$/i.test(file.originalname) && ocrDisponible()) {
-              const ext = file.originalname.split('.').pop();
-              const texto = await extraerTextoImagenBuffer(file.buffer, ext);
-              const p = parsearFacturaTexto(texto);
-              if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
-            } else if (/\.heic$/i.test(file.originalname)) {
-              const texto = await extraerTextoHeicBuffer(file.buffer);
-              const p = parsearFacturaTexto(texto);
-              if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
-            }
-          } catch {
-            textoParseado = null; // cualquier falla → camino 6, sin romper la sesión
-          }
-        }
+        // Lectura ya resuelta en el pre-pass (services/lecturaDocumento.js):
+        // aquí solo queda calcular, hashear e insertar. El único camino que
+        // sigue dentro de la transacción es el motor externo (necesita
+        // sesion.id y client) — y el pre-pass ya garantizó que si algo
+        // quedó sin señal es porque ese motor está activo.
+        const lectura = lecturas[i];
 
         let analysis;
         let motor;
-        if (dte && dte.items?.length) {
+        if (lectura.tipo === 'xml') {
           // Motor propio: cálculo real a partir de los datos del DTE, sin
           // depender del motor externo.
+          const { dte } = lectura;
           const calc = calcularFactura(dte.items, categoriasMotor);
           analysis = {
             invoice_id_simple: null,
@@ -324,9 +325,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             items: calc.items,
           };
           motor = 'propio';
-        } else if (textoParseado) {
+        } else if (lectura.tipo === 'texto') {
           // Motor propio sobre texto extraído (PDF con capa de texto u OCR):
           // los montos reales del documento alimentan el método por gasto.
+          const { textoParseado } = lectura;
           const calc = calcularFactura(textoParseado.items, categoriasMotor);
           analysis = {
             invoice_id_simple: null,
@@ -337,9 +339,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             categoria: calc.categoria,
             items: calc.items,
           };
-          motor = motorTexto;
-        } else if (motorExternoActivo()) {
-          // Sin datos reales extraíbles y con el motor externo aún activo.
+          motor = lectura.motor;
+        } else {
+          // Sin datos reales extraíbles y con el motor externo aún activo
+          // (garantizado por el pre-pass: apagado ⇒ 422 antes de llegar acá).
           analysis = await simpleApi.analyzeInvoice({
             sesionId: sesion.id,
             filename: file.originalname,
@@ -347,22 +350,12 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             rutReceptor: rut,
             client,
           });
-          if (dte) {
-            if (dte.folio) analysis.numero_venta = `F-${dte.folio}`;
-            if (dte.rut_emisor) analysis.rut_emisor = dte.rut_emisor;
-            if (dte.rut_receptor) analysis.rut_receptor = dte.rut_receptor;
+          if (lectura.dte) {
+            if (lectura.dte.folio) analysis.numero_venta = `F-${lectura.dte.folio}`;
+            if (lectura.dte.rut_emisor) analysis.rut_emisor = lectura.dte.rut_emisor;
+            if (lectura.dte.rut_receptor) analysis.rut_receptor = lectura.dte.rut_receptor;
           }
           motor = 'externo';
-        } else {
-          // Sin señal extraíble y con el motor externo apagado: se rechaza.
-          // Todos los datos de una factura —incluidos emisor y receptor—
-          // deben salir siempre de una lectura automática del documento,
-          // nunca de un tipeo humano de respaldo.
-          const e = new Error(
-            `No pudimos leer automáticamente "${file.originalname}". Vuelve a escanear el documento (buena luz, sin cortes) y cárgalo de nuevo.`
-          );
-          e.status = 422;
-          throw e;
         }
         totalSesion += Number(analysis.total_co2e || 0);
 
@@ -417,6 +410,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
         // Valorización: los DTE traen precio real por ítem → entradas de inventario.
         // El CO2e de la factura se reparte entre ítems según su monto.
+        const dte = lectura.tipo === 'xml' ? lectura.dte : null;
         if (dte && dte.items?.length) {
           const totalMonto = dte.items.reduce((a, it) => a + (Number(it.monto) || 0), 0);
           for (const it of dte.items) {

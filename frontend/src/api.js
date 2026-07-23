@@ -71,7 +71,11 @@ async function request(path, { method = 'GET', body, formData, authed = false, a
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || 'Ocurrió un error');
+  if (!res.ok) {
+    const err = new Error(data.error || 'Ocurrió un error');
+    err.data = data; // payload completo (ej. lista de documentos rechazados)
+    throw err;
+  }
   return data;
 }
 

@@ -132,9 +132,33 @@ router.get('/estadisticas', async (req, res, next) => {
     const propio_revisado = n('propio_revisado');
     const revision = n('revision');
     const externo = n('externo');
-    // "Propio" para el % de independencia = XML + texto de PDF + OCR +
-    // revisión humana confirmada. Lo aún EN revisión no cuenta para nadie.
+    // "Propio" para el % de independencia = XML + texto de PDF + OCR
+    // (+ conteos históricos de la revisión, hoy eliminada).
     const propioTotal = propio + propio_texto + propio_ocr + propio_revisado;
+
+    // Bitácora de rechazos (migración 030) — documentos ilegibles que
+    // nunca llegaron a ser factura. Defensivo si la migración no corrió.
+    let rechazadosTotal = 0;
+    let rechazados30d = 0;
+    const rechazosPorMotivo = {};
+    const rechazosPorEtapa = {};
+    try {
+      const { rows: rRows } = await query(
+        `SELECT motivo, etapa_alcanzada,
+                COUNT(*)::int AS n,
+                COUNT(*) FILTER (WHERE created_at > now() - interval '30 days')::int AS n30
+         FROM documentos_rechazados GROUP BY motivo, etapa_alcanzada`
+      );
+      for (const r of rRows) {
+        rechazadosTotal += r.n;
+        rechazados30d += r.n30;
+        rechazosPorMotivo[r.motivo] = (rechazosPorMotivo[r.motivo] || 0) + r.n;
+        rechazosPorEtapa[r.etapa_alcanzada] = (rechazosPorEtapa[r.etapa_alcanzada] || 0) + r.n;
+      }
+    } catch (err) {
+      if (err.code !== '42P01') throw err; // tabla aún no migrada → todo en 0
+    }
+
     res.json({
       total,
       propio,
@@ -145,6 +169,13 @@ router.get('/estadisticas', async (req, res, next) => {
       externo,
       motor_externo_activo: String(process.env.MOTOR_EXTERNO || 'on').toLowerCase() !== 'off',
       porcentaje_propio: total > 0 ? Math.round((propioTotal / total) * 1000) / 10 : 0,
+      rechazados_total: rechazadosTotal,
+      rechazados_30d: rechazados30d,
+      rechazos_por_motivo: rechazosPorMotivo,
+      rechazos_por_etapa: rechazosPorEtapa,
+      tasa_rechazo: (rechazadosTotal + total) > 0
+        ? Math.round((rechazadosTotal / (rechazadosTotal + total)) * 1000) / 10
+        : 0,
     });
   } catch (err) { next(err); }
 });

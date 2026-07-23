@@ -60,19 +60,41 @@ export default function MotorPropio() {
           ['Imagen/escaneo OCR (propio)', propioOcr],
           ['Motor externo', externo],
         ];
+        const rechazados = stats.rechazados_total || 0;
+        const etapas = Object.entries(stats.rechazos_por_etapa || {});
         return (
-          <div className="card card-pad" style={{ marginBottom: 18, maxWidth: 420 }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(pct, 1)}%</div>
-            <div className="muted" style={{ fontSize: 13 }}>
-              de independencia del motor externo ({independientes} de {total} facturas con cálculo propio)
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+            <div className="card card-pad" style={{ maxWidth: 420, flex: '1 1 300px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(pct, 1)}%</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                de independencia del motor externo ({independientes} de {total} facturas con cálculo propio)
+              </div>
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                {filas.map(([etiqueta, n]) => (
+                  <div key={etiqueta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                    <span className="muted">{etiqueta}</span>
+                    <b>{n}</b>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
-              {filas.map(([etiqueta, n]) => (
-                <div key={etiqueta} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
-                  <span className="muted">{etiqueta}</span>
-                  <b>{n}</b>
-                </div>
-              ))}
+            <div className="card card-pad" style={{ maxWidth: 420, flex: '1 1 300px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: rechazados > 0 ? '#b45309' : 'var(--green-600)' }}>
+                {fmt(stats.tasa_rechazo || 0, 1)}%
+              </div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                tasa de rechazo por lectura ({rechazados} documento{rechazados === 1 ? '' : 's'} ilegible{rechazados === 1 ? '' : 's'},{' '}
+                {stats.rechazados_30d || 0} en 30 días)
+              </div>
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                {etapas.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Sin rechazos registrados.</div>}
+                {etapas.map(([etapa, n]) => (
+                  <div key={etapa} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                    <span className="muted">Etapa alcanzada: {etapa}</span>
+                    <b>{n}</b>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         );

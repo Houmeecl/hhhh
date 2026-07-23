@@ -39,6 +39,7 @@ export default function CargarAv() {
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ rut: '', empresa: '', email: '' });
   const [error, setError] = useState('');
+  const [rechazados, setRechazados] = useState([]); // nombres de archivos ilegibles (422)
   const [procesando, setProcesando] = useState(false);
   const [resultado, setResultado] = useState(null); // { sesion, facturas }
   const [envio, setEnvio] = useState(null); // comprobante por correo: null | 'enviando' | 'ok' | 'error'
@@ -59,6 +60,7 @@ export default function CargarAv() {
 
   async function procesar() {
     setError('');
+    setRechazados([]);
     if (!form.rut || !form.empresa || !form.email) { setError('Completa RUT, empresa y email del cliente.'); return; }
     if (!validarRut(form.rut)) { setError('El RUT no es válido. Revisa el dígito verificador.'); return; }
     if (!EMAIL_RE.test(form.email)) { setError('El email del cliente no es válido.'); return; }
@@ -73,6 +75,9 @@ export default function CargarAv() {
       setResultado(await api.crearSesion(fd));
     } catch (e) {
       setError(e.message);
+      // El 422 lista TODOS los ilegibles del lote: se marcan en rojo para
+      // re-escanear solo esos y reintentar el envío completo.
+      setRechazados(e.data?.rechazados || []);
     } finally {
       setProcesando(false);
     }
@@ -199,6 +204,7 @@ export default function CargarAv() {
               <div className="file-item" key={i}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Icon.Doc size={16} /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span>
+                  {rechazados.includes(f.name) && <span className="badge badge-red">Ilegible — re-escanear</span>}
                 </span>
                 {procesando
                   ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Leyendo…</span>
