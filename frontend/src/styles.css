@@ -978,6 +978,7 @@ table.data tr:hover td { background: #f3f8f5; }
 
 /* Bento de entregables */
 .av2-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.av2-bento-3 { grid-template-columns: repeat(3, 1fr); }
 .av2-bento-card {
   background: #fff;
   border: 1px solid var(--border);

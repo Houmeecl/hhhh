@@ -21,7 +21,6 @@ function AvLayout({ children, t }) {
         <nav className="av2-nav">
           <SelectorIdioma />
           <Link to="/panel-verde/login" className="av2-nav-link">{t('av.nav_panel')}</Link>
-          <Link to="/pos" className="av2-nav-link">{t('av.cta_terminal')}</Link>
           <Link to="/cargar" className="btn btn-primary btn-sm">{t('av.hero_cta_pas')}</Link>
         </nav>
       </header>
@@ -80,7 +79,7 @@ function PasaportePreview() {
 // terminal mostrando un cálculo, sticker QR y colgante "Pronto" (pre-lanzamiento).
 function StandAduanaVerde() {
   return (
-    <svg viewBox="0 0 560 430" role="img" aria-label="Ilustración de una oficina Aduana Verde: letrero, toldo y vitrina con el terminal de cálculo" style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox="0 0 560 430" role="img" aria-label="Ilustración de una oficina Aduana Verde: letrero, toldo y vitrina con el mesón de atención" style={{ width: '100%', height: 'auto', display: 'block' }}>
       {/* Fondo */}
       <ellipse cx="280" cy="392" rx="252" ry="26" fill="#eaf6ef" />
       {/* Estructura del local */}
@@ -224,40 +223,6 @@ export default function AduanaVerde() {
         </div>
       </section>
 
-      {/* Franja "terminal físico": el flujo de la oficina como diagrama */}
-      <section className="av-terminal">
-        <div className="container">
-          <p className="av-term-label"><span className="av-led" /> {t('av.term_label')}</p>
-          <h2>{t('av.term_titulo')}</h2>
-          <p className="av-term-sub">{t('av.term_sub')}</p>
-          <div className="av-flow">
-            <div className="av-flow-node">
-              <div className="av-ico"><Icon.Doc size={22} /></div>
-              <b>{t('av.flujo_doc')}</b>
-              <span>{t('av.flujo_doc_d')}</span>
-            </div>
-            <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
-            <div className="av-flow-node">
-              <div className="av-ico"><Icon.Cog size={22} /></div>
-              <b>{t('av.flujo_calc')}</b>
-              <span>{t('av.flujo_calc_d')}</span>
-            </div>
-            <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
-            <div className="av-flow-node">
-              <div className="av-ico"><Icon.CreditCard size={22} /></div>
-              <b>{t('av.flujo_comp')}</b>
-              <span>{t('av.flujo_comp_d')}</span>
-            </div>
-            <div className="av-flow-arrow"><Icon.ArrowRight size={20} /></div>
-            <div className="av-flow-node">
-              <div className="av-ico"><Icon.Qr size={22} /></div>
-              <b>{t('av.flujo_qr')}</b>
-              <span>{t('av.flujo_qr_d')}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="pasos">
         <div className="container">
           <h2>{t('av.pasos_titulo')}</h2>
@@ -317,9 +282,9 @@ export default function AduanaVerde() {
         </div>
       </section>
 
-      {/* Calculadora pública: el mismo motor del terminal, para sacar la
-          cuenta antes de pisar la oficina. El DISEÑO y el cálculo no
-          cambian: mismos factores del servidor. */}
+      {/* Calculadora pública: para sacar la cuenta antes de pisar la
+          oficina. El DISEÑO y el cálculo no cambian: mismos factores
+          del servidor. */}
       <section className="sec-alt sec-pad" id="calculadora">
         <div className="container">
           <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('av.calc_titulo')}</h2>
@@ -369,7 +334,7 @@ export default function AduanaVerde() {
           <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 480, margin: '0 auto 32px', lineHeight: 1.6 }}>
             {t('av.quien_sub')}
           </p>
-          <div className="av2-bento" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="av2-bento av2-bento-3">
             <div className="av2-bento-card av2-reveal">
               <div className="av2-bento-ico"><Icon.Users size={24} /></div>
               <h3>{t('av.quien_1t')}</h3>
@@ -451,10 +416,6 @@ export default function AduanaVerde() {
               <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">{t('av.pre_cta1')}</a>
               <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">{t('av.pre_cta2')}</a>
             </div>
-            <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-              {t('av.pre_mirar')}{' '}
-              <Link to="/pos">{t('av.cta_terminal')}</Link>.
-            </p>
 
             {/* Nota de compensación, en el tono ya aprobado del sitio */}
             <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
