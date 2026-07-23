@@ -33,14 +33,20 @@ function imprimirSticker(facturaId) {
 // digita ningún dato del documento. Si un archivo no se puede leer
 // automáticamente, el servidor rechaza el envío completo y se vuelve a
 // escanear: no existe corrección manual.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function CargarAv() {
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState({ rut: '', empresa: '', email: '' });
   const [error, setError] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [resultado, setResultado] = useState(null); // { sesion, facturas }
+  const [envio, setEnvio] = useState(null); // comprobante por correo: null | 'enviando' | 'ok' | 'error'
 
   const rutValido = form.rut === '' || validarRut(form.rut);
+  const emailValido = form.email === '' || EMAIL_RE.test(form.email);
+  const listoParaProcesar = files.length > 0 && form.rut && form.empresa && form.email
+    && validarRut(form.rut) && EMAIL_RE.test(form.email);
 
   function addFiles(list) {
     setError('');
@@ -55,6 +61,7 @@ export default function CargarAv() {
     setError('');
     if (!form.rut || !form.empresa || !form.email) { setError('Completa RUT, empresa y email del cliente.'); return; }
     if (!validarRut(form.rut)) { setError('El RUT no es válido. Revisa el dígito verificador.'); return; }
+    if (!EMAIL_RE.test(form.email)) { setError('El email del cliente no es válido.'); return; }
     if (files.length === 0) { setError('Escanea o carga al menos un documento.'); return; }
     setProcesando(true);
     try {
@@ -72,7 +79,17 @@ export default function CargarAv() {
   }
 
   function nuevoTramite() {
-    setResultado(null); setFiles([]); setForm({ rut: '', empresa: '', email: '' }); setError('');
+    setResultado(null); setFiles([]); setForm({ rut: '', empresa: '', email: '' }); setError(''); setEnvio(null);
+  }
+
+  async function enviarCorreo() {
+    setEnvio('enviando');
+    try {
+      const r = await api.enviarComprobanteCorreo(resultado.sesion.id);
+      setEnvio(r?.ok ? 'ok' : 'error');
+    } catch {
+      setEnvio('error');
+    }
   }
 
   if (resultado) {
@@ -91,15 +108,25 @@ export default function CargarAv() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14, alignItems: 'center' }}>
             <a className="btn btn-outline btn-sm" href={api.informeUrl(sesion.id)} target="_blank" rel="noreferrer">
               <Icon.Download size={15} /> Informe (PDF)
             </a>
             <a className="btn btn-outline btn-sm" href={api.carpetaUrl(sesion.id)} target="_blank" rel="noreferrer">
               <Icon.Download size={15} /> Carpeta de evidencia
             </a>
+            <button className="btn btn-outline btn-sm" onClick={enviarCorreo} disabled={envio === 'enviando' || envio === 'ok'}>
+              {envio === 'enviando' ? <span className="spinner dark" style={{ width: 13, height: 13 }} />
+                : envio === 'ok' ? <><Icon.Check size={15} /> Enviado a {sesion.email_cliente}</>
+                : 'Enviar comprobante por correo'}
+            </button>
             <button className="btn btn-primary btn-sm" onClick={nuevoTramite}>Nuevo trámite</button>
           </div>
+          {envio === 'error' && (
+            <div className="badge badge-red" style={{ display: 'inline-block', padding: '8px 12px', marginTop: 10 }}>
+              No se pudo enviar el correo. Puedes reintentar o entregar el informe descargado.
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
@@ -158,7 +185,9 @@ export default function CargarAv() {
           </div>
           <div className="field">
             <label>Email del cliente</label>
-            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="contacto@empresa.cl" />
+            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="contacto@empresa.cl"
+              style={!emailValido ? { borderColor: '#ef4444' } : {}} />
+            {!emailValido && <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 4 }}>Email inválido</div>}
           </div>
         </div>
 
@@ -171,7 +200,9 @@ export default function CargarAv() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                   <Icon.Doc size={16} /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span>
                 </span>
-                {!procesando && <span className="rm" onClick={() => setFiles(files.filter((_, j) => j !== i))}>Quitar</span>}
+                {procesando
+                  ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Leyendo…</span>
+                  : <span className="rm" onClick={() => setFiles(files.filter((_, j) => j !== i))}>Quitar</span>}
               </div>
             ))}
             <div className="muted" style={{ fontSize: 13 }}>{files.length} de {MAX} documentos</div>
@@ -180,7 +211,7 @@ export default function CargarAv() {
 
         {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', margin: '12px 0' }}>{error}</div>}
 
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={procesar} disabled={procesando || files.length === 0}>
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 12 }} onClick={procesar} disabled={procesando || !listoParaProcesar}>
           {procesando ? <span className="spinner" /> : `Procesar ${files.length > 0 ? `${files.length} documento${files.length > 1 ? 's' : ''}` : 'documentos'}`}
         </button>
       </div>
