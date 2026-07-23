@@ -171,7 +171,14 @@ async function llamarClaude(texto) {
         messages: [{ role: 'user', content: construirPrompt(texto) }],
       }),
     });
-    if (!res.ok) throw new Error(`Anthropic API ${res.status}`);
+    if (!res.ok) {
+      // El cuerpo trae el motivo real (clave inválida, sin crédito, modelo
+      // desconocido, etc.) — capturarlo es lo que permite diagnosticar
+      // desde el panel de admin en vez de solo ver "Anthropic API 400".
+      const cuerpo = await res.json().catch(() => null);
+      const detalle = cuerpo?.error?.message || cuerpo?.error?.type;
+      throw new Error(`Anthropic API ${res.status}${detalle ? `: ${detalle}` : ''}`);
+    }
     const data = await res.json();
     const bloque = (data.content || []).find((b) => b.type === 'tool_use');
     if (!bloque) throw new Error('Sin bloque tool_use en la respuesta');
