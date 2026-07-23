@@ -16,9 +16,12 @@
 // descarta ("Sin cantidad ni monto → No se calcula", Figura 2 de la
 // guía); un monto negativo (descuento / nota de crédito) se descarta
 // (el proxy por gasto jamás produce CO2e negativo); un monto sobre
-// MONTO_MAX_CLP_ITEM lanza error tipificado 'monto_fuera_de_rango'
-// (un monto absurdo es síntoma de lectura corrupta: se rechaza el
-// documento, no se adivina).
+// MONTO_MAX_CLP_ITEM O una cantidad sobre CANTIDAD_MAX_ITEM lanza error
+// tipificado 'monto_fuera_de_rango' (un monto o una cantidad absurdos son
+// síntoma de lectura corrupta: se rechaza el documento, no se adivina —
+// el tope de cantidad protege el método FÍSICO tal como el de monto
+// protege el método por gasto; sin él, una cantidad corrupta con unidad
+// reconocida producía un CO2e disparatado sin disparar ningún rechazo).
 // ============================================================
 
 import { limpiar, normalizarOcr } from './textoOcr.js';
@@ -32,6 +35,14 @@ export const MONTO_MAX_CLP_ITEM = Number(process.env.MOTOR_MONTO_MAX_CLP) > 0
   ? Number(process.env.MOTOR_MONTO_MAX_CLP)
   : 1e10;
 
+// Tope de cantidad por ítem (unidad física: kWh, L, kg, m3, km — la que
+// sea). Deliberadamente holgado (mil millones): ninguna línea de factura
+// real trae esa magnitud; el objetivo es atrapar ceros de más por typo o
+// corrupción de OCR, no limitar consumo industrial legítimo.
+export const CANTIDAD_MAX_ITEM = Number(process.env.MOTOR_CANTIDAD_MAX) > 0
+  ? Number(process.env.MOTOR_CANTIDAD_MAX)
+  : 1e9;
+
 // Evalúa los ítems ANTES de calcular: separa calculables de descartados
 // y detecta montos fuera de rango. Pura (sin categorías ni BD) — la usa
 // también lecturaDocumento.js para rechazar en el pre-pass.
@@ -42,7 +53,7 @@ export function evaluarItems(items) {
   for (const it of items || []) {
     const monto = Number(it?.monto || 0);
     const cantidad = Number(it?.cantidad || 0);
-    if (monto > MONTO_MAX_CLP_ITEM) { fueraDeRango = true; continue; }
+    if (monto > MONTO_MAX_CLP_ITEM || cantidad > CANTIDAD_MAX_ITEM) { fueraDeRango = true; continue; }
     // Negativo en CUALQUIERA de los dos ejes descarta el ítem: un monto
     // negativo es un descuento/reverso, y una cantidad negativa entraría
     // al método físico produciendo CO2e negativo (vía de subdeclaración).
@@ -138,7 +149,7 @@ export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {})
   }
   const { calculables, descartados, fueraDeRango } = evaluarItems(dteItems);
   if (fueraDeRango) {
-    const e = new Error(`Un ítem supera el monto máximo admitido ($${MONTO_MAX_CLP_ITEM.toLocaleString('es-CL')} CLP): lectura corrupta o documento fuera de rango.`);
+    const e = new Error(`Un ítem supera el monto o la cantidad máxima admitida ($${MONTO_MAX_CLP_ITEM.toLocaleString('es-CL')} CLP / ${CANTIDAD_MAX_ITEM.toLocaleString('es-CL')} unidades): lectura corrupta o documento fuera de rango.`);
     e.code = 'monto_fuera_de_rango';
     throw e;
   }
@@ -159,7 +170,13 @@ export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {})
 
 // Carga el plan de categorías del motor como Map (usable dentro de una transacción).
 export async function cargarCategorias(run) {
-  const { rows } = await run(`SELECT * FROM motor_categorias`);
+  // ORDER BY: clasificar() desempata por orden de iteración cuando dos
+  // keywords tienen el mismo largo — sin este ORDER BY ese desempate
+  // dependía del orden físico que Postgres decidiera devolver (no
+  // garantizado), pudiendo clasificar el mismo documento distinto entre
+  // reinicios o planes de ejecución. Con ORDER BY, el resultado es
+  // reproducible siempre.
+  const { rows } = await run(`SELECT * FROM motor_categorias ORDER BY codigo`);
   if (rows.length === 0) throw new Error('Motor sin categorías configuradas (¿migraciones sin correr?).');
   return new Map(rows.map((r) => [r.codigo, r]));
 }

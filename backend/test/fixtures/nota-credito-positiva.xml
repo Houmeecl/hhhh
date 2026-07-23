@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture sintético: nota de crédito (DTE 61) con montos POSITIVOS —
+     así es como el SII realmente codifica una NC (el monto representa
+     lo reversado, el signo lo da el TipoDTE, no el ítem). Este es el
+     caso que exponía el doble conteo real: sin el chequeo de tipo_dte,
+     estos montos positivos se sumaban como CO2e nuevo en vez de anular
+     la factura F-4521 que reversan. -->
+<DTE version="1.0">
+  <Documento ID="NC-890">
+    <Encabezado>
+      <IdDoc>
+        <TipoDTE>61</TipoDTE>
+        <Folio>890</Folio>
+        <FchEmis>2026-06-30</FchEmis>
+      </IdDoc>
+      <Emisor>
+        <RUTEmisor>76123456-0</RUTEmisor>
+        <RznSoc>Electro SpA</RznSoc>
+        <GiroEmis>Suministro electrico</GiroEmis>
+      </Emisor>
+      <Receptor>
+        <RUTRecep>11111111-1</RUTRecep>
+        <RznSocRecep>Cliente Industrial Ltda</RznSocRecep>
+      </Receptor>
+      <Totales>
+        <MntNeto>390000</MntNeto>
+        <IVA>74100</IVA>
+        <MntTotal>464100</MntTotal>
+      </Totales>
+    </Encabezado>
+    <Detalle>
+      <NmbItem>Anula suministro electrico junio (Ref. F-4521)</NmbItem>
+      <QtyItem>1500</QtyItem>
+      <UnmdItem>KWH</UnmdItem>
+      <PrcItem>200</PrcItem>
+      <MontoItem>300000</MontoItem>
+    </Detalle>
+  </Documento>
+</DTE>

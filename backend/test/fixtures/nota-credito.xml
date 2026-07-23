@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Fixture sintético: nota de crédito (DTE 61) con líneas de reverso en
-     negativo. Fija el comportamiento vigente del motor (F3): las líneas
-     con monto negativo se DESCARTAN — el proxy por gasto jamás produce
-     CO2e negativo. Netear notas de crédito contra sus facturas es una
-     ronda futura, no un comportamiento actual. -->
+     negativo. El motor rechaza TODO DTE 61 antes de mirar sus ítems
+     (tipo_documento_no_calculable, ver lecturaDocumento.js) — este
+     fixture además fija que, aunque llegara a evaluarse, las líneas con
+     monto negativo se descartarían igual (el proxy por gasto jamás
+     produce CO2e negativo). Netear notas de crédito contra su factura
+     original es una ronda futura, no un comportamiento actual. -->
 <DTE version="1.0">
   <Documento ID="NC-889">
     <Encabezado>

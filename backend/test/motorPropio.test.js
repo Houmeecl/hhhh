@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizarUnidad, clasificar, calcularItem, calcularFactura, evaluarItems, MONTO_MAX_CLP_ITEM } from '../src/services/motorPropio.js';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { normalizarUnidad, clasificar, calcularItem, calcularFactura, evaluarItems, MONTO_MAX_CLP_ITEM, CANTIDAD_MAX_ITEM } from '../src/services/motorPropio.js';
 import { parseDte } from '../src/services/dte.js';
 
 // Mismas categorías/seed de migrations/010_motor_propio.sql, en memoria (sin BD).
@@ -252,6 +254,21 @@ test('monto sobre el tope lanza error tipificado monto_fuera_de_rango', () => {
   );
 });
 
+test('cantidad sobre el tope lanza error tipificado monto_fuera_de_rango (protege también el método físico)', () => {
+  // Hallazgo de auditoría: el tope de monto solo protegía el método por
+  // gasto; una cantidad corrupta (ceros de más por typo/OCR) en una
+  // categoría con unidad física reconocida producía un CO2e disparatado
+  // sin disparar ningún rechazo. CANTIDAD_MAX_ITEM cierra ese hueco.
+  const cats = categoriasEjemplo();
+  assert.throws(
+    () => calcularFactura([{ nombre: 'Suministro electrico', cantidad: CANTIDAD_MAX_ITEM + 1, unidad: 'kWh', monto: 1000 }], cats, { origen: 'xml' }),
+    (e) => e.code === 'monto_fuera_de_rango'
+  );
+  assert.equal(evaluarItems([{ cantidad: CANTIDAD_MAX_ITEM + 1, monto: 1 }]).fueraDeRango, true);
+  // Una cantidad grande pero plausible NO dispara el rechazo.
+  assert.equal(evaluarItems([{ cantidad: CANTIDAD_MAX_ITEM - 1, monto: 1 }]).fueraDeRango, false);
+});
+
 test('evaluarItems separa calculables, descartados y fuera de rango', () => {
   const r = evaluarItems([
     { nombre: 'ok', monto: 1000 },
@@ -303,4 +320,9 @@ test('cantidad negativa con monto positivo se descarta: el físico jamás resta 
   // Solo el ítem legítimo cuenta: 500 kWh × 0,2421 = 121,05 kg = 0,1211 t.
   assert.equal(f.items_descartados, 1);
   assert.ok(f.total_co2e > 0.12 && f.total_co2e < 0.13, `total ${f.total_co2e}`);
+});
+
+test('cargarCategorias pide orden determinista a la BD (evita desempates que dependan del orden físico de lectura)', () => {
+  const src = fs.readFileSync(fileURLToPath(new URL('../src/services/motorPropio.js', import.meta.url)), 'utf8');
+  assert.match(src, /SELECT \* FROM motor_categorias ORDER BY codigo/);
 });

@@ -1,9 +1,9 @@
 {
-  "name": "Aduana Verde · sicr3p",
+  "name": "sicr3p — Contabilidad de carbono trazable",
   "short_name": "sicr3p",
-  "description": "Terminal Aduana Verde — tramitación verde de documentos comerciales sobre la plataforma sicr3p.",
+  "description": "Sube tus documentos, calcula tu CO2e y verifica tu trazabilidad — contabilidad de carbono, tu contabilidad.",
   "lang": "es-CL",
-  "start_url": "/pos",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",

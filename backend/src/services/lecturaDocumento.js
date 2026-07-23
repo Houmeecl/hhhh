@@ -17,6 +17,9 @@ import { evaluarItems } from './motorPropio.js';
 //
 // Orden por archivo — cada camino cae al siguiente si no logra
 // señal real:
+//  0) XML de tipo no calculable    → { tipo:'rechazo', motivo:'tipo_documento_no_calculable' }
+//     (nota de crédito/débito, guía de despacho, liquidación: NUNCA se
+//     calculan como factura nueva — duplicarían o distorsionarían el CO2e)
 //  1) XML con ítems reales        → { tipo:'xml', dte }
 //  2) PDF con capa de texto       → { tipo:'texto', motor:'propio_texto' }
 //  3) PDF escaneado (raster+OCR)  → { tipo:'texto', motor:'propio_ocr' }
@@ -30,6 +33,16 @@ import { evaluarItems } from './motorPropio.js';
 export function sha256Hex(buffer) {
   return createHash('sha256').update(buffer).digest('hex');
 }
+
+// DTE cuyo tipo NO es un gasto directo: modifican o reversan un documento
+// previo (Nota de Débito 56 / Nota de Crédito 61 — una NC real trae montos
+// POSITIVOS que representan lo reversado, no negativos: calcularla como
+// factura nueva SUMARÍA en vez de anular), liquidan una factura ya emitida
+// (Liquidación de Factura 43) o no representan un gasto en sí (Guía de
+// Despacho 52). Netear NC/ND contra su documento original es otra ronda
+// (requiere localizarlo); mientras tanto se rechaza explícito en vez de
+// adivinar — nunca duplicar ni distorsionar el CO2e ya contabilizado.
+const TIPOS_DTE_NO_CALCULABLES = new Set([43, 52, 56, 61]);
 
 // Valida los ítems ya extraídos: un monto sobre el tope del motor es
 // lectura corrupta → rechazo duro (aunque el motor externo esté activo);
@@ -50,6 +63,9 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
   //    (folio/RUTs) por si el motor externo completa el cálculo.
   if (/\.xml$/i.test(nombreArchivo)) {
     const dte = parseDte(buffer.toString('utf8'));
+    if (dte && TIPOS_DTE_NO_CALCULABLES.has(dte.tipo_dte)) {
+      return { tipo: 'rechazo', motivo: 'tipo_documento_no_calculable', etapa: 'xml', dte };
+    }
     if (dte && dte.items?.length) {
       const invalido = validarItems(dte.items, { etapa: 'xml', dte });
       if (invalido) return invalido;

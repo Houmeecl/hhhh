@@ -254,10 +254,17 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       );
       const nombres = indicesRechazados.map((i) => files[i].originalname);
       const plural = nombres.length > 1;
-      return res.status(422).json({
-        error: `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`,
-        rechazados: nombres,
-      });
+      // Los documentos rechazados por tipo (nota de crédito/débito, guía de
+      // despacho, liquidación) SÍ se leyeron bien — el problema no es la
+      // lectura, es que ese tipo no se calcula como factura nueva (duplicaría
+      // o distorsionaría el CO2e). Mensaje honesto y distinto del genérico
+      // "vuelve a escanear", que no aplica aquí.
+      const todosPorTipo = indicesRechazados.every((i) => lecturas[i].motivo === 'tipo_documento_no_calculable');
+      const tipos = indicesRechazados.map((i) => lecturas[i].dte?.tipo_nombre).filter(Boolean).join(', ');
+      const error = todosPorTipo
+        ? `${plural ? `Estos documentos son de tipo: ${tipos}` : `"${nombres[0]}" es de tipo: ${tipos || 'no calculable'}`} — hoy sicr3p calcula CO2e solo desde facturas y boletas de compra. Sube el documento original o contacta soporte.`
+        : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
+      return res.status(422).json({ error, rechazados: nombres });
     }
 
     const result = await withTx(async (client) => {

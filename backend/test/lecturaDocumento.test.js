@@ -120,17 +120,39 @@ test('migración 030: idempotente, sin binario, con motivos y etapas del servici
 // ---------- F5: fixtures y cobertura del comportamiento vigente ----------
 
 const FIXTURE_NC = path.join(__dirname, 'fixtures', 'nota-credito.xml');
+const FIXTURE_NC_POSITIVA = path.join(__dirname, 'fixtures', 'nota-credito-positiva.xml');
 
-test('nota de crédito (DTE 61): líneas negativas descartadas → sin_senal, jamás CO2e negativo', async () => {
+test('nota de crédito (DTE 61): rechazada por tipo ANTES de mirar sus ítems', async () => {
   const r = await leerDocumento(fs.readFileSync(FIXTURE_NC), 'nota-credito.xml');
-  // Todas las líneas son reversos en negativo: cero ítems calculables.
-  // Netear la NC contra su factura es una ronda futura; el comportamiento
-  // vigente (F3) es descartar los negativos y quedarse sin señal.
-  assert.equal(r.tipo, 'sin_senal');
+  assert.equal(r.tipo, 'rechazo');
+  assert.equal(r.motivo, 'tipo_documento_no_calculable');
   assert.equal(r.etapa, 'xml');
   // El dte parseado se conserva (folio/RUTs para el motor externo).
   assert.equal(r.dte.tipo_dte, 61);
   assert.equal(r.dte.folio, '889');
+});
+
+test('nota de crédito con montos POSITIVOS (formato real del SII): también rechazada, nunca sumada como factura nueva', async () => {
+  // Hallazgo de auditoría: una NC real trae montos positivos (el signo lo
+  // da el TipoDTE, no el ítem) — sin el chequeo de tipo, este documento
+  // habría sumado 0,42 t CO2e nuevos en vez de anular la factura F-4521
+  // que reversa. Verificamos que el rechazo NO depende de que los montos
+  // sean negativos.
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_NC_POSITIVA), 'nota-credito-positiva.xml');
+  assert.equal(r.tipo, 'rechazo');
+  assert.equal(r.motivo, 'tipo_documento_no_calculable');
+  assert.equal(r.dte.tipo_dte, 61);
+  assert.equal(Number(r.dte.items[0].monto), 300000); // confirma que el monto SÍ es positivo en este fixture
+});
+
+test('guía de despacho (DTE 52) y nota de débito (DTE 56): rechazadas por tipo, igual que la nota de crédito', async () => {
+  for (const [tipo, folio] of [[52, '901'], [56, '902']]) {
+    const xml = XML_DTE.replace('<TipoDTE>33</TipoDTE>', `<TipoDTE>${tipo}</TipoDTE>`).replace('<Folio>77</Folio>', `<Folio>${folio}</Folio>`);
+    const r = await leerDocumento(Buffer.from(xml, 'latin1'), `doc-${tipo}.xml`);
+    assert.equal(r.tipo, 'rechazo', `DTE ${tipo} debe rechazarse`);
+    assert.equal(r.motivo, 'tipo_documento_no_calculable');
+    assert.equal(r.dte.tipo_dte, tipo);
+  }
 });
 
 test('lote mixto: cada archivo se lee de forma independiente (XML + PDF texto + basura)', async () => {

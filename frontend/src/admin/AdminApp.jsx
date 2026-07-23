@@ -39,11 +39,11 @@ const NAV = [
   { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
 ];
 
-// El panel admin es su propia "app" instalable, distinta del terminal
-// Aduana Verde (que usa /manifest.webmanifest, start_url "/pos"): mientras
-// se está en /admin, el navegador ofrece instalar "sicr3p Admin" con su
-// propio nombre/scope — mismo service worker (sw.js) para ambas, sin
-// cache especial de datos operativos.
+// El panel admin es su propia "app" instalable, distinta del sitio público
+// (que usa /manifest.webmanifest, start_url "/"): mientras se está en
+// /admin, el navegador ofrece instalar "sicr3p Admin" con su propio
+// nombre/scope — mismo service worker (sw.js) para ambas, sin cache
+// especial de datos operativos.
 function useManifestAdmin() {
   useEffect(() => {
     const link = document.querySelector('link[rel="manifest"]');
