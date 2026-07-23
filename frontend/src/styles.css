@@ -879,9 +879,10 @@ table.data tr:hover td { background: #f3f8f5; }
 .av2-hero {
   position: relative;
   background:
-    radial-gradient(720px 420px at 82% 8%, rgba(40, 167, 69, 0.22), transparent 62%),
-    radial-gradient(560px 380px at 8% 92%, rgba(40, 167, 69, 0.12), transparent 60%),
-    linear-gradient(160deg, #0f1f2e 0%, #14293c 60%, #0f1f2e 100%);
+    radial-gradient(760px 460px at 82% 6%, rgba(40, 167, 69, 0.26), transparent 62%),
+    radial-gradient(600px 400px at 6% 94%, rgba(40, 167, 69, 0.14), transparent 60%),
+    radial-gradient(900px 520px at 50% -12%, rgba(59, 98, 134, 0.32), transparent 65%),
+    linear-gradient(165deg, #0b1826 0%, #14293c 48%, #102638 78%, #0b1826 100%);
   color: #fff;
   overflow: hidden;
 }
@@ -932,13 +933,39 @@ table.data tr:hover td { background: #f3f8f5; }
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 .av2-btn-ghost:hover { background: rgba(255, 255, 255, 0.12); color: #fff; text-decoration: none; }
-.av2-trust { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 26px; }
-.av2-trust span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: #94a3b8; }
+.av2-trust { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.av2-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
 .av2-trust svg { color: #4ade80; }
 
 /* Mock del Pasaporte Digital (hero y sección resultado) */
-.av2-pas-wrap { display: flex; justify-content: flex-end; }
+.av2-pas-wrap { display: flex; justify-content: flex-end; position: relative; }
+/* Glow verde suave detrás del pasaporte flotante (solo se nota sobre
+   fondos oscuros; gradiente estático, sin animación) */
+.av2-pas-wrap::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(420px, 80vw);
+  height: min(420px, 80vw);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(40, 167, 69, 0.3), rgba(40, 167, 69, 0.08) 55%, transparent 72%);
+  pointer-events: none;
+}
 .av2-pas-card {
+  position: relative;
+  z-index: 1;
   width: min(340px, 100%);
   background: rgba(255, 255, 255, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.5);
@@ -981,13 +1008,22 @@ table.data tr:hover td { background: #f3f8f5; }
 .av2-bento-3 { grid-template-columns: repeat(3, 1fr); }
 .av2-bento-card {
   background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  border: 1px solid rgba(15, 31, 46, 0.08);
+  border-radius: 18px;
   padding: 26px 26px 22px;
-  box-shadow: var(--shadow);
+  box-shadow:
+    0 1px 2px rgba(15, 31, 46, 0.04),
+    0 6px 18px rgba(15, 31, 46, 0.05);
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
 }
-.av2-bento-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-2); border-color: var(--green-100); }
+.av2-bento-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(40, 167, 69, 0.35);
+  box-shadow:
+    0 1px 2px rgba(15, 31, 46, 0.05),
+    0 8px 16px rgba(15, 31, 46, 0.07),
+    0 22px 48px rgba(15, 31, 46, 0.1);
+}
 .av2-bento-card h3 { margin: 12px 0 6px; font-size: 17px; }
 .av2-bento-card p { margin: 0; color: var(--gray); font-size: 13.5px; line-height: 1.6; }
 .av2-bento-ico {
@@ -1030,6 +1066,8 @@ table.data tr:hover td { background: #f3f8f5; }
 @media (prefers-reduced-motion: reduce) {
   .av2-reveal { opacity: 1; transform: none; transition: none; }
   .av2-pas-card { animation: none; }
+  .av2-bento-card { transition: none; }
+  .av2-bento-card:hover { transform: none; }
 }
 
 @media (max-width: 900px) {

@@ -32,7 +32,7 @@ function AvLayout({ children, t }) {
           <span className="av2-logo-hoja"><Icon.Leaf size={18} /></span>
           <span className="av2-logo-nombre" style={{ fontSize: 16 }}>Aduana Verde<span style={{ color: 'var(--green)' }}>.</span></span>
         </span>
-        <span>{t('av.footer_red')} <Link to="/" style={{ color: '#4ade80', fontWeight: 700 }}>sicr3p</Link> · Antofagasta, Chile</span>
+        <span>{t('av.footer_red')} <Link to="/" style={{ color: '#4ade80', fontWeight: 700 }}>sicr3p</Link></span>
         <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
       </footer>
     </div>
