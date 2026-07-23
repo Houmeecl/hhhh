@@ -4,11 +4,13 @@ import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authAv } from '../api.js';
 import ResumenAv from './ResumenAv.jsx';
+import CargarAv from './CargarAv.jsx';
 import RepAv from './RepAv.jsx';
 import CompensacionAv from './CompensacionAv.jsx';
 
 const NAV = [
   { to: '/panel-verde', end: true, ico: Icon.Chart, label: 'Resumen' },
+  { to: '/panel-verde/cargar', ico: Icon.Doc, label: 'Cargar documento' },
   { to: '/panel-verde/rep', ico: Icon.Leaf, label: 'REP' },
   { to: '/panel-verde/compensacion', ico: Icon.Qr, label: 'Compensación' },
 ];
@@ -98,6 +100,7 @@ export default function AdminAvApp() {
       <main className="admin-main">
         <Routes>
           <Route index element={<ResumenAv />} />
+          <Route path="cargar" element={<CargarAv />} />
           <Route path="rep" element={<RepAv />} />
           <Route path="compensacion" element={<CompensacionAv />} />
           <Route path="*" element={<Navigate to="/panel-verde" replace />} />
