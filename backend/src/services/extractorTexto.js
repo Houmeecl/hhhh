@@ -68,14 +68,14 @@ export function ocrDisponible() {
  * reconocido o '' ante cualquier falla (archivo inexistente, formato no
  * soportado, tesseract ausente, timeout de 30 s).
  */
-export async function extraerTextoImagen(rutaArchivo) {
+export async function extraerTextoImagen(rutaArchivo, psm = '6') {
   try {
     const ext = path.extname(String(rutaArchivo || '')).toLowerCase();
     if (!EXTENSIONES_OCR.has(ext)) return '';
     if (!ocrDisponible()) return '';
     const { stdout } = await execFileAsync(
       'tesseract',
-      [rutaArchivo, 'stdout', '-l', 'spa+eng', '--psm', '6'],
+      [rutaArchivo, 'stdout', '-l', 'spa+eng', '--psm', String(psm)],
       { timeout: OCR_TIMEOUT_MS, maxBuffer: 10 * 1024 * 1024 }
     );
     return stdout || '';
@@ -89,14 +89,14 @@ export async function extraerTextoImagen(rutaArchivo) {
  * disco): escribe un temporal, corre tesseract y limpia siempre.
  * `extension` con o sin punto ('.png', 'jpg', …).
  */
-export async function extraerTextoImagenBuffer(buffer, extension) {
+export async function extraerTextoImagenBuffer(buffer, extension, psm = '6') {
   if (!buffer || !buffer.length) return '';
   const ext = String(extension || '').toLowerCase().replace(/^\.?/, '.');
   if (!EXTENSIONES_OCR.has(ext)) return '';
   const ruta = path.join(os.tmpdir(), `sicr3p-ocr-${crypto.randomUUID()}${ext}`);
   try {
     await fs.writeFile(ruta, buffer);
-    return await extraerTextoImagen(ruta);
+    return await extraerTextoImagen(ruta, psm);
   } catch {
     return '';
   } finally {
@@ -129,7 +129,7 @@ export function rasterPdfDisponible() {
  * Devuelve '' si falta pdftoppm o tesseract, o ante cualquier falla.
  * Temporales SIEMPRE limpiados (incluso en timeout).
  */
-export async function extraerTextoPdfEscaneado(buffer, maxPaginas = 2) {
+export async function extraerTextoPdfEscaneado(buffer, maxPaginas = 2, psm = '6') {
   if (!buffer || !buffer.length) return '';
   if (!rasterPdfDisponible() || !ocrDisponible()) return '';
   const base = path.join(os.tmpdir(), `sicr3p-raster-${crypto.randomUUID()}`);
@@ -138,7 +138,7 @@ export async function extraerTextoPdfEscaneado(buffer, maxPaginas = 2) {
     await fs.writeFile(rutaPdf, buffer);
     await execFileAsync(
       'pdftoppm',
-      ['-r', '300', '-png', '-f', '1', '-l', String(maxPaginas), rutaPdf, base],
+      ['-r', '300', '-gray', '-png', '-f', '1', '-l', String(maxPaginas), rutaPdf, base],
       { timeout: OCR_TIMEOUT_MS }
     );
     // pdftoppm nombra base-1.png, base-2.png… (o base-01.png según total).
@@ -150,7 +150,7 @@ export async function extraerTextoPdfEscaneado(buffer, maxPaginas = 2) {
       .map((f) => path.join(dir, f));
     let texto = '';
     for (const png of generados) {
-      texto += `${await extraerTextoImagen(png)}\n`;
+      texto += `${await extraerTextoImagen(png, psm)}\n`;
     }
     return texto.trim() ? texto : '';
   } catch {
@@ -192,7 +192,7 @@ export function heicDisponible() {
  * heif-convert y le pasa el OCR normal. Devuelve '' si falta el binario
  * o ante cualquier falla. Ambos temporales limpiados siempre.
  */
-export async function extraerTextoHeicBuffer(buffer) {
+export async function extraerTextoHeicBuffer(buffer, psm = '6') {
   if (!buffer || !buffer.length) return '';
   if (!heicDisponible() || !ocrDisponible()) return '';
   const base = path.join(os.tmpdir(), `sicr3p-heic-${crypto.randomUUID()}`);
@@ -201,7 +201,7 @@ export async function extraerTextoHeicBuffer(buffer) {
   try {
     await fs.writeFile(rutaHeic, buffer);
     await execFileAsync('heif-convert', [rutaHeic, rutaJpg], { timeout: OCR_TIMEOUT_MS });
-    return await extraerTextoImagen(rutaJpg);
+    return await extraerTextoImagen(rutaJpg, psm);
   } catch {
     return '';
   } finally {

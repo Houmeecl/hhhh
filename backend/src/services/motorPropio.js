@@ -21,6 +21,8 @@
 // documento, no se adivina).
 // ============================================================
 
+import { limpiar, normalizarOcr } from './textoOcr.js';
+
 const round4 = (n) => Math.round(n * 10000) / 10000;
 
 // Tope de monto por ítem (CLP). Mismo patrón que TARIFA_MAX_CLP en
@@ -48,13 +50,6 @@ export function evaluarItems(items) {
   return { calculables, descartados, fueraDeRango };
 }
 
-// Texto sin tildes ni mayúsculas, para comparar contra palabras clave.
-function limpiar(s) {
-  return String(s || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // quita tildes
-}
-
 // Mapea unidades libres del SII a una unidad canónica, o null si no se
 // reconoce. Decisión de diseño: 't-km' NO está en el mapa — el DTE chileno
 // no trae tonelada-kilómetro confiable, así que maritimo_contenedor queda
@@ -69,14 +64,6 @@ const UNIDADES = {
 export function normalizarUnidad(unidad) {
   const u = limpiar(unidad).replace(/[.\s]/g, '');
   return UNIDADES[u] || null;
-}
-
-// Normaliza confusiones típicas de OCR (0/O→o, 1/l→l, rn→m) para que un
-// error de reconocimiento de caracteres no le cueste la categoría a un
-// ítem real (ej. "e1ectricidad" u "0.NEMESA rnaritirno"). Se aplica por
-// igual a la glosa y a la palabra clave, así ambas quedan comparables.
-function normalizarOcr(s) {
-  return s.replace(/[01]/g, (c) => (c === '0' ? 'o' : 'l')).replace(/rn/g, 'm');
 }
 
 // Clasifica un ítem por coincidencia de palabra clave en su glosa.

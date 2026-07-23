@@ -171,3 +171,60 @@ test('extraerTextoImagen con ruta inexistente devuelve "" sin lanzar', async () 
   assert.equal(await extraerTextoImagen('/ruta/que/no/existe.heic'), ''); // formato fuera de alcance
   assert.equal(await extraerTextoImagen(null), '');
 });
+
+// ---------- Robustez OCR (F2: dígitos confundidos, cruce y receptor) ----------
+
+import { parsearFacturaTexto as parsearF2 } from '../src/services/facturaTexto.js';
+
+test('RUT con O y l de OCR se normaliza y valida por módulo 11', () => {
+  const p = parsearF2('Señor(es): EMPRESA SPA\nR.U.T.: 76.l23.456-O\nTOTAL $ 119.000');
+  assert.equal(p.rut_emisor, '76123456-0');
+});
+
+test('un token de puras letras jamás pasa por RUT ni por monto', () => {
+  const p = parsearF2('Ollll OIlO-l\nTOTAL $ IlO');
+  assert.equal(p.rut_emisor, null);
+  assert.equal(p.monto_total, 0);
+  assert.equal(p.senal_suficiente, false);
+});
+
+test('monto total con O/l de OCR se recupera ("1.19O.OOO" → 1.190.000)', () => {
+  const p = parsearF2('MONTO TOTAL: $ 1.19O.OOO');
+  assert.equal(p.monto_total, 1190000);
+});
+
+test('rutReceptorEsperado corrige la asignación posicional', () => {
+  const texto = 'Cliente: 11.111.111-1\nEmisor: 76.123.456-0\nTOTAL $ 50.000';
+  // Sin la opción: posicional (el primero sería emisor — incorrecto aquí).
+  const sin = parsearF2(texto);
+  assert.equal(sin.rut_emisor, '11111111-1');
+  // Con la opción: el RUT del trámite ancla al receptor.
+  const con = parsearF2(texto, { rutReceptorEsperado: '11.111.111-1' });
+  assert.equal(con.rut_receptor, '11111111-1');
+  assert.equal(con.rut_emisor, '76123456-0');
+});
+
+test('verificación cruzada: Σítems inflada (sobreconteo OCR) colapsa al total', () => {
+  const texto = [
+    'Servicio de aseo mensual 90.000',
+    'Servicio de aseo mensual 90.000', // línea duplicada por el OCR
+    'Insumos de limpieza 40.000',
+    'TOTAL $ 100.000',
+  ].join('\n');
+  const p = parsearF2(texto);
+  assert.equal(p.verificaciones.colapsado, true);
+  assert.equal(p.items.length, 1);
+  assert.equal(p.items[0].monto, 100000); // anclado al total real
+});
+
+test('verificación cruzada: Σítems ≈ neto (total/1,19) NO colapsa', () => {
+  const texto = [
+    'Servicio de aseo mensual 60.000',
+    'Insumos de limpieza 40.000',
+    'TOTAL $ 119.000', // 100.000 neto + IVA
+  ].join('\n');
+  const p = parsearF2(texto);
+  assert.equal(p.verificaciones.colapsado, false);
+  assert.equal(p.verificaciones.cuadra_con_neto, true);
+  assert.equal(p.items.length, 2);
+});

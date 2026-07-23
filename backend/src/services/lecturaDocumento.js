@@ -42,7 +42,9 @@ function validarItems(items, base) {
   return null; // válido
 }
 
-export async function leerDocumento(buffer, nombreArchivo) {
+export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado } = {}) {
+  const opts = { rutReceptorEsperado };
+
   // 1) DTE XML: datos reales del documento (folio, RUT, ítems). Un XML
   //    sin ítems no tiene señal propia, pero conserva el dte parseado
   //    (folio/RUTs) por si el motor externo completa el cálculo.
@@ -56,36 +58,46 @@ export async function leerDocumento(buffer, nombreArchivo) {
     return { tipo: 'sin_senal', dte: dte || null, etapa: 'xml' };
   }
 
+  // Los caminos OCR reintentan UNA vez con --psm 3 (segmentación
+  // automática de página) cuando el --psm 6 por defecto (bloque uniforme)
+  // no entrega señal — facturas con tablas o dos columnas suelen
+  // recuperarse con la segmentación automática.
   let etapa = 'ninguna';
   try {
     if (/\.pdf$/i.test(nombreArchivo)) {
       etapa = 'pdf_texto';
-      let texto = await extraerTextoPdf(buffer);
-      let p = parsearFacturaTexto(texto);
+      const texto = await extraerTextoPdf(buffer);
+      const p = parsearFacturaTexto(texto, opts);
       if (p.senal_suficiente) {
         return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_texto', etapa };
       }
       // PDF sin capa de texto útil: rasterizar y leer con OCR.
       etapa = 'pdf_ocr';
-      texto = await extraerTextoPdfEscaneado(buffer);
-      p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) {
-        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      for (const psm of ['6', '3']) {
+        const t = await extraerTextoPdfEscaneado(buffer, 2, psm);
+        const q = parsearFacturaTexto(t, opts);
+        if (q.senal_suficiente) {
+          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
+        }
       }
     } else if (/\.(jpe?g|png)$/i.test(nombreArchivo) && ocrDisponible()) {
       etapa = 'imagen_ocr';
       const ext = nombreArchivo.split('.').pop();
-      const texto = await extraerTextoImagenBuffer(buffer, ext);
-      const p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) {
-        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      for (const psm of ['6', '3']) {
+        const t = await extraerTextoImagenBuffer(buffer, ext, psm);
+        const q = parsearFacturaTexto(t, opts);
+        if (q.senal_suficiente) {
+          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
+        }
       }
     } else if (/\.heic$/i.test(nombreArchivo)) {
       etapa = 'heic_ocr';
-      const texto = await extraerTextoHeicBuffer(buffer);
-      const p = parsearFacturaTexto(texto);
-      if (p.senal_suficiente) {
-        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_ocr', etapa };
+      for (const psm of ['6', '3']) {
+        const t = await extraerTextoHeicBuffer(buffer, psm);
+        const q = parsearFacturaTexto(t, opts);
+        if (q.senal_suficiente) {
+          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
+        }
       }
     }
   } catch {

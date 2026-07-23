@@ -232,7 +232,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
     // se toma recién con las lecturas ya resueltas.
     const lecturas = [];
     for (const file of files) {
-      lecturas.push(await leerDocumento(file.buffer, file.originalname));
+      // El RUT del formulario es la identidad del trámite (no un dato de
+      // factura): si aparece en el documento, ancla quién es el receptor.
+      lecturas.push(await leerDocumento(file.buffer, file.originalname, { rutReceptorEsperado: rut }));
     }
 
     // Rechazos del lote — TODOS de una vez (el operador re-escanea solo
