@@ -89,19 +89,27 @@ function Codigos({ flash }) {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Código</th><th>Empresa</th><th className="num">Créditos</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Código</th><th>Empresa</th><th className="num">Créditos</th><th>Último uso</th><th>Conexión</th><th>Estado</th><th></th></tr></thead>
           <tbody>
-            {items.map((c) => (
+            {items.map((c) => {
+              const conexion = c.creditos_usados > 0
+                ? { texto: 'Usó créditos', clase: 'badge-green' }
+                : c.primera_conexion_at
+                  ? { texto: 'Conectado, sin usar créditos', clase: 'badge-yellow' }
+                  : { texto: 'No conectado', clase: 'badge-gray' };
+              return (
               <tr key={c.id}>
                 <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{c.codigo}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{c.empresa || '—'}{c.email && <div style={{ fontSize: 12 }}>{c.email}</div>}</td>
                 <td className="num"><b>{c.creditos - c.creditos_usados}</b> / {c.creditos}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{c.ultimo_uso ? fmtFecha(c.ultimo_uso) : '—'}</td>
+                <td><span className={`badge ${conexion.clase}`}>{conexion.texto}</span></td>
                 <td><span className={`badge ${c.activo ? 'badge-green' : 'badge-gray'}`}>{c.activo ? 'Activo' : 'Inactivo'}</span></td>
                 <td><button className="btn btn-outline btn-sm" onClick={() => toggle(c)}>{c.activo ? 'Desactivar' : 'Activar'}</button></td>
               </tr>
-            ))}
-            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin códigos generados.</td></tr>}
+              );
+            })}
+            {items.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin códigos generados.</td></tr>}
           </tbody>
         </table>
         </div>

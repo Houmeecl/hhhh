@@ -86,6 +86,15 @@ router.get('/codigos/:codigo', async (req, res, next) => {
     );
     const c = rows[0];
     if (!c || !c.activo) return res.status(404).json({ error: 'Código inválido o inactivo.' });
+    // Marca la primera conexión (entrar con el código), distinta de consumir
+    // un crédito (subir una factura, ver public.js más abajo) — solo la
+    // primera vez, para poder distinguir en el admin "nunca entró" de
+    // "entró pero no llegó a subir nada".
+    await query(
+      `UPDATE codigos_acceso SET primera_conexion_at = now()
+       WHERE codigo = $1 AND primera_conexion_at IS NULL`,
+      [c.codigo]
+    );
     res.json({
       valido: true,
       codigo: c.codigo,
