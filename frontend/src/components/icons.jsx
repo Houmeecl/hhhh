@@ -79,6 +79,10 @@ export const Icon = {
     <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
     <path d="M12 3v12M12 15l-4-4M12 15l4-4" />
   </>),
+  Printer: ({ size = 22 }) => base(size, <>
+    <path d="M6 9V3h12v6" /><rect x="4" y="9" width="16" height="8" rx="1.5" />
+    <path d="M6 17v4h12v-4" /><path d="M7 12h.01" />
+  </>),
   Logout: ({ size = 22 }) => base(size, <>
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 12H3M3 12l3-3M3 12l3 3" />
   </>),
