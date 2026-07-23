@@ -50,16 +50,19 @@ export default function MotorPropio() {
         const propio = stats.propio || 0;
         const propioTexto = stats.propio_texto || 0;
         const propioOcr = stats.propio_ocr || 0;
+        const propioIA = stats.propio_ia || 0;
         const externo = stats.externo || 0;
         const total = stats.total || 0;
-        const independientes = propio + propioTexto + propioOcr;
+        const independientes = propio + propioTexto + propioOcr + propioIA;
         const pct = total > 0 ? (independientes / total) * 100 : 0;
         const filas = [
           ['DTE XML (propio)', propio],
-          ['PDF texto (propio)', propioTexto],
-          ['Imagen/escaneo OCR (propio)', propioOcr],
+          ['Texto/OCR vía IA (propio)', propioIA],
+          ['PDF texto — respaldo reglas (propio)', propioTexto],
+          ['Imagen/escaneo — respaldo reglas (propio)', propioOcr],
           ['Motor externo', externo],
         ];
+        const ia = stats.analisis_ia || {};
         const rechazados = stats.rechazados_total || 0;
         const etapas = Object.entries(stats.rechazos_por_etapa || {});
         return (
@@ -94,6 +97,36 @@ export default function MotorPropio() {
                     <b>{n}</b>
                   </div>
                 ))}
+              </div>
+            </div>
+            <div className="card card-pad" style={{ maxWidth: 420, flex: '1 1 300px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className={`badge ${stats.analisis_ia_activo ? 'badge-green' : 'badge-gray'}`}>
+                  {stats.analisis_ia_activo ? 'Activo' : 'Inactivo'}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Análisis con IA</span>
+              </div>
+              <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                Lee texto/OCR con más flexibilidad que las reglas — solo extrae y clasifica; el cálculo de CO2e
+                sigue siendo 100% del motor propio. Si no está configurado o falla, se usa el respaldo de reglas.
+              </div>
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Llamadas (30 días)</span>
+                  <b>{ia.llamadas_30d || 0}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Exitosas</span>
+                  <b>{ia.exitosas_30d || 0}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Latencia promedio</span>
+                  <b>{ia.latencia_prom_ms != null ? `${ia.latencia_prom_ms} ms` : '—'}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Costo estimado (30 días)</span>
+                  <b>${fmt(ia.costo_estimado_clp_30d || 0, 0)} CLP</b>
+                </div>
               </div>
             </div>
           </div>

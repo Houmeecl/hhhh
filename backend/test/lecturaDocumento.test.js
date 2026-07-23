@@ -210,3 +210,67 @@ test('factura real en PDF que cita su Orden de Compra como referencia: SÍ se ca
   assert.equal(r.motor, 'propio_texto');
   assert.equal(r.textoParseado.senal_suficiente, true);
 });
+
+// ---------- Integración con IA (stub inyectado, sin red) ----------
+// La IA real (analisisIA.analizarTexto) llama a la API de Anthropic — no
+// se puede ni se debe probar contra la red en la suite. Se inyecta un
+// stub vía la opción `analizarIA` (dependency injection) para probar la
+// cascada completa: IA primero, reglas como respaldo, mismas guardias.
+
+test('con IA disponible: una factura calculable se lee vía analisisIA (motor propio_ia)', async () => {
+  const analizarIA = async () => ({
+    tipo_no_calculable: null,
+    folio: '4521',
+    rut_emisor: '76123456-0',
+    rut_receptor: '11111111-1',
+    fecha: '2026-06-15',
+    monto_total: 450000,
+    items: [{ nombre: 'Suministro eléctrico', descripcion: null, cantidad: 500, unidad: 'kWh', monto: 450000 }],
+    senal_suficiente: true,
+    verificaciones: null,
+  });
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'factura.pdf', { analizarIA });
+  assert.equal(r.tipo, 'texto');
+  assert.equal(r.motor, 'propio_ia');
+  assert.equal(r.etapa, 'pdf_texto');
+  assert.equal(r.textoParseado.monto_total, 450000);
+});
+
+test('con IA disponible: un tipo no calculable se rechaza igual que con el parser de reglas', async () => {
+  const analizarIA = async () => ({ tipo_no_calculable: 'Orden de compra' });
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'orden.pdf', { analizarIA });
+  assert.equal(r.tipo, 'rechazo');
+  assert.equal(r.motivo, 'tipo_documento_no_calculable');
+  assert.equal(r.tipo_detectado, 'Orden de compra');
+});
+
+test('si la IA falla o no responde: cae al parser de reglas sin rechazar el documento', async () => {
+  const analizarIA = async () => { throw new Error('timeout simulado'); };
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'factura.pdf', { analizarIA });
+  // Mismo resultado que sin IA en absoluto (ver test de más arriba con FIXTURE_PDF).
+  assert.equal(r.tipo, 'texto');
+  assert.equal(r.motor, 'propio_texto');
+});
+
+test('si la IA no logra confianza (tipo "desconocido" ya filtrado a null): cae al parser de reglas', async () => {
+  // analisisIA.analizarTexto ya traduce tipo_documento:'desconocido' a null
+  // internamente — el stub simula exactamente ese contrato.
+  const analizarIA = async () => null;
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'factura.pdf', { analizarIA });
+  assert.equal(r.tipo, 'texto');
+  assert.equal(r.motor, 'propio_texto');
+});
+
+test('con IA disponible: un ítem con monto absurdo sigue disparando el tope (misma guardia, cualquier origen)', async () => {
+  const { MONTO_MAX_CLP_ITEM } = await import('../src/services/motorPropio.js');
+  const analizarIA = async () => ({
+    tipo_no_calculable: null,
+    monto_total: MONTO_MAX_CLP_ITEM + 1,
+    items: [{ nombre: 'Lectura corrupta', descripcion: null, cantidad: 1, unidad: null, monto: MONTO_MAX_CLP_ITEM + 1 }],
+    senal_suficiente: true,
+    verificaciones: null,
+  });
+  const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'factura.pdf', { analizarIA });
+  assert.equal(r.tipo, 'rechazo');
+  assert.equal(r.motivo, 'monto_fuera_de_rango');
+});

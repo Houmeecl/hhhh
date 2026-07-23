@@ -1,6 +1,7 @@
 import express from 'express';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { config } from '../config.js';
 
 // ============================================================
 // Motor propio de cálculo — administración de categorías
@@ -129,12 +130,13 @@ router.get('/estadisticas', async (req, res, next) => {
     const propio = n('propio');
     const propio_texto = n('propio_texto');
     const propio_ocr = n('propio_ocr');
+    const propio_ia = n('propio_ia');
     const propio_revisado = n('propio_revisado');
     const revision = n('revision');
     const externo = n('externo');
-    // "Propio" para el % de independencia = XML + texto de PDF + OCR
+    // "Propio" para el % de independencia = XML + texto de PDF + OCR + IA
     // (+ conteos históricos de la revisión, hoy eliminada).
-    const propioTotal = propio + propio_texto + propio_ocr + propio_revisado;
+    const propioTotal = propio + propio_texto + propio_ocr + propio_ia + propio_revisado;
 
     // Bitácora de rechazos (migración 030) — documentos ilegibles que
     // nunca llegaron a ser factura. Defensivo si la migración no corrió.
@@ -159,15 +161,40 @@ router.get('/estadisticas', async (req, res, next) => {
       if (err.code !== '42P01') throw err; // tabla aún no migrada → todo en 0
     }
 
+    // Análisis con IA (migración 033) — llamadas, éxito, latencia y costo
+    // estimado, para transparencia del admin. Defensivo si aún no migró.
+    let ia = { llamadas_30d: 0, exitosas_30d: 0, latencia_prom_ms: null, costo_estimado_clp_30d: 0 };
+    try {
+      const { rows: iaRows } = await query(
+        `SELECT COUNT(*) FILTER (WHERE created_at > now() - interval '30 days')::int AS llamadas,
+                COUNT(*) FILTER (WHERE exito AND created_at > now() - interval '30 days')::int AS exitosas,
+                COALESCE(AVG(latencia_ms) FILTER (WHERE created_at > now() - interval '30 days'), 0)::int AS latencia_prom,
+                COALESCE(SUM(costo_estimado_clp) FILTER (WHERE created_at > now() - interval '30 days'), 0)::numeric AS costo
+         FROM analisis_ia_uso`
+      );
+      const r = iaRows[0];
+      ia = {
+        llamadas_30d: r.llamadas,
+        exitosas_30d: r.exitosas,
+        latencia_prom_ms: r.llamadas > 0 ? r.latencia_prom : null,
+        costo_estimado_clp_30d: Number(r.costo),
+      };
+    } catch (err) {
+      if (err.code !== '42P01') throw err; // tabla aún no migrada → todo en 0
+    }
+
     res.json({
       total,
       propio,
       propio_texto,
       propio_ocr,
+      propio_ia,
       propio_revisado,
       revision,
       externo,
       motor_externo_activo: String(process.env.MOTOR_EXTERNO || 'on').toLowerCase() !== 'off',
+      analisis_ia_activo: config.analisisIA.enabled,
+      analisis_ia: ia,
       porcentaje_propio: total > 0 ? Math.round((propioTotal / total) * 1000) / 10 : 0,
       rechazados_total: rechazadosTotal,
       rechazados_30d: rechazados30d,

@@ -6,6 +6,7 @@ import {
 } from './extractorTexto.js';
 import { parsearFacturaTexto, detectarTipoNoCalculable } from './facturaTexto.js';
 import { evaluarItems } from './motorPropio.js';
+import { analisisIA } from './analisisIA.js';
 
 // ============================================================
 // Lectura automática de un documento — la cascada de decisión
@@ -24,10 +25,12 @@ import { evaluarItems } from './motorPropio.js';
 //     duplicarían o distorsionarían el CO2e si el cliente entrega varios
 //     documentos del mismo despacho)
 //  1) XML con ítems reales        → { tipo:'xml', dte }
-//  2) PDF con capa de texto       → { tipo:'texto', motor:'propio_texto' }
-//  3) PDF escaneado (raster+OCR)  → { tipo:'texto', motor:'propio_ocr' }
-//  4) JPG/PNG con OCR local       → { tipo:'texto', motor:'propio_ocr' }
-//  5) HEIC (heif-convert + OCR)   → { tipo:'texto', motor:'propio_ocr' }
+//  2) PDF con capa de texto       → IA primero (análisis flexible),
+//     respaldo con reglas (regex) si la IA no está disponible/falla
+//                                  → { tipo:'texto', motor:'propio_ia'|'propio_texto' }
+//  3) PDF escaneado (raster+OCR)  → ídem                → motor:'propio_ia'|'propio_ocr'
+//  4) JPG/PNG con OCR local       → ídem                → motor:'propio_ia'|'propio_ocr'
+//  5) HEIC (heif-convert + OCR)   → ídem                → motor:'propio_ia'|'propio_ocr'
 //  6) sin señal                   → { tipo:'sin_senal', etapa }
 //     (el llamador decide: motor externo si está activo, o rechazo —
 //      jamás corrección manual).
@@ -68,12 +71,42 @@ function rechazoPorTipoTexto(texto, etapa) {
   return tipo ? { tipo: 'rechazo', motivo: 'tipo_documento_no_calculable', etapa, tipo_detectado: tipo } : null;
 }
 
-export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado } = {}) {
+// Intenta leer el texto extraído (capa de PDF u OCR) con IA primero — más
+// flexible ante layouts raros y ruido de OCR que el parser de reglas — y
+// cae al parser de reglas si la IA no está disponible, falla, o no logra
+// señal suficiente. `analizarIA` es inyectable (por defecto
+// analisisIA.analizarTexto) para poder testear la cascada sin red.
+// Devuelve un resultado de leerDocumento, o null si ni la IA ni las
+// reglas lograron señal en ESTE intento (el llamador decide si reintenta
+// con otro PSM o sigue cayendo al siguiente formato).
+async function leerTexto(texto, etapa, opts, analizarIA) {
+  const ia = await analizarIA(texto).catch(() => null);
+  if (ia) {
+    if (ia.tipo_no_calculable) {
+      return { tipo: 'rechazo', motivo: 'tipo_documento_no_calculable', etapa, tipo_detectado: ia.tipo_no_calculable };
+    }
+    if (ia.senal_suficiente) {
+      return validarItems(ia.items, { etapa }) || { tipo: 'texto', textoParseado: ia, motor: 'propio_ia', etapa };
+    }
+  }
+  const rechazoTipo = rechazoPorTipoTexto(texto, etapa);
+  if (rechazoTipo) return rechazoTipo;
+  const p = parsearFacturaTexto(texto, opts);
+  if (p.senal_suficiente) {
+    const motor = etapa === 'pdf_texto' ? 'propio_texto' : 'propio_ocr';
+    return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor, etapa };
+  }
+  return null;
+}
+
+export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado, analizarIA = analisisIA.analizarTexto.bind(analisisIA) } = {}) {
   const opts = { rutReceptorEsperado };
 
   // 1) DTE XML: datos reales del documento (folio, RUT, ítems). Un XML
   //    sin ítems no tiene señal propia, pero conserva el dte parseado
-  //    (folio/RUTs) por si el motor externo completa el cálculo.
+  //    (folio/RUTs) por si el motor externo completa el cálculo. La IA
+  //    no participa aquí: el XML ya es dato estructurado del SII, sin
+  //    ambigüedad que resolver.
   if (/\.xml$/i.test(nombreArchivo)) {
     const dte = parseDte(buffer.toString('utf8'));
     if (dte && TIPOS_DTE_NO_CALCULABLES.has(dte.tipo_dte)) {
@@ -87,54 +120,39 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
     return { tipo: 'sin_senal', dte: dte || null, etapa: 'xml' };
   }
 
-  // Los caminos OCR reintentan UNA vez con --psm 3 (segmentación
-  // automática de página) cuando el --psm 6 por defecto (bloque uniforme)
-  // no entrega señal — facturas con tablas o dos columnas suelen
-  // recuperarse con la segmentación automática.
+  // Los caminos de texto/OCR intentan la IA primero (leerTexto) y caen al
+  // parser de reglas si no está disponible o no logra señal; los caminos
+  // OCR además reintentan UNA vez con --psm 3 (segmentación automática de
+  // página) cuando el --psm 6 por defecto (bloque uniforme) no entrega
+  // señal — facturas con tablas o dos columnas suelen recuperarse así.
   let etapa = 'ninguna';
   try {
     if (/\.pdf$/i.test(nombreArchivo)) {
       etapa = 'pdf_texto';
       const texto = await extraerTextoPdf(buffer);
-      const rechazoTipo = rechazoPorTipoTexto(texto, etapa);
-      if (rechazoTipo) return rechazoTipo;
-      const p = parsearFacturaTexto(texto, opts);
-      if (p.senal_suficiente) {
-        return validarItems(p.items, { etapa }) || { tipo: 'texto', textoParseado: p, motor: 'propio_texto', etapa };
-      }
+      const r = await leerTexto(texto, etapa, opts, analizarIA);
+      if (r) return r;
       // PDF sin capa de texto útil: rasterizar y leer con OCR.
       etapa = 'pdf_ocr';
       for (const psm of ['6', '3']) {
         const t = await extraerTextoPdfEscaneado(buffer, 2, psm);
-        const rechazoTipoOcr = rechazoPorTipoTexto(t, etapa);
-        if (rechazoTipoOcr) return rechazoTipoOcr;
-        const q = parsearFacturaTexto(t, opts);
-        if (q.senal_suficiente) {
-          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
-        }
+        const r2 = await leerTexto(t, etapa, opts, analizarIA);
+        if (r2) return r2;
       }
     } else if (/\.(jpe?g|png)$/i.test(nombreArchivo) && ocrDisponible()) {
       etapa = 'imagen_ocr';
       const ext = nombreArchivo.split('.').pop();
       for (const psm of ['6', '3']) {
         const t = await extraerTextoImagenBuffer(buffer, ext, psm);
-        const rechazoTipo = rechazoPorTipoTexto(t, etapa);
-        if (rechazoTipo) return rechazoTipo;
-        const q = parsearFacturaTexto(t, opts);
-        if (q.senal_suficiente) {
-          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
-        }
+        const r = await leerTexto(t, etapa, opts, analizarIA);
+        if (r) return r;
       }
     } else if (/\.heic$/i.test(nombreArchivo)) {
       etapa = 'heic_ocr';
       for (const psm of ['6', '3']) {
         const t = await extraerTextoHeicBuffer(buffer, psm);
-        const rechazoTipo = rechazoPorTipoTexto(t, etapa);
-        if (rechazoTipo) return rechazoTipo;
-        const q = parsearFacturaTexto(t, opts);
-        if (q.senal_suficiente) {
-          return validarItems(q.items, { etapa }) || { tipo: 'texto', textoParseado: q, motor: 'propio_ocr', etapa };
-        }
+        const r = await leerTexto(t, etapa, opts, analizarIA);
+        if (r) return r;
       }
     }
   } catch {

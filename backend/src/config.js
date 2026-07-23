@@ -23,6 +23,24 @@ export const config = {
     key: process.env.SIMPLE_API_KEY || '',
   },
 
+  // Análisis de documentos con IA (Anthropic Claude) — camino principal de
+  // lectura de texto/OCR en lecturaDocumento.js, con el motor de reglas
+  // (regex) como respaldo automático si no hay clave, la llamada falla, el
+  // plazo se agota, o la respuesta no valida contra el esquema esperado.
+  // La IA SOLO extrae y clasifica: el cálculo de CO2e sigue siendo 100%
+  // del motor propio determinista — nunca lo calcula la IA.
+  analisisIA: {
+    enabled: bool(process.env.ANALISIS_IA, true) && Boolean(process.env.ANTHROPIC_API_KEY),
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
+    modelo: process.env.ANALISIS_IA_MODELO || 'claude-sonnet-5',
+    timeoutMs: parseInt(process.env.ANALISIS_IA_TIMEOUT_MS || '15000', 10),
+    // Referenciales (ajustar según tarifa vigente de Anthropic) — solo
+    // para el costo estimado que se muestra en el panel de admin, igual
+    // que el costo fijo de referencia que ya usa simple_api_uso.
+    costoInputClp1k: Number(process.env.ANALISIS_IA_COSTO_INPUT_CLP_1K) || 3,
+    costoOutputClp1k: Number(process.env.ANALISIS_IA_COSTO_OUTPUT_CLP_1K) || 15,
+  },
+
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret_change_me',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_change_me',

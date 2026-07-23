@@ -174,6 +174,42 @@ function extraerItems(texto) {
 // a cuadra con b dentro de una tolerancia del 5%.
 const cuadra = (a, b) => b > 0 && Math.abs(a - b) <= b * 0.05;
 
+// Verificación cruzada (paridad con dte.js): la suma de ítems debe cuadrar
+// con el total (con IVA) o con el neto (total/1,19). Si la lectura duplicó
+// líneas (sobreconteo) o perdió la mayoría (subconteo), se colapsa al ítem
+// único por el total: se pierde granularidad de clasificación pero el CO2e
+// queda anclado al total real del documento — nunca se infla ni se inventa.
+// Compartida por el parser de reglas y por el análisis con IA: la misma
+// protección anti-alucinación aplica sin importar quién leyó el documento.
+export function verificarYColapsarItems(itemsIn, montoTotal) {
+  let items = itemsIn;
+  let verificaciones = null;
+  if (montoTotal > 0 && items.length >= 2) {
+    const sumaItems = items.reduce((a, it) => a + it.monto, 0);
+    const cuadraConTotal = cuadra(sumaItems, montoTotal);
+    const cuadraConNeto = cuadra(sumaItems, montoTotal / 1.19);
+    const sobreconteo = sumaItems > montoTotal * 1.05;
+    const subconteo = sumaItems < montoTotal * 0.5;
+    let colapsado = false;
+    if (!cuadraConTotal && !cuadraConNeto && (sobreconteo || subconteo)) {
+      items = [];
+      colapsado = true;
+    }
+    verificaciones = {
+      suma_items: sumaItems,
+      cuadra_con_total: cuadraConTotal,
+      cuadra_con_neto: cuadraConNeto,
+      colapsado,
+    };
+  }
+  // Sin líneas útiles pero con total real → un único ítem por el total,
+  // suficiente para el método por gasto (spend-based).
+  if (items.length === 0 && montoTotal > 0) {
+    items = [{ nombre: 'Documento (texto extraído)', descripcion: null, cantidad: 1, unidad: null, monto: montoTotal }];
+  }
+  return { items, verificaciones };
+}
+
 /**
  * Parsea el texto plano de una factura chilena.
  * Devuelve { folio, rut_emisor, rut_receptor, fecha, monto_total, items,
@@ -201,45 +237,8 @@ export function parsearFacturaTexto(texto, { rutReceptorEsperado } = {}) {
     rutEmisor = ruts.find((r) => r !== esperado) || null;
   }
 
-  let items = extraerItems(t);
-
-  // Verificación cruzada (paridad con dte.js): la suma de ítems debe
-  // cuadrar con el total (con IVA) o con el neto (total/1,19). Si el OCR
-  // duplicó líneas (sobreconteo) o perdió la mayoría (subconteo), se
-  // colapsa al ítem único por el total: se pierde granularidad de
-  // clasificación pero el CO2e queda anclado al total real del documento
-  // — nunca se infla ni se inventa.
-  let verificaciones = null;
-  if (montoTotal > 0 && items.length >= 2) {
-    const sumaItems = items.reduce((a, it) => a + it.monto, 0);
-    const cuadraConTotal = cuadra(sumaItems, montoTotal);
-    const cuadraConNeto = cuadra(sumaItems, montoTotal / 1.19);
-    const sobreconteo = sumaItems > montoTotal * 1.05;
-    const subconteo = sumaItems < montoTotal * 0.5;
-    let colapsado = false;
-    if (!cuadraConTotal && !cuadraConNeto && (sobreconteo || subconteo)) {
-      items = [];
-      colapsado = true;
-    }
-    verificaciones = {
-      suma_items: sumaItems,
-      cuadra_con_total: cuadraConTotal,
-      cuadra_con_neto: cuadraConNeto,
-      colapsado,
-    };
-  }
-
-  // Sin líneas útiles pero con total real → un único ítem por el total,
-  // suficiente para el método por gasto (spend-based).
-  if (items.length === 0 && montoTotal > 0) {
-    items = [{
-      nombre: 'Documento (texto extraído)',
-      descripcion: null,
-      cantidad: 1,
-      unidad: null,
-      monto: montoTotal,
-    }];
-  }
+  const extraidos = extraerItems(t);
+  const { items, verificaciones } = verificarYColapsarItems(extraidos, montoTotal);
 
   return {
     folio: folioMatch ? folioMatch[1] : null,
