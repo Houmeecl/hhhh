@@ -8,39 +8,14 @@ import { Icon } from '../components/icons.jsx';
 export default function MotorPropio() {
   const [categorias, setCategorias] = useState([]);
   const [stats, setStats] = useState(null);
-  const [pendientes, setPendientes] = useState([]);
   const [edit, setEdit] = useState(null);
-  const [rev, setRev] = useState(null); // documento de la cola en corrección
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
-  const cargar = () => Promise.all([api.motorCategorias(), api.motorEstadisticas(), api.motorRevision()])
-    .then(([c, s, r]) => { setCategorias(c.categorias); setStats(s); setPendientes(r.pendientes || []); })
+  const cargar = () => Promise.all([api.motorCategorias(), api.motorEstadisticas()])
+    .then(([c, s]) => { setCategorias(c.categorias); setStats(s); })
     .catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
-
-  const itemRevVacio = () => ({ nombre: '', cantidad: '', unidad: '', monto: '' });
-
-  async function confirmarRevision() {
-    try {
-      const items = rev.items
-        .filter((it) => it.nombre.trim() || it.monto)
-        .map((it) => ({
-          nombre: it.nombre.trim(),
-          cantidad: it.cantidad === '' ? null : parseFloat(String(it.cantidad).replace(',', '.')),
-          unidad: it.unidad.trim() || null,
-          monto: parseFloat(String(it.monto).replace(/\./g, '').replace(',', '.')) || 0,
-        }));
-      const r = await api.confirmarRevisionMotor(rev.id, {
-        folio: rev.folio.trim() || null,
-        rut_emisor: rev.rut_emisor.trim() || null,
-        rut_receptor: rev.rut_receptor.trim() || null,
-        items,
-      });
-      setRev(null); cargar();
-      flash(`Documento confirmado: ${fmt(r.factura.total_co2e, 4)} t CO2e, ya encadenado.`);
-    } catch (e) { flash(e.message, true); }
-  }
 
   async function guardar() {
     try {
@@ -75,18 +50,14 @@ export default function MotorPropio() {
         const propio = stats.propio || 0;
         const propioTexto = stats.propio_texto || 0;
         const propioOcr = stats.propio_ocr || 0;
-        const propioRevisado = stats.propio_revisado || 0;
-        const enRevision = stats.revision || 0;
         const externo = stats.externo || 0;
         const total = stats.total || 0;
-        const independientes = propio + propioTexto + propioOcr + propioRevisado;
+        const independientes = propio + propioTexto + propioOcr;
         const pct = total > 0 ? (independientes / total) * 100 : 0;
         const filas = [
           ['DTE XML (propio)', propio],
           ['PDF texto (propio)', propioTexto],
           ['Imagen/escaneo OCR (propio)', propioOcr],
-          ['Revisión confirmada (propio)', propioRevisado],
-          ['En cola de revisión', enRevision],
           ['Motor externo', externo],
         ];
         return (
@@ -108,34 +79,6 @@ export default function MotorPropio() {
       })()}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-        {pendientes.length > 0 && (
-          <div className="card card-pad" style={{ gridColumn: '1 / -1', borderLeft: '4px solid #d97706' }}>
-            <b style={{ fontSize: 15 }}>Cola de revisión — {pendientes.length} documento{pendientes.length === 1 ? '' : 's'}</b>
-            <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
-              Documentos sin datos extraíbles que quedaron esperando corrección humana
-              (con el motor externo apagado, nada sale a terceros). Al confirmar, el motor
-              propio calcula con tus datos y el documento recién ahí se encadena.
-            </p>
-            {pendientes.map((p) => (
-              <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '6px 0', borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0 }}>
-                  <b style={{ fontSize: 13 }}>{p.archivo_original}</b>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    Sesión {p.sesion_id} · {p.rut_sesion || 'sin RUT'} · {new Date(p.created_at).toLocaleString('es-CL')}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => api.abrirArchivoRevision(p.id).catch((e) => flash(e.message, true))}>Ver archivo</button>
-                  <button className="btn btn-primary btn-sm" onClick={() => setRev({
-                    id: p.id, archivo: p.archivo_original, texto: p.texto_extraido || '',
-                    folio: '', rut_emisor: p.rut_emisor || '', rut_receptor: p.rut_receptor || '',
-                    items: [itemRevVacio()],
-                  })}>Corregir y confirmar</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
         {categorias.map((c) => (
           <div className="card card-pad" key={c.codigo}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -198,52 +141,6 @@ export default function MotorPropio() {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setEdit(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar}>Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {rev && (
-        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setRev(null)}>
-          <div className="modal" style={{ maxWidth: 640 }}>
-            <h2 style={{ marginTop: 0, fontSize: 18 }}>Revisión: {rev.archivo}</h2>
-            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-              Ingresa lo que dice el documento. El CO2e lo calcula el motor propio con
-              estos datos — el total no se tipea nunca a mano.
-            </p>
-            {rev.texto && (
-              <details style={{ marginBottom: 10 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 13 }}>Texto que alcanzó a leer el motor</summary>
-                <pre style={{ fontSize: 11, maxHeight: 140, overflow: 'auto', background: 'var(--bg)', padding: 8, borderRadius: 6, whiteSpace: 'pre-wrap' }}>{rev.texto}</pre>
-              </details>
-            )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
-              <div className="field"><label>Folio</label>
-                <input value={rev.folio} onChange={(e) => setRev({ ...rev, folio: e.target.value })} placeholder="4521" /></div>
-              <div className="field"><label>RUT emisor</label>
-                <input value={rev.rut_emisor} onChange={(e) => setRev({ ...rev, rut_emisor: e.target.value })} placeholder="76.123.456-0" /></div>
-              <div className="field"><label>RUT receptor</label>
-                <input value={rev.rut_receptor} onChange={(e) => setRev({ ...rev, rut_receptor: e.target.value })} placeholder="11.111.111-1" /></div>
-            </div>
-            <label style={{ fontSize: 13, fontWeight: 600 }}>Ítems del documento</label>
-            {rev.items.map((it, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 70px 70px 1fr 32px', gap: 6, marginTop: 6, alignItems: 'center' }}>
-                <input placeholder="Descripción (ej: diésel grado B)" value={it.nombre}
-                  onChange={(e) => setRev({ ...rev, items: rev.items.map((x, j) => j === i ? { ...x, nombre: e.target.value } : x) })} />
-                <input placeholder="Cant." value={it.cantidad}
-                  onChange={(e) => setRev({ ...rev, items: rev.items.map((x, j) => j === i ? { ...x, cantidad: e.target.value.replace(/[^\d.,]/g, '') } : x) })} />
-                <input placeholder="Unidad" value={it.unidad}
-                  onChange={(e) => setRev({ ...rev, items: rev.items.map((x, j) => j === i ? { ...x, unidad: e.target.value } : x) })} />
-                <input placeholder="Monto CLP" value={it.monto}
-                  onChange={(e) => setRev({ ...rev, items: rev.items.map((x, j) => j === i ? { ...x, monto: e.target.value.replace(/[^\d.,]/g, '') } : x) })} />
-                <button className="btn btn-outline btn-sm" aria-label="Quitar ítem" disabled={rev.items.length === 1}
-                  onClick={() => setRev({ ...rev, items: rev.items.filter((_, j) => j !== i) })}>×</button>
-              </div>
-            ))}
-            <button className="btn btn-outline btn-sm" style={{ marginTop: 8 }}
-              onClick={() => setRev({ ...rev, items: [...rev.items, itemRevVacio()] })}>+ Agregar ítem</button>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
-              <button className="btn btn-outline" onClick={() => setRev(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={confirmarRevision}>Calcular, encadenar y confirmar</button>
             </div>
           </div>
         </div>

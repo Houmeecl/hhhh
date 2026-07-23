@@ -33,9 +33,9 @@ import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 const router = express.Router();
 
 // Kill switch del motor externo: con MOTOR_EXTERNO=off ningún documento
-// del cliente sale a un motor de terceros — lo irresoluble queda en la
-// cola de revisión humana (motor='revision', sin eslabón hasta confirmar).
-// Se lee por request (no al cargar el módulo) para poder probarlo en vivo.
+// del cliente sale a un motor de terceros — lo irresoluble se rechaza
+// (nunca se completa a mano). Se lee por request (no al cargar el
+// módulo) para poder probarlo en vivo.
 const motorExternoActivo = () =>
   String(process.env.MOTOR_EXTERNO || 'on').toLowerCase() !== 'off';
 
@@ -276,9 +276,8 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         //  3) PDF escaneado (raster+OCR)  → parser propio  (motor='propio_ocr')
         //  4) JPG/PNG con OCR local       → parser propio  (motor='propio_ocr')
         //  5) HEIC (heif-convert + OCR)   → parser propio  (motor='propio_ocr')
-        //  6) sin señal → motor externo, o cola de revisión humana si
-        //     MOTOR_EXTERNO=off (nada del cliente sale a terceros).
-        let textoParcial = ''; // lo que se alcanzó a leer, para la cola de revisión
+        //  6) sin señal → motor externo si está activo; si no, se rechaza
+        //     el documento (jamás se completa a mano).
         let textoParseado = null;
         let motorTexto = null;
         if (!(dte && dte.items?.length)) {
@@ -294,18 +293,15 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
               } else {
                 textoParseado = p; motorTexto = 'propio_texto';
               }
-              textoParcial = texto || '';
             } else if (/\.(jpe?g|png)$/i.test(file.originalname) && ocrDisponible()) {
               const ext = file.originalname.split('.').pop();
               const texto = await extraerTextoImagenBuffer(file.buffer, ext);
               const p = parsearFacturaTexto(texto);
               if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
-              textoParcial = texto || '';
             } else if (/\.heic$/i.test(file.originalname)) {
               const texto = await extraerTextoHeicBuffer(file.buffer);
               const p = parsearFacturaTexto(texto);
               if (p.senal_suficiente) { textoParseado = p; motorTexto = 'propio_ocr'; }
-              textoParcial = texto || '';
             }
           } catch {
             textoParseado = null; // cualquier falla → camino 6, sin romper la sesión
@@ -358,45 +354,30 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           }
           motor = 'externo';
         } else {
-          // MOTOR_EXTERNO=off: el documento queda EN REVISIÓN humana con
-          // total 0 (no se inventa nada) y SIN eslabón — se encadena recién
-          // cuando un operador confirma los datos corregidos. El archivo se
-          // guarda en facturas_revision para poder revisarlo, y se borra al
-          // confirmar.
-          analysis = {
-            invoice_id_simple: null,
-            numero_venta: dte?.folio ? `F-${dte.folio}` : null,
-            rut_emisor: dte?.rut_emisor || null,
-            rut_receptor: dte?.rut_receptor || rut,
-            total_co2e: 0,
-            categoria: null,
-            items: [],
-          };
-          motor = 'revision';
+          // Sin señal extraíble y con el motor externo apagado: se rechaza.
+          // Todos los datos de una factura —incluidos emisor y receptor—
+          // deben salir siempre de una lectura automática del documento,
+          // nunca de un tipeo humano de respaldo.
+          const e = new Error(
+            `No pudimos leer automáticamente "${file.originalname}". Vuelve a escanear el documento (buena luz, sin cortes) y cárgalo de nuevo.`
+          );
+          e.status = 422;
+          throw e;
         }
         totalSesion += Number(analysis.total_co2e || 0);
 
-        // Un documento en revisión NO se encadena todavía: sus datos van a
-        // cambiar cuando el operador los confirme, y un eslabón jamás se
-        // reescribe. Se encadena en el PUT de revisión, con los datos finales.
-        let hDoc = null;
-        let hPrevio = null;
-        let hCad = null;
-        let nEslabon = null;
-        if (motor !== 'revision') {
-          hDoc = hashDocumento({
-            numero_venta: analysis.numero_venta,
-            rut_emisor: analysis.rut_emisor,
-            rut_receptor: analysis.rut_receptor,
-            total_co2e: analysis.total_co2e,
-            categoria: analysis.categoria,
-            archivo_original: file.originalname,
-          });
-          hPrevio = hashAnterior;
-          hCad = hashCadena(hashAnterior, hDoc);
-          eslabon += 1;
-          nEslabon = eslabon;
-        }
+        const hDoc = hashDocumento({
+          numero_venta: analysis.numero_venta,
+          rut_emisor: analysis.rut_emisor,
+          rut_receptor: analysis.rut_receptor,
+          total_co2e: analysis.total_co2e,
+          categoria: analysis.categoria,
+          archivo_original: file.originalname,
+        });
+        const hPrevio = hashAnterior;
+        const hCad = hashCadena(hashAnterior, hDoc);
+        eslabon += 1;
+        const nEslabon = eslabon;
 
         const { rows: fRows } = await client.query(
           `INSERT INTO facturas
@@ -413,7 +394,7 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             analysis.rut_receptor,
             analysis.total_co2e,
             analysis.categoria,
-            motor === 'revision' ? 'en_revision' : 'procesada',
+            'procesada',
             motor,
             hDoc,
             hPrevio,
@@ -421,19 +402,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             nEslabon,
           ]
         );
-        if (motor !== 'revision') hashAnterior = hCad;
+        hashAnterior = hCad;
         const factura = fRows[0];
 
-        if (motor === 'revision') {
-          // Archivo original + texto parcial para que el operador pueda
-          // revisar. La fila se borra al confirmar (no se retiene de más).
-          await client.query(
-            `INSERT INTO facturas_revision (factura_id, archivo, mime, texto_extraido)
-             VALUES ($1,$2,$3,$4)
-             ON CONFLICT (factura_id) DO NOTHING`,
-            [factura.id, file.buffer, file.mimetype || null, textoParcial ? textoParcial.slice(0, 20000) : null]
-          );
-        }
         for (const it of analysis.items) {
           await client.query(
             `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total)
