@@ -150,8 +150,8 @@
     <tr><td><code>propio</code></td><td>XML DTE con ítems reales</td><td>El mejor caso: cantidades, unidades y montos estructurados del documento oficial del SII</td></tr>
     <tr><td><code>propio_texto</code></td><td>PDF con capa de texto</td><td>Ítems y montos leídos del texto del documento</td></tr>
     <tr><td><code>propio_ocr</code></td><td>PDF escaneado, JPG/PNG o HEIC vía OCR local</td><td>Ítems y montos reconocidos ópticamente; sin señal suficiente, no se calcula</td></tr>
-    <tr><td><code>propio_revisado</code></td><td>Corrección humana confirmada</td><td>Datos ingresados por un operador mirando el documento; el cálculo sigue siendo del motor</td></tr>
-    <tr><td><code>revision</code></td><td>En cola de revisión</td><td>Documento aún sin calcular — total 0, sin eslabón; jamás se inventa</td></tr>
+    <tr><td><code>propio_revisado</code></td><td>Histórico (camino eliminado)</td><td>Origen legado de documentos antiguos; la corrección manual fue eliminada y ningún documento nuevo recibe este origen</td></tr>
+    <tr><td><code>revision</code></td><td>Histórico (camino eliminado)</td><td>Origen legado; hoy un documento sin señal se rechaza (HTTP 422), queda en la bitácora de rechazos y se vuelve a escanear — jamás se inventa</td></tr>
     <tr><td><code>externo</code></td><td>Motor externo (residual, en retiro)</td><td>Solo si está habilitado y ningún camino local logró señal</td></tr>
   </table>
 </div>
@@ -224,9 +224,9 @@
     <tr><td>Kerosene / Jet A-1</td><td>Alcance 1 — combustión propia</td><td>2,54 kg/L</td><td>1,10</td><td>DEFRA 2024</td></tr>
     <tr><td>Refrigerante R-134a</td><td>Alcance 1 — fugitivas</td><td>1.530 kg/kg fugado (GWP100)</td><td>25,0</td><td>IPCC AR6 (2021)</td></tr>
     <tr><td>Refrigerante R-410A</td><td>Alcance 1 — fugitivas</td><td>2.256 kg/kg fugado (GWP100)</td><td>35,0</td><td>IPCC AR6 (2021)</td></tr>
-    <tr><td>Electricidad</td><td>Alcance 2 — electricidad comprada</td><td>0,2421 kg/kWh</td><td>0,60</td><td>MMA Chile — HuellaChile (2023)</td></tr>
-    <tr><td>Materiales</td><td>Alcance 3 · Cat. 1 — bienes</td><td>1,50 kg/kg</td><td>0,45</td><td>GHG Protocol (spend-based)</td></tr>
-    <tr><td>Agua / Agua potable</td><td>Alcance 3 · Cat. 1 — bienes</td><td>0,344–0,41 kg/m³</td><td>0,30</td><td>DEFRA 2024</td></tr>
+    <tr><td>Electricidad</td><td>Alcance 2 — electricidad comprada</td><td>0,2421 kg/kWh</td><td>0,60</td><td>CEN — SEN 2023, difundido por HuellaChile (MMA)</td></tr>
+    <tr><td>Materiales</td><td>Alcance 3 · Cat. 1 — bienes</td><td>1,50 kg/kg (proxy interno)</td><td>0,45</td><td>Físico: proxy interno sicr3p · Gasto: GHG Protocol (spend-based)</td></tr>
+    <tr><td>Agua potable</td><td>Alcance 3 · Cat. 1 — bienes</td><td>0,41 kg/m³</td><td>0,30</td><td>DEFRA 2024 (la categoría legada de 0,344 sin fuente externa fue desactivada)</td></tr>
     <tr><td>Servicios</td><td>Alcance 3 · Cat. 1 — servicios</td><td>— (solo gasto)</td><td>0,25</td><td>GHG Protocol (spend-based)</td></tr>
     <tr><td>Transporte terrestre</td><td>Alcance 3 · Cat. 4 — T&amp;D</td><td>0,12 kg/km</td><td>0,35</td><td>GLEC Framework v3 / ISO 14083</td></tr>
     <tr><td>Marítimo contenedor</td><td>Alcance 3 · Cat. 4 — T&amp;D</td><td>0,012 kg/t-km</td><td>0,20</td><td>GLEC Framework v3 / ISO 14083</td></tr>
@@ -236,8 +236,9 @@
   </table>
   <p class="ref">Todos los factores están en estado "avalada_referencial": la fuente que avala la
   METODOLOGÍA está citada, y el valor debe validarse contra la edición oficial vigente antes de
-  declararse "validada_oficial" (Anexo II). Los factores por gasto de las categorías nuevas son
-  proxies referenciales.</p>
+  declararse "validada_oficial" (Anexo II). TODOS los factores por gasto (columna kgCO2e/$1.000) son
+  proxies internos referenciales, sin cita externa — el estándar citado avala el MÉTODO
+  spend-based, no el valor.</p>
 
   <h3>3.1 Los dos métodos de cálculo</h3>
   <table>
@@ -274,23 +275,23 @@
     <div class="fila"><div class="nodo-p">¿El archivo es un <b>XML DTE</b> con ítems estructurados?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Motor propio<br>(origen: propio)</div></div>
     <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿Es un <b>PDF con capa de texto</b> y el parser encuentra señal suficiente (total &gt; 0)?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Parser de texto<br>(propio_texto)</div></div>
     <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿Es un <b>PDF escaneado</b>? Se rasteriza localmente (300 dpi) y se lee con OCR. ¿O es una <b>imagen JPG/PNG/HEIC</b>? Se lee con OCR local (HEIC se convierte antes). ¿Hay señal?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">OCR local<br>(propio_ocr)</div></div>
-    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin señal suficiente. <b>Jamás se inventa un dato.</b> Con el motor externo desactivado (configuración de independencia total), el documento espera corrección humana.</div><span class="flecha">→</span><div class="nodo-r">Cola de revisión<br>(revision → propio_revisado)</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin señal suficiente. <b>Jamás se inventa un dato ni se digita a mano.</b> Con el motor externo desactivado (configuración de independencia total), el envío se rechaza (HTTP 422), queda registrado en la bitácora de rechazos y el documento se vuelve a escanear.</div><span class="flecha">→</span><div class="nodo-r">Rechazo registrado<br>(re-escanear)</div></div>
   </div>
   <p class="fuente-fig">Fuente: comportamiento implementado en la plataforma (verificable en el código y por prueba en vivo)</p>
 
   <p class="figura-titulo">Figura 2: Árbol decisional del método de cálculo (se ejecuta por ítem)</p>
   <div class="arbol">
     <div class="fila"><div class="nodo-p">El ítem se clasifica por su glosa (gana la palabra clave más específica: "flete marítimo" le gana a "flete"). ¿La categoría tiene <b>factor físico</b> y el ítem trae <b>cantidad con unidad reconocida</b>?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método físico<br>cantidad × factor</div></div>
-    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿El ítem trae <b>monto</b>? (las unidades leídas de texto libre u OCR no se consideran confiables por diseño: solo el XML y la revisión humana entregan unidades al método físico)</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método por gasto<br>monto × factor</div></div>
-    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin cantidad ni monto: el ítem no aporta al total y el documento puede caer a revisión.</div><span class="flecha">→</span><div class="nodo-r">No se calcula</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿El ítem trae <b>monto</b>? (las unidades leídas de texto libre u OCR no se consideran confiables por diseño: el motor exige origen XML para habilitar el método físico)</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método por gasto<br>monto × factor</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin cantidad ni monto (o con monto negativo, como un descuento): el ítem se descarta del cálculo. Si TODOS los ítems del documento quedan descartados, el documento se trata como sin señal.</div><span class="flecha">→</span><div class="nodo-r">No se calcula</div></div>
   </div>
   <p class="fuente-fig">Fuente: comportamiento implementado en la plataforma</p>
 
   <div class="caja-alerta">
     <strong>Decisión de diseño declarada:</strong> una distancia o cantidad mencionada dentro del texto
     libre de una glosa (ej: "flete 1.360 km") NO se usa como dato físico — el texto libre y el OCR
-    son ambiguos y usar esos valores sería fabricar precisión. El dato físico entra por el XML DTE,
-    por la corrección humana en la cola de revisión, o por el módulo de viajes del panel.
+    son ambiguos y usar esos valores sería fabricar precisión. El dato físico entra por el XML DTE
+    o por el módulo de viajes del panel — el motor mismo rechaza unidades de cualquier otro origen.
   </div>
 </div>
 
@@ -385,8 +386,9 @@
     <li><strong>Sin verificación acreditada:</strong> ningún informe sicr3p constituye una
     verificación de tercera parte acreditada (ISO 14064-3); cada informe lo declara impreso.
     sicr3p deja el expediente ordenado para que esa verificación, si se requiere, cueste menos.</li>
-    <li><strong>Sin datos inventados:</strong> documento sin señal suficiente = documento sin
-    cálculo (cola de revisión), nunca un número supuesto.</li>
+    <li><strong>Sin datos inventados:</strong> documento sin señal suficiente = documento
+    rechazado (HTTP 422, registrado en la bitácora de rechazos y devuelto para re-escaneo),
+    nunca un número supuesto.</li>
     <li><strong>REP — declarar no es pagar:</strong> la captura de embalajes es insumo de gestión
     para la declaración del cliente; sicr3p no es sistema de gestión ni presenta declaraciones
     oficiales.</li>
