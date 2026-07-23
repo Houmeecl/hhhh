@@ -143,7 +143,8 @@ MOTOR_EXTERNO=off
 ```
 
 y reiniciar pm2. Desde ese momento ningún documento del cliente sale a un
-motor de terceros: lo ilegible queda en la **cola de revisión** del panel,
-donde un operador corrige los datos mirando el archivo, el motor propio
-calcula y el documento recién ahí se encadena. Con la cola bajo control,
-`SIMPLE_API_KEY` puede eliminarse del .env.
+motor de terceros: lo ilegible se **rechaza en el momento** (HTTP 422, sin
+registro parcial) y se pide reescanear el documento — todos los datos de
+una factura salen siempre de la lectura automática, nunca de un tipeo
+humano. Con la tasa de rechazo bajo control, `SIMPLE_API_KEY` puede
+eliminarse del .env.

@@ -10,7 +10,7 @@
 //
 // Contrato honesto: cualquier falla devuelve '' — NUNCA se lanza hacia el
 // flujo de sesiones. Sin texto no hay señal, y sin señal el llamador cae
-// al camino siguiente (motor externo o cola de revisión, según config).
+// al camino siguiente (motor externo, o rechazo del envío si está apagado).
 // ============================================================
 
 import { execFile, spawnSync } from 'node:child_process';

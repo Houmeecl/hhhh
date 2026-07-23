@@ -81,9 +81,9 @@ sicr3p **no vende datos** ni los cede para publicidad.
 
 ## 6. Retención y supresión
 
-- **Documentos en cola de revisión**: el archivo original se retiene SOLO
-  hasta que un operador confirma la revisión; al confirmar, se elimina
-  automáticamente (minimización por diseño).
+- **Documentos ilegibles**: si un documento no se puede leer de forma
+  automática, el envío se rechaza en el momento y NO se almacena ningún
+  archivo ni registro parcial (minimización por diseño).
 - **Datos de sesiones y cálculos**: se conservan mientras el servicio esté
   vigente, porque son el historial trazable del cliente. `[REVISAR ABOGADO:
   plazo máximo y política de eliminación a solicitud]`

@@ -119,7 +119,7 @@ autoalojado): `deploy/WEBMAIL.md` §9.
 
 - [ ] Observar el % de independencia en el panel "Motor propio" durante
   varias semanas.
-- [ ] Cuando esté ~100% sostenido (o la cola de revisión esté bajo control):
+- [ ] Cuando esté ~100% sostenido (con tasa de rechazo de ilegibles baja):
   poner `MOTOR_EXTERNO=off` en `backend/.env`, reiniciar, y evaluar dar de
   baja el contrato de itssimple (`SIMPLE_API_KEY` deja de ser necesaria).
 
