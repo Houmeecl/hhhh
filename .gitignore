@@ -25,6 +25,10 @@ backend/generated/
 !docs/**/*.pdf
 !prelanzamiento-empresas/public/muestra-informe.pdf
 
+# Video: solo se versiona el entregable final, no los clips crudos/intermedios
+docs/video/raw/
+docs/video/build/
+
 # Logs
 *.log
 npm-debug.log*
