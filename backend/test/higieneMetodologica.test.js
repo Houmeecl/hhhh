@@ -38,7 +38,9 @@ test('migración 031: materiales queda como proxy interno, sin cita inventada', 
   assert.match(sql, /proxy interno sicr3p, sin fuente externa/);
   // La FK a ghg_protocol_2004 se anula…
   assert.match(sql, /fuente_metodologica_id = NULL/);
-  // …y hay una guardia que solo actúa mientras siga apuntando al estándar spend-based.
+  // …la reescritura de la fuente va guardada por firma textual del seed 010…
+  assert.match(sql, /AND fuente = 'Factor genérico de insumos — mismo default de Capital Natural'/);
+  // …y la anulación de FK solo actúa mientras siga apuntando al estándar spend-based.
   assert.match(sql, /fuente_metodologica_id = \(SELECT id FROM fuentes_metodologicas WHERE codigo = 'ghg_protocol_2004'\)/);
   // El texto reconoce lo que SÍ avala el estándar (método por gasto), sin atribuirle el factor físico.
   assert.match(sql, /Método por gasto avalado por GHG Protocol \(spend-based\)/);
@@ -60,12 +62,14 @@ test('migración 031: electricidad documenta CEN—SEN solo si la fuente sigue s
   assert.match(sql, /AND fuente = 'HuellaChile \(MMA\) — SEN 2023: 0,2421 kgCO2e\/kWh'/);
 });
 
-test('migración 031: todos los factores por gasto quedan marcados como proxy interno, con guardia', () => {
+test('migración 031: la nota de proxy por gasto va acotada a los códigos del seed, con guardia', () => {
   assert.match(sql, /factor_gasto_kgco2e_clp1000 IS NOT NULL/);
   assert.match(sql, /Factor por gasto: proxy interno referencial, sin cita externa\./);
-  // Guardia anti-duplicado: no re-anexa la nota si ya está.
-  const guardias = sql.match(/fuente NOT LIKE '%proxy interno%'/g) || [];
-  assert.ok(guardias.length >= 2, 'guardia NOT LIKE proxy interno en materiales y en la nota global');
+  // Acotada al seed 010/018: una categoría futura del admin con cita
+  // externa legítima no debe recibir el sello.
+  assert.match(sql, /codigo IN \('electricidad','combustible'/);
+  // Guardia anti-duplicado amplia (también salta "proxy referencial" del 018).
+  assert.match(sql, /AND fuente NOT LIKE '%proxy%'/);
 });
 
 test('migración 031: no promete certificaciones ni inventa citas', () => {

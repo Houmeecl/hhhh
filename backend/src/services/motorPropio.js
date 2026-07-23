@@ -43,7 +43,10 @@ export function evaluarItems(items) {
     const monto = Number(it?.monto || 0);
     const cantidad = Number(it?.cantidad || 0);
     if (monto > MONTO_MAX_CLP_ITEM) { fueraDeRango = true; continue; }
-    if (monto < 0) { descartados += 1; continue; }
+    // Negativo en CUALQUIERA de los dos ejes descarta el ítem: un monto
+    // negativo es un descuento/reverso, y una cantidad negativa entraría
+    // al método físico produciendo CO2e negativo (vía de subdeclaración).
+    if (monto < 0 || cantidad < 0) { descartados += 1; continue; }
     if (monto === 0 && cantidad <= 0) { descartados += 1; continue; }
     calculables.push(it);
   }

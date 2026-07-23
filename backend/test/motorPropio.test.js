@@ -287,3 +287,20 @@ test('t-km nunca entra al método físico, ni siquiera desde XML (gasto-only por
   // $800.000 → 800 miles × 0,20 kg/miles = 160 kg = 0,16 t.
   assert.ok(Math.abs(r.co2e - 0.16) < 1e-9, `co2e esperado 0.16, fue ${r.co2e}`);
 });
+
+test('cantidad negativa con monto positivo se descarta: el físico jamás resta CO2e', () => {
+  const cats = categoriasEjemplo();
+  // Vector de subdeclaración detectado en auditoría: QtyItem negativo con
+  // MontoItem positivo entraría al método físico con CO2e negativo.
+  const malicioso = { nombre: 'Suministro electrico', cantidad: -1000000, unidad: 'kWh', monto: 1 };
+  const ev = evaluarItems([malicioso]);
+  assert.equal(ev.calculables.length, 0);
+  assert.equal(ev.descartados, 1);
+  const f = calcularFactura([
+    { nombre: 'Suministro electrico', cantidad: 500, unidad: 'kWh', monto: 100000 },
+    malicioso,
+  ], cats, { origen: 'xml' });
+  // Solo el ítem legítimo cuenta: 500 kWh × 0,2421 = 121,05 kg = 0,1211 t.
+  assert.equal(f.items_descartados, 1);
+  assert.ok(f.total_co2e > 0.12 && f.total_co2e < 0.13, `total ${f.total_co2e}`);
+});
