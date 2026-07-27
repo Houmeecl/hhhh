@@ -183,6 +183,24 @@ router.get('/estadisticas', async (req, res, next) => {
       if (err.code !== '42P01') throw err; // tabla aún no migrada → todo en 0
     }
 
+    // Método físico vs. por gasto (migración 035) — mide qué tan seguido el
+    // motor calcula sobre un dato físico real (cantidad × factor) en vez de
+    // caer al piso metodológico (monto × factor). Los NULL son ítems de
+    // antes de la migración, o del motor externo (no calcula método): se
+    // excluyen del porcentaje en vez de contarlos como "gasto".
+    let metodoFisico = 0;
+    let metodoGasto = 0;
+    try {
+      const { rows: mRows } = await query(
+        `SELECT metodo, COUNT(*)::int AS n FROM line_items WHERE metodo IS NOT NULL GROUP BY metodo`
+      );
+      metodoFisico = mRows.find((r) => r.metodo === 'fisico')?.n || 0;
+      metodoGasto = mRows.find((r) => r.metodo === 'gasto')?.n || 0;
+    } catch (err) {
+      if (err.code !== '42P01') throw err; // columna aún no migrada → todo en 0
+    }
+    const metodoTotal = metodoFisico + metodoGasto;
+
     res.json({
       total,
       propio,
@@ -192,6 +210,8 @@ router.get('/estadisticas', async (req, res, next) => {
       propio_revisado,
       revision,
       externo,
+      metodo_fisico_pct: metodoTotal > 0 ? Math.round((metodoFisico / metodoTotal) * 1000) / 10 : null,
+      metodo_gasto_pct: metodoTotal > 0 ? Math.round((metodoGasto / metodoTotal) * 1000) / 10 : null,
       motor_externo_activo: String(process.env.MOTOR_EXTERNO || 'on').toLowerCase() !== 'off',
       analisis_ia_activo: config.analisisIA.enabled,
       analisis_ia: ia,

@@ -225,6 +225,24 @@ test('origen texto NUNCA usa método físico aunque el ítem traiga unidad', () 
   assert.equal(f.total_co2e, 0.042);
 });
 
+test('origen ia_verificada SÍ usa método físico cuando la unidad coincide (documento ya verificado)', () => {
+  const cats = categoriasEjemplo();
+  // Mismo ítem de los dos tests anteriores: con 'ia_verificada' se comporta como 'xml'.
+  const f = calcularFactura([{ nombre: 'Suministro eléctrico SEN', cantidad: 2500, unidad: 'kWh', monto: 70000 }], cats, { origen: 'ia_verificada' });
+  assert.equal(f.total_co2e, 0.6053);
+  assert.equal(f.items[0].metodo, 'fisico');
+});
+
+test('calcularFactura persiste el campo metodo por ítem en su salida (no lo descarta)', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([
+    { nombre: 'Suministro eléctrico SEN', cantidad: 2500, unidad: 'kWh', monto: 70000 },
+    { nombre: 'Cargo por potencia', cantidad: 1, unidad: null, monto: 30000 },
+  ], cats, { origen: 'xml' });
+  assert.equal(f.items[0].metodo, 'fisico');
+  assert.equal(f.items[1].metodo, 'gasto');
+});
+
 test('ítems con monto negativo (descuentos / notas de crédito) se descartan', () => {
   const cats = categoriasEjemplo();
   const f = calcularFactura([

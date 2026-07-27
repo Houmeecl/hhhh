@@ -142,14 +142,15 @@
     </tr>
   </table>
 
-  <h3>1.1 Los seis orígenes del cálculo</h3>
+  <h3>1.1 Los siete orígenes del cálculo</h3>
   <p>Cada documento queda marcado con el origen exacto de su cálculo — el equivalente a declarar
   la configuración operacional en un inventario minero:</p>
   <table>
     <tr><th>Origen (campo motor)</th><th>Camino</th><th>Naturaleza del dato</th></tr>
     <tr><td><code>propio</code></td><td>XML DTE con ítems reales</td><td>El mejor caso: cantidades, unidades y montos estructurados del documento oficial del SII</td></tr>
-    <tr><td><code>propio_texto</code></td><td>PDF con capa de texto</td><td>Ítems y montos leídos del texto del documento</td></tr>
-    <tr><td><code>propio_ocr</code></td><td>PDF escaneado, JPG/PNG o HEIC vía OCR local</td><td>Ítems y montos reconocidos ópticamente; sin señal suficiente, no se calcula</td></tr>
+    <tr><td><code>propio_ia</code></td><td>Texto/OCR analizado por IA (camino principal para PDF/imagen)</td><td>Extrae y clasifica ítems, folio y RUTs; el cálculo de CO2e lo sigue haciendo el motor propio determinista, nunca la IA. Habilita método físico solo si el documento pasó la verificación cruzada Σítems≈total</td></tr>
+    <tr><td><code>propio_texto</code></td><td>PDF con capa de texto (respaldo de reglas si la IA no está disponible o falla)</td><td>Ítems y montos leídos por regex del texto del documento; nunca habilita método físico</td></tr>
+    <tr><td><code>propio_ocr</code></td><td>PDF escaneado, JPG/PNG o HEIC vía OCR local (mismo respaldo de reglas)</td><td>Ítems y montos reconocidos ópticamente; sin señal suficiente, no se calcula; nunca habilita método físico</td></tr>
     <tr><td><code>propio_revisado</code></td><td>Histórico (camino eliminado)</td><td>Origen legado de documentos antiguos; la corrección manual fue eliminada y ningún documento nuevo recibe este origen</td></tr>
     <tr><td><code>revision</code></td><td>Histórico (camino eliminado)</td><td>Origen legado; hoy un documento sin señal se rechaza (HTTP 422), queda en la bitácora de rechazos y se vuelve a escanear — jamás se inventa</td></tr>
     <tr><td><code>externo</code></td><td>Motor externo (residual, en retiro)</td><td>Solo si está habilitado y ningún camino local logró señal</td></tr>
@@ -282,16 +283,19 @@
   <p class="figura-titulo">Figura 2: Árbol decisional del método de cálculo (se ejecuta por ítem)</p>
   <div class="arbol">
     <div class="fila"><div class="nodo-p">El ítem se clasifica por su glosa (gana la palabra clave más específica: "flete marítimo" le gana a "flete"). ¿La categoría tiene <b>factor físico</b> y el ítem trae <b>cantidad con unidad reconocida</b>?</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método físico<br>cantidad × factor</div></div>
-    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿El ítem trae <b>monto</b>? (las unidades leídas de texto libre u OCR no se consideran confiables por diseño: el motor exige origen XML para habilitar el método físico)</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método por gasto<br>monto × factor</div></div>
+    <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; ¿El ítem trae <b>monto</b>? (las unidades leídas por el parser de reglas de texto libre u OCR no se consideran confiables por diseño; una unidad leída por IA solo habilita el método físico cuando su documento ya pasó la verificación cruzada Σítems≈total — si no, o si viene del parser de reglas, se trata como sin unidad confiable)</div><span class="flecha">→ <span class="etiqueta-si">SÍ</span> →</span><div class="nodo-r">Método por gasto<br>monto × factor</div></div>
     <div class="fila"><div class="nodo-p"><span class="etiqueta-no">NO ↓</span> &nbsp; Sin cantidad ni monto (o con monto negativo, como un descuento): el ítem se descarta del cálculo. Si TODOS los ítems del documento quedan descartados, el documento se trata como sin señal.</div><span class="flecha">→</span><div class="nodo-r">No se calcula</div></div>
   </div>
   <p class="fuente-fig">Fuente: comportamiento implementado en la plataforma</p>
 
   <div class="caja-alerta">
     <strong>Decisión de diseño declarada:</strong> una distancia o cantidad mencionada dentro del texto
-    libre de una glosa (ej: "flete 1.360 km") NO se usa como dato físico — el texto libre y el OCR
-    son ambiguos y usar esos valores sería fabricar precisión. El dato físico entra por el XML DTE
-    o por el módulo de viajes del panel — el motor mismo rechaza unidades de cualquier otro origen.
+    libre de una glosa que solo pasó por el parser de reglas (ej: "flete 1.360 km") NO se usa como
+    dato físico — el texto libre y el OCR sin verificación son ambiguos y usar esos valores sería
+    fabricar precisión. El dato físico entra por el XML DTE, por el módulo de viajes del panel, o
+    por una unidad que la IA extrajo Y que su propio documento validó cruzando Σítems contra el
+    total (misma verificación anti-alucinación que protege los montos) — sin esa verificación, o
+    viniendo del parser de reglas, el motor rechaza igual la unidad y calcula por gasto.
   </div>
 </div>
 

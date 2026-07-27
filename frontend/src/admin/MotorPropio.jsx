@@ -129,6 +129,25 @@ export default function MotorPropio() {
                 </div>
               </div>
             </div>
+            <div className="card card-pad" style={{ maxWidth: 420, flex: '1 1 300px' }}>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green-600)' }}>
+                {stats.metodo_fisico_pct != null ? `${fmt(stats.metodo_fisico_pct, 1)}%` : '—'}
+              </div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                de los ítems calculados por método físico (cantidad × factor), no por gasto (monto × factor) —
+                el piso metodológico cuando no hay unidad confiable.
+              </div>
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Método físico</span>
+                  <b>{stats.metodo_fisico_pct != null ? `${fmt(stats.metodo_fisico_pct, 1)}%` : '—'}</b>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Por gasto</span>
+                  <b>{stats.metodo_gasto_pct != null ? `${fmt(stats.metodo_gasto_pct, 1)}%` : '—'}</b>
+                </div>
+              </div>
+            </div>
           </div>
         );
       })()}

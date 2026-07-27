@@ -6,11 +6,17 @@
 // Metodología (misma jerarquía de calidad de dato citada en los PDF):
 //  - Método FÍSICO (nivel 2-3): si la unidad del ítem coincide con la
 //    unidad física de la categoría → co2e = cantidad × factor_físico.
-//    Solo con origen 'xml': las unidades leídas de texto libre u OCR
-//    no se consideran confiables (la guía metodológica lo promete y
-//    esta es la garantía en el motor, no solo en el parser).
+//    Habilitado con origen 'xml' (siempre) o 'ia_verificada': la IA
+//    (analisisIA.js) sí captura unidad de texto libre, pero solo se
+//    confía en ella cuando el documento ya pasó la verificación cruzada
+//    Σítems≈total (verificarYColapsarItems en facturaTexto.js) — si esa
+//    verificación no corrió o colapsó los ítems, el documento llega aquí
+//    con origen 'texto' y cae a gasto, igual que siempre. El parser de
+//    reglas (propio_texto/propio_ocr) nunca captura unidad (no hay nada
+//    que verificar ahí), así que para esos dos orígenes nada cambia.
 //  - Método por GASTO (nivel 4, spend-based del GHG Protocol): si la
-//    unidad no es reconocible → co2e = monto_CLP × factor_gasto.
+//    unidad no es reconocible, o el origen no la habilita → co2e =
+//    monto_CLP × factor_gasto.
 //
 // Guardias: un ítem sin cantidad física utilizable NI monto > 0 se
 // descarta ("Sin cantidad ni monto → No se calcula", Figura 2 de la
@@ -112,13 +118,15 @@ export function clasificar(texto, categorias) {
 }
 
 // Calcula el CO2e (tCO2e) de un ítem de factura, eligiendo método físico o
-// de gasto. `origen` decide si el método físico está disponible: solo 'xml'
-// (unidades reales del DTE). Es un helper de bajo nivel — la política de
-// origen por defecto (conservadora) vive en calcularFactura.
+// de gasto. `origen` decide si el método físico está disponible: 'xml'
+// (unidades reales del DTE) o 'ia_verificada' (unidad extraída por IA, solo
+// cuando el llamador ya confirmó que el documento pasó la verificación
+// cruzada Σítems≈total — ver public.js). Es un helper de bajo nivel — la
+// política de origen por defecto (conservadora) vive en calcularFactura.
 export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, categorias, origen = 'xml') {
   const codigo = clasificar(`${nombre || ''} ${descripcion || ''}`, categorias);
   const cat = categorias.get(codigo);
-  const unidadCanonica = origen === 'xml' ? normalizarUnidad(unidad) : null;
+  const unidadCanonica = (origen === 'xml' || origen === 'ia_verificada') ? normalizarUnidad(unidad) : null;
 
   let co2e, metodo;
   if (unidadCanonica && cat.unidad_fisica === unidadCanonica && Number(cat.factor_fisico_kgco2e) > 0) {
@@ -141,8 +149,9 @@ export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, c
 // Calcula la factura completa a partir de los ítems reales del documento.
 // Devuelve el MISMO shape que simpleApi.analyzeInvoice() — drop-in — más
 // `items_descartados` (ítems sin datos o negativos, excluidos del cálculo).
-// origen: 'xml' habilita el método físico; 'texto' (default, conservador)
-// fuerza método por gasto aunque el ítem traiga unidad.
+// origen: 'xml' o 'ia_verificada' habilitan el método físico; 'texto'
+// (default, conservador) fuerza método por gasto aunque el ítem traiga
+// unidad — ver calcularItem() para el detalle de cada origen.
 export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {}) {
   if (![...(categorias?.values() || [])].some((c) => c.activo)) {
     throw new Error('Motor sin categorías activas configuradas.');
@@ -163,7 +172,7 @@ export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {})
   return {
     total_co2e: total,
     categoria: dominante?.categoria || 'Sin categoría',
-    items: items.map(({ descripcion, cantidad, co2e, porcentaje_total }) => ({ descripcion, cantidad, co2e, porcentaje_total })),
+    items: items.map(({ descripcion, cantidad, co2e, porcentaje_total, metodo }) => ({ descripcion, cantidad, co2e, porcentaje_total, metodo })),
     items_descartados: descartados,
   };
 }

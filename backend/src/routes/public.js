@@ -348,10 +348,18 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           };
           motor = 'propio';
         } else if (lectura.tipo === 'texto') {
-          // Motor propio sobre texto extraído (PDF con capa de texto u OCR):
-          // los montos reales del documento alimentan el método por gasto.
+          // Motor propio sobre texto extraído (PDF con capa de texto, OCR, o
+          // IA): el parser de reglas (propio_texto/propio_ocr) nunca captura
+          // unidad, así que siempre cae a gasto. La IA (propio_ia) sí captura
+          // unidad, pero solo se habilita el método físico cuando su propio
+          // documento ya pasó la verificación cruzada Σítems≈total (no
+          // colapsó) — si colapsó, o no corrió (menos de 2 ítems), sigue
+          // tratándose como 'texto' (gasto), igual que siempre.
           const { textoParseado } = lectura;
-          const calc = calcularFactura(textoParseado.items, categoriasMotor, { origen: 'texto' });
+          const origenCalculo = (lectura.motor === 'propio_ia' && textoParseado.verificaciones?.colapsado === false)
+            ? 'ia_verificada'
+            : 'texto';
+          const calc = calcularFactura(textoParseado.items, categoriasMotor, { origen: origenCalculo });
           analysis = {
             invoice_id_simple: null,
             numero_venta: textoParseado.folio ? `F-${textoParseado.folio}` : null,
@@ -422,9 +430,9 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
         for (const it of analysis.items) {
           await client.query(
-            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total)
-             VALUES ($1,$2,$3,$4,$5)`,
-            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total]
+            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null]
           );
         }
         // Capital Natural: cargos automáticos en las cuentas ambientales activas.
