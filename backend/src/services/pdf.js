@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl } from './qr.js';
+import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
@@ -988,6 +988,63 @@ export async function generateReporteCbam({ mandante, lotes }) {
     'verificador acreditado exigida por el Art. 8 y el Art. 10 del Reglamento (UE) 2023/956 bajo el régimen ' +
     'definitivo (vigente desde el 1 de enero de 2026). sicr3p no es certificador ni verificador de tercera parte.',
     60, y + 24, { width: W - 24 }
+  );
+
+  return bufferDoc(doc);
+}
+
+// ---------- CREDENCIAL VIRTUAL — Firma del Proveedor (atestación) ----------
+// IMPORTANTE (honestidad, ver migración 038): esto NO es una firma
+// electrónica con validez legal (Ley N° 19.799 de Chile). Es una
+// atestación sellada por hash: confirma que el titular de esta credencial
+// (identidad fijada por quien la emitió) registró el eslabón 'proveedor'
+// en la cadena de custodia del lote. sicr3p no certifica ni verifica la
+// identidad del firmante más allá de la credencial entregada.
+export async function generateCredencialProveedor({ credencial, lote }) {
+  const doc = new PDFDocument({ size: [420, 260], margin: 0 });
+  const qr = await qrBufferDe(firmaProveedorUrl(credencial.serial));
+
+  // Fondo
+  doc.rect(0, 0, 420, 260).fill('#ffffff');
+  doc.roundedRect(8, 8, 404, 244, 12).lineWidth(1.5).stroke(BORDER);
+
+  // Encabezado
+  drawLogo(doc, 24, 24, 20);
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(GREEN)
+    .text('CREDENCIAL DE FIRMA · PROVEEDOR', 24, 50, { lineBreak: false });
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+    .text(' · Pasaporte de Origen', doc.x, 51, { lineBreak: false });
+
+  // Serial protagonista
+  doc.font('Courier-Bold').fontSize(24).fillColor(NAVY).text(credencial.serial, 24, 74);
+
+  // Datos de la credencial — 4 filas en el mismo espacio que el molde de
+  // 3 filas de la Tarjeta de Viaje (menor paso vertical, para no invadir
+  // la caja de disclaimer que empieza en y=200).
+  let y = 106;
+  const fila = (label, value) => {
+    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(label.toUpperCase(), 24, y);
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(NAVY)
+      .text(String(value || '—').slice(0, 40), 24, y + 9, { width: 235 });
+    y += 21;
+  };
+  fila('Lote', lote.codigo);
+  fila('Material', MATERIAL_EXPEDIENTE[lote.material] || lote.material);
+  fila('Empresa proveedora', credencial.nombre_empresa);
+  fila('RUT', credencial.rut_empresa);
+
+  // QR grande — el corazón de la credencial
+  doc.image(qr, 282, 62, { width: 118, height: 118 });
+  doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+    .text('Escanee para ver el estado de la credencial', 274, 184, { width: 134, align: 'center' });
+
+  // Pie — disclaimer de honestidad, obligatorio
+  doc.roundedRect(24, 200, 372, 40, 8).fill(LIGHT);
+  doc.font('Helvetica').fontSize(6.7).fillColor(NAVY).text(
+    'Esta credencial NO es una firma electrónica con validez legal (Ley N° 19.799). Es una atestación ' +
+    'sellada con hash: quien tenga la clave entregada junto con esta credencial firma UNA sola vez el ' +
+    'eslabón "proveedor" de este lote, con la identidad indicada arriba (fijada al emitir la credencial).',
+    34, 205, { width: 352 }
   );
 
   return bufferDoc(doc);

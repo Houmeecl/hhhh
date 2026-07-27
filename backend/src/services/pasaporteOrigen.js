@@ -361,6 +361,39 @@ export function serialTarjetaValido(s) {
   return /^TV-[0-9A-F]{4}$/.test(String(s || ''));
 }
 
+// ---------- Credencial de Firma del Proveedor (atestación, migración 038) ----------
+// NO es firma electrónica con validez legal (Ley N° 19.799) — es una
+// atestación sellada por hash. La identidad (rut_empresa/nombre_empresa)
+// la fija el EMISOR de la credencial al crearla; el firmante nunca la
+// declara. Mismo espíritu de serial corto que generarSerialTarjeta.
+export function generarSerialCredencialProveedor() {
+  return `FP-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+}
+
+export function serialCredencialProveedorValido(s) {
+  return /^FP-[0-9A-F]{4}$/.test(String(s || ''));
+}
+
+// Identidad que el ADMIN fija al emitir la credencial — se valida acá,
+// no al firmar (para no descubrir un RUT inválido recién en ese momento).
+// Reusa las mismas reglas de validarEslabon (RUT chileno módulo 11).
+export function validarIdentidadProveedor({ rut_empresa, nombre_empresa } = {}) {
+  const errores = [];
+  const rut = NORM(rut_empresa);
+  if (!rut) errores.push('rut_empresa es obligatorio.');
+  else if (!rutNormalizadoValido(rut)) errores.push('RUT inválido (dígito verificador).');
+  if (!String(nombre_empresa || '').trim()) errores.push('nombre_empresa es obligatorio.');
+  return { ok: errores.length === 0, errores, rut_normalizado: rut || null };
+}
+
+// Emitir la credencial solo tiene sentido si el tipo del lote incluye el
+// rol 'proveedor' en su cadena de custodia (hoy solo 'producto') — se
+// valida ANTES de crear la credencial, no se delega en validarEslabon
+// (que recién correría al firmar, mucho después de emitida la clave).
+export function loteAdmiteProveedor(lote) {
+  return (ROLES_POR_TIPO[lote?.tipo] || []).includes('proveedor');
+}
+
 // ---------- Anclaje del lote en la cadena GLOBAL ----------
 // Al cerrar un lote, su hash final se sella como eslabón de la cadena
 // global (junto a las facturas). Preimage canónico con prefijo literal

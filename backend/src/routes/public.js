@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso } from '../services/pdf.js';
-import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl } from '../services/qr.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
   filtrarPorVisibilidad, enmascararRut, balanceMasas,
@@ -1157,6 +1157,38 @@ router.get('/v/:serial/qr.png', async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
     res.type('png').send(await qrBufferDe(tarjetaUrl(rows[0].serial)));
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/f/:serial — resolución de credencial de firma del proveedor ----------
+// Solo lectura, sin login: dice el lote y si la credencial ya firmó
+// (atestación, migración 038 — NO es firma electrónica legal). Registrar
+// la firma exige la clave, vía /api/firma-proveedor/auth.
+router.get('/f/:serial', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.serial, c.nombre_empresa, c.firmado_at, l.codigo, l.estado AS lote_estado
+       FROM credenciales_proveedor c JOIN lotes_minerales l ON l.id = c.lote_id
+       WHERE c.serial = $1 AND c.activo = true`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Credencial no encontrada o inactiva' });
+    res.json({
+      serial: rows[0].serial, codigo: rows[0].codigo, nombre_empresa: rows[0].nombre_empresa,
+      firmado: !!rows[0].firmado_at, lote_estado: rows[0].lote_estado,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/f/:serial/qr.png ----------
+router.get('/f/:serial/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT serial FROM credenciales_proveedor WHERE serial = $1 AND activo = true`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Credencial no encontrada o inactiva' });
+    res.type('png').send(await qrBufferDe(firmaProveedorUrl(rows[0].serial)));
   } catch (err) { next(err); }
 });
 

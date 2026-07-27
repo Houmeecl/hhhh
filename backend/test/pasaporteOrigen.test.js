@@ -398,3 +398,47 @@ test('validarMensajeTorre: estacionamiento exige zona; puerto/puerto_seco no; sa
   assert.equal(validarMensajeTorre({ destino: 'estacionamiento', zona: 'z'.repeat(100) }).zona.length, 60);
   assert.equal(validarMensajeTorre({ destino: 'puerto', zona: 'Zona X' }).zona, null);
 });
+
+// ---------- Credencial de Firma del Proveedor (atestación, migración 038) ----------
+// NO es firma electrónica con validez legal (Ley N° 19.799) — ver el
+// disclaimer en la propia migración y en pdf.js/generateCredencialProveedor.
+
+test('generarSerialCredencialProveedor produce FP-XXXX válidos y variados', async () => {
+  const { generarSerialCredencialProveedor, serialCredencialProveedorValido } = await import('../src/services/pasaporteOrigen.js');
+  const vistos = new Set();
+  for (let i = 0; i < 50; i++) {
+    const s = generarSerialCredencialProveedor();
+    assert.equal(serialCredencialProveedorValido(s), true, s);
+    vistos.add(s);
+  }
+  assert.ok(vistos.size > 40);
+  assert.equal(serialCredencialProveedorValido('TV-1234'), false);
+  assert.equal(serialCredencialProveedorValido('FP-12G4'), false);
+  assert.equal(serialCredencialProveedorValido(''), false);
+});
+
+test('validarIdentidadProveedor exige RUT válido y nombre no vacío', async () => {
+  const { validarIdentidadProveedor } = await import('../src/services/pasaporteOrigen.js');
+  assert.equal(validarIdentidadProveedor({ rut_empresa: '76.123.456-0', nombre_empresa: 'Acme SpA' }).ok, true);
+  assert.equal(validarIdentidadProveedor({ rut_empresa: '', nombre_empresa: 'Acme' }).ok, false);
+  assert.equal(validarIdentidadProveedor({ rut_empresa: '12345678-9', nombre_empresa: 'Acme' }).ok, false); // DV incorrecto a propósito
+  assert.equal(validarIdentidadProveedor({ rut_empresa: '76.123.456-0', nombre_empresa: '   ' }).ok, false);
+  assert.equal(validarIdentidadProveedor({}).ok, false);
+});
+
+test('loteAdmiteProveedor solo admite lotes tipo producto', async () => {
+  const { loteAdmiteProveedor } = await import('../src/services/pasaporteOrigen.js');
+  assert.equal(loteAdmiteProveedor({ tipo: 'producto' }), true);
+  assert.equal(loteAdmiteProveedor({ tipo: 'mineral' }), false);
+  assert.equal(loteAdmiteProveedor({ tipo: 'documental' }), false);
+  assert.equal(loteAdmiteProveedor({}), false);
+  assert.equal(loteAdmiteProveedor(undefined), false);
+});
+
+test('validarEslabon acepta rol proveedor solo en tipo producto (cinturón y tirantes con loteAdmiteProveedor)', () => {
+  const lote = { estado: 'abierto', tipo: 'producto', cantidad: 100 };
+  const r = validarEslabon({ rol: 'proveedor', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, lote, []);
+  assert.equal(r.ok, true);
+  const rMineral = validarEslabon({ rol: 'proveedor', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, { ...lote, tipo: 'mineral' }, []);
+  assert.equal(rMineral.ok, false);
+});

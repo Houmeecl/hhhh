@@ -7,6 +7,7 @@ import Verificar from './pages/Verificar.jsx';
 import Pasaporte from './pages/Pasaporte.jsx';
 import PasaporteLote from './pages/PasaporteLote.jsx';
 import TarjetaViaje from './pages/TarjetaViaje.jsx';
+import FirmaProveedor from './pages/FirmaProveedor.jsx';
 import Ingresar from './pages/Ingresar.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
@@ -47,6 +48,7 @@ export default function App() {
       <Route path="/pasaporte/:id" element={<Pasaporte />} />
       <Route path="/lote/:codigo" element={<PasaporteLote />} />
       <Route path="/v/:serial" element={<TarjetaViaje />} />
+      <Route path="/f/:serial" element={<FirmaProveedor />} />
       <Route path="/torre" element={<TorreFlota />} />
       <Route path="/torre/:codigo" element={<Torre />} />
       <Route path="/ingresar" element={<Ingresar />} />

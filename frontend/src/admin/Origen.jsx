@@ -324,6 +324,9 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       </div>
 
       <Tarjetas lote={lote} abierto={abierto} flash={flash} />
+      {(ROLES_POR_TIPO[lote.tipo || 'mineral'] || ROLES_POR_TIPO.mineral).includes('proveedor') && (
+        <CredencialesProveedor lote={lote} abierto={abierto} flash={flash} />
+      )}
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
         <h3 style={{ marginTop: 0 }}>Cadena de custodia ({fmtInt(lote.n_eslabones)} eslabones)</h3>
@@ -543,6 +546,120 @@ function Tarjetas({ lote, abierto, flash }) {
                       Credencial
                     </button>
                     <button className="btn btn-sm btn-outline" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Reactivar'}</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Credencial de Firma del Proveedor: atestación con credencial propia
+// (serial+clave) para el eslabón 'proveedor' — NO es firma electrónica con
+// validez legal (Ley N° 19.799). Identidad (RUT+empresa) fijada por el
+// admin al emitir; un solo uso.
+function CredencialesProveedor({ lote, abierto, flash }) {
+  const [items, setItems] = useState(null);
+  const [rut, setRut] = useState('');
+  const [nombreEmpresa, setNombreEmpresa] = useState('');
+  const [emitiendo, setEmitiendo] = useState(false);
+  const [nueva, setNueva] = useState(null); // { credencial, clave } — clave visible UNA vez
+
+  const cargar = () =>
+    api.origenCredencialesProveedor(lote.id).then((r) => setItems(r.credenciales)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, [lote.id]);
+
+  async function emitir() {
+    if (!validarRut(rut)) { flash('RUT inválido.', true); return; }
+    if (!nombreEmpresa.trim()) { flash('Falta el nombre de la empresa proveedora.', true); return; }
+    setEmitiendo(true);
+    try {
+      const r = await api.origenEmitirCredencialProveedor(lote.id, {
+        rut_empresa: formatearRut(rut), nombre_empresa: nombreEmpresa.trim(),
+      });
+      setNueva(r);
+      setRut('');
+      setNombreEmpresa('');
+      cargar();
+    } catch (e) { flash(e.message, true); }
+    finally { setEmitiendo(false); }
+  }
+
+  async function toggleActivo(c) {
+    try {
+      await api.origenEditarCredencialProveedor(c.id, { activo: !c.activo });
+      cargar();
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Credencial de firma del proveedor (atestación)</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        Emite la credencial, descarga el <b>PDF con QR</b> y envíaselo al proveedor con la clave. Con ella
+        confirma (una sola vez) su eslabón en la cadena de custodia. <b>Esto NO es una firma electrónica con
+        validez legal (Ley N° 19.799)</b> — es una atestación sellada por hash, con la identidad fijada aquí,
+        no la que declare quien firma.
+      </p>
+
+      {nueva && (
+        <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 12, marginBottom: 12 }}>
+          <b>Credencial {nueva.credencial.serial} emitida.</b>
+          <div style={{ fontSize: 13, marginTop: 4 }}>
+            Clave del proveedor (visible SOLO ahora — entrégala junto con la credencial):
+            <div style={{ fontFamily: 'monospace', fontSize: 18, marginTop: 4 }}>{nueva.clave}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Página de firma: <span style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/f/${nueva.credencial.serial}`}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <button className="btn btn-sm btn-primary" onClick={() => api.abrirCredencialProveedor(lote.id, nueva.credencial.id).catch((e) => flash(e.message, true))}>
+              Descargar credencial PDF
+            </button>
+            <button className="btn btn-sm btn-outline" onClick={() => setNueva(null)}>Entendido, ocultar clave</button>
+          </div>
+        </div>
+      )}
+
+      {abierto && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+            <label>RUT del proveedor</label>
+            <input value={rut} placeholder="76.123.456-0" onChange={(e) => setRut(e.target.value)} />
+          </div>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+            <label>Nombre de la empresa</label>
+            <input value={nombreEmpresa} placeholder="Proveedor Demo SpA" onChange={(e) => setNombreEmpresa(e.target.value)} />
+          </div>
+          <button className="btn btn-primary" onClick={emitir} disabled={emitiendo}>
+            {emitiendo ? <span className="spinner" /> : 'Emitir credencial'}
+          </button>
+        </div>
+      )}
+
+      {!items ? <div className="skeleton" style={{ height: 40 }} /> : !items.length ? (
+        <p className="muted" style={{ fontSize: 13 }}>Sin credenciales emitidas para este lote.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Serial</th><th>RUT</th><th>Empresa</th><th>Firmada</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {items.map((c) => (
+                <tr key={c.id}>
+                  <td style={{ fontFamily: 'monospace' }}>{c.serial}</td>
+                  <td>{c.rut_empresa}</td>
+                  <td>{c.nombre_empresa}</td>
+                  <td>{c.firmado_at ? fmtFecha(c.firmado_at) : <span className="badge badge-gray">sin firmar</span>}</td>
+                  <td><span className={`badge ${c.activo ? 'badge-green' : 'badge-gray'}`}>{c.activo ? 'activa' : 'inactiva'}</span></td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-sm btn-outline" style={{ marginRight: 6 }}
+                      onClick={() => api.abrirCredencialProveedor(lote.id, c.id).catch((e) => flash(e.message, true))}>
+                      Credencial
+                    </button>
+                    <button className="btn btn-sm btn-outline" onClick={() => toggleActivo(c)}>{c.activo ? 'Desactivar' : 'Reactivar'}</button>
                   </td>
                 </tr>
               ))}

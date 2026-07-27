@@ -91,6 +91,20 @@ export const api = {
   // --- Tarjeta de viaje (pública / portador) ---
   tarjetaResolver: (serial) => request(`/v/${serial}`),
   tarjetaAuth: (b) => request('/tarjeta/auth', { method: 'POST', body: b }),
+  // --- Firma del proveedor (pública / firmante) — atestación, NO firma
+  // electrónica legal (Ley N° 19.799). Ver origen.js/firmaProveedorRouter. ---
+  firmaResolver: (serial) => request(`/f/${serial}`),
+  firmaAuth: (b) => request('/firma-proveedor/auth', { method: 'POST', body: b }),
+  firmaFirmar: async (token, b) => {
+    const res = await fetch('/api/firma-proveedor/firmar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(b),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al firmar');
+    return data;
+  },
   // --- Torre de control (mapa público + operador con credencial pos) ---
   loteMensajes: (codigo) => request(`/lote/${codigo}/mensajes`),
   posAuth: (b) => request('/pos/auth', { method: 'POST', body: b }),
@@ -137,6 +151,13 @@ export const api = {
   origenDemoTorre: () => request('/admin/origen/demo-torre', { method: 'POST', authed: true }),
   abrirCredencialTarjeta: (loteId, tarjetaId) =>
     abrirPdfAuth(`/api/admin/origen/lotes/${loteId}/tarjetas/${tarjetaId}/credencial.pdf`),
+  origenCredencialesProveedor: (loteId) => request(`/admin/origen/lotes/${loteId}/credenciales-proveedor`, { authed: true }),
+  origenEmitirCredencialProveedor: (loteId, b) =>
+    request(`/admin/origen/lotes/${loteId}/credenciales-proveedor`, { method: 'POST', body: b, authed: true }),
+  origenEditarCredencialProveedor: (id, b) =>
+    request(`/admin/origen/credenciales-proveedor/${id}`, { method: 'PUT', body: b, authed: true }),
+  abrirCredencialProveedor: (loteId, credencialId) =>
+    abrirPdfAuth(`/api/admin/origen/lotes/${loteId}/credenciales-proveedor/${credencialId}/credencial.pdf`),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el

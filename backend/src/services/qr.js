@@ -46,6 +46,11 @@ export function constanciaUrl(serial) {
   return `${config.publicAppUrl}/constancia/${serial}`;
 }
 
+// URL pública de la credencial de firma del proveedor (atestación).
+export function firmaProveedorUrl(serial) {
+  return `${config.publicAppUrl}/f/${serial}`;
+}
+
 // Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
 export async function qrBufferDe(url) {
   return QRCode.toBuffer(url, {

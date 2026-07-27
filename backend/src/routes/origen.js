@@ -5,7 +5,7 @@ import { requireAuth, requireRole, requireHomePanel, logActividad, signAccess } 
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
-import { generateCredencialTarjeta } from '../services/pdf.js';
+import { generateCredencialTarjeta, generateCredencialProveedor } from '../services/pdf.js';
 import {
   ROLES,
   TIPOS,
@@ -27,6 +27,9 @@ import {
   hashCadena,
   validarMensajeTorre,
   sanearPuntoId,
+  generarSerialCredencialProveedor,
+  validarIdentidadProveedor,
+  loteAdmiteProveedor,
 } from '../services/pasaporteOrigen.js';
 
 // ============================================================
@@ -482,6 +485,125 @@ router.put('/tarjetas/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- Credenciales de Firma del Proveedor (atestación, migración 038) ----------
+// NO es firma electrónica con validez legal (Ley N° 19.799): es una
+// atestación sellada por hash, con identidad FIJADA por quien emite la
+// credencial (nunca declarada por el firmante). Válida para UN SOLO
+// eslabón — ver firmaProveedorRouter más abajo.
+router.get('/lotes/:id/credenciales-proveedor', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, serial, rut_empresa, nombre_empresa, activo, firmado_at, eslabon_id, created_at
+       FROM credenciales_proveedor WHERE lote_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ credenciales: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/lotes/:id/credenciales-proveedor', adminOnly, async (req, res, next) => {
+  try {
+    const { rows: lRows } = await query(`SELECT id, codigo, tipo, estado FROM lotes_minerales WHERE id = $1`, [req.params.id]);
+    if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    if (lRows[0].estado !== 'abierto') return res.status(409).json({ error: 'El lote está cerrado.' });
+    if (!loteAdmiteProveedor(lRows[0])) {
+      return res.status(400).json({
+        error: `Este lote (tipo '${lRows[0].tipo}') no tiene el rol 'proveedor' en su cadena de custodia.`,
+      });
+    }
+
+    const b = req.body || {};
+    const val = validarIdentidadProveedor(b);
+    if (!val.ok) return res.status(400).json({ error: val.errores.join(' ') });
+
+    const clave = generarClave();
+    const claveHash = await bcrypt.hash(clave, 10);
+
+    let credencial = null;
+    for (let intento = 0; intento < 5 && !credencial; intento++) {
+      try {
+        const { rows } = await query(
+          `INSERT INTO credenciales_proveedor (serial, lote_id, rut_empresa, nombre_empresa, clave_hash)
+           VALUES ($1,$2,$3,$4,$5)
+           RETURNING id, serial, rut_empresa, nombre_empresa, activo, created_at`,
+          [generarSerialCredencialProveedor(), lRows[0].id, val.rut_normalizado, b.nombre_empresa.trim(), claveHash]
+        );
+        credencial = rows[0];
+      } catch (e) {
+        if (e.code !== '23505') throw e; // colisión de serial: reintenta
+      }
+    }
+    if (!credencial) return res.status(500).json({ error: 'No se pudo generar un serial único.' });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'emitir_credencial_proveedor', entidad: 'credencial_proveedor',
+      entidadId: credencial.id, detalle: { serial: credencial.serial, lote: lRows[0].codigo }, ip: req.ip,
+    });
+    // `clave` en claro SOLO aquí, igual que tarjetas de viaje / POS.
+    res.status(201).json({ credencial, clave });
+  } catch (err) { next(err); }
+});
+
+// Credencial virtual PDF (tamaño tarjeta, con QR a /f/serial + disclaimer).
+router.get('/lotes/:id/credenciales-proveedor/:credencialId/credencial.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.*, l.codigo AS lote_codigo, l.material AS lote_material
+       FROM credenciales_proveedor c JOIN lotes_minerales l ON l.id = c.lote_id
+       WHERE c.id = $1 AND c.lote_id = $2`,
+      [req.params.credencialId, req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Credencial no encontrada' });
+    const c = rows[0];
+    const pdf = await generateCredencialProveedor({
+      credencial: c,
+      lote: { codigo: c.lote_codigo, material: c.lote_material },
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-credencial-proveedor-${c.serial}.pdf"`);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+router.put('/credenciales-proveedor/:id', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const { rows: cRows } = await query(`SELECT firmado_at FROM credenciales_proveedor WHERE id = $1`, [req.params.id]);
+    if (!cRows[0]) return res.status(404).json({ error: 'Credencial no encontrada' });
+    // Identidad inmutable una vez usada: firmó con esos datos, corregirlos
+    // rompería la atestación ya sellada. Solo se puede activar/desactivar.
+    if (cRows[0].firmado_at && (b.rut_empresa !== undefined || b.nombre_empresa !== undefined)) {
+      return res.status(409).json({ error: 'La credencial ya firmó: no se puede editar su identidad.' });
+    }
+    let val = { rut_normalizado: undefined };
+    if (b.rut_empresa !== undefined || b.nombre_empresa !== undefined) {
+      // Identidad se reemplaza completa (nunca a medias): evita que falte
+      // uno de los dos campos al validar mientras el otro queda intacto.
+      if (b.rut_empresa === undefined || b.nombre_empresa === undefined) {
+        return res.status(400).json({ error: 'Para editar la identidad debes enviar rut_empresa y nombre_empresa juntos.' });
+      }
+      const check = validarIdentidadProveedor({ rut_empresa: b.rut_empresa, nombre_empresa: b.nombre_empresa });
+      if (!check.ok) return res.status(400).json({ error: check.errores.join(' ') });
+      val = check;
+    }
+    const { rows } = await query(
+      `UPDATE credenciales_proveedor SET
+         activo = COALESCE($2, activo),
+         rut_empresa = COALESCE($3, rut_empresa),
+         nombre_empresa = COALESCE($4, nombre_empresa)
+       WHERE id = $1
+       RETURNING id, serial, rut_empresa, nombre_empresa, activo, firmado_at`,
+      [req.params.id, typeof b.activo === 'boolean' ? b.activo : null,
+       val.rut_normalizado ?? null, b.nombre_empresa?.trim() ?? null]
+    );
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'editar_credencial_proveedor', entidad: 'credencial_proveedor',
+      entidadId: rows[0].id, detalle: { serial: rows[0].serial, activo: rows[0].activo }, ip: req.ip,
+    });
+    res.json({ credencial: rows[0] });
+  } catch (err) { next(err); }
+});
+
 // ---------- GET /lotes/:id/verificar — recalcular la cadena del lote ----------
 router.get('/lotes/:id/verificar', async (req, res, next) => {
   try {
@@ -744,6 +866,94 @@ tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res
       await logActividad({
         accion: 'tarjeta_paso', entidad: 'lote_eslabon', entidadId: resultado.body.eslabon.id,
         detalle: { eslabon: resultado.body.eslabon.eslabon, punto: b.punto_control || null }, ip: req.ip,
+      });
+    }
+    res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// Router de la CREDENCIAL DE FIRMA DEL PROVEEDOR — montado SIN
+// requireAuth de admin en /api/firma-proveedor. NO es firma electrónica
+// legal (Ley N° 19.799): es una atestación sellada por hash, con
+// identidad FIJADA por quien emitió la credencial — nunca declarada por
+// el firmante. Válida para UN SOLO eslabón (firmado_at + eslabon_id,
+// migración 038).
+// ============================================================
+export const firmaProveedorRouter = express.Router();
+
+const MENSAJE_FIRMA = 'Serial o clave incorrectos';
+
+// POST /api/firma-proveedor/auth — login del proveedor (patrón login POS/tarjeta).
+firmaProveedorRouter.post('/auth', loginLimiter, async (req, res, next) => {
+  try {
+    const { serial, clave } = req.body || {};
+    if (!serial || !clave) return res.status(401).json({ error: MENSAJE_FIRMA });
+    const { rows } = await query(
+      `SELECT c.*, l.codigo AS lote_codigo, l.estado AS lote_estado
+       FROM credenciales_proveedor c JOIN lotes_minerales l ON l.id = c.lote_id
+       WHERE c.serial = $1`,
+      [String(serial).trim().toUpperCase()]
+    );
+    const cred = rows[0];
+    if (!cred || !cred.activo) return res.status(401).json({ error: MENSAJE_FIRMA });
+    const ok = await bcrypt.compare(String(clave), cred.clave_hash);
+    if (!ok) return res.status(401).json({ error: MENSAJE_FIRMA });
+    if (cred.firmado_at) return res.status(409).json({ error: 'Esta credencial ya firmó un documento: es de un solo uso.' });
+    if (cred.lote_estado !== 'abierto') return res.status(409).json({ error: 'El lote ya está cerrado.' });
+
+    await logActividad({ accion: 'firma_proveedor_login', entidad: 'credencial_proveedor', entidadId: cred.id, ip: req.ip });
+    res.json({
+      credencial: { serial: cred.serial, nombre_empresa: cred.nombre_empresa, lote_codigo: cred.lote_codigo },
+      token: signAccess({ id: cred.id, rol: 'firma_proveedor', email: null }),
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/firma-proveedor/firmar — la atestación en sí: crea el eslabón
+// 'proveedor' con la identidad de la CREDENCIAL (nunca del body) y agota
+// la credencial en la misma transacción.
+firmaProveedorRouter.post('/firmar', requireAuth, requireRole('firma_proveedor'), async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const resultado = await withTx(async (client) => {
+      const { rows: cRows } = await client.query(
+        `SELECT * FROM credenciales_proveedor WHERE id = $1 AND activo = true FOR UPDATE`, [req.user.sub]
+      );
+      const cred = cRows[0];
+      if (!cred) return { status: 404, body: { error: 'Credencial inválida o inactiva' } };
+      if (cred.firmado_at) return { status: 409, body: { error: 'Esta credencial ya firmó un documento: es de un solo uso.' } };
+
+      const { rows: lRows } = await client.query(
+        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [cred.lote_id]
+      );
+      const lote = lRows[0];
+      if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
+
+      const r = await anexarEslabonTx(client, lote, {
+        rol: 'proveedor',
+        rut_empresa: cred.rut_empresa,        // identidad de la CREDENCIAL, no del body
+        nombre_empresa: cred.nombre_empresa,  // ídem
+        pais: b.pais || 'CL',
+        fecha: b.fecha || new Date().toISOString().slice(0, 10),
+        cantidad: b.cantidad,
+        co2e_aportado: b.co2e_aportado ?? 0,
+        visibilidad: b.visibilidad || 'publico',
+        datos: { ...(b.datos || {}), credencial_serial: cred.serial, atestacion: true },
+      });
+      if (r.status === 201) {
+        await client.query(
+          `UPDATE credenciales_proveedor SET firmado_at = now(), eslabon_id = $2 WHERE id = $1`,
+          [cred.id, r.body.eslabon.id]
+        );
+      }
+      return r;
+    });
+
+    if (resultado.status === 201) {
+      await logActividad({
+        accion: 'firma_proveedor_firmar', entidad: 'lote_eslabon', entidadId: resultado.body.eslabon.id,
+        detalle: { eslabon: resultado.body.eslabon.eslabon }, ip: req.ip,
       });
     }
     res.status(resultado.status).json(resultado.body);
