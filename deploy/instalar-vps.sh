@@ -34,7 +34,16 @@ fi
 npm install -g pm2 >/dev/null
 
 # ---------- 2. Base de datos ----------
-DB_PASS="$(openssl rand -hex 16)"
+# Si ya existe backend/.env, la clave de la BD se toma de su DATABASE_URL:
+# re-ejecutar este script NUNCA debe desincronizar Postgres del .env (bug
+# visto en producción: el ALTER ROLE de abajo fijaba una clave aleatoria
+# nueva mientras el .env existente conservaba la vieja, y el backend
+# quedaba sin poder conectar hasta arreglarlo a mano).
+DB_PASS=""
+if [ -f "$DIR/backend/.env" ]; then
+  DB_PASS="$(grep '^DATABASE_URL=' "$DIR/backend/.env" | sed -E 's|.*://[^:]+:([^@]+)@.*|\1|')"
+fi
+[ -n "$DB_PASS" ] || DB_PASS="$(openssl rand -hex 16)"
 sudo -u postgres psql -tc "SELECT 1 FROM pg_roles WHERE rolname='sicr3p'" | grep -q 1 || \
   sudo -u postgres psql -c "CREATE ROLE sicr3p LOGIN PASSWORD '$DB_PASS';"
 sudo -u postgres psql -tc "SELECT 1 FROM pg_database WHERE datname='sicr3p'" | grep -q 1 || \
