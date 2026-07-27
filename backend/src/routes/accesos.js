@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
+import { sanearPuntoId } from '../services/pasaporteOrigen.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -98,6 +99,49 @@ router.delete('/mandantes/:id/proveedores/:proveedorId', adminOnly, async (req, 
     );
     if (!rowCount) return res.status(404).json({ error: 'Proveedor no encontrado' });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- PUERTOS (acceso de lectura completa por punto del Corredor) ----------
+// A diferencia de mandantes (RUT receptor sobre facturas nacionales), un
+// puerto se ancla a un punto_id del Corredor (catálogo PUNTOS_CORREDOR del
+// frontend) — ver routes/puerto.js.
+router.get('/puertos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre, punto_id, activo, ultimo_uso, created_at FROM puertos ORDER BY created_at DESC`
+    );
+    res.json({ puertos: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/puertos', adminOnly, async (req, res, next) => {
+  try {
+    const { nombre, punto_id } = req.body || {};
+    const puntoLimpio = sanearPuntoId(punto_id);
+    if (!nombre || !puntoLimpio) return res.status(400).json({ error: 'Nombre y punto_id son obligatorios.' });
+    // El token se muestra UNA sola vez; solo se guarda su hash (mismo patrón que mandantes).
+    const token = `pto_${crypto.randomBytes(24).toString('base64url')}`;
+    const { rows } = await query(
+      `INSERT INTO puertos (nombre, punto_id, token_hash) VALUES ($1,$2,$3)
+       RETURNING id, nombre, punto_id, activo, created_at`,
+      [nombre, puntoLimpio, hashToken(token)]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_puerto', entidad: 'puerto', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ puerto: rows[0], token });
+  } catch (err) { next(err); }
+});
+
+router.put('/puertos/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { activo } = req.body || {};
+    const { rows } = await query(
+      `UPDATE puertos SET activo = COALESCE($2, activo) WHERE id = $1
+       RETURNING id, nombre, punto_id, activo`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Puerto no encontrado' });
+    res.json({ puerto: rows[0] });
   } catch (err) { next(err); }
 });
 

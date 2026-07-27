@@ -5,12 +5,13 @@ import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 
-// Credencial de Firma del Proveedor: atestación con credencial propia
-// (serial+clave, mismo patrón que la Tarjeta de Viaje) para el eslabón
-// 'proveedor' de un Pasaporte de Origen tipo 'producto'. NO es firma
-// electrónica con validez legal (Ley N° 19.799) — es una atestación
-// sellada por hash, con identidad FIJADA por quien emitió la credencial
-// (nunca declarada por quien firma). Válida para UN SOLO uso.
+// Credencial de Firma del actor de la cadena: atestación con credencial
+// propia (serial+clave, mismo patrón que la Tarjeta de Viaje) para el
+// eslabón 'proveedor' (Pasaporte tipo 'producto') o 'puerto' (Pasaporte
+// tipo 'documental', Corredor Bioceánico) — el rol viene del resolver
+// (info.rol). NO es firma electrónica con validez legal (Ley N° 19.799)
+// — es una atestación sellada por hash, con identidad FIJADA por quien
+// emitió la credencial (nunca declarada por quien firma). Un solo uso.
 export default function FirmaProveedor() {
   const { serial } = useParams();
   const { t } = useIdioma();
@@ -64,7 +65,9 @@ export default function FirmaProveedor() {
         {info && (
           <div className="card card-pad pasaporte-doc" style={{ textAlign: 'center' }}>
             <div className="pas-kicker">sicr3p</div>
-            <h1 style={{ fontSize: 22, margin: '10px 0 10px' }}>{t('fp.titulo')}</h1>
+            <h1 style={{ fontSize: 22, margin: '10px 0 10px' }}>
+              {t(info.rol === 'puerto' ? 'fp.titulo_puerto' : 'fp.titulo')}
+            </h1>
             <div className="pas-lbl" style={{ marginBottom: 4 }}>{t('fp.lote')}</div>
             <div className="pas-code">{info.codigo}</div>
             <p className="muted" style={{ margin: '8px 0 16px', fontSize: 12 }}>
@@ -93,7 +96,7 @@ export default function FirmaProveedor() {
             ) : (
               <>
                 <button className="btn btn-outline" style={{ width: '100%' }} onClick={() => setAbierto(!abierto)}>
-                  {t('fp.soy_proveedor')}
+                  {t(info.rol === 'puerto' ? 'fp.soy_puerto' : 'fp.soy_proveedor')}
                 </button>
 
                 {abierto && (

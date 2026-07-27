@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
+import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 
 // Accesos externos: API para mandantes + códigos de prueba con créditos.
 export default function Accesos() {
@@ -16,7 +17,8 @@ export default function Accesos() {
             <span style={{ color: 'var(--green-600)' }}><Icon.Qr size={24} /></span> Accesos externos
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Códigos de prueba con créditos (1 crédito = 1 factura) y API keys para empresas mandantes.
+            Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes
+            y API keys para puertos (tránsito del Corredor por su punto).
           </p>
         </div>
       </div>
@@ -24,10 +26,12 @@ export default function Accesos() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
         <button className={`btn btn-sm ${tab === 'codigos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('codigos')}>Códigos de prueba</button>
         <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
+        <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
       </div>
 
       {tab === 'codigos' && <Codigos flash={flash} />}
       {tab === 'mandantes' && <Mandantes flash={flash} />}
+      {tab === 'puertos' && <Puertos flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -262,6 +266,90 @@ function GestionMandante({ mandante, flash, onClose }) {
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
           <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Puertos: acceso completo (tipo mandante) por punto del Corredor ----------
+// A diferencia de mandantes (RUT receptor sobre facturas nacionales), un
+// puerto se ancla a un punto_id del Corredor (PUNTOS_CORREDOR) y ve el
+// tránsito documental que pasa por ese punto — dominio distinto, propio.
+function Puertos({ flash }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ nombre: '', punto_id: '' });
+  const [tokenNuevo, setTokenNuevo] = useState(null);
+  const [creando, setCreando] = useState(false);
+
+  const cargar = () => api.puertos().then((r) => setItems(r.puertos)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const { puerto, token } = await api.crearPuerto(form);
+      setTokenNuevo({ nombre: puerto.nombre, token });
+      setForm({ nombre: '', punto_id: '' });
+      cargar(); flash('Puerto creado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(p) {
+    try { await api.editarPuerto(p.id, { activo: !p.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div className="card card-pad">
+          <h3 style={{ marginTop: 0 }}>Nuevo puerto</h3>
+          <div className="field"><label>Nombre</label><input value={form.nombre} placeholder="Puerto de Antofagasta" onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label>Punto del Corredor</label>
+            <select value={form.punto_id} onChange={(e) => setForm({ ...form, punto_id: e.target.value })}>
+              <option value="">— Selecciona —</option>
+              {PUNTOS_CORREDOR.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre} ({p.pais})</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre || !form.punto_id}>
+            {creando ? <span className="spinner" /> : 'Crear y generar API key'}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            La API key se muestra <b>una sola vez</b>. El puerto consulta el tránsito de su punto con el
+            header <code>X-Api-Key</code> contra <code>/api/puerto/transitos</code>.
+          </p>
+        </div>
+        {tokenNuevo && (
+          <div className="card card-pad" style={{ borderColor: 'var(--green)' }}>
+            <h3 style={{ marginTop: 0 }}>API key de {tokenNuevo.nombre}</h3>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>{tokenNuevo.token}</div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Cópiala ahora: no volverá a mostrarse.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Nombre</th><th>Punto</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id}>
+                <td><b>{p.nombre}</b></td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.punto_id}</td>
+                <td className="muted" style={{ fontSize: 13 }}>{p.ultimo_uso ? fmtFecha(p.ultimo_uso) : 'Nunca'}</td>
+                <td><span className={`badge ${p.activo ? 'badge-green' : 'badge-gray'}`}>{p.activo ? 'Activa' : 'Inactiva'}</span></td>
+                <td><button className="btn btn-outline btn-sm" onClick={() => toggle(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button></td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin puertos registrados.</td></tr>}
+          </tbody>
+        </table>
         </div>
       </div>
     </div>

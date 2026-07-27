@@ -21,6 +21,7 @@ import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
 import origenRoutes, { tarjetaRouter, torreRouter, firmaProveedorRouter } from './routes/origen.js';
 import capacitacionRoutes from './routes/capacitacion.js';
+import puertoRoutes from './routes/puerto.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 
 const app = express();
@@ -50,6 +51,7 @@ app.use('/api/admin/valorizacion', valorizacionRoutes);
 app.use('/api/admin/transporte', transporteRoutes);
 app.use('/api/admin/accesos', accesosRoutes);
 app.use('/api/mandante', apiLimiter, mandanteRoutes);
+app.use('/api/puerto', apiLimiter, puertoRoutes);
 app.use('/api/admin/motor-propio', motorRoutes);
 // Alias del mismo router: el registro de fuentes metodológicas se consume
 // como /api/admin/motor/fuentes; /api/admin/motor-propio sigue vivo (compat).

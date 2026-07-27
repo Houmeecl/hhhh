@@ -387,11 +387,14 @@ export function validarIdentidadProveedor({ rut_empresa, nombre_empresa } = {}) 
 }
 
 // Emitir la credencial solo tiene sentido si el tipo del lote incluye el
-// rol 'proveedor' en su cadena de custodia (hoy solo 'producto') — se
-// valida ANTES de crear la credencial, no se delega en validarEslabon
-// (que recién correría al firmar, mucho después de emitida la clave).
-export function loteAdmiteProveedor(lote) {
-  return (ROLES_POR_TIPO[lote?.tipo] || []).includes('proveedor');
+// ROL indicado en su cadena de custodia (ej. 'proveedor' en tipo
+// 'producto', 'puerto' en tipo 'documental') — se valida ANTES de crear
+// la credencial, no se delega en validarEslabon (que recién correría al
+// firmar, mucho después de emitida la clave). Genérico por diseño: cada
+// tipo de lote admite como mucho un rol de "autoservicio" vía credencial
+// hoy (ver ROL_CREDENCIAL_POR_TIPO en origen.js/Origen.jsx del frontend).
+export function loteAdmiteRol(lote, rol) {
+  return (ROLES_POR_TIPO[lote?.tipo] || []).includes(rol);
 }
 
 // ---------- Anclaje del lote en la cadena GLOBAL ----------

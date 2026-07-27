@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
+import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 
 // ============================================================
 // Pasaporte de Origen — back-office de lotes minerales.
@@ -41,6 +42,15 @@ const ROLES_POR_TIPO = {
   mineral: ['mina', 'planta', 'refineria', 'transporte', 'comerciante', 'exportador', 'comprador'],
   producto: ['productor', 'proveedor', 'transporte', 'comercio', 'punto_aduana_verde', 'comprador'],
   documental: ['origen', 'transporte', 'deposito', 'frontera', 'puerto', 'destino'],
+};
+// Rol de "autoservicio" (credencial de firma/atestación) por tipo de
+// lote — hoy uno solo por tipo: el proveedor en lotes de producto, el
+// puerto en lotes documentales del Corredor. `transporte` ya tiene su
+// propio mecanismo (Tarjeta de Viaje, componente Tarjetas más abajo).
+const ROL_CREDENCIAL_POR_TIPO = { producto: 'proveedor', documental: 'puerto' };
+const ROL_CREDENCIAL_LABELS = {
+  proveedor: { titulo: 'proveedor', empresa: 'Nombre de la empresa', placeholderEmpresa: 'Proveedor Demo SpA', rutLabel: 'RUT del proveedor' },
+  puerto: { titulo: 'puerto', empresa: 'Autoridad portuaria', placeholderEmpresa: 'Puerto de Antofagasta', rutLabel: 'RUT de la autoridad portuaria' },
 };
 const DECLARACIONES = [
   { codigo: 'oecd_p1', label: 'OECD P1 — Sistema de gestión y política de cadena' },
@@ -324,8 +334,8 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       </div>
 
       <Tarjetas lote={lote} abierto={abierto} flash={flash} />
-      {(ROLES_POR_TIPO[lote.tipo || 'mineral'] || ROLES_POR_TIPO.mineral).includes('proveedor') && (
-        <CredencialesProveedor lote={lote} abierto={abierto} flash={flash} />
+      {ROL_CREDENCIAL_POR_TIPO[lote.tipo] && (
+        <CredencialesProveedor lote={lote} rol={ROL_CREDENCIAL_POR_TIPO[lote.tipo]} abierto={abierto} flash={flash} />
       )}
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
@@ -561,10 +571,12 @@ function Tarjetas({ lote, abierto, flash }) {
 // (serial+clave) para el eslabón 'proveedor' — NO es firma electrónica con
 // validez legal (Ley N° 19.799). Identidad (RUT+empresa) fijada por el
 // admin al emitir; un solo uso.
-function CredencialesProveedor({ lote, abierto, flash }) {
+function CredencialesProveedor({ lote, rol, abierto, flash }) {
+  const labels = ROL_CREDENCIAL_LABELS[rol] || ROL_CREDENCIAL_LABELS.proveedor;
   const [items, setItems] = useState(null);
   const [rut, setRut] = useState('');
   const [nombreEmpresa, setNombreEmpresa] = useState('');
+  const [puntoId, setPuntoId] = useState(rol === 'puerto' ? PUNTOS_CORREDOR[0]?.id || '' : '');
   const [emitiendo, setEmitiendo] = useState(false);
   const [nueva, setNueva] = useState(null); // { credencial, clave } — clave visible UNA vez
 
@@ -574,11 +586,13 @@ function CredencialesProveedor({ lote, abierto, flash }) {
 
   async function emitir() {
     if (!validarRut(rut)) { flash('RUT inválido.', true); return; }
-    if (!nombreEmpresa.trim()) { flash('Falta el nombre de la empresa proveedora.', true); return; }
+    if (!nombreEmpresa.trim()) { flash(`Falta el nombre de la/el ${labels.titulo}.`, true); return; }
+    if (rol === 'puerto' && !puntoId) { flash('Falta el punto del Corredor.', true); return; }
     setEmitiendo(true);
     try {
       const r = await api.origenEmitirCredencialProveedor(lote.id, {
-        rut_empresa: formatearRut(rut), nombre_empresa: nombreEmpresa.trim(),
+        rol, rut_empresa: formatearRut(rut), nombre_empresa: nombreEmpresa.trim(),
+        ...(rol === 'puerto' ? { punto_id: puntoId } : {}),
       });
       setNueva(r);
       setRut('');
@@ -597,9 +611,9 @@ function CredencialesProveedor({ lote, abierto, flash }) {
 
   return (
     <div className="card card-pad" style={{ marginBottom: 14 }}>
-      <h3 style={{ marginTop: 0 }}>Credencial de firma del proveedor (atestación)</h3>
+      <h3 style={{ marginTop: 0 }}>Credencial de firma del {labels.titulo} (atestación)</h3>
       <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-        Emite la credencial, descarga el <b>PDF con QR</b> y envíaselo al proveedor con la clave. Con ella
+        Emite la credencial, descarga el <b>PDF con QR</b> y envíasela al {labels.titulo} con la clave. Con ella
         confirma (una sola vez) su eslabón en la cadena de custodia. <b>Esto NO es una firma electrónica con
         validez legal (Ley N° 19.799)</b> — es una atestación sellada por hash, con la identidad fijada aquí,
         no la que declare quien firma.
@@ -609,7 +623,7 @@ function CredencialesProveedor({ lote, abierto, flash }) {
         <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 12, marginBottom: 12 }}>
           <b>Credencial {nueva.credencial.serial} emitida.</b>
           <div style={{ fontSize: 13, marginTop: 4 }}>
-            Clave del proveedor (visible SOLO ahora — entrégala junto con la credencial):
+            Clave del {labels.titulo} (visible SOLO ahora — entrégala junto con la credencial):
             <div style={{ fontFamily: 'monospace', fontSize: 18, marginTop: 4 }}>{nueva.clave}</div>
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
               Página de firma: <span style={{ fontFamily: 'monospace' }}>{`${window.location.origin}/f/${nueva.credencial.serial}`}</span>
@@ -627,13 +641,23 @@ function CredencialesProveedor({ lote, abierto, flash }) {
       {abierto && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
           <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-            <label>RUT del proveedor</label>
+            <label>{labels.rutLabel}</label>
             <input value={rut} placeholder="76.123.456-0" onChange={(e) => setRut(e.target.value)} />
           </div>
           <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-            <label>Nombre de la empresa</label>
-            <input value={nombreEmpresa} placeholder="Proveedor Demo SpA" onChange={(e) => setNombreEmpresa(e.target.value)} />
+            <label>{labels.empresa}</label>
+            <input value={nombreEmpresa} placeholder={labels.placeholderEmpresa} onChange={(e) => setNombreEmpresa(e.target.value)} />
           </div>
+          {rol === 'puerto' && (
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 200 }}>
+              <label>Punto del Corredor</label>
+              <select value={puntoId} onChange={(e) => setPuntoId(e.target.value)}>
+                {PUNTOS_CORREDOR.map((p) => (
+                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <button className="btn btn-primary" onClick={emitir} disabled={emitiendo}>
             {emitiendo ? <span className="spinner" /> : 'Emitir credencial'}
           </button>

@@ -29,8 +29,13 @@ import {
   sanearPuntoId,
   generarSerialCredencialProveedor,
   validarIdentidadProveedor,
-  loteAdmiteProveedor,
+  loteAdmiteRol,
 } from '../services/pasaporteOrigen.js';
+
+// Roles que hoy admiten credencial de firma (atestación) por tipo de
+// lote — uno por tipo, para mantener la emisión simple sin selector de
+// rol en el body salvo cuando el tipo lo requiere.
+const ROLES_CREDENCIAL_VALIDOS = ['proveedor', 'puerto'];
 
 // ============================================================
 // Pasaporte de Origen — administración de lotes minerales y su
@@ -493,7 +498,7 @@ router.put('/tarjetas/:id', adminOnly, async (req, res, next) => {
 router.get('/lotes/:id/credenciales-proveedor', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, serial, rut_empresa, nombre_empresa, activo, firmado_at, eslabon_id, created_at
+      `SELECT id, serial, rol, rut_empresa, nombre_empresa, punto_id, activo, firmado_at, eslabon_id, created_at
        FROM credenciales_proveedor WHERE lote_id = $1 ORDER BY created_at DESC`,
       [req.params.id]
     );
@@ -506,15 +511,26 @@ router.post('/lotes/:id/credenciales-proveedor', adminOnly, async (req, res, nex
     const { rows: lRows } = await query(`SELECT id, codigo, tipo, estado FROM lotes_minerales WHERE id = $1`, [req.params.id]);
     if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
     if (lRows[0].estado !== 'abierto') return res.status(409).json({ error: 'El lote está cerrado.' });
-    if (!loteAdmiteProveedor(lRows[0])) {
+
+    const b = req.body || {};
+    const rol = ROLES_CREDENCIAL_VALIDOS.includes(b.rol) ? b.rol : 'proveedor';
+    if (!loteAdmiteRol(lRows[0], rol)) {
       return res.status(400).json({
-        error: `Este lote (tipo '${lRows[0].tipo}') no tiene el rol 'proveedor' en su cadena de custodia.`,
+        error: `Este lote (tipo '${lRows[0].tipo}') no tiene el rol '${rol}' en su cadena de custodia.`,
       });
     }
 
-    const b = req.body || {};
     const val = validarIdentidadProveedor(b);
     if (!val.ok) return res.status(400).json({ error: val.errores.join(' ') });
+
+    // El punto_id (igual que rut_empresa/nombre_empresa) lo fija el EMISOR,
+    // nunca el firmante — así el eslabón 'puerto' que se sella al firmar
+    // queda con la ubicación correcta para que el actor Puerto lo encuentre.
+    let puntoId = null;
+    if (rol === 'puerto') {
+      puntoId = sanearPuntoId(b.punto_id);
+      if (!puntoId) return res.status(400).json({ error: 'punto_id es obligatorio para el rol puerto.' });
+    }
 
     const clave = generarClave();
     const claveHash = await bcrypt.hash(clave, 10);
@@ -523,10 +539,10 @@ router.post('/lotes/:id/credenciales-proveedor', adminOnly, async (req, res, nex
     for (let intento = 0; intento < 5 && !credencial; intento++) {
       try {
         const { rows } = await query(
-          `INSERT INTO credenciales_proveedor (serial, lote_id, rut_empresa, nombre_empresa, clave_hash)
-           VALUES ($1,$2,$3,$4,$5)
-           RETURNING id, serial, rut_empresa, nombre_empresa, activo, created_at`,
-          [generarSerialCredencialProveedor(), lRows[0].id, val.rut_normalizado, b.nombre_empresa.trim(), claveHash]
+          `INSERT INTO credenciales_proveedor (serial, lote_id, rol, rut_empresa, nombre_empresa, clave_hash, punto_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)
+           RETURNING id, serial, rol, rut_empresa, nombre_empresa, punto_id, activo, created_at`,
+          [generarSerialCredencialProveedor(), lRows[0].id, rol, val.rut_normalizado, b.nombre_empresa.trim(), claveHash, puntoId]
         );
         credencial = rows[0];
       } catch (e) {
@@ -537,7 +553,7 @@ router.post('/lotes/:id/credenciales-proveedor', adminOnly, async (req, res, nex
 
     await logActividad({
       usuarioId: req.user.sub, accion: 'emitir_credencial_proveedor', entidad: 'credencial_proveedor',
-      entidadId: credencial.id, detalle: { serial: credencial.serial, lote: lRows[0].codigo }, ip: req.ip,
+      entidadId: credencial.id, detalle: { serial: credencial.serial, rol, lote: lRows[0].codigo, punto_id: puntoId }, ip: req.ip,
     });
     // `clave` en claro SOLO aquí, igual que tarjetas de viaje / POS.
     res.status(201).json({ credencial, clave });
@@ -911,8 +927,9 @@ firmaProveedorRouter.post('/auth', loginLimiter, async (req, res, next) => {
 });
 
 // POST /api/firma-proveedor/firmar — la atestación en sí: crea el eslabón
-// 'proveedor' con la identidad de la CREDENCIAL (nunca del body) y agota
-// la credencial en la misma transacción.
+// (rol 'proveedor' o 'puerto', según lo fijado al emitir la credencial)
+// con la identidad de la CREDENCIAL (nunca del body) y agota la
+// credencial en la misma transacción.
 firmaProveedorRouter.post('/firmar', requireAuth, requireRole('firma_proveedor'), async (req, res, next) => {
   try {
     const b = req.body || {};
@@ -931,7 +948,7 @@ firmaProveedorRouter.post('/firmar', requireAuth, requireRole('firma_proveedor')
       if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
 
       const r = await anexarEslabonTx(client, lote, {
-        rol: 'proveedor',
+        rol: cred.rol,                        // 'proveedor' | 'puerto' — fijado al emitir la credencial
         rut_empresa: cred.rut_empresa,        // identidad de la CREDENCIAL, no del body
         nombre_empresa: cred.nombre_empresa,  // ídem
         pais: b.pais || 'CL',
@@ -939,7 +956,15 @@ firmaProveedorRouter.post('/firmar', requireAuth, requireRole('firma_proveedor')
         cantidad: b.cantidad,
         co2e_aportado: b.co2e_aportado ?? 0,
         visibilidad: b.visibilidad || 'publico',
-        datos: { ...(b.datos || {}), credencial_serial: cred.serial, atestacion: true },
+        datos: {
+          ...(b.datos || {}),
+          credencial_serial: cred.serial,
+          atestacion: true,
+          // punto_id viene SOLO de la credencial (fijado por el emisor) —
+          // nunca del body del firmante — así el actor Puerto puede
+          // encontrar este eslabón por su propio punto (routes/puerto.js).
+          ...(cred.rol === 'puerto' && cred.punto_id ? { punto_id: cred.punto_id } : {}),
+        },
       });
       if (r.status === 201) {
         await client.query(

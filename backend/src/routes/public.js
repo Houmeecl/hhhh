@@ -1167,14 +1167,14 @@ router.get('/v/:serial/qr.png', async (req, res, next) => {
 router.get('/f/:serial', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT c.serial, c.nombre_empresa, c.firmado_at, l.codigo, l.estado AS lote_estado
+      `SELECT c.serial, c.rol, c.nombre_empresa, c.firmado_at, l.codigo, l.estado AS lote_estado
        FROM credenciales_proveedor c JOIN lotes_minerales l ON l.id = c.lote_id
        WHERE c.serial = $1 AND c.activo = true`,
       [String(req.params.serial || '').trim().toUpperCase()]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Credencial no encontrada o inactiva' });
     res.json({
-      serial: rows[0].serial, codigo: rows[0].codigo, nombre_empresa: rows[0].nombre_empresa,
+      serial: rows[0].serial, rol: rows[0].rol, codigo: rows[0].codigo, nombre_empresa: rows[0].nombre_empresa,
       firmado: !!rows[0].firmado_at, lote_estado: rows[0].lote_estado,
     });
   } catch (err) { next(err); }

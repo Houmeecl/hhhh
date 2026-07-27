@@ -184,6 +184,31 @@ export default function CorredorLanding() {
         </div>
       </section>
 
+      {/* Firma de actores: atestación con credencial propia (proveedor y puerto) */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 28, margin: '0 0 10px' }}>{t('cor.firma_titulo')}</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 620, margin: '0 auto 28px', lineHeight: 1.6 }}>
+            {t('cor.firma_sub')}
+          </p>
+          <div className="av2-bento" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Check size={24} /></div>
+              <h3>{t('cor.firma_prov_t')}</h3>
+              <p>{t('cor.firma_prov_d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><span style={{ fontSize: 22, lineHeight: 1 }}>⚓</span></div>
+              <h3>{t('cor.firma_puerto_t')}</h3>
+              <p>{t('cor.firma_puerto_d')}</p>
+            </div>
+          </div>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 18, maxWidth: 620, marginLeft: 'auto', marginRight: 'auto' }}>
+            {t('cor.firma_disclaimer')}
+          </p>
+        </div>
+      </section>
+
       {/* Piloto — honesto: la tecnología ya opera; falta un lote real */}
       <section className="pasos">
         <div className="container">

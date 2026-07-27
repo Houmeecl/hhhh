@@ -426,19 +426,31 @@ test('validarIdentidadProveedor exige RUT válido y nombre no vacío', async () 
   assert.equal(validarIdentidadProveedor({}).ok, false);
 });
 
-test('loteAdmiteProveedor solo admite lotes tipo producto', async () => {
-  const { loteAdmiteProveedor } = await import('../src/services/pasaporteOrigen.js');
-  assert.equal(loteAdmiteProveedor({ tipo: 'producto' }), true);
-  assert.equal(loteAdmiteProveedor({ tipo: 'mineral' }), false);
-  assert.equal(loteAdmiteProveedor({ tipo: 'documental' }), false);
-  assert.equal(loteAdmiteProveedor({}), false);
-  assert.equal(loteAdmiteProveedor(undefined), false);
+test('loteAdmiteRol: proveedor solo en producto, puerto solo en documental', async () => {
+  const { loteAdmiteRol } = await import('../src/services/pasaporteOrigen.js');
+  assert.equal(loteAdmiteRol({ tipo: 'producto' }, 'proveedor'), true);
+  assert.equal(loteAdmiteRol({ tipo: 'mineral' }, 'proveedor'), false);
+  assert.equal(loteAdmiteRol({ tipo: 'documental' }, 'proveedor'), false);
+  assert.equal(loteAdmiteRol({}, 'proveedor'), false);
+  assert.equal(loteAdmiteRol(undefined, 'proveedor'), false);
+
+  assert.equal(loteAdmiteRol({ tipo: 'documental' }, 'puerto'), true);
+  assert.equal(loteAdmiteRol({ tipo: 'producto' }, 'puerto'), false);
+  assert.equal(loteAdmiteRol({ tipo: 'mineral' }, 'puerto'), false);
 });
 
-test('validarEslabon acepta rol proveedor solo en tipo producto (cinturón y tirantes con loteAdmiteProveedor)', () => {
+test('validarEslabon acepta rol proveedor solo en tipo producto (cinturón y tirantes con loteAdmiteRol)', () => {
   const lote = { estado: 'abierto', tipo: 'producto', cantidad: 100 };
   const r = validarEslabon({ rol: 'proveedor', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, lote, []);
   assert.equal(r.ok, true);
   const rMineral = validarEslabon({ rol: 'proveedor', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, { ...lote, tipo: 'mineral' }, []);
   assert.equal(rMineral.ok, false);
+});
+
+test('validarEslabon acepta rol puerto solo en tipo documental', () => {
+  const lote = { estado: 'abierto', tipo: 'documental', cantidad: 100 };
+  const r = validarEslabon({ rol: 'puerto', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, lote, []);
+  assert.equal(r.ok, true);
+  const rProducto = validarEslabon({ rol: 'puerto', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, { ...lote, tipo: 'producto' }, []);
+  assert.equal(rProducto.ok, false);
 });
