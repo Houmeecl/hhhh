@@ -30,7 +30,7 @@ las que trae por defecto son ilustrativas.
 | # | Documento | Audiencia principal |
 |---|-----------|---------------------|
 | 01 | sicr3p (plataforma) | Todas |
-| 02 | Aduana Verde | Comercios y pymes |
+| 02 | Mostrador presencial sicr3p | Comercios y pymes |
 | 03 | REP · Ley 20.920 | Empresas obligadas a declarar REP |
 | 04 | Correo corporativo | Interno (activación de contacto@sicrep.cl) |
 | 05 | Informe para autoridades | Reguladores, municipios |

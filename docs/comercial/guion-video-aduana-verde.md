@@ -1,4 +1,4 @@
-# Guion — Video corto "Aduana Verde" (recorrido real del mostrador)
+# Guion — Video corto "Mostrador presencial sicr3p" (recorrido real del mostrador)
 
 **Duración total aproximada:** ~2 min 35 s
 **Fuente reutilizada:** `docs/comercial/fuente/10-manual-beneficios.html` (Recorrido A, capturas
@@ -21,18 +21,18 @@ los subtítulos. No requiere clic; es el único tramo del video sin pantalla rea
 1. "Cada mes llegan más boletas y facturas de las que alcanzas a ordenar."
 2. "Sin tiempo para pasarlas a una planilla, papel por papel."
 3. "Y sin nada real que mostrar cuando te piden el dato."
-4. "Esto es Aduana Verde — el mostrador de sicr3p."
+4. "Esto es sicr3p — también en el mostrador."
 
 ---
 
-## Escena 1 — Landing Aduana Verde (0:12–0:27 · 15 s)
+## Escena 1 — Landing del mostrador presencial (0:12–0:27 · 15 s)
 
 **Pantalla/acción:** Abrir `https://sicr3p.cl/aduana-verde` (landing real, `AduanaVerde.jsx`).
-Mostrar el header con el logo "Aduana Verde. by sicr3p", el eyebrow y el hero. Hacer un scroll
+Mostrar el header con la identidad de marca de sicr3p, el eyebrow y el hero. Hacer un scroll
 lento hasta el bloque de los 4 pasos ("pasos_titulo").
 
 **Subtítulos:**
-1. "Aduana Verde. — by sicr3p"
+1. "sicr3p — mostrador presencial"
 2. "Atención presencial: trazabilidad que sí se ve."
 3. "Tu factura entra. Tu Pasaporte Digital sale."
 4. "Cálculo de CO2e, declaración REP y un QR que cualquiera revisa."
@@ -44,7 +44,7 @@ mostrador físico — es la aclaración "presencial" que pidió el usuario, ante
 
 ## Escena 2 — Login del terminal (0:27–0:42 · 15 s)
 
-**Pantalla/acción:** Navegar a `/pos`. En la pantalla "Terminal Aduana Verde" (paso `inicio`),
+**Pantalla/acción:** Navegar a `/pos`. En la pantalla "Terminal sicr3p" (paso `inicio`),
 clic en la tarjeta **"Conectar terminal"**. En la pantalla "Conectar terminal", completar
 **"ID de terminal"** y **"Clave del terminal"** con credenciales reales del dispositivo de prueba
 y presionar **"Conectar"**. (Si no hay credenciales de terminal disponibles para la grabación,
@@ -53,7 +53,7 @@ documentos sigue siendo real.)
 
 **Subtítulos:**
 1. "En el mostrador, el operador conecta el terminal."
-2. "Cada dispositivo Aduana Verde tiene su propio ID y clave."
+2. "Cada dispositivo del mostrador tiene su propio ID y clave."
 3. "Login por dispositivo, no por persona."
 
 ---
@@ -167,10 +167,10 @@ público de la cadena de integridad) y mostrar el estado global.
 pantalla de la cadena pública de fondo mientras corren los subtítulos de cierre.
 
 **Subtítulos:**
-1. "Aduana Verde no certifica ni reemplaza a un verificador acreditado."
+1. "sicr3p no certifica ni reemplaza a un verificador acreditado."
 2. "Entrega evidencia trazable y verificable de tu contabilidad de carbono."
 3. "Un trámite. Un mostrador presencial. Un Pasaporte Digital."
-4. "sicr3p.cl — Aduana Verde."
+4. "sicr3p.cl — mostrador presencial."
 
 ---
 

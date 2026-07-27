@@ -25,7 +25,7 @@ const TASA_DESCUENTO_ANUAL = 0.18; // 18% anual — tasa de descuento típica pa
 // montos base).
 const LINEAS_BASE = [
   { nombre: 'Suscripción SaaS', anual: [8_000_000, 28_000_000, 62_000_000, 105_000_000, 150_000_000] },
-  { nombre: 'Tramitación Aduana Verde', anual: [4_000_000, 16_000_000, 38_000_000, 68_000_000, 95_000_000] },
+  { nombre: 'Tramitación en mostrador presencial', anual: [4_000_000, 16_000_000, 38_000_000, 68_000_000, 95_000_000] },
   { nombre: 'Pasaportes de origen', anual: [3_000_000, 12_000_000, 30_000_000, 55_000_000, 80_000_000] },
   { nombre: 'API mandantes', anual: [0, 6_000_000, 20_000_000, 42_000_000, 65_000_000] },
 ];
