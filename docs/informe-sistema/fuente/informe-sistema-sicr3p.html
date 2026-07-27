@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Informe técnico de estado del sistema</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">INFORME TÉCNICO DE ESTADO · USO INTERNO</div>
+    <h1>Informe técnico<br>de estado del<br>sistema sicr3p</h1>
+    <p class="bajada">Arquitectura, módulos y estado real de la plataforma al cierre de esta
+    ronda de trabajo. Documento técnico y neutral — no es material de venta.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. RESUMEN EJECUTIVO -->
+<div class="pagina">
+  <h2>1. Resumen ejecutivo</h2>
+  <p><strong>sicr3p</strong> es una plataforma de contabilidad de carbono y trazabilidad
+  documental: procesa facturas y documentos comerciales, calcula sus emisiones de CO2e y
+  produce evidencia verificable públicamente (hash encadenado + QR) sin requerir digitación
+  manual de datos. Opera en dos frentes: un flujo 100% en línea (<code>/cargar</code>) y un
+  mostrador presencial (<code>/panel-verde</code>) para quienes prefieren entregar sus
+  documentos en papel.</p>
+
+  <table>
+    <tr><th>Capa</th><th>Tecnología</th></tr>
+    <tr><td>Backend</td><td>Node.js + Express + PostgreSQL (14+)</td></tr>
+    <tr><td>Frontend</td><td>React 18 + Vite, code-splitting por panel</td></tr>
+    <tr><td>Motor de cálculo</td><td>Motor propio (categorías/factores internos) + motor
+    externo intercambiable (modo mock u operativo real)</td></tr>
+    <tr><td>Generación de documentos</td><td>PDFKit (informes, etiquetas, constancias,
+    credenciales) + librería QR propia</td></tr>
+    <tr><td>Integridad</td><td>Cadena de hash SHA-256 de solo-agregado, pública y
+    verificable, sin blockchain externa</td></tr>
+  </table>
+</div>
+
+<!-- 2. ARQUITECTURA -->
+<div class="pagina seccion">
+  <h2>2. Arquitectura</h2>
+
+  <h3>2.1 Backend</h3>
+  <p>17 archivos de rutas Express, cada uno montado bajo su propio prefijo
+  (<code>/api/admin/*</code> para el panel núcleo, <code>/api/pos</code> /
+  <code>/api/admin/pos</code> para el mostrador, <code>/api</code> para el flujo público sin
+  autenticación). La autenticación es JWT de acceso + refresh, con un claim <code>panel</code>
+  (<code>sicrep</code> | <code>aduana_verde</code>) que aísla los dos paneles administrativos
+  entre sí — cada router aplica <code>requireHomePanel(...)</code>, con una única excepción
+  documentada: el router de <strong>Capacitación</strong>, transversal a ambos paneles porque
+  la formación de personal no es un dato de negocio de un panel en particular.</p>
+
+  <p>37 migraciones SQL, todas <em>append-only</em> e idempotentes (<code>IF NOT EXISTS</code>
+  / <code>ON CONFLICT DO NOTHING</code>), sin reescrituras destructivas de esquema desde el
+  inicio del proyecto.</p>
+
+  <h3>2.2 Frontend</h3>
+  <p>Dos "apps" instalables (PWA) independientes montadas en la misma SPA: el panel núcleo
+  (<code>/admin</code>, manifest propio) y el panel del mostrador (<code>/panel-verde</code>,
+  manifest y tema visual propios — sidebar verde oscuro vs. navy del núcleo). Ambas comparten
+  el mismo service worker (network-first, sin cachear <code>/api/</code>) y el mismo sistema
+  de diseño base (tokens de color, componentes de tarjeta/tabla/badge).</p>
+
+  <p>Las páginas públicas (landing, carga, verificación, pasaportes) están en español/inglés/
+  portugués vía un sistema de i18n propio; los paneles administrativos son solo en español
+  (audiencia interna).</p>
+
+  <h3>2.3 Motor de cálculo</h3>
+  <p>El motor propio clasifica cada ítem por palabras clave (con tolerancia a variantes de
+  OCR) contra categorías con su Alcance GHG (1/2/3, incluidas las 15 categorías estándar de
+  Alcance 3) y calcula por método <strong>físico</strong> (cantidad × factor) cuando el
+  origen del dato lo permite, o por <strong>gasto</strong> (monto × factor monetario) como
+  piso metodológico siempre disponible. Documentos ilegibles se <strong>rechazan</strong> por
+  completo — el sistema no tipea datos en nombre del usuario ni corrige a mano.</p>
+</div>
+
+<!-- 3. MÓDULOS Y FUNCIONALIDADES -->
+<div class="pagina seccion">
+  <h2>3. Módulos y funcionalidades</h2>
+  <table>
+    <tr><th>Módulo</th><th>Qué hace</th><th>Estado</th></tr>
+    <tr><td>Contabilidad de carbono</td><td>Carga de documentos, cálculo por ítem, informe
+    PDF consolidado (Libro Mayor de Carbono)</td><td class="ok">Operativo</td></tr>
+    <tr><td>Trazabilidad / cadena de integridad</td><td>Cadena de hash pública encadenada
+    por documento, explorador público en <code>/cadena</code></td><td class="ok">Operativo</td></tr>
+    <tr><td>REP · Ley 20.920</td><td>Declaración de embalaje por componentes, % de
+    reciclabilidad calculado en servidor</td><td class="ok">Operativo</td></tr>
+    <tr><td>Capital Natural</td><td>6 cuentas (Agua/Energía/CO2e/Materiales/Suelo/
+    Biodiversidad) con movimientos automáticos y sello por cuenta</td><td class="ok">Operativo</td></tr>
+    <tr><td>Corredor Bioceánico + Torre de Control</td><td>Seguimiento de flota multi-camión
+    por pasos sellados (sin GPS), instrucciones en vivo</td><td class="ok">Operativo</td></tr>
+    <tr><td>Pasaportes (documental/producto/mineral) + Tarjeta de Viaje</td><td>Documento
+    público verificable por QR, con cadena de custodia propia por lote</td><td class="ok">Operativo</td></tr>
+    <tr><td>API de mandantes</td><td>Consulta de proveedores por X-Api-Key, export Alcance 3
+    GHG (ISSB IFRS S2 / NCG 461)</td><td class="ok">Operativo</td></tr>
+    <tr><td>Capacitación interna</td><td>Cursos, evaluación (≥70%) y constancia con QR
+    verificable — para personal de ambos paneles</td><td class="ok">Operativo (nuevo)</td></tr>
+    <tr><td>Landing — Servicios</td><td>Sección que divide la oferta pública en 4 líneas de
+    servicio (contabilidad, trazabilidad, REP, mostrador)</td><td class="ok">Operativo (nuevo)</td></tr>
+    <tr><td>Compensación voluntaria de CO2e</td><td>Registro de cobro/omisión, tarifa
+    configurable</td><td class="ok">Operativo — <strong>pago simulado</strong>, sin pasarela real todavía</td></tr>
+    <tr><td>Correo transaccional</td><td>Magic links, recuperación de contraseña,
+    comprobantes (Resend)</td><td class="ok">Activo en producción</td></tr>
+  </table>
+</div>
+
+<!-- 4. CALIDAD -->
+<div class="pagina seccion">
+  <h2>4. Calidad</h2>
+  <p>Suite de pruebas automatizadas (<code>node:test</code>, sin dependencias de framework
+  externo): <strong>343 casos en 33 archivos</strong>, en verde al momento de este informe.
+  Cubre servicios puros (hash, cálculo de puntaje, REP, motor propio/de texto/OCR,
+  valorización FIFO/PMP, transporte) y flujos de integración con base de datos real
+  (autenticación, capacitación, cadena de hash, Capital Natural).</p>
+  <p>Las 37 migraciones se verifican corriéndolas dos veces seguidas contra una base
+  poblada — ninguna reescribe ni duplica datos ya existentes.</p>
+  <p>Frontend: build de producción (Vite) sin errores ni advertencias de compilación.</p>
+</div>
+
+<!-- 5. SEGURIDAD -->
+<div class="pagina seccion">
+  <h2>5. Seguridad</h2>
+  <ul>
+    <li>Contraseñas con bcrypt (costo ≥12), JWT de acceso + refresh firmados por separado.</li>
+    <li>Rate limiting en endpoints públicos y de autenticación.</li>
+    <li>Aislamiento por panel (<code>requireHomePanel</code>) entre las cuentas de
+    <code>/admin</code> y <code>/panel-verde</code> — una cuenta de un panel no puede iniciar
+    sesión en el otro.</li>
+    <li>La API key nunca llega al navegador: todo el tráfico al motor externo pasa por el
+    backend.</li>
+    <li>Auditoría de accesos cruzados (búsqueda por RUT, consultas de mandantes) registrada
+    en el log de actividad y, opcionalmente, exportada a BigQuery.</li>
+  </ul>
+</div>
+
+<!-- 6. PENDIENTES CONOCIDOS -->
+<div class="pagina seccion">
+  <h2>6. Pendientes conocidos</h2>
+  <p>La mayoría de lo pendiente depende de una decisión o acción externa al código, no de
+  desarrollo adicional:</p>
+  <ul>
+    <li><strong>Cobro real (VirtualPos):</strong> la compensación voluntaria sigue simulada
+    — falta integrar una pasarela de pago real.</li>
+    <li><strong>Documentos legales:</strong> Términos de Servicio y Política de Privacidad
+    son borradores con secciones marcadas para revisión de un abogado.</li>
+    <li><strong>Integraciones oficiales</strong> (SII/RCV, factores de emisión de otros
+    países, HuellaChile, CBAM, ISO 14083/GLEC, ISSB/NCG 461, CDP): investigadas y diseñadas,
+    pendientes de credenciales de terceros o de un mandante real que las active.</li>
+    <li><strong>Accesibilidad (WCAG):</strong> pase de accesibilidad del panel administrativo
+    no realizado todavía.</li>
+  </ul>
+</div>
+
+<!-- 7. CIERRE -->
+<div class="pagina seccion">
+  <h2>7. Cierre</h2>
+  <p>Este informe describe el estado real de la plataforma al momento de su redacción, sin
+  cifras de negocio proyectadas ni promesas de certificación. sicr3p no es un organismo
+  certificador ni un verificador de tercera parte acreditado: registra, calcula y sella
+  datos desde los documentos reales del presentador, con integridad garantizada por una
+  cadena de hash pública propia.</p>
+
+  <div class="pie-doc">
+    sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl · Informe técnico interno, versión 1.0
+  </div>
+</div>
+
+</body>
+</html>
