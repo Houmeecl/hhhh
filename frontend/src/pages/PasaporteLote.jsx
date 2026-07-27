@@ -5,6 +5,8 @@ import { Icon } from '../components/icons.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 
+const SEMAFORO_BADGE = { verde: 'badge-green', amarillo: 'badge-amber', rojo: 'badge-red', gris: 'badge-gray' };
+
 // Pasaporte de Origen: la cadena de custodia pública de un lote mineral
 // (estilo Minespider, con las piezas propias de sicr3p: cadena de hash
 // por lote, eslabones anclados a DTE reales y divulgación selectiva).
@@ -70,6 +72,11 @@ export default function PasaporteLote() {
                   </span>
                   {copperMark?.estado && (
                     <span className="badge badge-green" style={{ fontSize: 12 }}>Copper Mark: {copperMark.estado}</span>
+                  )}
+                  {tipo === 'documental' && data.semaforo && (
+                    <span className={`badge ${SEMAFORO_BADGE[data.semaforo.color] || 'badge-gray'}`} style={{ fontSize: 12 }}>
+                      📄 {t(`lote.semaforo_${data.semaforo.color}`)}
+                    </span>
                   )}
                 </div>
               </div>
@@ -205,6 +212,26 @@ export default function PasaporteLote() {
                 </div>
               </div>
             </div>
+
+            {/* Documentos del expediente — Carga Bioceánica (migración 043) */}
+            {tipo === 'documental' && (
+              <div className="pasaporte-sec">
+                <h3>{t('lote.sec_documentos')}</h3>
+                {!data.documentos?.length ? (
+                  <p className="muted" style={{ fontSize: 13 }}>{t('lote.doc_sin_datos')}</p>
+                ) : (
+                  <div style={{ display: 'grid', gap: 8, fontSize: 13 }}>
+                    {data.documentos.map((d) => (
+                      <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <b>{t(`lote.doc.${d.tipo_documento}`)}</b>
+                        {d.divulgado && d.archivo_original && <span className="muted">{d.archivo_original}</span>}
+                        <span className="mono" style={{ fontSize: 11 }}>{String(d.hash_cadena).slice(0, 16)}…</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t('lote.disclaimer')}</p>
 

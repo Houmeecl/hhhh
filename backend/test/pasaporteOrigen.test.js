@@ -343,12 +343,13 @@ test('resumenNormativo: OECD minerales SOLO para tipo mineral', () => {
 
 // ---------- Torre de control (migración 024) ----------
 
-test('destinoTorreValido acepta solo puerto_seco, puerto y estacionamiento', async () => {
+test('destinoTorreValido acepta solo puerto_seco, puerto, estacionamiento y frontera', async () => {
   const { destinoTorreValido, DESTINOS_TORRE } = await import('../src/services/pasaporteOrigen.js');
-  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento']);
+  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento', 'frontera']);
   assert.equal(destinoTorreValido('puerto_seco'), true);
   assert.equal(destinoTorreValido('puerto'), true);
   assert.equal(destinoTorreValido('estacionamiento'), true);
+  assert.equal(destinoTorreValido('frontera'), true);
   assert.equal(destinoTorreValido('aeropuerto'), false);
   assert.equal(destinoTorreValido(''), false);
   assert.equal(destinoTorreValido(undefined), false);
@@ -383,7 +384,7 @@ test('paso de transporte chileno SIN RUT pasa (la tarjeta es la identidad); otro
 
 test('validarMensajeTorre: estacionamiento exige zona; puerto/puerto_seco no; sanea largos', async () => {
   const { validarMensajeTorre, DESTINOS_TORRE } = await import('../src/services/pasaporteOrigen.js');
-  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento']);
+  assert.deepEqual(DESTINOS_TORRE, ['puerto_seco', 'puerto', 'estacionamiento', 'frontera']);
   assert.equal(validarMensajeTorre({ destino: 'puerto' }).ok, true);
   assert.equal(validarMensajeTorre({ destino: 'puerto_seco' }).ok, true);
   assert.equal(validarMensajeTorre({ destino: 'aeropuerto' }).ok, false);
@@ -397,6 +398,64 @@ test('validarMensajeTorre: estacionamiento exige zona; puerto/puerto_seco no; sa
   // zona se recorta a 60 y solo aplica a estacionamiento
   assert.equal(validarMensajeTorre({ destino: 'estacionamiento', zona: 'z'.repeat(100) }).zona.length, 60);
   assert.equal(validarMensajeTorre({ destino: 'puerto', zona: 'Zona X' }).zona, null);
+});
+
+test('validarMensajeTorre: frontera exige uno de los 3 pasos conocidos', async () => {
+  const { validarMensajeTorre, PUNTOS_FRONTERA } = await import('../src/services/pasaporteOrigen.js');
+  assert.deepEqual(PUNTOS_FRONTERA, ['ponta-pora', 'pozo-hondo', 'paso-de-jama']);
+  assert.equal(validarMensajeTorre({ destino: 'frontera' }).ok, false);
+  assert.equal(validarMensajeTorre({ destino: 'frontera', zona: 'zona-inventada' }).ok, false);
+  const ok = validarMensajeTorre({ destino: 'frontera', zona: 'pozo-hondo', nota: 'aduana PY' });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.zona, 'pozo-hondo');
+  assert.equal(ok.nota, 'aduana PY');
+});
+
+test('placaValida: liviano y no bloqueante — vacío pasa, formatos razonables pasan, basura no', async () => {
+  const { placaValida } = await import('../src/services/pasaporteOrigen.js');
+  assert.equal(placaValida(''), true);
+  assert.equal(placaValida(undefined), true);
+  assert.equal(placaValida('AB1234'), true);
+  assert.equal(placaValida('ab-1234'), true);
+  assert.equal(placaValida('BRA2E19'), true);
+  assert.equal(placaValida('X'), false);
+  assert.equal(placaValida('$$$$'), false);
+});
+
+test('semaforoDocumental: verde con todos los esperados leídos, amarillo con avance parcial, rojo sin nada', async () => {
+  const { semaforoDocumental, DOCUMENTOS_ESPERADOS_POR_TIPO_CARGA } = await import('../src/services/pasaporteOrigen.js');
+  const lote = { material: 'contenedor' };
+  const esperados = DOCUMENTOS_ESPERADOS_POR_TIPO_CARGA.contenedor;
+
+  const rojo = semaforoDocumental(lote, []);
+  assert.equal(rojo.color, 'rojo');
+  assert.deepEqual(rojo.esperados, esperados);
+  assert.deepEqual(rojo.presentes, []);
+  assert.deepEqual(rojo.faltantes, esperados);
+
+  const amarillo = semaforoDocumental(lote, [{ tipo_documento: 'factura', estado: 'leido' }]);
+  assert.equal(amarillo.color, 'amarillo');
+  assert.deepEqual(amarillo.presentes, ['factura']);
+
+  const verde = semaforoDocumental(lote, esperados.map((t) => ({ tipo_documento: t, estado: 'leido' })));
+  assert.equal(verde.color, 'verde');
+  assert.deepEqual(verde.faltantes, []);
+
+  const gris = semaforoDocumental({ material: 'inexistente' }, []);
+  assert.equal(gris.color, 'gris');
+  assert.deepEqual(gris.esperados, []);
+});
+
+test('hashDocumentoLote: determinista y sensible a cada campo', async () => {
+  const { hashDocumentoLote } = await import('../src/services/pasaporteOrigen.js');
+  const base = { lote_codigo: 'LM-2026-000001', n_documento: 1, tipo_documento: 'factura', sha256: 'abc123', nonce: 'n1' };
+  const h1 = hashDocumentoLote(base);
+  const h2 = hashDocumentoLote({ ...base });
+  assert.equal(h1, h2);
+  assert.notEqual(h1, hashDocumentoLote({ ...base, n_documento: 2 }));
+  assert.notEqual(h1, hashDocumentoLote({ ...base, tipo_documento: 'packing_list' }));
+  assert.notEqual(h1, hashDocumentoLote({ ...base, sha256: 'def456' }));
+  assert.notEqual(h1, hashDocumentoLote({ ...base, nonce: 'n2' }));
 });
 
 // ---------- Credencial de Firma del Proveedor (atestación, migración 038) ----------

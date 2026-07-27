@@ -207,6 +207,37 @@ export function filtrarPorVisibilidad(eslabones, nivelLector = 'publico') {
   });
 }
 
+// Misma lógica que filtrarPorVisibilidad pero para lote_documentos: los
+// campos de INTEGRIDAD (tipo, estado, hashes) se exponen SIEMPRE; el
+// contenido (nombre de archivo, extensión, tamaño, sha256) respeta la
+// visibilidad del documento. El binario (archivo_pendiente) NUNCA sale
+// por esta función — ni siquiera se recibe como parámetro: el llamador
+// no debe seleccionarlo de la BD para una respuesta pública.
+export function filtrarDocumentosPorVisibilidad(documentos, nivelLector = 'publico') {
+  const nl = NIVEL[nivelLector] || 1;
+  return (documentos || []).map((d) => {
+    const base = {
+      id: d.id,
+      tipo_documento: d.tipo_documento,
+      estado: d.estado,
+      hash_documento: d.hash_documento,
+      hash_anterior: d.hash_anterior,
+      hash_cadena: d.hash_cadena,
+      visibilidad: d.visibilidad,
+      created_at: d.created_at,
+      divulgado: (NIVEL[d.visibilidad] || 1) <= nl,
+    };
+    if (!base.divulgado) return base;
+    return {
+      ...base,
+      archivo_original: d.archivo_original ?? null,
+      extension: d.extension ?? null,
+      tamano_bytes: d.tamano_bytes ?? null,
+      sha256: d.sha256 ?? null,
+    };
+  });
+}
+
 // Máscara pública de RUT: 76.123.456-0 → 76.***.**6-0 (se reconoce a
 // quién SÍ divulgó sin regalar el identificador completo a scrapers).
 export function enmascararRut(rut) {
@@ -406,23 +437,37 @@ export function hashAnclajeLote({ codigo, ultimo_hash, n_eslabones }) {
   return sha256(canonico);
 }
 
-// ---------- Torre de control (migraciones 024/025) ----------
+// ---------- Torre de control (migraciones 024/025/045) ----------
 // Instrucciones operativas de la torre al portador: dirigirse al puerto
-// seco (interior), al puerto (terminal marítimo) o a una ZONA DE
-// ESTACIONAMIENTO designada (ej. "Zona E-3, La Negra"). NO son
-// eslabones: no entran en la cadena de hash del lote.
-export const DESTINOS_TORRE = ['puerto_seco', 'puerto', 'estacionamiento'];
+// seco (interior), al puerto (terminal marítimo), a una ZONA DE
+// ESTACIONAMIENTO designada (ej. "Zona E-3, La Negra") o a uno de los 3
+// PASOS FRONTERIZOS del Corredor Bioceánico. NO son eslabones: no entran
+// en la cadena de hash del lote (guía operativa, no custodia sellada).
+export const DESTINOS_TORRE = ['puerto_seco', 'puerto', 'estacionamiento', 'frontera'];
+
+// Los 3 pasos fronterizos que cruza el Corredor Bioceánico (mismo
+// catálogo que PUNTOS_CORREDOR en frontend/src/lib/corredor.js).
+export const PUNTOS_FRONTERA = ['ponta-pora', 'pozo-hondo', 'paso-de-jama'];
 
 export function destinoTorreValido(d) {
   return DESTINOS_TORRE.includes(d);
 }
 
 // Valida el mensaje completo de la torre: destino del catálogo y, si es
-// estacionamiento, zona obligatoria (¿a cuál mando al chofer si no?).
+// estacionamiento o frontera, zona obligatoria (¿a cuál zona/paso mando
+// al chofer si no?). Frontera exige uno de los 3 pasos conocidos;
+// estacionamiento acepta texto libre (nombres de zona varían por planta).
 // Devuelve la zona/nota ya saneadas para insertar.
 export function validarMensajeTorre({ destino, zona, nota } = {}) {
   if (!destinoTorreValido(destino)) {
     return { ok: false, error: `Destino inválido. Uno de: ${DESTINOS_TORRE.join(', ')}.` };
+  }
+  const notaLimpia = String(nota || '').trim().slice(0, 200) || null;
+  if (destino === 'frontera') {
+    if (!PUNTOS_FRONTERA.includes(zona)) {
+      return { ok: false, error: `Para frontera debes indicar el paso: ${PUNTOS_FRONTERA.join(', ')}.` };
+    }
+    return { ok: true, destino, zona, nota: notaLimpia };
   }
   const zonaLimpia = String(zona || '').trim().slice(0, 60) || null;
   if (destino === 'estacionamiento' && !zonaLimpia) {
@@ -432,7 +477,7 @@ export function validarMensajeTorre({ destino, zona, nota } = {}) {
     ok: true,
     destino,
     zona: destino === 'estacionamiento' ? zonaLimpia : null,
-    nota: String(nota || '').trim().slice(0, 200) || null,
+    nota: notaLimpia,
   };
 }
 
@@ -442,6 +487,68 @@ export function validarMensajeTorre({ destino, zona, nota } = {}) {
 export function sanearPuntoId(v) {
   const s = String(v || '').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 40);
   return s || null;
+}
+
+// ---------- Carga Bioceánica: documentos del expediente (migración 043) ----------
+// Lista textual confirmada con el usuario para la Etapa 1 — coincide 1:1
+// con el CHECK de lote_documentos.tipo_documento.
+export const TIPOS_DOCUMENTO_CARGA = [
+  'factura', 'packing_list', 'carta_porte', 'mic_dta', 'cert_origen',
+  'sag', 'seguro', 'pesaje', 'foto', 'comprobante_frontera', 'otro',
+];
+
+// Documentos que se esperan según el material del lote (CATALOGO_MATERIALES.documental).
+// No es exhaustivo ni normativo — es la base del semáforo, ajustable sin
+// tocar el CHECK de la tabla (es un mapa de datos, no de esquema).
+export const DOCUMENTOS_ESPERADOS_POR_TIPO_CARGA = {
+  carga_general: ['factura', 'packing_list', 'carta_porte', 'mic_dta', 'cert_origen'],
+  carga_refrigerada: ['factura', 'packing_list', 'carta_porte', 'mic_dta', 'cert_origen', 'sag'],
+  granel: ['factura', 'carta_porte', 'mic_dta', 'pesaje'],
+  contenedor: ['factura', 'packing_list', 'carta_porte', 'mic_dta'],
+  documentos: ['factura', 'carta_porte', 'mic_dta'],
+};
+
+// Semáforo de completitud documental — mismo estilo puro que resumenNormativo.
+// verde: todos los esperados están leídos. amarillo: hay avance o algo
+// pendiente de revisión humana, pero falta al menos uno. rojo: nada leído
+// todavía. gris: el material no tiene esperados definidos (no se puede evaluar).
+export function semaforoDocumental(lote, documentos = []) {
+  const esperados = DOCUMENTOS_ESPERADOS_POR_TIPO_CARGA[lote?.material] || [];
+  const presentesSet = new Set(
+    (documentos || []).filter((d) => d.estado === 'leido').map((d) => d.tipo_documento)
+  );
+  const presentes = esperados.filter((t) => presentesSet.has(t));
+  const faltantes = esperados.filter((t) => !presentesSet.has(t));
+  const hayPendientes = (documentos || []).some((d) => d.estado === 'pendiente_revision');
+
+  let color;
+  if (!esperados.length) color = 'gris';
+  else if (faltantes.length === 0) color = 'verde';
+  else if (presentes.length > 0 || hayPendientes) color = 'amarillo';
+  else color = 'rojo';
+
+  return { color, esperados, presentes, faltantes };
+}
+
+// Chequeo liviano de patente/placa — NUNCA bloqueante: los formatos varían
+// mucho entre BR/PY/AR/CL (mercosur vs. chileno). Solo advierte si el
+// texto no parece una placa en absoluto (vacío, demasiado corto/largo).
+export function placaValida(v) {
+  const s = String(v || '').toUpperCase().replace(/\s+/g, '');
+  if (!s) return true; // campo opcional: vacío no es "inválido"
+  return /^[A-Z0-9-]{5,10}$/.test(s);
+}
+
+// ---------- Cadena de hash de lote_documentos (migración 043) ----------
+// Cadena PROPIA y AISLADA de lote_eslabones (mismo patrón de aislamiento
+// que cuentas_naturales, migración 029): subir un documento del expediente
+// nunca toca la cadena de custodia del lote, y viceversa. Reusa
+// hashCadena/GENESIS de cadenaHash.js igual que lote_eslabones.
+export function hashDocumentoLote({ lote_codigo, n_documento, tipo_documento, sha256: shaArchivo, nonce }) {
+  const canonico = [
+    lote_codigo || '', String(n_documento || 0), tipo_documento || '', shaArchivo || '', nonce || '',
+  ].join('|');
+  return sha256(canonico);
 }
 
 // Re-export de las primitivas de cadena que la ruta necesita junto a

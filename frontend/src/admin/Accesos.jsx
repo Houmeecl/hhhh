@@ -17,21 +17,24 @@ export default function Accesos() {
             <span style={{ color: 'var(--green-600)' }}><Icon.Qr size={24} /></span> Accesos externos
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes
-            y API keys para puertos (tránsito del Corredor por su punto).
+            Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes,
+            API keys para puertos (tránsito del Corredor por su punto) y accesos para agencias de aduana
+            (Pasaporte Bioceánico — sicr3p es su infraestructura documental, nunca se presenta como agencia).
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
         <button className={`btn btn-sm ${tab === 'codigos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('codigos')}>Códigos de prueba</button>
         <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
         <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
+        <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
       </div>
 
       {tab === 'codigos' && <Codigos flash={flash} />}
       {tab === 'mandantes' && <Mandantes flash={flash} />}
       {tab === 'puertos' && <Puertos flash={flash} />}
+      {tab === 'agencias' && <Agencias flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -436,6 +439,97 @@ function Puertos({ flash }) {
         <CrearCuentaWeb
           entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre}
           crear={api.crearCuentaPuerto}
+          onCreada={cargar}
+          onClose={() => setCuentaWeb(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Agencias de aduana (panel /panel-agencia — Pasaporte Bioceánico): la
+// agencia sigue realizando la tramitación oficial; sicr3p es su
+// infraestructura documental y de trazabilidad — nunca se presenta como
+// agencia de aduanas. Mismo patrón que Puertos, sin punto_id (se ancla
+// por lotes_minerales.agencia_id, no por punto del Corredor).
+function Agencias({ flash }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ nombre: '', rut: '' });
+  const [tokenNuevo, setTokenNuevo] = useState(null);
+  const [creando, setCreando] = useState(false);
+  const [cuentaWeb, setCuentaWeb] = useState(null);
+
+  const cargar = () => api.agencias().then((r) => setItems(r.agencias)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const { agencia, token } = await api.crearAgencia(form);
+      setTokenNuevo({ nombre: agencia.nombre, token });
+      setForm({ nombre: '', rut: '' });
+      cargar(); flash('Agencia creada.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(a) {
+    try { await api.editarAgencia(a.id, { activo: !a.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div className="card card-pad">
+          <h3 style={{ marginTop: 0 }}>Nueva agencia de aduana</h3>
+          <div className="field"><label>Nombre</label><input value={form.nombre} placeholder="Agencia de Aduanas Ejemplo Ltda." onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
+          <div className="field" style={{ marginBottom: 14 }}><label>RUT (opcional)</label><input value={form.rut} placeholder="76.123.456-0" onChange={(e) => setForm({ ...form, rut: e.target.value })} /></div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre}>
+            {creando ? <span className="spinner" /> : 'Crear y generar API key'}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            La API key se muestra <b>una sola vez</b>. Para el panel web de la agencia usa "Crear acceso web"
+            abajo — la pantalla de captura de documentos vive en <code>/panel-agencia</code> (tablet/PC).
+          </p>
+        </div>
+        {tokenNuevo && (
+          <div className="card card-pad" style={{ borderColor: 'var(--green)' }}>
+            <h3 style={{ marginTop: 0 }}>API key de {tokenNuevo.nombre}</h3>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>{tokenNuevo.token}</div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Cópiala ahora: no volverá a mostrarse.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Nombre</th><th>RUT</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
+          <tbody>
+            {items.map((a) => (
+              <tr key={a.id}>
+                <td><b>{a.nombre}</b></td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{a.rut || '—'}</td>
+                <td className="muted" style={{ fontSize: 13 }}>{a.ultimo_uso ? fmtFecha(a.ultimo_uso) : 'Nunca'}</td>
+                <td><span className={`badge ${a.activo ? 'badge-green' : 'badge-gray'}`}>{a.activo ? 'Activa' : 'Inactiva'}</span></td>
+                <td>
+                  {a.tiene_cuenta_web
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(a)}>Crear acceso web</button>}
+                </td>
+                <td><button className="btn btn-outline btn-sm" onClick={() => toggle(a)}>{a.activo ? 'Desactivar' : 'Activar'}</button></td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin agencias registradas.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      {cuentaWeb && (
+        <CrearCuentaWeb
+          entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre}
+          crear={api.crearCuentaAgencia}
           onCreada={cargar}
           onClose={() => setCuentaWeb(null)}
         />

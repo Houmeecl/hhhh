@@ -21,6 +21,7 @@ import ActivarCuenta from './components/ActivarCuenta.jsx';
 import LoginAv from './admin-av/LoginAv.jsx';
 import LoginPuerto from './panel-puerto/LoginPuerto.jsx';
 import LoginMandante from './panel-mandante/LoginMandante.jsx';
+import LoginAgencia from './panel-agencia/LoginAgencia.jsx';
 
 // Code-splitting: los paneles admin son la mitad del bundle y solo los
 // usan operadores logueados — se cargan bajo demanda para que las
@@ -30,6 +31,7 @@ const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
 const AdminAvApp = lazy(() => import('./admin-av/AdminAvApp.jsx'));
 const PuertoApp = lazy(() => import('./panel-puerto/PuertoApp.jsx'));
 const MandanteApp = lazy(() => import('./panel-mandante/MandanteApp.jsx'));
+const AgenciaApp = lazy(() => import('./panel-agencia/AgenciaApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
@@ -83,6 +85,11 @@ export default function App() {
       <Route path="/panel-mandante/login" element={<LoginMandante />} />
       <Route path="/panel-mandante/activar" element={<ActivarCuenta loginPath="/panel-mandante/login" titulo="el panel de Mandante" />} />
       <Route path="/panel-mandante/*" element={<MandanteApp />} />
+
+      {/* Panel de Agencia de Aduana — expedientes del Corredor + captura de documentos (tablet/PC) */}
+      <Route path="/panel-agencia/login" element={<LoginAgencia />} />
+      <Route path="/panel-agencia/activar" element={<ActivarCuenta loginPath="/panel-agencia/login" titulo="el panel de Agencia" />} />
+      <Route path="/panel-agencia/*" element={<AgenciaApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

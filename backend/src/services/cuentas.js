@@ -14,6 +14,7 @@ export const RUTA_ACTIVAR = {
   aduana_verde: '/panel-verde/activar',
   puerto: '/panel-puerto/activar',
   mandante: '/panel-mandante/activar',
+  agencia: '/panel-agencia/activar',
 };
 
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');

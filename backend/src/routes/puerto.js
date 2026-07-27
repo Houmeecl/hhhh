@@ -5,7 +5,7 @@ import { query } from '../lib/db.js';
 import { hashApiKey } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
-import { filtrarPorVisibilidad } from '../services/pasaporteOrigen.js';
+import { filtrarPorVisibilidad, filtrarDocumentosPorVisibilidad, semaforoDocumental } from '../services/pasaporteOrigen.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 
 // ============================================================
@@ -90,9 +90,18 @@ router.get('/transitos/:codigo', async (req, res, next) => {
     const pasaPorMiPunto = eslabones.some((e) => e.datos?.punto_id === req.puerto.punto_id);
     if (!pasaPorMiPunto) return res.status(403).json({ error: 'Este tránsito no pasa por tu punto.' });
 
+    const { rows: documentos } = await query(
+      `SELECT id, tipo_documento, estado, visibilidad, archivo_original, extension, tamano_bytes,
+              sha256, hash_documento, hash_anterior, hash_cadena, created_at
+       FROM lote_documentos WHERE lote_id = $1 ORDER BY created_at DESC`,
+      [lote.id]
+    );
+
     res.json({
       lote,
       eslabones: filtrarPorVisibilidad(eslabones, 'cadena'),
+      documentos: filtrarDocumentosPorVisibilidad(documentos.filter((d) => d.estado === 'leido'), 'cadena'),
+      semaforo: semaforoDocumental(lote, documentos),
       integridad: verificarCadenaCompleta(eslabones),
     });
 

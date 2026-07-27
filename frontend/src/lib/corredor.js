@@ -30,9 +30,18 @@ export const PUNTOS_CORREDOR = [
   { id: 'puerto-mejillones', nombre: 'Puerto Mejillones', pais: 'CL', lat: -23.0959, lng: -70.4519 },
 ];
 
+// Los 3 pasos fronterizos que cruza el Corredor Bioceánico — mismo
+// catálogo que PUNTOS_FRONTERA en backend/src/services/pasaporteOrigen.js.
+// A diferencia de 'estacionamiento' (zona = texto libre), para
+// 'frontera' la zona ES uno de estos 3 ids (ya existentes en
+// PUNTOS_CORREDOR arriba).
+export const PUNTOS_FRONTERA = ['ponta-pora', 'pozo-hondo', 'paso-de-jama'];
+
 // Destino de una instrucción de la torre → punto del catálogo.
 // 'estacionamiento' no tiene punto fijo: la zona la designa la torre
-// como texto (ej. "Zona E-3, La Negra") y no se dibuja línea.
+// como texto (ej. "Zona E-3, La Negra") y no se dibuja línea. 'frontera'
+// tampoco tiene un punto único fijo: el punto lo da la propia zona (uno
+// de los 3 pasos) — ver puntoDestinoDe() más abajo.
 export const DESTINO_A_PUNTO = {
   puerto_seco: 'puerto-seco',
   puerto: 'puerto-antofagasta',
@@ -43,12 +52,28 @@ export const CLAVE_DESTINO = {
   puerto_seco: 'torre.puerto_seco',
   puerto: 'torre.puerto',
   estacionamiento: 'torre.estacionamiento',
+  frontera: 'torre.frontera',
 };
 
-// Etiqueta completa de una instrucción: "PUERTO SECO" / "ESTACIONAMIENTO · Zona E-3".
+// Resuelve a qué punto del catálogo apunta una instrucción de la torre —
+// fijo para puerto_seco/puerto, dinámico (por zona) para frontera, sin
+// punto para estacionamiento (zona es texto libre).
+export function puntoDestinoDe(m) {
+  if (!m) return null;
+  if (m.destino === 'frontera' && m.zona) return porId.get(m.zona) || null;
+  const id = DESTINO_A_PUNTO[m.destino];
+  return id ? porId.get(id) || null : null;
+}
+
+// Etiqueta completa de una instrucción: "PUERTO SECO" / "ESTACIONAMIENTO · Zona E-3"
+// / "FRONTERA · Paso de Jama (frontera AR/CL)".
 export function etiquetaInstruccion(m, t) {
   if (!m) return '';
   const base = t(CLAVE_DESTINO[m.destino] || m.destino);
+  if (m.destino === 'frontera' && m.zona) {
+    const punto = porId.get(m.zona);
+    return `${base} · ${punto?.nombre || m.zona}`;
+  }
   return m.zona ? `${base} · ${m.zona}` : base;
 }
 

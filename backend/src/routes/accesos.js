@@ -204,6 +204,58 @@ router.put('/puertos/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- AGENCIAS DE ADUANA (panel /panel-agencia — Pasaporte Bioceánico) ----------
+// La agencia sigue realizando la tramitación oficial; sicr3p es su
+// infraestructura documental/de trazabilidad — nunca se presenta como
+// agencia de aduanas. Acceso por lotes tipo 'documental' scopeados a SU
+// lotes_minerales.agencia_id (migración 046), no por punto_id como puerto.
+router.get('/agencias', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT a.id, a.nombre, a.rut, a.activo, a.ultimo_uso, a.created_at,
+              (u.id IS NOT NULL) AS tiene_cuenta_web
+       FROM agencias_aduana a LEFT JOIN usuarios u ON u.agencia_id = a.id
+       ORDER BY a.created_at DESC`
+    );
+    res.json({ agencias: rows });
+  } catch (err) { next(err); }
+});
+
+// Acceso web propio de la agencia (panel /panel-agencia) — distinto de la
+// API key (X-Api-Key, integración de sistemas): esto es un login humano.
+router.post('/agencias/:id/crear-cuenta', adminOnly, (req, res, next) =>
+  crearCuentaEntidad({ req, res, panel: 'agencia', columnaFk: 'agencia_id', entidadId: req.params.id }).catch(next)
+);
+
+router.post('/agencias', adminOnly, async (req, res, next) => {
+  try {
+    const { nombre, rut } = req.body || {};
+    if (!nombre) return res.status(400).json({ error: 'Nombre es obligatorio.' });
+    // El token se muestra UNA sola vez; solo se guarda su hash (mismo patrón que puertos/mandantes).
+    const token = `agn_${crypto.randomBytes(24).toString('base64url')}`;
+    const { rows } = await query(
+      `INSERT INTO agencias_aduana (nombre, rut, token_hash) VALUES ($1,$2,$3)
+       RETURNING id, nombre, rut, activo, created_at`,
+      [nombre, rut || null, hashToken(token)]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_agencia', entidad: 'agencia_aduana', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ agencia: rows[0], token });
+  } catch (err) { next(err); }
+});
+
+router.put('/agencias/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { activo } = req.body || {};
+    const { rows } = await query(
+      `UPDATE agencias_aduana SET activo = COALESCE($2, activo) WHERE id = $1
+       RETURNING id, nombre, rut, activo`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Agencia no encontrada' });
+    res.json({ agencia: rows[0] });
+  } catch (err) { next(err); }
+});
+
 // ---------- CÓDIGOS DE ACCESO (créditos) ----------
 router.get('/codigos', async (req, res, next) => {
   try {

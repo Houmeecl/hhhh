@@ -3,6 +3,7 @@ import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import Dropzone from '../components/Dropzone.jsx';
 
 // ============================================================
 // Pasaporte de Origen — back-office de lotes minerales.
@@ -68,9 +69,22 @@ const DECLARACIONES = [
 ];
 const ESTADOS_DECL = ['pendiente', 'declarado', 'con_evidencia', 'no_aplica'];
 
+// Documentos del expediente — Carga Bioceánica (migración 043).
+const TIPO_DOCUMENTO_LABEL = {
+  factura: 'Factura comercial', packing_list: 'Packing list', carta_porte: 'Carta de porte',
+  mic_dta: 'MIC/DTA', cert_origen: 'Certificado de origen', sag: 'Documento SAG',
+  seguro: 'Seguro', pesaje: 'Comprobante de pesaje', foto: 'Fotografía',
+  comprobante_frontera: 'Comprobante fronterizo', otro: 'Otro',
+};
+const TIPOS_DOCUMENTO_CARGA = Object.keys(TIPO_DOCUMENTO_LABEL);
+const ESTADO_DOCUMENTO_LABEL = { leido: 'Leído', pendiente_revision: 'En revisión', sin_texto: 'Sin señal', rechazado: 'Rechazado' };
+const SEMAFORO_LABEL = { verde: 'Completo', amarillo: 'Parcial', rojo: 'Sin documentos', gris: 'Sin criterio' };
+const SEMAFORO_BADGE = { verde: 'badge-green', amarillo: 'badge-amber', rojo: 'badge-red', gris: 'badge-gray' };
+
 export default function Origen() {
   const [lotes, setLotes] = useState(null);
   const [sel, setSel] = useState(null);       // detalle del lote seleccionado
+  const [revision, setRevision] = useState(false); // cola de revisión de documentos (transversal a lotes)
   const [msg, setMsg] = useState(null);
   const flash = (texto, error) => { setMsg({ texto, error }); setTimeout(() => setMsg(null), 5000); };
 
@@ -86,13 +100,81 @@ export default function Origen() {
         <span className="muted" style={{ fontSize: 13 }}>
           Trazabilidad de lotes minerales — cadena de custodia con hash, alineada a OECD / CBAM / DPP.
         </span>
+        {!sel && (
+          <button className="btn btn-sm btn-outline" style={{ marginLeft: 'auto' }} onClick={() => setRevision((v) => !v)}>
+            {revision ? '← Volver a lotes' : 'Revisión de documentos'}
+          </button>
+        )}
       </div>
       {msg && (
         <div className={`badge ${msg.error ? 'badge-red' : 'badge-green'}`} style={{ margin: '10px 0' }}>{msg.texto}</div>
       )}
 
-      {!sel && <ListaLotes lotes={lotes} flash={flash} onAbrir={abrirLote} onCreado={(id) => { cargarLista(); abrirLote(id); }} />}
+      {revision && !sel && <RevisionDocumentos flash={flash} />}
+      {!revision && !sel && <ListaLotes lotes={lotes} flash={flash} onAbrir={abrirLote} onCreado={(id) => { cargarLista(); abrirLote(id); }} />}
       {sel && <DetalleLote data={sel} flash={flash} onVolver={() => { setSel(null); cargarLista(); }} onRefrescar={() => abrirLote(sel.lote.id)} />}
+    </div>
+  );
+}
+
+// ---------- Cola de revisión de documentos — SOLO Carga Bioceánica ----------
+// Único humano-en-el-medio del proyecto: acotado a lote_documentos
+// (el autoservicio público /cargar sigue siendo 422-solo, sin cambios).
+function RevisionDocumentos({ flash }) {
+  const [items, setItems] = useState(null);
+  const [resolviendo, setResolviendo] = useState(null); // id en curso
+
+  const cargar = () => api.origenRevisionDocumentos().then((r) => setItems(r.pendientes)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function resolver(id, accion) {
+    if (accion === 'rechazar' && !window.confirm('¿Rechazar este documento? Se borra su binario y queda registrado como rechazo.')) return;
+    setResolviendo(id);
+    try {
+      await api.origenResolverRevision(id, { accion });
+      flash(accion === 'aprobar' ? 'Documento aprobado y sellado en la cadena.' : 'Documento rechazado.');
+      cargar();
+    } catch (e) { flash(e.message, true); }
+    finally { setResolviendo(null); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginTop: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Documentos pendientes de revisión</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        Documentos del expediente que no pasaron el umbral de legibilidad automática — el binario se guarda
+        SOLO mientras está aquí. Apruébalo (entra a la cadena de hash) o recházalo (se borra el binario, queda
+        el registro sin el archivo, mismo patrón que el autoservicio público).
+      </p>
+      {!items ? <div className="skeleton" style={{ height: 60 }} /> : !items.length ? (
+        <p className="muted">Sin documentos pendientes.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Lote</th><th>Tipo</th><th>Archivo</th><th>Etapa</th><th>Fecha</th><th></th></tr></thead>
+            <tbody>
+              {items.map((d) => (
+                <tr key={d.id}>
+                  <td style={{ fontFamily: 'monospace' }}>{d.lote_codigo}</td>
+                  <td>{TIPO_DOCUMENTO_LABEL[d.tipo_documento] || d.tipo_documento}</td>
+                  <td>{d.archivo_original}</td>
+                  <td className="muted">{d.etapa_lectura || '—'}</td>
+                  <td>{fmtFecha(d.created_at)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-sm btn-primary" style={{ marginRight: 6 }}
+                      disabled={resolviendo === d.id} onClick={() => resolver(d.id, 'aprobar')}>
+                      Aprobar
+                    </button>
+                    <button className="btn btn-sm btn-outline" disabled={resolviendo === d.id} onClick={() => resolver(d.id, 'rechazar')}>
+                      Rechazar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -269,7 +351,7 @@ function DemoTorre({ flash }) {
 
 // ---------- Detalle: cadena + declaraciones ----------
 function DetalleLote({ data, flash, onVolver, onRefrescar }) {
-  const { lote, eslabones, declaraciones, balance, emisiones, normativo, integridad } = data;
+  const { lote, eslabones, declaraciones, documentos, semaforo, balance, emisiones, normativo, integridad } = data;
   const abierto = lote.estado === 'abierto';
   const rolesDelTipo = ROLES_POR_TIPO[lote.tipo || 'mineral'] || ROLES_POR_TIPO.mineral;
   const [e, setE] = useState({ rol: rolesDelTipo[0], rut_empresa: '', nombre_empresa: '', pais: 'CL', fecha: '', cantidad: '', co2e_aportado: '', visibilidad: 'publico', punto_control: '' });
@@ -328,6 +410,11 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
         </span>
         <span className={`badge ${lote.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{lote.estado}</span>
         {balance.alerta && <span className="badge badge-amber">⚠ Merma {fmt(balance.merma_pct, 1)}%</span>}
+        {lote.tipo === 'documental' && semaforo && (
+          <span className={`badge ${SEMAFORO_BADGE[semaforo.color] || 'badge-gray'}`}>
+            📄 Documentos: {SEMAFORO_LABEL[semaforo.color] || semaforo.color}
+          </span>
+        )}
         <a className="btn btn-sm btn-outline" href={`/lote/${lote.codigo}`} target="_blank" rel="noreferrer">Ver pasaporte público ↗</a>
         <a className="btn btn-sm btn-outline" href={api.expedienteLoteUrl(lote.codigo)} target="_blank" rel="noreferrer">Expediente PDF ↗</a>
         {abierto && <button className="btn btn-sm btn-outline" onClick={cerrar}>Cerrar lote</button>}
@@ -336,6 +423,12 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       <Tarjetas lote={lote} abierto={abierto} flash={flash} />
       {ROL_CREDENCIAL_POR_TIPO[lote.tipo] && (
         <CredencialesProveedor lote={lote} rol={ROL_CREDENCIAL_POR_TIPO[lote.tipo]} abierto={abierto} flash={flash} />
+      )}
+      {lote.tipo === 'documental' && (
+        <>
+          <AgenciaAsignada lote={lote} abierto={abierto} flash={flash} onRefrescar={onRefrescar} />
+          <Documentos lote={lote} abierto={abierto} documentos={documentos} semaforo={semaforo} flash={flash} onRefrescar={onRefrescar} />
+        </>
       )}
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
@@ -466,6 +559,10 @@ function Tarjetas({ lote, abierto, flash }) {
   const [items, setItems] = useState(null);
   const [portador, setPortador] = useState('');
   const [uid, setUid] = useState('');
+  const [placaTracto, setPlacaTracto] = useState('');
+  const [placaSemi, setPlacaSemi] = useState('');
+  const [conductorNombre, setConductorNombre] = useState('');
+  const [conductorDoc, setConductorDoc] = useState('');
   const [emitiendo, setEmitiendo] = useState(false);
   const [nueva, setNueva] = useState(null); // { tarjeta, clave } — clave visible UNA vez
 
@@ -475,10 +572,14 @@ function Tarjetas({ lote, abierto, flash }) {
   async function emitir() {
     setEmitiendo(true);
     try {
-      const r = await api.origenEmitirTarjeta(lote.id, { portador: portador || null, uid_fisico: uid || null });
+      const r = await api.origenEmitirTarjeta(lote.id, {
+        portador: portador || null, uid_fisico: uid || null,
+        placa_tracto: placaTracto || null, placa_semirremolque: placaSemi || null,
+        conductor_nombre: conductorNombre || null, conductor_documento: conductorDoc || null,
+      });
+      (r.advertencias || []).forEach((a) => flash(a, true));
       setNueva(r);
-      setPortador('');
-      setUid('');
+      setPortador(''); setUid(''); setPlacaTracto(''); setPlacaSemi(''); setConductorNombre(''); setConductorDoc('');
       cargar();
     } catch (e) { flash(e.message, true); }
     finally { setEmitiendo(false); }
@@ -521,18 +622,42 @@ function Tarjetas({ lote, abierto, flash }) {
       )}
 
       {abierto && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
-          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-            <label>Portador (transportista)</label>
-            <input value={portador} placeholder="Transportes Andinos Ltda." onChange={(e) => setPortador(e.target.value)} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label>Portador (transportista)</label>
+              <input value={portador} placeholder="Transportes Andinos Ltda." onChange={(e) => setPortador(e.target.value)} />
+            </div>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label>UID físico del chip (opcional)</label>
+              <input value={uid} placeholder="04:A3:2B:..." onChange={(e) => setUid(e.target.value)} />
+            </div>
           </div>
-          <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
-            <label>UID físico del chip (opcional)</label>
-            <input value={uid} placeholder="04:A3:2B:..." onChange={(e) => setUid(e.target.value)} />
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+              <label>Placa tracto (opcional)</label>
+              <input value={placaTracto} placeholder="BRA2E19" onChange={(e) => setPlacaTracto(e.target.value)} />
+            </div>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+              <label>Placa semirremolque (opcional)</label>
+              <input value={placaSemi} placeholder="XY123AB" onChange={(e) => setPlacaSemi(e.target.value)} />
+            </div>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 160 }}>
+              <label>Conductor (opcional)</label>
+              <input value={conductorNombre} placeholder="Juan Pérez" onChange={(e) => setConductorNombre(e.target.value)} />
+            </div>
+            <div className="field" style={{ margin: 0, flex: 1, minWidth: 140 }}>
+              <label>Documento conductor (opcional)</label>
+              <input value={conductorDoc} placeholder="12.345.678-9" onChange={(e) => setConductorDoc(e.target.value)} />
+            </div>
+            <button className="btn btn-primary" onClick={emitir} disabled={emitiendo}>
+              {emitiendo ? <span className="spinner" /> : 'Emitir tarjeta'}
+            </button>
           </div>
-          <button className="btn btn-primary" onClick={emitir} disabled={emitiendo}>
-            {emitiendo ? <span className="spinner" /> : 'Emitir tarjeta'}
-          </button>
+          <p className="muted" style={{ fontSize: 11, margin: 0 }}>
+            Placa y conductor son opcionales y su formato no se valida estrictamente — varían mucho entre
+            Brasil, Paraguay, Argentina y Chile.
+          </p>
         </div>
       )}
 
@@ -541,12 +666,14 @@ function Tarjetas({ lote, abierto, flash }) {
       ) : (
         <div className="table-scroll">
           <table className="data">
-            <thead><tr><th>Serial</th><th>Portador</th><th className="num">Pasos</th><th>Última actividad</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th>Serial</th><th>Portador</th><th>Vehículo</th><th>Conductor</th><th className="num">Pasos</th><th>Última actividad</th><th>Estado</th><th></th></tr></thead>
             <tbody>
               {items.map((t) => (
                 <tr key={t.id}>
                   <td style={{ fontFamily: 'monospace' }}>{t.serial}</td>
                   <td>{t.portador || '—'}</td>
+                  <td>{[t.placa_tracto, t.placa_semirremolque].filter(Boolean).join(' / ') || '—'}</td>
+                  <td>{t.conductor_nombre || '—'}</td>
                   <td className="num">{fmtInt(t.pasos_registrados)}</td>
                   <td>{t.ultima_actividad ? fmtFecha(t.ultima_actividad) : '—'}</td>
                   <td><span className={`badge ${t.activo ? 'badge-green' : 'badge-gray'}`}>{t.activo ? 'activa' : 'inactiva'}</span></td>
@@ -557,6 +684,134 @@ function Tarjetas({ lote, abierto, flash }) {
                     </button>
                     <button className="btn btn-sm btn-outline" onClick={() => toggleActivo(t)}>{t.activo ? 'Desactivar' : 'Reactivar'}</button>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Agencia de aduana asignada al expediente ----------
+// Sin agencia asignada, el expediente nunca aparece en /panel-agencia
+// (routes/agencia.js filtra por agencia_id). La agencia sigue realizando
+// la tramitación oficial; sicr3p es su infraestructura documental.
+function AgenciaAsignada({ lote, abierto, flash, onRefrescar }) {
+  const [agencias, setAgencias] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => { api.agencias().then((r) => setAgencias(r.agencias)).catch((e) => flash(e.message, true)); }, []);
+
+  async function asignar(e) {
+    const agenciaId = e.target.value;
+    setGuardando(true);
+    try {
+      await api.origenEditarLote(lote.id, { agencia_id: agenciaId });
+      flash(agenciaId ? 'Agencia asignada.' : 'Agencia desasignada.');
+      onRefrescar();
+    } catch (err) { flash(err.message, true); }
+    finally { setGuardando(false); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Agencia de aduana</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        La agencia sigue realizando la tramitación oficial; sicr3p es su infraestructura documental y de
+        trazabilidad. Solo la agencia asignada ve este expediente en <span className="mono">/panel-agencia</span>.
+      </p>
+      {!agencias ? <div className="skeleton" style={{ height: 30 }} /> : (
+        <div className="field" style={{ maxWidth: 320, marginBottom: 0 }}>
+          <select value={lote.agencia_id || ''} onChange={asignar} disabled={!abierto || guardando}>
+            <option value="">— Sin asignar —</option>
+            {agencias.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Documentos del expediente — Carga Bioceánica (migración 043) ----------
+function Documentos({ lote, abierto, documentos, semaforo, flash, onRefrescar }) {
+  const [tipoDocumento, setTipoDocumento] = useState(TIPOS_DOCUMENTO_CARGA[0]);
+  const [subiendo, setSubiendo] = useState(false);
+
+  async function subir(files) {
+    if (!files?.length) return;
+    setSubiendo(true);
+    try {
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('archivo', file);
+        fd.append('tipo_documento', tipoDocumento);
+        const r = await api.origenSubirDocumento(lote.id, fd);
+        flash(r.documento.estado === 'pendiente_revision'
+          ? `${file.name}: sin señal suficiente — queda en revisión.`
+          : `${file.name}: sellado en la cadena de documentos.`);
+      }
+      onRefrescar();
+    } catch (e) { flash(e.message, true); }
+    finally { setSubiendo(false); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Documentos del expediente</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        Factura, packing list, carta de porte, MIC/DTA, certificado de origen, documentos SAG, seguro,
+        pesaje, fotografías y comprobantes fronterizos. Cada documento entra a su propia cadena de hash
+        (aislada de la cadena de custodia). Lo que no se lee automáticamente queda en la cola de revisión.
+      </p>
+
+      {semaforo && (
+        <div style={{ marginBottom: 12 }}>
+          <span className={`badge ${SEMAFORO_BADGE[semaforo.color] || 'badge-gray'}`}>
+            {SEMAFORO_LABEL[semaforo.color] || semaforo.color}
+          </span>
+          {semaforo.faltantes.length > 0 && (
+            <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+              Faltan: {semaforo.faltantes.map((t) => TIPO_DOCUMENTO_LABEL[t] || t).join(', ')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {abierto && (
+        <div style={{ marginBottom: 12 }}>
+          <div className="field" style={{ maxWidth: 280, marginBottom: 10 }}>
+            <label>Tipo de documento a subir</label>
+            <select value={tipoDocumento} onChange={(e) => setTipoDocumento(e.target.value)}>
+              {TIPOS_DOCUMENTO_CARGA.map((v) => <option key={v} value={v}>{TIPO_DOCUMENTO_LABEL[v]}</option>)}
+            </select>
+          </div>
+          {subiendo ? (
+            <div style={{ padding: 20, textAlign: 'center' }}><span className="spinner dark" /> Subiendo…</div>
+          ) : (
+            <Dropzone onFiles={subir} />
+          )}
+        </div>
+      )}
+
+      {!documentos?.length ? (
+        <p className="muted" style={{ fontSize: 13 }}>Sin documentos cargados todavía.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Tipo</th><th>Archivo</th><th>Estado</th><th>Fecha</th></tr></thead>
+            <tbody>
+              {documentos.map((d) => (
+                <tr key={d.id}>
+                  <td>{TIPO_DOCUMENTO_LABEL[d.tipo_documento] || d.tipo_documento}</td>
+                  <td>{d.archivo_original}</td>
+                  <td>
+                    <span className={`badge ${d.estado === 'leido' ? 'badge-green' : d.estado === 'pendiente_revision' ? 'badge-amber' : 'badge-gray'}`}>
+                      {ESTADO_DOCUMENTO_LABEL[d.estado] || d.estado}
+                    </span>
+                  </td>
+                  <td>{fmtFecha(d.created_at)}</td>
                 </tr>
               ))}
             </tbody>

@@ -6,7 +6,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR, DESTINO_A_PUNTO, puntoDe, etiquetaInstruccion } from '../lib/corredor.js';
+import { PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, puntoDestinoDe, etiquetaInstruccion } from '../lib/corredor.js';
 
 // ============================================================
 // Torre de Control — /torre/:codigo
@@ -127,8 +127,7 @@ export default function Torre() {
     // Instrucción vigente → línea punteada camión→destino.
     if (destinoRef.current) { destinoRef.current.remove(); destinoRef.current = null; }
     const vigente = mensajes[0];
-    const destinoId = vigente ? DESTINO_A_PUNTO[vigente.destino] : null;
-    const destino = destinoId ? PUNTOS_CORREDOR.find((p) => p.id === destinoId) : null;
+    const destino = puntoDestinoDe(vigente);
     if (ultimo && destino && destino.id !== ultimo.id) {
       destinoRef.current = L.polyline(
         [[ultimo.lat, ultimo.lng], [destino.lat, destino.lng]],
@@ -276,12 +275,13 @@ function Operador({ codigo, t, onEnviado }) {
 
   async function enviar() {
     if (destino === 'estacionamiento' && !zona.trim()) { flash(t('torre.falta_zona'), true); return; }
+    if (destino === 'frontera' && !zona) { flash(t('torre.falta_paso'), true); return; }
     setOcupado(true);
     try {
       await api.torreMensaje(token, {
         codigo_lote: codigo,
         destino,
-        zona: destino === 'estacionamiento' ? zona.trim() : undefined,
+        zona: (destino === 'estacionamiento' || destino === 'frontera') ? zona.trim() : undefined,
         nota: nota.trim() || undefined,
       });
       setNota('');
@@ -298,6 +298,7 @@ function Operador({ codigo, t, onEnviado }) {
     { valor: 'puerto', etiqueta: t('torre.puerto') },
     { valor: 'puerto_seco', etiqueta: t('torre.puerto_seco') },
     { valor: 'estacionamiento', etiqueta: t('torre.estacionamiento') },
+    { valor: 'frontera', etiqueta: t('torre.frontera') },
   ];
 
   return (
@@ -333,7 +334,7 @@ function Operador({ codigo, t, onEnviado }) {
               {DESTINOS.map((d) => (
                 <button key={d.valor} type="button"
                   className={`torre-dest-btn ${destino === d.valor ? 'activo' : ''}`}
-                  onClick={() => setDestino(d.valor)}>
+                  onClick={() => { setDestino(d.valor); setZona(''); }}>
                   {d.etiqueta}
                 </button>
               ))}
@@ -343,6 +344,17 @@ function Operador({ codigo, t, onEnviado }) {
             <div className="field">
               <label>{t('torre.zona')}</label>
               <input value={zona} maxLength={60} placeholder={t('torre.zona_ej')} onChange={(e) => setZona(e.target.value)} />
+            </div>
+          )}
+          {destino === 'frontera' && (
+            <div className="field">
+              <label>{t('torre.paso')}</label>
+              <select value={zona} onChange={(e) => setZona(e.target.value)}>
+                <option value="">—</option>
+                {PUNTOS_FRONTERA.map((id) => (
+                  <option key={id} value={id}>{PUNTOS_CORREDOR.find((p) => p.id === id)?.nombre || id}</option>
+                ))}
+              </select>
             </div>
           )}
           <div className="field">

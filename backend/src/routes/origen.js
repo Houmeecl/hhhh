@@ -1,11 +1,14 @@
 import express from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import multer from 'multer';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad, signAccess } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
-import { verificarCadenaCompleta } from '../services/cadenaHash.js';
+import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
 import { generateCredencialTarjeta, generateCredencialProveedor } from '../services/pdf.js';
+import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
 import {
   ROLES,
   TIPOS,
@@ -24,12 +27,15 @@ import {
   generarCodigoLote,
   generarSerialTarjeta,
   hashAnclajeLote,
-  hashCadena,
   validarMensajeTorre,
   sanearPuntoId,
   generarSerialCredencialProveedor,
   validarIdentidadProveedor,
   loteAdmiteRol,
+  TIPOS_DOCUMENTO_CARGA,
+  semaforoDocumental,
+  hashDocumentoLote,
+  placaValida,
 } from '../services/pasaporteOrigen.js';
 
 // Roles que hoy admiten credencial de firma (atestación) por tipo de
@@ -139,17 +145,31 @@ router.post('/lotes', adminOnly, async (req, res, next) => {
 // ---------- GET /lotes/:id — detalle completo (nivel privado) ----------
 router.get('/lotes/:id', async (req, res, next) => {
   try {
-    const { rows } = await query(`SELECT * FROM lotes_minerales WHERE id = $1`, [req.params.id]);
+    const { rows } = await query(
+      `SELECT l.*, a.nombre AS agencia_nombre
+       FROM lotes_minerales l LEFT JOIN agencias_aduana a ON a.id = l.agencia_id
+       WHERE l.id = $1`,
+      [req.params.id]
+    );
     if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
     const lote = rows[0];
-    const [{ rows: eslabones }, { rows: declaraciones }] = await Promise.all([
+    const [{ rows: eslabones }, { rows: declaraciones }, { rows: documentos }] = await Promise.all([
       query(`SELECT * FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]),
       query(`SELECT codigo, estado, detalle, evidencia_url, updated_at FROM lote_declaraciones WHERE lote_id = $1`, [lote.id]),
+      query(
+        `SELECT id, lote_id, eslabon_id, tipo_documento, archivo_original, extension, tamano_bytes,
+                sha256, estado, etapa_lectura, visibilidad, datos, hash_documento, hash_anterior,
+                hash_cadena, revisado_por, revisado_en, created_at
+         FROM lote_documentos WHERE lote_id = $1 ORDER BY created_at DESC`,
+        [lote.id]
+      ),
     ]);
     res.json({
       lote,
       eslabones: filtrarPorVisibilidad(eslabones, 'privado'),
       declaraciones,
+      documentos,
+      semaforo: semaforoDocumental(lote, documentos),
       balance: balanceMasas(lote, eslabones),
       emisiones: emisionesIncorporadasPorTonelada(lote, eslabones),
       normativo: resumenNormativo(lote, declaraciones),
@@ -177,6 +197,16 @@ router.patch('/lotes/:id', adminOnly, async (req, res, next) => {
     if (b.metodo_emisiones != null && !['valores_reales', 'valores_defecto', 'mixto'].includes(b.metodo_emisiones)) {
       return res.status(400).json({ error: 'metodo_emisiones inválido.' });
     }
+    // Asignación de agencia de aduana — solo lotes documentales (Carga
+    // Bioceánica); sin esto la agencia nunca vería el expediente en
+    // /panel-agencia (routes/agencia.js filtra por agencia_id).
+    if (b.agencia_id !== undefined && b.agencia_id !== null) {
+      if (rows[0].tipo !== 'documental') {
+        return res.status(400).json({ error: 'Solo los lotes documentales admiten agencia de aduana.' });
+      }
+      const { rows: aRows } = await query(`SELECT id FROM agencias_aduana WHERE id = $1 AND activo = true`, [b.agencia_id]);
+      if (!aRows[0]) return res.status(400).json({ error: 'agencia_id no existe o está inactiva.' });
+    }
 
     const { rows: uRows } = await query(
       `UPDATE lotes_minerales SET
@@ -190,6 +220,7 @@ router.patch('/lotes/:id', adminOnly, async (req, res, next) => {
          emisiones_indirectas_tco2e_t = COALESCE($9, emisiones_indirectas_tco2e_t),
          metodo_emisiones = COALESCE($10, metodo_emisiones),
          fuente_metodologica_id = COALESCE($11, fuente_metodologica_id),
+         agencia_id    = CASE WHEN $12::text IS NOT NULL THEN NULLIF($12,'')::uuid ELSE agencia_id END,
          updated_at = now()
        WHERE id = $1 RETURNING *`,
       [
@@ -199,6 +230,7 @@ router.patch('/lotes/:id', adminOnly, async (req, res, next) => {
         b.estandar_externo !== undefined ? JSON.stringify(b.estandar_externo) : null,
         b.emisiones_directas_tco2e_t ?? null, b.emisiones_indirectas_tco2e_t ?? null,
         b.metodo_emisiones ?? null, b.fuente_metodologica_id ?? null,
+        b.agencia_id !== undefined ? String(b.agencia_id ?? '') : null,
       ]
     );
     await logActividad({
@@ -400,7 +432,8 @@ router.post('/lotes/:id/cerrar', adminOnly, async (req, res, next) => {
 router.get('/lotes/:id/tarjetas', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, serial, uid_fisico, portador, activo, ultima_actividad, pasos_registrados, created_at
+      `SELECT id, serial, uid_fisico, portador, activo, ultima_actividad, pasos_registrados, created_at,
+              placa_tracto, placa_semirremolque, conductor_nombre, conductor_documento
        FROM tarjetas_viaje WHERE lote_id = $1 ORDER BY created_at DESC`,
       [req.params.id]
     );
@@ -420,14 +453,26 @@ router.post('/lotes/:id/tarjetas', adminOnly, async (req, res, next) => {
     const clave = generarClave();
     const claveHash = await bcrypt.hash(clave, 10);
 
+    // Placa/conductor: chequeo liviano, NUNCA bloqueante — un camión un
+    // día no tiene todavía la placa a mano, no debe impedir emitir la tarjeta.
+    const advertencias = [];
+    if (b.placa_tracto && !placaValida(b.placa_tracto)) advertencias.push('placa_tracto no parece una patente válida.');
+    if (b.placa_semirremolque && !placaValida(b.placa_semirremolque)) advertencias.push('placa_semirremolque no parece una patente válida.');
+
     let tarjeta = null;
     for (let intento = 0; intento < 5 && !tarjeta; intento++) {
       try {
         const { rows } = await query(
-          `INSERT INTO tarjetas_viaje (serial, uid_fisico, lote_id, portador, clave_hash)
-           VALUES ($1,$2,$3,$4,$5)
-           RETURNING id, serial, uid_fisico, portador, activo, created_at`,
-          [generarSerialTarjeta(), b.uid_fisico || null, lRows[0].id, b.portador || null, claveHash]
+          `INSERT INTO tarjetas_viaje
+             (serial, uid_fisico, lote_id, portador, clave_hash,
+              placa_tracto, placa_semirremolque, conductor_nombre, conductor_documento)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+           RETURNING id, serial, uid_fisico, portador, activo, created_at,
+                     placa_tracto, placa_semirremolque, conductor_nombre, conductor_documento`,
+          [
+            generarSerialTarjeta(), b.uid_fisico || null, lRows[0].id, b.portador || null, claveHash,
+            b.placa_tracto || null, b.placa_semirremolque || null, b.conductor_nombre || null, b.conductor_documento || null,
+          ]
         );
         tarjeta = rows[0];
       } catch (e) {
@@ -444,7 +489,7 @@ router.post('/lotes/:id/tarjetas', adminOnly, async (req, res, next) => {
       entidadId: tarjeta.id, detalle: { serial: tarjeta.serial, lote: lRows[0].codigo }, ip: req.ip,
     });
     // `clave` en claro SOLO aquí: se entrega impresa junto con la tarjeta.
-    res.status(201).json({ tarjeta, clave });
+    res.status(201).json({ tarjeta, clave, advertencias });
   } catch (err) { next(err); }
 });
 
@@ -473,20 +518,225 @@ router.get('/lotes/:id/tarjetas/:tarjetaId/credencial.pdf', async (req, res, nex
 router.put('/tarjetas/:id', adminOnly, async (req, res, next) => {
   try {
     const b = req.body || {};
+    // Placa/conductor: chequeo liviano, NUNCA bloqueante (formatos varían
+    // mucho entre BR/PY/AR/CL) — solo se advierte, no se rechaza el guardado.
+    const advertencias = [];
+    if (b.placa_tracto && !placaValida(b.placa_tracto)) advertencias.push('placa_tracto no parece una patente válida.');
+    if (b.placa_semirremolque && !placaValida(b.placa_semirremolque)) advertencias.push('placa_semirremolque no parece una patente válida.');
     const { rows } = await query(
       `UPDATE tarjetas_viaje SET
          activo = COALESCE($2, activo),
-         portador = COALESCE($3, portador)
+         portador = COALESCE($3, portador),
+         placa_tracto = COALESCE($4, placa_tracto),
+         placa_semirremolque = COALESCE($5, placa_semirremolque),
+         conductor_nombre = COALESCE($6, conductor_nombre),
+         conductor_documento = COALESCE($7, conductor_documento)
        WHERE id = $1
-       RETURNING id, serial, portador, activo, pasos_registrados`,
-      [req.params.id, typeof b.activo === 'boolean' ? b.activo : null, b.portador ?? null]
+       RETURNING id, serial, portador, activo, pasos_registrados, placa_tracto, placa_semirremolque, conductor_nombre, conductor_documento`,
+      [
+        req.params.id, typeof b.activo === 'boolean' ? b.activo : null, b.portador ?? null,
+        b.placa_tracto ?? null, b.placa_semirremolque ?? null, b.conductor_nombre ?? null, b.conductor_documento ?? null,
+      ]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada' });
     await logActividad({
       usuarioId: req.user.sub, accion: 'editar_tarjeta_viaje', entidad: 'tarjeta_viaje',
       entidadId: rows[0].id, detalle: { serial: rows[0].serial, activo: rows[0].activo }, ip: req.ip,
     });
-    res.json({ tarjeta: rows[0] });
+    res.json({ tarjeta: rows[0], advertencias });
+  } catch (err) { next(err); }
+});
+
+// ---------- Documentos del expediente — Carga Bioceánica (migración 043) ----------
+// Relaciona N documentos con un lote (factura, packing list, carta de
+// porte, MIC/DTA, etc.) en su PROPIA cadena de hash, aislada de
+// lote_eslabones (mismo aislamiento que cuentas_naturales, migración 029).
+export const uploadDocumentoLote = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(pdf|jpe?g|png|heic)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Formato no permitido'), ok);
+  },
+});
+
+router.get('/lotes/:id/documentos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, lote_id, eslabon_id, tipo_documento, archivo_original, extension, tamano_bytes,
+              sha256, estado, etapa_lectura, visibilidad, datos, hash_documento, hash_anterior,
+              hash_cadena, revisado_por, revisado_en, created_at
+       FROM lote_documentos WHERE lote_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ documentos: rows });
+  } catch (err) { next(err); }
+});
+
+// Sube un documento del expediente. Si se lee con señal suficiente, entra
+// DE INMEDIATO a la cadena de hash de documentos del lote (estado
+// 'leido'). Si no, se guarda TEMPORALMENTE con su binario en
+// 'pendiente_revision' para que un humano de sicrep lo resuelva — la
+// única cola de revisión que existe en el proyecto, acotada a este flujo
+// (el autoservicio público /cargar sigue siendo 422-solo, sin cambios).
+// Compartida con routes/agencia.js (pantalla de captura tablet/PC) — mismo
+// espíritu que anexarEslabonTx: una sola fuente de verdad para el cálculo
+// de hash, exportada en vez de duplicada.
+export async function subirDocumentoLote({ loteId, file, tipoDocumento, subidoPor }) {
+  if (!TIPOS_DOCUMENTO_CARGA.includes(tipoDocumento)) {
+    return { status: 400, body: { error: `tipo_documento inválido. Uno de: ${TIPOS_DOCUMENTO_CARGA.join(', ')}.` } };
+  }
+  if (!file) return { status: 400, body: { error: 'Debes adjuntar un archivo.' } };
+
+  // Pre-lectura FUERA de la transacción (mismo motivo que public.js: el
+  // OCR puede tardar decenas de segundos y no debe serializar al resto).
+  const lectura = await leerDocumentoGenerico(file.buffer, file.originalname, tipoDocumento);
+  const shaArchivo = crypto.createHash('sha256').update(file.buffer).digest('hex');
+  const extension = (file.originalname.split('.').pop() || '').toLowerCase();
+
+  return withTx(async (client) => {
+    const { rows: lockRows } = await client.query(
+      `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [loteId]
+    );
+    const lote = lockRows[0];
+    if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
+    if (lote.estado !== 'abierto') return { status: 409, body: { error: 'El lote está cerrado.' } };
+    const nonce = generarNonce();
+
+    if (lectura.estado === 'sin_texto') {
+      const { rows } = await client.query(
+        `INSERT INTO lote_documentos
+           (lote_id, tipo_documento, archivo_original, extension, tamano_bytes, sha256,
+            estado, etapa_lectura, archivo_pendiente, nonce, hash_documento, hash_anterior, hash_cadena, subido_por)
+         VALUES ($1,$2,$3,$4,$5,$6,'pendiente_revision',$7,$8,$9,$10,$10,$10,$11)
+         RETURNING id, lote_id, tipo_documento, archivo_original, extension, tamano_bytes, sha256, estado, etapa_lectura, created_at`,
+        [lote.id, tipoDocumento, file.originalname, extension, file.size, shaArchivo, lectura.etapa, file.buffer, nonce, GENESIS, subidoPor || null]
+      );
+      return { status: 201, body: { documento: rows[0] } };
+    }
+
+    const nDocumento = Number(lote.doc_n_documentos) + 1;
+    const hashDoc = hashDocumentoLote({
+      lote_codigo: lote.codigo, n_documento: nDocumento, tipo_documento: tipoDocumento, sha256: shaArchivo, nonce,
+    });
+    const hashEnc = hashCadena(lote.doc_ultimo_hash, hashDoc);
+    const { rows } = await client.query(
+      `INSERT INTO lote_documentos
+         (lote_id, tipo_documento, archivo_original, extension, tamano_bytes, sha256,
+          estado, etapa_lectura, nonce, hash_documento, hash_anterior, hash_cadena, subido_por)
+       VALUES ($1,$2,$3,$4,$5,$6,'leido',$7,$8,$9,$10,$11,$12)
+       RETURNING id, lote_id, tipo_documento, archivo_original, extension, tamano_bytes, sha256, estado, etapa_lectura, hash_cadena, created_at`,
+      [lote.id, tipoDocumento, file.originalname, extension, file.size, shaArchivo, lectura.etapa, nonce, hashDoc, lote.doc_ultimo_hash, hashEnc, subidoPor || null]
+    );
+    await client.query(
+      `UPDATE lotes_minerales SET doc_ultimo_hash = $2, doc_n_documentos = $3, updated_at = now() WHERE id = $1`,
+      [lote.id, hashEnc, nDocumento]
+    );
+    return { status: 201, body: { documento: rows[0] } };
+  });
+}
+
+router.post('/lotes/:id/documentos', adminOnly, uploadDocumentoLote.single('archivo'), async (req, res, next) => {
+  try {
+    const resultado = await subirDocumentoLote({
+      loteId: req.params.id, file: req.file,
+      tipoDocumento: String(req.body?.tipo_documento || ''), subidoPor: req.user.sub,
+    });
+    if (resultado.status === 201) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'subir_documento_lote', entidad: 'lote_documento',
+        entidadId: resultado.body.documento.id,
+        detalle: { lote_id: req.params.id, tipo_documento: resultado.body.documento.tipo_documento, estado: resultado.body.documento.estado },
+        ip: req.ip,
+      });
+    }
+    res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
+});
+
+// ---------- Cola de revisión de documentos — SOLO Carga Bioceánica ----------
+// Único humano-en-el-medio del proyecto: acotado a lote_documentos, nunca
+// al autoservicio público /cargar (que sigue rechazando con 422).
+router.get('/revision-documentos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT d.id, d.lote_id, l.codigo AS lote_codigo, l.tipo AS lote_tipo, d.tipo_documento,
+              d.archivo_original, d.extension, d.tamano_bytes, d.sha256, d.etapa_lectura, d.created_at
+       FROM lote_documentos d JOIN lotes_minerales l ON l.id = d.lote_id
+       WHERE d.estado = 'pendiente_revision'
+       ORDER BY d.created_at ASC`
+    );
+    res.json({ pendientes: rows });
+  } catch (err) { next(err); }
+});
+
+// Aprobar: entra recién ahora a la cadena de hash de documentos del lote y
+// se borra el binario temporal. Rechazar: se registra en
+// documentos_rechazados (SIN binario, mismo patrón del flujo público) y
+// se borra la fila (y su binario) por completo.
+router.put('/revision-documentos/:id', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    if (!['aprobar', 'rechazar'].includes(b.accion)) {
+      return res.status(400).json({ error: 'accion debe ser aprobar o rechazar.' });
+    }
+
+    const resultado = await withTx(async (client) => {
+      const { rows: dRows } = await client.query(
+        `SELECT * FROM lote_documentos WHERE id = $1 AND estado = 'pendiente_revision' FOR UPDATE`,
+        [req.params.id]
+      );
+      const doc = dRows[0];
+      if (!doc) return { status: 404, body: { error: 'Documento pendiente no encontrado.' } };
+
+      if (b.accion === 'rechazar') {
+        try {
+          await client.query(
+            `INSERT INTO documentos_rechazados (nombre_archivo, extension, tamano_bytes, sha256, motivo, etapa_alcanzada, rut_cliente)
+             VALUES ($1,$2,$3,$4,'sin_senal',$5,
+               (SELECT rut_titular FROM lotes_minerales WHERE id = $6))`,
+            [doc.archivo_original, doc.extension, doc.tamano_bytes, doc.sha256, doc.etapa_lectura, doc.lote_id]
+          );
+        } catch (e) {
+          if (e.code !== '42P01') throw e; // migración 030 sin correr: no bloquea el rechazo
+        }
+        await client.query(`DELETE FROM lote_documentos WHERE id = $1`, [doc.id]);
+        return { status: 200, body: { resultado: 'rechazado', documento_id: doc.id } };
+      }
+
+      const { rows: lRows } = await client.query(
+        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [doc.lote_id]
+      );
+      const lote = lRows[0];
+      if (!lote) return { status: 404, body: { error: 'Lote no encontrado.' } };
+
+      const tipoFinal = b.tipo_documento && TIPOS_DOCUMENTO_CARGA.includes(b.tipo_documento) ? b.tipo_documento : doc.tipo_documento;
+      const nDocumento = Number(lote.doc_n_documentos) + 1;
+      const hashDoc = hashDocumentoLote({
+        lote_codigo: lote.codigo, n_documento: nDocumento, tipo_documento: tipoFinal, sha256: doc.sha256, nonce: doc.nonce,
+      });
+      const hashEnc = hashCadena(lote.doc_ultimo_hash, hashDoc);
+      const { rows: uRows } = await client.query(
+        `UPDATE lote_documentos SET
+           estado = 'leido', tipo_documento = $2, archivo_pendiente = NULL,
+           hash_documento = $3, hash_anterior = $4, hash_cadena = $5,
+           revisado_por = $6, revisado_en = now(), datos = COALESCE($7::jsonb, datos)
+         WHERE id = $1
+         RETURNING id, lote_id, tipo_documento, archivo_original, estado, hash_cadena, revisado_en`,
+        [doc.id, tipoFinal, hashDoc, lote.doc_ultimo_hash, hashEnc, req.user.sub, b.datos !== undefined ? JSON.stringify(b.datos) : null]
+      );
+      await client.query(
+        `UPDATE lotes_minerales SET doc_ultimo_hash = $2, doc_n_documentos = $3, updated_at = now() WHERE id = $1`,
+        [lote.id, hashEnc, nDocumento]
+      );
+      return { status: 200, body: { documento: uRows[0] } };
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: `revision_documento_${b.accion}`, entidad: 'lote_documento',
+      entidadId: req.params.id, detalle: { accion: b.accion }, ip: req.ip,
+    });
+    res.status(resultado.status).json(resultado.body);
   } catch (err) { next(err); }
 });
 

@@ -10,6 +10,7 @@ import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
   filtrarPorVisibilidad, enmascararRut, balanceMasas,
   emisionesIncorporadasPorTonelada, resumenNormativo,
+  filtrarDocumentosPorVisibilidad, semaforoDocumental,
 } from '../services/pasaporteOrigen.js';
 import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
@@ -1060,12 +1061,18 @@ router.get('/lote/:codigo', async (req, res, next) => {
     if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
     const lote = rows[0];
 
-    const [{ rows: eslabones }, { rows: declaraciones }, { rows: fRows }] = await Promise.all([
+    const [{ rows: eslabones }, { rows: declaraciones }, { rows: fRows }, { rows: documentos }] = await Promise.all([
       query(`SELECT * FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]),
       query(`SELECT codigo, estado FROM lote_declaraciones WHERE lote_id = $1`, [lote.id]),
       lote.fuente_metodologica_id
         ? query(`SELECT organismo, documento, version_anio FROM fuentes_metodologicas WHERE id = $1`, [lote.fuente_metodologica_id])
         : Promise.resolve({ rows: [] }),
+      query(
+        `SELECT id, tipo_documento, estado, visibilidad, archivo_original, extension, tamano_bytes,
+                sha256, hash_documento, hash_anterior, hash_cadena, created_at
+         FROM lote_documentos WHERE lote_id = $1 ORDER BY created_at DESC`,
+        [lote.id]
+      ),
     ]);
 
     const publicos = filtrarPorVisibilidad(eslabones, 'publico').map((e) => ({
@@ -1111,6 +1118,12 @@ router.get('/lote/:codigo', async (req, res, next) => {
       },
       balance: balanceMasas(lote, eslabones),
       normativo: resumenNormativo(lote, declaraciones),
+      // Documentos del expediente (Carga Bioceánica, migración 043): solo
+      // los ya confirmados en la cadena de documentos (estado 'leido') —
+      // uno 'pendiente_revision' es estado interno, no se muestra al
+      // público. Nunca se expone el binario (ni siquiera se seleccionó).
+      documentos: filtrarDocumentosPorVisibilidad(documentos.filter((d) => d.estado === 'leido'), 'publico'),
+      semaforo: semaforoDocumental(lote, documentos),
     });
   } catch (err) {
     next(err);
@@ -1279,13 +1292,15 @@ router.get('/lote/:codigo/expediente.pdf', async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
     const lote = rows[0];
-    const [{ rows: eslabones }, { rows: declaraciones }, { rows: aRows }, { rows: fRows }] = await Promise.all([
+    const [{ rows: eslabones }, { rows: declaraciones }, { rows: aRows }, { rows: fRows }, { rows: documentos }, { rows: tarjetas }] = await Promise.all([
       query(`SELECT * FROM lote_eslabones WHERE lote_id = $1 ORDER BY eslabon`, [lote.id]),
       query(`SELECT codigo, estado FROM lote_declaraciones WHERE lote_id = $1`, [lote.id]),
       query(`SELECT eslabon, hash_cadena, created_at FROM cadena_anclajes WHERE lote_id = $1`, [lote.id]),
       lote.fuente_metodologica_id
         ? query(`SELECT organismo, documento, version_anio FROM fuentes_metodologicas WHERE id = $1`, [lote.fuente_metodologica_id])
         : Promise.resolve({ rows: [] }),
+      query(`SELECT tipo_documento, estado, hash_cadena, created_at FROM lote_documentos WHERE lote_id = $1 ORDER BY created_at`, [lote.id]),
+      query(`SELECT serial, portador, placa_tracto, placa_semirremolque, conductor_nombre, conductor_documento FROM tarjetas_viaje WHERE lote_id = $1 ORDER BY created_at`, [lote.id]),
     ]);
 
     const pdf = await generateExpedienteLote({
@@ -1297,6 +1312,8 @@ router.get('/lote/:codigo/expediente.pdf', async (req, res, next) => {
       emisiones: { ...emisionesIncorporadasPorTonelada(lote, eslabones), fuente: fRows[0] || null },
       anclaje: aRows[0] || null,
       integra: verificarCadenaCompleta(eslabones).valido,
+      documentos,
+      tarjetas,
     });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-expediente-${lote.codigo}.pdf"`);

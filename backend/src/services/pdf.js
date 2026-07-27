@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from './qr.js';
 import { query } from '../lib/db.js';
-import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
+import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
@@ -684,7 +684,22 @@ const SUBTITULO_EXPEDIENTE = {
   documental: 'Pasaporte Documental · cadena de custodia de la carga (Corredor)',
 };
 
-export async function generateExpedienteLote({ lote, eslabones, declaraciones, normativo, balance, emisiones, anclaje, integra }) {
+// Carga Bioceánica (migración 043) — etiquetas legibles de los tipos de
+// documento del expediente, mismo catálogo que TIPOS_DOCUMENTO_CARGA.
+const TIPO_DOCUMENTO_EXPEDIENTE = {
+  factura: 'Factura comercial', packing_list: 'Packing list', carta_porte: 'Carta de porte',
+  mic_dta: 'MIC/DTA', cert_origen: 'Certificado de origen', sag: 'Documento SAG',
+  seguro: 'Seguro', pesaje: 'Comprobante de pesaje', foto: 'Fotografía',
+  comprobante_frontera: 'Comprobante fronterizo', otro: 'Otro',
+};
+const SEMAFORO_COLOR_EXPEDIENTE = {
+  verde: GREEN, amarillo: '#b45309', rojo: '#b91c1c', gris: GRAY,
+};
+const SEMAFORO_TEXTO_EXPEDIENTE = {
+  verde: 'COMPLETO', amarillo: 'PARCIAL', rojo: 'SIN DOCUMENTOS', gris: 'SIN CRITERIO DEFINIDO',
+};
+
+export async function generateExpedienteLote({ lote, eslabones, declaraciones, normativo, balance, emisiones, anclaje, integra, documentos, tarjetas }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const W = doc.page.width - 96;
   const sellado = lote.estado === 'cerrado';
@@ -775,6 +790,77 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
   if (!publicos.length) {
     doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin eslabones registrados.', 54, y + 4);
     y += 20;
+  }
+
+  // ---- Vehículos y conductores (Carga Bioceánica) ----
+  if (tarjetas?.length) {
+    y += 10;
+    if (y > 700) { doc.addPage(); y = 60; }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('VEHÍCULOS Y CONDUCTORES', 48, y);
+    y += 16;
+    doc.font('Helvetica').fontSize(8.5).fillColor(NAVY);
+    for (const t of tarjetas) {
+      if (y > 760) { doc.addPage(); y = 60; }
+      const placas = [t.placa_tracto, t.placa_semirremolque].filter(Boolean).join(' / ') || 'sin placa registrada';
+      const conductor = t.conductor_nombre
+        ? `${t.conductor_nombre}${t.conductor_documento ? ` (${t.conductor_documento})` : ''}`
+        : 'sin conductor registrado';
+      doc.text(`·  ${t.portador || 'Tarjeta ' + t.serial}  —  Placas: ${placas}  —  Conductor: ${conductor}`, 48, y, { width: W });
+      y = doc.y + 4;
+    }
+  }
+
+  // ---- Documentos del expediente (Carga Bioceánica, migración 043) ----
+  if (lote.tipo === 'documental') {
+    const docs = documentos || [];
+    const semaforo = semaforoDocumental(lote, docs);
+
+    y += 14;
+    if (y > 700) { doc.addPage(); y = 60; }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('SEMÁFORO DOCUMENTAL', 48, y);
+    y += 16;
+    const chipSem = SEMAFORO_TEXTO_EXPEDIENTE[semaforo.color] || semaforo.color.toUpperCase();
+    const colorSem = SEMAFORO_COLOR_EXPEDIENTE[semaforo.color] || GRAY;
+    doc.roundedRect(48, y, doc.font('Helvetica-Bold').fontSize(9).widthOfString(chipSem) + 24, 20, 4).fillAndStroke(LIGHT, colorSem);
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(colorSem).text(chipSem, 60, y + 6);
+    y += 30;
+    doc.font('Helvetica').fontSize(8.5).fillColor(NAVY)
+      .text(`Documentos esperados para ${MATERIAL_EXPEDIENTE[lote.material] || lote.material}: ${semaforo.esperados.map((t) => TIPO_DOCUMENTO_EXPEDIENTE[t] || t).join(', ') || '—'}`, 48, y, { width: W });
+    y = doc.y + 4;
+    if (semaforo.faltantes.length) {
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor('#b45309')
+        .text(`Faltantes: ${semaforo.faltantes.map((t) => TIPO_DOCUMENTO_EXPEDIENTE[t] || t).join(', ')}`, 48, y, { width: W });
+      y = doc.y + 4;
+    }
+
+    y += 10;
+    if (y > 700) { doc.addPage(); y = 60; }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('DOCUMENTOS DEL EXPEDIENTE', 48, y);
+    y += 16;
+    doc.rect(48, y, W, 18).fill(NAVY);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff');
+    doc.text('Tipo', 54, y + 5).text('Estado', 220, y + 5)
+      .text('Fecha', 310, y + 5).text('Hash (inicio)', 380, y + 5);
+    y += 18;
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY);
+    let zebraDoc = false;
+    for (const d of docs) {
+      if (y > 760) { doc.addPage(); y = 60; }
+      if (zebraDoc) { doc.rect(48, y, W, 16).fill(LIGHT); doc.fillColor(NAVY); }
+      zebraDoc = !zebraDoc;
+      const estadoTexto = d.estado === 'leido' ? 'Leído' : d.estado === 'pendiente_revision' ? 'En revisión' : d.estado === 'sin_texto' ? 'Sin señal' : d.estado;
+      doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+        .text(TIPO_DOCUMENTO_EXPEDIENTE[d.tipo_documento] || d.tipo_documento, 54, y + 4, { width: 160 })
+        .text(estadoTexto, 220, y + 4, { width: 84 })
+        .text(d.created_at ? fechaCorta(d.created_at) : '', 310, y + 4, { width: 64 });
+      doc.font('Courier').fontSize(7)
+        .text(d.hash_cadena ? String(d.hash_cadena).slice(0, 12) + '…' : '—', 380, y + 4);
+      y += 16;
+    }
+    if (!docs.length) {
+      doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin documentos cargados todavía.', 54, y + 4);
+      y += 20;
+    }
   }
 
   // ---- Emisiones incorporadas ----

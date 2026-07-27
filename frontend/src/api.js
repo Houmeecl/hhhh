@@ -44,6 +44,7 @@ function crearAlmacenSesion(prefijo) {
 }
 export const authPuerto = crearAlmacenSesion('puerto');
 export const authMandante = crearAlmacenSesion('mandante');
+export const authAgencia = crearAlmacenSesion('agencia');
 
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
@@ -58,9 +59,9 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, cliente = false } = {}) {
-  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : auth;
-  const anyAuthed = authed || authedAv || authedPuerto || authedMandante;
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : auth;
+  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
   if (anyAuthed && store.access) headers['Authorization'] = `Bearer ${store.access}`;
@@ -178,6 +179,12 @@ export const api = {
     request(`/admin/origen/credenciales-proveedor/${id}`, { method: 'PUT', body: b, authed: true }),
   abrirCredencialProveedor: (loteId, credencialId) =>
     abrirPdfAuth(`/api/admin/origen/lotes/${loteId}/credenciales-proveedor/${credencialId}/credencial.pdf`),
+  // Documentos del expediente — Carga Bioceánica (migración 043).
+  origenDocumentos: (loteId) => request(`/admin/origen/lotes/${loteId}/documentos`, { authed: true }),
+  origenSubirDocumento: (loteId, formData) =>
+    request(`/admin/origen/lotes/${loteId}/documentos`, { method: 'POST', body: formData, formData: true, authed: true }),
+  origenRevisionDocumentos: () => request('/admin/origen/revision-documentos', { authed: true }),
+  origenResolverRevision: (id, b) => request(`/admin/origen/revision-documentos/${id}`, { method: 'PUT', body: b, authed: true }),
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el
@@ -201,6 +208,7 @@ export const api = {
   meAv: () => request('/auth/me', { authedAv: true }),
   mePuerto: () => request('/auth/me', { authedPuerto: true }),
   meMandante: () => request('/auth/me', { authedMandante: true }),
+  meAgencia: () => request('/auth/me', { authedAgencia: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
 
@@ -283,6 +291,10 @@ export const api = {
   crearPuerto: (b) => request('/admin/accesos/puertos', { method: 'POST', body: b, authed: true }),
   editarPuerto: (id, b) => request(`/admin/accesos/puertos/${id}`, { method: 'PUT', body: b, authed: true }),
   crearCuentaPuerto: (id, b) => request(`/admin/accesos/puertos/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
+  agencias: () => request('/admin/accesos/agencias', { authed: true }),
+  crearAgencia: (b) => request('/admin/accesos/agencias', { method: 'POST', body: b, authed: true }),
+  editarAgencia: (id, b) => request(`/admin/accesos/agencias/${id}`, { method: 'PUT', body: b, authed: true }),
+  crearCuentaAgencia: (id, b) => request(`/admin/accesos/agencias/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
   codigos: () => request('/admin/accesos/codigos', { authed: true }),
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
@@ -325,6 +337,17 @@ export const api = {
   // integración X-Api-Key, autenticada con la sesión propia authedPuerto.
   puertoTransitos: () => request('/puerto/transitos', { authedPuerto: true }),
   puertoTransito: (codigo) => request(`/puerto/transitos/${encodeURIComponent(codigo)}`, { authedPuerto: true }),
+
+  // --- Panel exclusivo de la agencia de aduana (/panel-agencia) — misma
+  // API que la integración X-Api-Key, autenticada con la sesión propia
+  // authedAgencia. A diferencia de puerto (solo lectura), SÍ escribe: sube
+  // documentos del expediente (pantalla de captura tablet/PC).
+  agenciaExpedientes: () => request('/agencia/expedientes', { authedAgencia: true }),
+  agenciaExpediente: (codigo) => request(`/agencia/expedientes/${encodeURIComponent(codigo)}`, { authedAgencia: true }),
+  agenciaSubirDocumento: (codigo, formData) =>
+    request(`/agencia/expedientes/${encodeURIComponent(codigo)}/documentos`, { method: 'POST', body: formData, formData: true, authedAgencia: true }),
+  abrirExpedienteAgenciaPdf: (codigo) =>
+    abrirPdfAuth(`/api/agencia/expedientes/${encodeURIComponent(codigo)}/expediente.pdf`, authAgencia),
 
   // --- Panel exclusivo del mandante (/panel-mandante) — misma API que la
   // integración X-Api-Key, autenticada con la sesión propia authedMandante.
