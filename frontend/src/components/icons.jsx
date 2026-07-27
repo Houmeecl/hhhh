@@ -107,6 +107,10 @@ export const Icon = {
     <path d="M3 8l9 5 9-5M12 13v8" />
     <path d="M7.5 5.5l9 5" />
   </>),
+  Coin: ({ size = 22 }) => base(size, <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v10M9.5 9.2c0-1.2 1.1-2 2.5-2s2.5.9 2.5 2-1.1 1.8-2.5 1.8-2.5.7-2.5 1.9 1.1 2 2.5 2 2.5-.8 2.5-2" />
+  </>),
 };
 
 export default Icon;

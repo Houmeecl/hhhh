@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
+import { Donut } from '../components/Charts.jsx';
 
 const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
 
@@ -45,13 +46,13 @@ export default function ResumenAv() {
       {embalajeResumen && embalajeResumen.total > 0 && (
         <div className="card card-pad" style={{ marginTop: 16 }}>
           <h3 style={{ marginTop: 0 }}>Distribución de reciclabilidad (REP)</h3>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {['Alto', 'Medio', 'Bajo'].map((nivel) => (
-              <span key={nivel} className={`badge ${NIVEL_BADGE[nivel]}`}>
-                {nivel}: {fmtInt(embalajeResumen.por_nivel[nivel] || 0)}
-              </span>
-            ))}
-          </div>
+          <Donut
+            unit="declaraciones"
+            data={['Alto', 'Medio', 'Bajo'].map((nivel) => ({
+              label: nivel,
+              value: embalajeResumen.por_nivel[nivel] || 0,
+            }))}
+          />
         </div>
       )}
 

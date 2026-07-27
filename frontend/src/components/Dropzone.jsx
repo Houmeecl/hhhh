@@ -32,7 +32,7 @@ export default function Dropzone({ onFiles, accept = '.pdf,.xml,.jpg,.jpeg,.png,
       {/* En móvil: dos acciones explícitas — la cámara abre directo, sin pasar por el selector. */}
       <div className="capture-actions" onClick={(e) => e.stopPropagation()}>
         <button className="btn btn-outline" type="button" onClick={() => cameraRef.current.click()}>
-          <Icon.Cloud size={16} /> Tomar foto
+          <Icon.Camera size={16} /> Tomar foto
         </button>
         <button className="btn btn-outline" type="button" onClick={() => fileRef.current.click()}>
           <Icon.Doc size={16} /> Elegir archivos

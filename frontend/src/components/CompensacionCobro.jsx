@@ -54,7 +54,10 @@ export default function CompensacionCobro({ sesionId, totalCo2e, compensacion, o
   if (compensacion && !editando) {
     return (
       <div className="card card-pad" style={{ marginTop: 16 }}>
-        <h3 style={{ margin: '0 0 8px' }}>Compensación voluntaria</h3>
+        <h3 style={{ margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="send-check-pop" style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CheckCircle size={18} /></span>
+          Compensación voluntaria
+        </h3>
         {compensacion.estado === 'simulado' ? (
           <div>
             <b>${fmtInt(compensacion.monto_clp)} CLP</b>{' '}
@@ -96,7 +99,7 @@ export default function CompensacionCobro({ sesionId, totalCo2e, compensacion, o
         )}
       </div>
 
-      <div style={{ margin: '14px 0', padding: '14px 16px', background: 'var(--bg)', borderRadius: 10, textAlign: 'center' }}>
+      <div className="result-box" style={{ margin: '14px 0', textAlign: 'center' }}>
         <div className="muted" style={{ fontSize: 13 }}>{fmt(totalCo2e, 3)} t CO2e × ${fmtInt(tarifaNum)}</div>
         <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--navy)' }}>= ${fmtInt(monto)} CLP</div>
       </div>

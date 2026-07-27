@@ -329,6 +329,9 @@ table.data tr:hover td { background: #f3f8f5; }
 .progress-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .progress-bar > div { height: 100%; background: var(--green); transition: width 0.4s; }
 
+/* ---------- Caja de resultado (REP/compensación en /panel-verde) ---------- */
+.result-box { background: var(--bg); border-radius: 10px; padding: 14px 16px; }
+
 /* ---------- Captura por cámara (Dropzone) ---------- */
 .capture-actions { display: none; gap: 10px; justify-content: center; margin-top: 14px; }
 .capture-actions .btn { flex: 1; max-width: 220px; }

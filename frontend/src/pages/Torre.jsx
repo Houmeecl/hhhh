@@ -170,7 +170,13 @@ export default function Torre() {
           </div>
         )}
 
-        {!error && (
+        {!error && !data && (
+          <div className="card card-pad" style={{ textAlign: 'center', margin: '20px 0' }}>
+            <span className="spinner dark" /> Cargando…
+          </div>
+        )}
+
+        {!error && data && (
           <>
             {vigente && (
               <div className="torre-banner">

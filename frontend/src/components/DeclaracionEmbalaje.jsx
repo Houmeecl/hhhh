@@ -60,7 +60,7 @@ export default function DeclaracionEmbalaje({ sesionId, componentes, setComponen
   }
 
   return (
-    <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="card" style={{ marginTop: 16, overflow: 'hidden' }}>
       <button type="button" onClick={() => setAbierta((a) => !a)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px',
@@ -73,16 +73,18 @@ export default function DeclaracionEmbalaje({ sesionId, componentes, setComponen
           <span className="muted" style={{ display: 'block', fontSize: 12 }}>Ley 20.920 · composición por componentes y reciclabilidad</span>
         </span>
         {guardada && <span className="badge badge-green" style={{ flexShrink: 0 }}>Guardada</span>}
-        <span className="muted" style={{ flexShrink: 0 }}>{abierta ? '▴' : '▾'}</span>
+        <span className="muted" style={{ flexShrink: 0, display: 'inline-flex', transform: abierta ? 'rotate(-90deg)' : 'rotate(90deg)', transition: 'transform 0.2s ease' }}>
+          <Icon.ArrowRight size={14} />
+        </span>
       </button>
 
       {/* Declaración ya guardada en el backend: resumen bloqueado + Modificar. */}
       {abierta && guardada && (
         <div style={{ padding: 16 }}>
-          <div className="badge badge-green" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>
+          <div className="badge badge-green send-check-pop" style={{ display: 'block', padding: '10px 14px', marginBottom: 12 }}>
             ✓ Declaración guardada — quedará en la verificación pública
           </div>
-          <div style={{ padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div className="result-box" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(guardada.porcentaje, 1)}%</div>
             <div style={{ minWidth: 0 }}>
               <span className={`badge ${nivelBadge[guardada.nivel] || 'badge-gray'}`}>Reciclabilidad: {guardada.nivel}</span>
@@ -141,7 +143,7 @@ export default function DeclaracionEmbalaje({ sesionId, componentes, setComponen
           </button>
 
           {calculo.nivel && (
-            <div style={{ marginTop: 14, padding: '12px 16px', background: 'var(--bg)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div className="result-box" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--green-600)' }}>{fmt(calculo.porcentaje, 1)}%</div>
               <div style={{ minWidth: 0 }}>
                 <span className={`badge ${nivelBadge[calculo.nivel]}`}>Reciclabilidad: {calculo.nivel}</span>

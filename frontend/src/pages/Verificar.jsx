@@ -33,39 +33,54 @@ export default function Verificar() {
         )}
 
         {data && (
-          <div className="card card-pad">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
-              <span className="badge badge-green" style={{ fontSize: 14, padding: '6px 14px' }}>✓ {t('ver.trazabilidad_ok')}</span>
-              {data.cadena && (
-                <span className={`badge ${data.cadena.intacto ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 14, padding: '6px 14px' }}>
-                  {data.cadena.intacto ? `✓ ${t('ver.cadena_intacta')}` : `⚠ ${t('ver.cadena_alterada')}`}
-                </span>
-              )}
-            </div>
-            <h1 style={{ fontSize: 26, margin: '10px 0 4px' }}>{t('ver.documento')} {data.factura.numero_venta}</h1>
-            <p className="muted" style={{ marginTop: 0 }}>{t('ver.subtitulo')}</p>
-
-            <div className="result-cards cols-3">
-              <div className="result-card">
-                <div className="big">{fmt(data.factura.total_co2e, 3)} <small>t CO2e</small></div>
-                <div className="lbl">{t('ver.resultado_incorporado')}</div>
+          <div className="card card-pad pasaporte-doc">
+            <div className="pas-head">
+              <div style={{ minWidth: 0 }}>
+                <div className="pas-kicker">sicr3p</div>
+                <h1 style={{ fontSize: 24, margin: '10px 0 6px' }}>{t('ver.documento')}</h1>
+                <div className="pas-code">{data.factura.numero_venta}</div>
+                <p className="muted" style={{ margin: '10px 0 12px', fontSize: 14 }}>{t('ver.subtitulo')}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span className="badge badge-green" style={{ fontSize: 13, padding: '5px 12px' }}>✓ {t('ver.trazabilidad_ok')}</span>
+                  {data.cadena && (
+                    <span className={`badge ${data.cadena.intacto ? 'badge-green' : 'badge-red'}`} style={{ fontSize: 13, padding: '5px 12px' }}>
+                      {data.cadena.intacto ? `✓ ${t('ver.cadena_intacta')}` : `⚠ ${t('ver.cadena_alterada')}`}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="result-card">
-                <div className="big" style={{ fontSize: 18 }}>{data.factura.categoria}</div>
-                <div className="lbl">{t('ver.categoria')}</div>
-              </div>
-              <div className="result-card">
-                <div className="big">{data.items.length}</div>
-                <div className="lbl">{t('ver.items')}</div>
+              <div style={{ textAlign: 'center' }}>
+                <div className="pas-qr">
+                  <img src={api.qrUrl(data.factura.id)} alt={t('ver.qr_alt')} width={104} height={104} />
+                </div>
+                <div className="muted" style={{ fontSize: 11, maxWidth: 128, margin: '6px auto 0' }}>{t('ver.escanea')}</div>
               </div>
             </div>
 
-            <div style={{ margin: '18px 0', padding: '16px', background: 'var(--bg)', borderRadius: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 14 }}>
-                <div><span className="muted">{t('ver.cliente')}</span><br /><b>{data.cliente.nombre}</b></div>
-                <div><span className="muted">{t('ver.rut')}</span><br /><b>{data.cliente.rut}</b></div>
-                <div><span className="muted">{t('ver.fecha')}</span><br /><b>{fmtFecha(data.factura.fecha)}</b></div>
-                <div><span className="muted">{t('ver.estado')}</span><br /><span className="badge badge-green">{data.factura.status}</span></div>
+            <div className="pasaporte-sec">
+              <h3>{t('ver.resultado_incorporado')}</h3>
+              <div className="result-cards cols-3">
+                <div className="result-card">
+                  <div className="big">{fmt(data.factura.total_co2e, 3)} <small>t CO2e</small></div>
+                  <div className="lbl">{t('ver.resultado_incorporado')}</div>
+                </div>
+                <div className="result-card">
+                  <div className="big" style={{ fontSize: 18 }}>{data.factura.categoria}</div>
+                  <div className="lbl">{t('ver.categoria')}</div>
+                </div>
+                <div className="result-card">
+                  <div className="big">{data.items.length}</div>
+                  <div className="lbl">{t('ver.items')}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pasaporte-sec">
+              <div className="pas-grid">
+                <div><span className="pas-lbl">{t('ver.cliente')}</span><b>{data.cliente.nombre}</b></div>
+                <div><span className="pas-lbl">{t('ver.rut')}</span><b>{data.cliente.rut}</b></div>
+                <div><span className="pas-lbl">{t('ver.fecha')}</span><b>{fmtFecha(data.factura.fecha)}</b></div>
+                <div><span className="pas-lbl">{t('ver.estado')}</span><span className="badge badge-green">{data.factura.status}</span></div>
               </div>
             </div>
 

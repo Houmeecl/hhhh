@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { SelectorIdioma } from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 import { useIdioma } from '../lib/i18n.js';
+import { useScrollReveal } from '../lib/scrollReveal.js';
 
 // Layout del mostrador presencial de sicr3p — landing propia para la red
 // de oficinas físicas de tramitación verde. El header y el footer NO son
@@ -37,21 +37,6 @@ function AvLayout({ children, t }) {
       </footer>
     </div>
   );
-}
-
-// Aparición al hacer scroll (estilo landing moderna): los elementos con
-// .av2-reveal entran cuando cruzan el viewport. Con prefers-reduced-motion
-// el CSS los muestra fijos y este hook no molesta.
-function useRevelar() {
-  useEffect(() => {
-    if (!('IntersectionObserver' in window)) return undefined;
-    const io = new IntersectionObserver(
-      (entradas) => entradas.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); } }),
-      { threshold: 0.15 }
-    );
-    document.querySelectorAll('.av2-reveal').forEach((el) => io.observe(el));
-    return () => io.disconnect();
-  }, []);
 }
 
 // Captura REAL del Pasaporte Digital que flota en el hero — no un mock
@@ -155,7 +140,7 @@ function StandSicr3p() {
 
 export default function AduanaVerde() {
   const { t } = useIdioma();
-  useRevelar();
+  useScrollReveal();
   return (
     <AvLayout t={t}>
       {/* HERO oscuro estilo producto moderno: navy con brillos verdes,

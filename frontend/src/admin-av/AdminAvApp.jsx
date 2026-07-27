@@ -12,7 +12,7 @@ const NAV = [
   { to: '/panel-verde', end: true, ico: Icon.Chart, label: 'Resumen' },
   { to: '/panel-verde/cargar', ico: Icon.Doc, label: 'Cargar documento' },
   { to: '/panel-verde/rep', ico: Icon.Leaf, label: 'REP' },
-  { to: '/panel-verde/compensacion', ico: Icon.Qr, label: 'Compensación' },
+  { to: '/panel-verde/compensacion', ico: Icon.Coin, label: 'Compensación' },
 ];
 
 // El panel del mostrador presencial de sicr3p es su propia "app" instalable,

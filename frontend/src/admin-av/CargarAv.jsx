@@ -30,6 +30,17 @@ function imprimirSticker(facturaId) {
   document.body.appendChild(iframe);
 }
 
+// Barra de pasos del flujo tras procesar un trámite: Trámite → REP →
+// Compensación. Puramente informativa (no bloquea nada: ambos pasos son
+// opcionales) — comunica que son 3 etapas de la misma secuencia.
+function PasoBadge({ n, label, hecho }) {
+  return (
+    <span className={`badge ${hecho ? 'badge-green' : 'badge-gray'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      {hecho ? <Icon.Check size={13} /> : n} {label}
+    </span>
+  );
+}
+
 // Mostrador presencial de sicr3p: el cliente entrega sus documentos (papel →
 // escáner, o digitales) y el sistema los lee y calcula solo — aquí no se
 // digita ningún dato del documento. Si un archivo no se puede leer
@@ -138,6 +149,14 @@ export default function CargarAv() {
               No se pudo enviar el correo. Puedes reintentar o entregar el informe descargado.
             </div>
           )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 4px' }}>
+          <PasoBadge n={1} label="Trámite" hecho />
+          <span className="muted">→</span>
+          <PasoBadge n={2} label="REP" hecho={!!embalajeGuardado} />
+          <span className="muted">→</span>
+          <PasoBadge n={3} label="Compensación" hecho={!!compensacion} />
         </div>
 
         <DeclaracionEmbalaje
