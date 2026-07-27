@@ -15,20 +15,41 @@
 -- agrega el camino de sesión humana, no reemplaza el existente.
 -- ============================================================
 
-ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_panel_check;
-ALTER TABLE usuarios ADD CONSTRAINT usuarios_panel_check
-  CHECK (panel IN ('sicrep', 'aduana_verde', 'puerto', 'mandante'));
+-- Las migraciones se re-ejecutan completas en cada arranque: recrear el
+-- CHECK sin guardia pisaría la versión más amplia que instala la 046
+-- ('agencia') y rompería el arranque con cualquier usuario de agencia ya
+-- creado. Solo se recrea si la definición vigente aún no conoce 'puerto'.
+DO $$
+DECLARE def TEXT;
+BEGIN
+  SELECT pg_get_constraintdef(oid) INTO def FROM pg_constraint
+   WHERE conname = 'usuarios_panel_check' AND conrelid = 'usuarios'::regclass;
+  IF def IS NULL OR def NOT LIKE '%puerto%' THEN
+    ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_panel_check;
+    ALTER TABLE usuarios ADD CONSTRAINT usuarios_panel_check
+      CHECK (panel IN ('sicrep', 'aduana_verde', 'puerto', 'mandante'));
+  END IF;
+END $$;
 
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS puerto_id UUID REFERENCES puertos(id) ON DELETE CASCADE;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mandante_id UUID REFERENCES mandantes(id) ON DELETE CASCADE;
 
 -- Cada panel exige su propia entidad; sicrep/aduana_verde no llevan ninguna.
-ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_panel_entidad_check;
-ALTER TABLE usuarios ADD CONSTRAINT usuarios_panel_entidad_check CHECK (
-  (panel = 'puerto' AND puerto_id IS NOT NULL AND mandante_id IS NULL) OR
-  (panel = 'mandante' AND mandante_id IS NOT NULL AND puerto_id IS NULL) OR
-  (panel IN ('sicrep', 'aduana_verde') AND puerto_id IS NULL AND mandante_id IS NULL)
-);
+-- Misma guardia de re-ejecución: si el constraint ya existe (esta versión o
+-- la ampliada de la 046), se deja tal cual.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+     WHERE conname = 'usuarios_panel_entidad_check' AND conrelid = 'usuarios'::regclass
+  ) THEN
+    ALTER TABLE usuarios ADD CONSTRAINT usuarios_panel_entidad_check CHECK (
+      (panel = 'puerto' AND puerto_id IS NOT NULL AND mandante_id IS NULL) OR
+      (panel = 'mandante' AND mandante_id IS NOT NULL AND puerto_id IS NULL) OR
+      (panel IN ('sicrep', 'aduana_verde') AND puerto_id IS NULL AND mandante_id IS NULL)
+    );
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_usuarios_puerto ON usuarios(puerto_id) WHERE puerto_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_usuarios_mandante ON usuarios(mandante_id) WHERE mandante_id IS NOT NULL;
