@@ -3,6 +3,8 @@ import { query } from '../lib/db.js';
 import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
+import { agregarAlcance3, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
+import { filasACsv } from '../services/csv.js';
 
 // ============================================================
 // API pública para MANDANTES (auth por header X-Api-Key).
@@ -118,6 +120,70 @@ router.get('/proveedor/:rut/resumen', async (req, res, next) => {
       });
       bigquery.exportAcceso({ tipo: 'consulta_proveedor_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.params.rut, detalle });
     }
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/mandante/export/alcance3?anio=&formato=csv|json ----------
+// Export de Alcance 3 (ISSB IFRS S2 / NCG 461 de la CMF) agregado por
+// proveedor y categoría GHG Protocol (1-15), para que el mandante lo
+// pegue en su memoria anual. Sin LIMIT: a diferencia de /proveedores
+// (vista rápida), este es un export contable de cierre — truncar en
+// silencio produciría una cifra de Alcance 3 incompleta.
+router.get('/export/alcance3', async (req, res, next) => {
+  try {
+    const rn = rutNorm(req.mandante.rut);
+    const permitidos = await proveedoresPermitidos(req.mandante.id);
+    const params = [rn];
+    const cond = [`${NORM('f.rut_receptor')} = $1`, `f.rut_emisor IS NOT NULL`, `mc.alcance_ghg LIKE 'Alcance 3%'`];
+    if (permitidos.length) {
+      params.push(permitidos);
+      cond.push(`${NORM('f.rut_emisor')} = ANY($${params.length})`);
+    }
+    if (req.query.anio) {
+      params.push(Number(req.query.anio));
+      cond.push(`EXTRACT(YEAR FROM f.created_at) = $${params.length}`);
+    }
+
+    const { rows } = await query(
+      `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
+              mc.alcance_ghg, f.total_co2e,
+              fm.organismo, fm.documento, fm.version_anio
+         FROM facturas f
+         JOIN motor_categorias mc ON mc.nombre = f.categoria
+         LEFT JOIN fuentes_metodologicas fm ON fm.id = mc.fuente_metodologica_id
+        WHERE ${cond.join(' AND ')}`,
+      params
+    );
+
+    const filas = agregarAlcance3(rows);
+    const anio = req.query.anio || 'todos';
+
+    if (req.query.formato === 'csv') {
+      const headers = ['rut_proveedor', 'categoria_numero', 'categoria_nombre_ghg_protocol', 'descripcion_motor', 'n_documentos', 'total_tco2e', 'fuente_factor'];
+      const csv = filasACsv(headers, filas.map((f) => ({
+        rut_proveedor: f.rut_proveedor,
+        categoria_numero: f.categoria_numero ?? '',
+        categoria_nombre_ghg_protocol: f.categoria_nombre ?? '',
+        descripcion_motor: f.descripcion_motor,
+        n_documentos: f.n_documentos,
+        total_tco2e: f.total_tco2e.toFixed(4),
+        fuente_factor: f.fuente_factor,
+      })));
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="alcance3_${rn}_${anio}.csv"`);
+      res.send('\uFEFF' + csv); // BOM: Excel abre con tildes/ñ correctas
+    } else {
+      res.json({
+        mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa },
+        periodo: { anio },
+        metodologia: { taxonomia_categorias: CITA_CATEGORIAS_ALCANCE3 },
+        filas,
+      });
+    }
+
+    const detalle = { rut_mandante: req.mandante.rut, anio, n_filas: filas.length, formato: req.query.formato === 'csv' ? 'csv' : 'json' };
+    logActividad({ usuarioId: null, accion: 'export_alcance3_mandante', entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip });
+    bigquery.exportAcceso({ tipo: 'export_alcance3_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
   } catch (err) { next(err); }
 });
 

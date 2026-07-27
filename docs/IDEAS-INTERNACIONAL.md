@@ -83,9 +83,9 @@ reporte pueda citar.
 | Campo | Detalle |
 |-------|---------|
 | Aval | IFRS S2 (ISSB, Fundación IFRS) + GHG Protocol Corporate Value Chain (Scope 3) Standard; localmente NCG 461 (CMF). GHG Protocol ya registrado en `fuentes_metodologicas` (`ghg_protocol_2004`). |
-| Base en el repo | API mandantes v2 (`routes/mandante.js`: X-Api-Key, `mandante_proveedores`, `webhook_url`), clasificación `alcance_ghg` por categoría del motor (incluye categorías de Alcance 3 Cat. 1/4/5/6), informes PDF con alcances (patrón defensivo `fetchAlcancesGHG` en `services/pdf.js`). |
-| Qué falta | Export agregado por período y proveedor, con desglose por alcance y categoría GHG y las fuentes metodológicas citadas (CSV/JSON), pensado para pegarse en la memoria del mandante. Mapeo explícito a las 15 categorías de Alcance 3. Feedback de un mandante real usando la API (mismo prerrequisito que el portal del mandante en ETAPA3). |
-| Esfuerzo | **M** (S si se parte por un export simple sobre los endpoints existentes). |
+| Base en el repo | API mandantes v2 (`routes/mandante.js`: X-Api-Key, `mandante_proveedores`, `webhook_url`), clasificación `alcance_ghg` por categoría del motor (incluye categorías de Alcance 3 Cat. 1/4/5/6), informes PDF con alcances (patrón defensivo `fetchAlcancesGHG` en `services/pdf.js`). **Hecho**: `GET /api/mandante/export/alcance3?anio=&formato=csv|json` (`services/alcanceGhg.js`, `services/csv.js`, migración `036_fuente_scope3_taxonomia.sql`) — agrega por proveedor y categoría GHG Protocol (1-15), CSV con BOM/escape RFC 4180, cita la fuente real (WRI/WBCSD 2011, registrada como `ghg_protocol_scope3_2011`). Parseo de `alcance_ghg` en el momento del export, no persistido (el campo es texto libre editable desde el panel; persistir columnas derivadas se desincronizaría). |
+| Qué falta | Feedback de un mandante real usando el export (mismo prerrequisito que el portal del mandante en ETAPA3). |
+| Esfuerzo | **Hecho** (S si se parte por un export simple sobre los endpoints existentes). |
 
 ## 4. HuellaChile (MMA) — reconocimiento local para los clientes de sicr3p
 
@@ -171,7 +171,7 @@ los números que sicr3p ya calcula: emisiones por alcance con metodología citad
 |-------|------|---------|----------|-----------------------|
 | 1 | Multilingüe + sello `?lang=en` | Alto | S (este ciclo) | Habilita todo lo demás: sin comprobante legible afuera, ninguna otra idea internacional despega. |
 | 2 | Tarifa dual CLP/USD | Medio | S (este ciclo) | Coherente con el ancla en USD del impuesto verde; costo marginal casi cero. |
-| 3 | Export Alcance 3 para ISSB / NCG 461 | Alto | M | La demanda ya existe y es local (mandantes listados bajo NCG 461); la API v2 está construida — falta solo el formato citable. |
+| 3 | Export Alcance 3 para ISSB / NCG 461 | Alto | **Hecho** | La demanda ya existe y es local (mandantes listados bajo NCG 461); la API v2 está construida y el export CSV/JSON ya está implementado y probado — falta feedback de un mandante real usándolo. |
 | 4 | Expediente HuellaChile | Medio-alto | S–M + trámite externo | Reconocimiento estatal visible para el cliente; refuerza la credibilidad de todo el resto. Depende de un cliente que postule. |
 | 5 | ISO 14083 / GLEC por envío (Corredor) | Alto | M | El diferenciador del corredor bioceánico; requiere capturar t-km reales antes de prometer nada. |
 | 6 | CBAM — base de datos por embarque | Muy alto (condicionado) | L | El de mayor valor unitario, pero condicionado a un exportador real de los sectores del Anexo I (hoy el gancho más probable: hidrógeno verde) y a la metodología CBAM descargada. |
