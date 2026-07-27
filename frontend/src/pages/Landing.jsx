@@ -130,6 +130,42 @@ export default function Landing() {
       {/* Números vivos de la plataforma (solo si el backend responde) */}
       <FranjaCadena t={t} />
 
+      {/* Servicios: la oferta dividida en líneas diferenciadas, cada una
+          enlazando a algo real (no un catálogo aspiracional). */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('landing.servicios_titulo')}</h2>
+          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
+            {t('landing.servicios_sub')}
+          </p>
+          <div className="av2-bento">
+            <div className="av2-bento-card av2-bento-a av2-reveal">
+              <div className="av2-bento-ico"><Icon.Chart size={24} /></div>
+              <h3>{t('landing.serv1_t')}</h3>
+              <p>{t('landing.serv1_d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Qr size={24} /></div>
+              <h3>{t('landing.serv2_t')}</h3>
+              <p>{t('landing.serv2_d')}</p>
+            </div>
+            <div className="av2-bento-card av2-reveal">
+              <div className="av2-bento-ico"><Icon.Leaf size={24} /></div>
+              <h3>{t('landing.serv3_t')}</h3>
+              <p>{t('landing.serv3_d')}</p>
+            </div>
+            <div className="av2-bento-card av2-bento-b av2-reveal">
+              <div className="av2-bento-ico"><Icon.Building size={24} /></div>
+              <h3>{t('landing.serv4_t')}</h3>
+              <p>{t('landing.serv4_d')}</p>
+              <Link to="/aduana-verde" className="av2-nav-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                {t('landing.serv4_link')} <Icon.ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="sec-pad">
         <div className="container">
           <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('landing.pasos_titulo')}</h2>
