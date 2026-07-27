@@ -15,10 +15,10 @@ const NAV = [
   { to: '/panel-verde/compensacion', ico: Icon.Qr, label: 'Compensación' },
 ];
 
-// El panel Aduana Verde es su propia "app" instalable, distinta del panel
-// sicrep (que usa /manifest-admin.webmanifest) — mismo service worker
-// (sw.js), solo cambia el manifest mientras esta ruta está montada. Mismo
-// patrón que useManifestAdmin en admin/AdminApp.jsx.
+// El panel del mostrador presencial de sicr3p es su propia "app" instalable,
+// distinta del panel núcleo (que usa /manifest-admin.webmanifest) — mismo
+// service worker (sw.js), solo cambia el manifest mientras esta ruta está
+// montada. Mismo patrón que useManifestAdmin en admin/AdminApp.jsx.
 function useManifestAv() {
   useEffect(() => {
     const link = document.querySelector('link[rel="manifest"]');
@@ -37,7 +37,7 @@ export default function AdminAvApp() {
 
   useManifestAv();
 
-  useEffect(() => { document.title = 'Aduana Verde — Panel'; }, []);
+  useEffect(() => { document.title = 'sicr3p — Panel mostrador'; }, []);
 
   useEffect(() => {
     if (!authAv.access) { nav('/panel-verde/login'); return; }
@@ -78,7 +78,7 @@ export default function AdminAvApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo size={26} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Aduana Verde</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Mostrador presencial</div>
         </div>
         <nav>
           {NAV.map((n) => {

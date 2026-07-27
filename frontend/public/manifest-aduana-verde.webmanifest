@@ -1,7 +1,7 @@
 {
-  "name": "Aduana Verde — Panel",
-  "short_name": "Aduana Verde",
-  "description": "Panel operativo de Aduana Verde — compensación, tarifa y declaraciones REP.",
+  "name": "sicr3p — Panel mostrador",
+  "short_name": "sicr3p mostrador",
+  "description": "Panel operativo del mostrador presencial de sicr3p — compensación, tarifa y declaraciones REP.",
   "lang": "es-CL",
   "start_url": "/panel-verde",
   "scope": "/panel-verde",

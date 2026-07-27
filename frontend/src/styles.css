@@ -31,9 +31,10 @@
 
 h1, h2, h3, .logo { font-family: var(--font-head); }
 
-/* Tokens del panel Aduana Verde — scope .theme-av, no toca --navy/--green
-   globales (compartidos con la landing pública ni con el panel sicrep).
-   Solo repinta el sidebar del shell admin ya existente, mismo layout. */
+/* Tokens del panel del mostrador presencial — scope .theme-av, no toca
+   --navy/--green globales (compartidos con la landing pública ni con el
+   panel núcleo). Solo repinta el sidebar del shell admin ya existente,
+   mismo layout. */
 .theme-av .admin-side { background: #0f2e1f; }
 .theme-av .admin-side nav a.active { background: var(--green); color: #fff; }
 
@@ -393,7 +394,7 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 
 /* ============================================================
-   Aduana Verde — landing de oficinas físicas (clases .av-*)
+   Mostrador presencial de sicr3p — landing de oficinas físicas (clases .av-*)
    Solo aditivo: no modifica clases existentes.
    ============================================================ */
 
@@ -545,7 +546,7 @@ table.data tr:hover td { background: #f3f8f5; }
    visualmente bajo 640px y entra cuando el hero salió de pantalla. */
 .mobile-cta { display: none; }
 
-/* Stand Aduana Verde: colgante "PRONTO" con balanceo leve desde su bisagra
+/* Stand del mostrador presencial: colgante "PRONTO" con balanceo leve desde su bisagra
    (transform-box: view-box → el origin se expresa en coordenadas del viewBox)
    y número del tótem con fade-in de solo opacidad (no pisa el rotate del grupo). */
 @keyframes avSwing { from { transform: rotate(2.4deg); } to { transform: rotate(-2.4deg); } }
@@ -872,7 +873,7 @@ table.data tr:hover td { background: #f3f8f5; }
 .pos-detalle[open] > summary { margin-bottom: 4px; }
 
 /* ============================================================
-   Aduana Verde v2 — landing estilo producto moderno.
+   Landing v2 del mostrador presencial — estilo producto moderno.
    Hero oscuro con brillos, bento de entregables, mock del
    Pasaporte Digital y aparición al hacer scroll.
    ============================================================ */
@@ -1080,7 +1081,7 @@ table.data tr:hover td { background: #f3f8f5; }
   .av2-pas-secgrid { grid-template-columns: 1fr; }
 }
 
-/* Header y footer propios de Aduana Verde (marca de dos capas). */
+/* Header y footer propios de la landing del mostrador presencial. */
 .av2-header {
   display: flex;
   align-items: center;

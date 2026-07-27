@@ -6,17 +6,17 @@ import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 import { useIdioma } from '../lib/i18n.js';
 
-// Layout PROPIO de Aduana Verde: la marca de la red es "Aduana Verde."
-// con "by sicr3p" pequeño (dos capas, igual que el terminal). El header
-// y el footer NO son los del sitio sicr3p — cada marca tiene su landing.
+// Layout del mostrador presencial de sicr3p — landing propia para la red
+// de oficinas físicas de tramitación verde. El header y el footer NO son
+// los del sitio principal (esta landing sigue teniendo su propia entrada
+// de navegación), pero la marca es una sola: sicr3p.
 function AvLayout({ children, t }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header className="av2-header">
         <span className="av2-logo">
           <span className="av2-logo-hoja"><Icon.Leaf size={24} /></span>
-          <span className="av2-logo-nombre">Aduana Verde<span style={{ color: 'var(--green)' }}>.</span></span>
-          <Link to="/" className="av2-logo-by">by <Logo size={13} light /></Link>
+          <Link to="/" className="av2-logo-by"><Logo size={20} light /></Link>
         </span>
         <nav className="av2-nav">
           <SelectorIdioma />
@@ -30,9 +30,9 @@ function AvLayout({ children, t }) {
       <footer className="av2-footer">
         <span className="av2-logo" style={{ gap: 8 }}>
           <span className="av2-logo-hoja"><Icon.Leaf size={18} /></span>
-          <span className="av2-logo-nombre" style={{ fontSize: 16 }}>Aduana Verde<span style={{ color: 'var(--green)' }}>.</span></span>
+          <Link to="/" style={{ display: 'inline-flex' }}><Logo size={16} light /></Link>
         </span>
-        <span>{t('av.footer_red')} <Link to="/" style={{ color: '#4ade80', fontWeight: 700 }}>sicr3p</Link></span>
+        <span>{t('av.footer_red')}</span>
         <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
       </footer>
     </div>
@@ -66,9 +66,9 @@ function PasaportePreview() {
   );
 }
 
-// Landing pública de Aduana Verde: la red de oficinas físicas de tramitación
-// verde que opera con la plataforma sicr3p por dentro. Marca de dos capas:
-// "Aduana Verde" grande, "by sicr3p" visible y elegante.
+// Landing pública del mostrador presencial de sicr3p: la red de oficinas
+// físicas de tramitación verde que opera sobre la misma plataforma.
+// Marca única: sicr3p en el letrero, sin doble nombre.
 // Nota de negocio: NO es una integración con el servicio de aduanas ni un
 // trámite aduanero oficial — es tramitación verde de documentos comerciales.
 // Copy: técnicas de PNL honestas (presuposiciones, lenguaje sensorial,
@@ -77,9 +77,9 @@ function PasaportePreview() {
 // Ilustración plana del stand/oficina física (SVG propio, paleta de marca):
 // letrero con la marca, toldo verde, vitrina con el mesón y el tótem del
 // terminal mostrando un cálculo, sticker QR y colgante "Pronto" (pre-lanzamiento).
-function StandAduanaVerde() {
+function StandSicr3p() {
   return (
-    <svg viewBox="0 0 560 430" role="img" aria-label="Ilustración de una oficina Aduana Verde: letrero, toldo y vitrina con el mesón de atención" style={{ width: '100%', height: 'auto', display: 'block' }}>
+    <svg viewBox="0 0 560 430" role="img" aria-label="Ilustración de una oficina sicr3p: letrero, toldo y vitrina con el mesón de atención" style={{ width: '100%', height: 'auto', display: 'block' }}>
       {/* Fondo */}
       <ellipse cx="280" cy="392" rx="252" ry="26" fill="#eaf6ef" />
       {/* Estructura del local */}
@@ -88,8 +88,8 @@ function StandAduanaVerde() {
       <rect x="52" y="58" width="456" height="58" rx="12" fill="#0f1f2e" />
       <circle cx="96" cy="87" r="15" fill="#28a745" />
       <path d="M96 79c-5 3-7 8-6 13 5 1 10-1 12-6 1.6-3.6.4-6-6-7z" fill="#eaf6ef" />
-      <text x="124" y="95" fontFamily="Poppins, Inter, sans-serif" fontSize="27" fontWeight="700" fill="#ffffff">Aduana Verde<tspan fill="#28a745">.</tspan></text>
-      <text x="380" y="93" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="600" fill="#94a3b8" letterSpacing="1.5">BY SICR3P</text>
+      <text x="124" y="95" fontFamily="Poppins, Inter, sans-serif" fontSize="27" fontWeight="700" fill="#ffffff">sicr3p<tspan fill="#28a745">.</tspan></text>
+      <text x="330" y="93" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="600" fill="#94a3b8" letterSpacing="1.5">ATENCIÓN PRESENCIAL</text>
       {/* Toldo */}
       <g>
         <rect x="62" y="116" width="436" height="16" fill="#218838" />
@@ -166,7 +166,7 @@ export default function AduanaVerde() {
             <div className="fade-up">
               <span className="av2-eyebrow"><span className="av-led" /> {t('av.hero_eyebrow')}</span>
               <h1 className="av2-h1">
-                Aduana Verde<span style={{ color: 'var(--green)' }}>.</span>
+                sicr3p<span style={{ color: 'var(--green)' }}>.</span>
               </h1>
               <p className="av2-t2">
                 {t('av.hero_t1')} <span className="av2-grad">{t('av.hero_t2')}</span>
@@ -321,7 +321,7 @@ export default function AduanaVerde() {
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
               {t('av.prov_texto')}
             </p>
-            <a href="mailto:contacto@sicrep.cl?subject=Aduana%20Verde%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('av.prov_cta')}</a>
+            <a href="mailto:contacto@sicrep.cl?subject=sicr3p%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('av.prov_cta')}</a>
           </div>
         </div>
         </div>
@@ -397,7 +397,7 @@ export default function AduanaVerde() {
       <section className="pasos">
         <div className="container">
           <div className="av-stand-wrap" style={{ maxWidth: 560, margin: '0 auto 28px' }}>
-            <StandAduanaVerde />
+            <StandSicr3p />
             <div className="av-stand-note">
               <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.CreditCard size={18} /></span>
               <span>
@@ -413,8 +413,8 @@ export default function AduanaVerde() {
               {t('av.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20Aduana%20Verde" className="btn btn-primary">{t('av.pre_cta1')}</a>
-              <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20Aduana%20Verde" className="btn btn-outline">{t('av.pre_cta2')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20sicr3p" className="btn btn-primary">{t('av.pre_cta1')}</a>
+              <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20sicr3p" className="btn btn-outline">{t('av.pre_cta2')}</a>
             </div>
 
             {/* Nota de compensación, en el tono ya aprobado del sitio */}
@@ -425,7 +425,7 @@ export default function AduanaVerde() {
               </span>
             </div>
             {/* Honestidad de marca: en inglés incluye "not affiliated with any
-                national customs service" (Aduana Verde no es aduana estatal). */}
+                national customs service" (sicr3p no es aduana estatal). */}
             <p className="muted" style={{ fontSize: 12, marginTop: 8, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
               {t('av.disclaimer')}
             </p>

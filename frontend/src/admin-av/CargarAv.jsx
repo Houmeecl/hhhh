@@ -28,7 +28,7 @@ function imprimirSticker(facturaId) {
   document.body.appendChild(iframe);
 }
 
-// Mostrador Aduana Verde: el cliente entrega sus documentos (papel →
+// Mostrador presencial de sicr3p: el cliente entrega sus documentos (papel →
 // escáner, o digitales) y el sistema los lee y calcula solo — aquí no se
 // digita ningún dato del documento. Si un archivo no se puede leer
 // automáticamente, el servidor rechaza el envío completo y se vuelve a

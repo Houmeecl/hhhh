@@ -7,7 +7,7 @@ import { IDIOMAS, useIdioma } from '../lib/i18n.js';
 const NOMBRE_IDIOMA = { es: 'Español', en: 'English', pt: 'Português' };
 
 // Selector discreto "ES · EN · PT". Se usa en este layout y en el layout
-// propio de Aduana Verde (marca de dos capas); jamás aparece en /admin.
+// propio del mostrador presencial (/aduana-verde); jamás aparece en /admin.
 export function SelectorIdioma() {
   const { idioma, setIdioma, t } = useIdioma();
   return (

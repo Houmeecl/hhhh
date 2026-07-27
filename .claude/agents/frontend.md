@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: Frontend React/Vite de sicr3p — páginas públicas, panel admin, terminal POS Aduana Verde. Componentes, responsive (min-width:0 en grids, .table-scroll en tablas), copy es-CL sin "huella".
+description: Frontend React/Vite de sicr3p — páginas públicas, panel admin, terminal POS de mostrador. Componentes, responsive (min-width:0 en grids, .table-scroll en tablas), copy es-CL sin "huella".
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
@@ -10,7 +10,7 @@ Responsable de `frontend/` (React 18 + Vite + react-router).
 
 ## Mapa
 - **Público** (`src/pages/`): Landing, Cargar, Resultado, Verificar, Prueba (mini sitio
-  con código), Ingresar/Acceso/MisSesiones (magic link), PosTerminal (Aduana Verde),
+  con código), Ingresar/Acceso/MisSesiones (magic link), PosTerminal (mostrador sicr3p),
   AduanaVerde (landing oficinas físicas).
 - **Admin** (`src/admin/`): AdminApp (shell + drawer móvil) y ~15 páginas.
 - **Compartido**: `src/api.js` (helpers fetch con token), `src/components/`

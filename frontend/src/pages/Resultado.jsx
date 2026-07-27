@@ -129,7 +129,7 @@ export default function Resultado() {
   const [error, setError] = useState('');
   const [sel, setSel] = useState(0);
   // Declaración de embalaje REP (Ley 20.920): misma sección plegable del
-  // terminal Aduana Verde, ahora también en el flujo web.
+  // terminal del mostrador presencial, ahora también en el flujo web.
   const [embComponentes, setEmbComponentes] = useState([]);
   const [embalajeGuardado, setEmbalajeGuardado] = useState(null);
 

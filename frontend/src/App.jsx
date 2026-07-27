@@ -64,7 +64,7 @@ export default function App() {
       <Route path="/admin/activar" element={<Activar />} />
       <Route path="/admin/*" element={<AdminApp />} />
 
-      {/* Panel Aduana Verde — compensación, tarifa y REP, cuentas propias */}
+      {/* Panel del mostrador presencial — compensación, tarifa y REP, cuentas propias */}
       <Route path="/panel-verde/login" element={<LoginAv />} />
       <Route path="/panel-verde/*" element={<AdminAvApp />} />
 

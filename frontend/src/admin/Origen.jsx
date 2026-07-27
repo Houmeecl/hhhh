@@ -13,14 +13,14 @@ import { validarRut, formatearRut } from '../lib/rut.js';
 
 const TIPO_LABEL = {
   mineral: 'Mineral (minería)',
-  producto: 'Producto (ciudad / Aduana Verde)',
+  producto: 'Producto (ciudad / mostrador sicr3p)',
   documental: 'Documental (Corredor Bioceánico)',
 };
 const ROL_LABEL = {
   mina: 'Mina', planta: 'Planta', refineria: 'Refinería', transporte: 'Transporte',
   comerciante: 'Comerciante', exportador: 'Exportador', comprador: 'Comprador',
   productor: 'Productor', proveedor: 'Proveedor', comercio: 'Comercio',
-  punto_aduana_verde: 'Punto Aduana Verde',
+  punto_aduana_verde: 'Punto sicr3p',
   origen: 'Origen', deposito: 'Depósito', frontera: 'Frontera', puerto: 'Puerto', destino: 'Destino',
 };
 const MATERIAL_LABEL = {

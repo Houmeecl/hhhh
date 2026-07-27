@@ -33,7 +33,7 @@ export default function PasaporteLote() {
   const nombreRol = (r) => t(`lote.rol.${r}`);
   const copperMark = data?.lote?.estandar_externo?.copper_mark;
   // Título e identidad según el tipo de pasaporte (migración 023):
-  // documental (Corredor) / producto (ciudad-Aduana Verde) / mineral.
+  // documental (Corredor) / producto (ciudad-mostrador presencial) / mineral.
   const tipo = data?.lote?.tipo || 'mineral';
   const tituloPas = tipo === 'producto' ? t('lote.titulo_producto')
     : tipo === 'documental' ? t('lote.titulo_documental') : t('lote.titulo');

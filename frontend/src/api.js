@@ -12,8 +12,8 @@ export const auth = {
   clear() { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
 };
 
-// Sesión del panel Aduana Verde — storage separado del panel sicrep, para
-// que ambas puedan estar logueadas a la vez en el mismo navegador.
+// Sesión del panel del mostrador presencial — storage separado del panel
+// núcleo, para que ambas puedan estar logueadas a la vez en el mismo navegador.
 const TOKEN_AV_KEY = 'sicr3p_av_access';
 const REFRESH_AV_KEY = 'sicr3p_av_refresh';
 export const authAv = {
@@ -239,7 +239,7 @@ export const api = {
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
 
-  // Panel Aduana Verde (authedAv: sesión propia, separada del panel sicrep)
+  // Panel del mostrador presencial (authedAv: sesión propia, separada del panel núcleo)
   editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
   compensacionesResumen: () => request('/admin/pos/compensaciones/resumen', { authedAv: true }),
   compensacionesAv: (qs = '') => request(`/admin/pos/compensaciones${qs}`, { authedAv: true }),

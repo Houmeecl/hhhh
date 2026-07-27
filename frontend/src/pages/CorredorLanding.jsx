@@ -5,9 +5,9 @@ import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
 
 // Landing pública del servicio de trazabilidad para el Corredor Bioceánico
-// (Brasil–Paraguay–Argentina–Chile). A diferencia de Aduana Verde —una
-// red comercial que sicr3p crea y opera de punta a punta, con su propia
-// marca de dos capas— el Corredor Bioceánico es infraestructura real y
+// (Brasil–Paraguay–Argentina–Chile). A diferencia del mostrador presencial
+// de sicr3p (/aduana-verde) —una red comercial que sicr3p crea y opera de
+// punta a punta— el Corredor Bioceánico es infraestructura real y
 // preexistente que sicr3p NO posee ni administra: por eso esta página usa
 // el layout y la marca de sicr3p directamente (sin inventar una marca
 // "Corredor Bioceánico. by sicr3p" que insinuaría lo contrario). El MIC/DTA
@@ -52,8 +52,8 @@ export default function CorredorLanding() {
   useRevelar();
   return (
     <PublicLayout>
-      {/* HERO — mismo sistema visual que Aduana Verde (navy + brillos),
-          reutilizando las clases av2-* ya construidas. */}
+      {/* HERO — mismo sistema visual que la landing del mostrador presencial
+          (navy + brillos), reutilizando las clases av2-* ya construidas. */}
       <div className="av2-hero">
         <div className="container">
           <section className="av2-hero-grid">
@@ -166,7 +166,7 @@ export default function CorredorLanding() {
         </div>
       </section>
 
-      {/* La torre: mapa en vivo (fondo navy, como en Aduana Verde) */}
+      {/* La torre: mapa en vivo (fondo navy, mismo estilo del mostrador presencial) */}
       <section className="av2-pasaporte sec-pad">
         <div className="container">
           <div className="av2-pas-secgrid">

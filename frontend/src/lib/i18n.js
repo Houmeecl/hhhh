@@ -1,13 +1,14 @@
 // ============================================================
-// i18n liviano de las superficies públicas de Aduana Verde (es/en/pt).
+// i18n liviano de las superficies públicas de sicr3p (es/en/pt).
 // Sin dependencias: diccionarios planos + pub/sub mínimo con
 // useSyncExternalStore. Español es la fuente de verdad: si falta una
 // clave en en/pt se cae a es (nunca aparece undefined en pantalla).
 // Idioma inicial: ?lang= en la URL > localStorage('idioma') > es.
 //
-// Honestidad de marca: "Aduana Verde" NO se traduce como "customs" —
-// es una marca de tramitación verde de documentos ("green document
-// processing"); la versión en inglés lo aclara explícitamente.
+// Honestidad de marca: "sicr3p" NO se traduce como "customs" — es una
+// marca de tramitación verde de documentos ("green document
+// processing"), no un organismo estatal; la versión en inglés lo
+// aclara explícitamente.
 // ============================================================
 import { useSyncExternalStore } from 'react';
 
@@ -44,7 +45,7 @@ const DICCIONARIOS = {
     'calc.nota': 'Estimación referencial con los factores reales del motor sicr3p y la tarifa vigente — tu número exacto sale de tus documentos.',
     'calc.cta': 'Calcula el tuyo con tus facturas',
     'calc.en_oficina_pre': 'o en una',
-    'calc.en_oficina_link': 'oficina Aduana Verde',
+    'calc.en_oficina_link': 'oficina de sicr3p',
 
     // Verificación pública (/verificar/:id)
     'ver.error_titulo': 'Documento no encontrado',
@@ -75,7 +76,7 @@ const DICCIONARIOS = {
     'ver.nota_legal': 'Esta página confirma la trazabilidad del documento registrado en sicr3p. No constituye una verificación de tercera parte acreditada.',
     'ver.descargar_carpeta': 'Descargar carpeta de evidencia',
 
-    // Landing Aduana Verde
+    // Landing sicr3p — mostrador presencial
     'av.badge_red': 'Red de oficinas en preparación',
     'av.nav_panel': 'Acceso panel',
     'av.trust_oficinas': 'Oficinas físicas',
@@ -93,7 +94,7 @@ const DICCIONARIOS = {
     'av.paso4_t': '4. Te llevas el respaldo en la mano',
     'av.paso4_d': 'Informe de tu contabilidad de carbono y etiqueta con QR verificable. Cuando tu mandante lo escanee, verá lo mismo que tú.',
     'av.cuenta_titulo': 'La cuenta es corta',
-    'av.cuenta_sub': 'Sin letra chica: el modelo completo de Aduana Verde cabe en cuatro números.',
+    'av.cuenta_sub': 'Sin letra chica: el modelo completo de sicr3p cabe en cuatro números.',
     'av.stat_1eq': 'Una tonelada calculada es una tonelada compensada. Pagas según los documentos escaneados en tu visita, con tarifa referencial por t CO2e.',
     'av.stat_1eq_nota': 'Tarifa referencial — se confirma en la oficina antes de pagar.',
     'av.stat_visita': 'visita basta para salir con informe y etiqueta QR',
@@ -110,11 +111,11 @@ const DICCIONARIOS = {
     'av.prov_texto': 'Si le vendes a mandantes o grandes compañías que piden información REP y de emisiones, y hasta ahora respondes con correos y planillas, esto te cambia la conversación: de una sola visita sales con ambas declaraciones respaldadas y verificables. En tu próxima licitación, muestras el QR y listo.',
     'av.prov_cta': 'Quiero saber más',
     'av.pre_titulo': 'Estamos armando la red',
-    'av.pre_texto': 'Aduana Verde está en pre-lanzamiento: todavía no publicamos direcciones de oficinas. Los primeros cupos son para clientes fundadores y operadores de punto. Escríbenos hoy — es un correo, nada más — y te guardamos el tuyo: cuando abramos cerca tuyo, serás de los primeros en pasar por el mesón.',
+    'av.pre_texto': 'sicr3p está en pre-lanzamiento: todavía no publicamos direcciones de oficinas. Los primeros cupos son para clientes fundadores y operadores de punto. Escríbenos hoy — es un correo, nada más — y te guardamos el tuyo: cuando abramos cerca tuyo, serás de los primeros en pasar por el mesón.',
     'av.pre_cta1': 'Guárdame un cupo fundador',
     'av.pre_cta2': 'Quiero operar un punto',
-    'av.disclaimer': 'Aduana Verde no realiza trámites ante el servicio de aduanas ni constituye una verificación de tercera parte acreditada: es tramitación verde de tus documentos comerciales sobre la plataforma sicr3p.',
-    'av.quien_titulo': '¿Para quién es Aduana Verde?',
+    'av.disclaimer': 'sicr3p no realiza trámites ante el servicio de aduanas ni constituye una verificación de tercera parte acreditada: es tramitación verde de tus documentos comerciales, presencial o en línea.',
+    'av.quien_titulo': '¿Para quién es sicr3p?',
     'av.quien_sub': 'Si te ha pasado alguna de estas tres cosas, es para ti.',
     'av.quien_1t': 'Tu mandante te pidió datos de emisiones',
     'av.quien_1d': 'Un correo con "necesitamos tu reporte de emisiones" y no sabes por dónde partir. Sales con el informe y el QR en la misma visita.',
@@ -123,8 +124,8 @@ const DICCIONARIOS = {
     'av.quien_3t': 'Quieres exportar y te piden trazabilidad',
     'av.quien_3d': 'Los mercados de destino ya piden datos de producto verificables. Tu Pasaporte Digital captura ese formato desde hoy.',
     'av.faq_titulo': 'Preguntas frecuentes',
-    'av.faq_q1': '¿Aduana Verde es el Servicio Nacional de Aduanas?',
-    'av.faq_a1': 'No. Es una red comercial de tramitación verde operada por sicr3p, sin relación con ese organismo público. No hacemos trámites aduaneros.',
+    'av.faq_q1': '¿sicr3p es el Servicio Nacional de Aduanas?',
+    'av.faq_a1': 'No. sicr3p es una red comercial de tramitación verde, sin relación con ese organismo público. No hacemos trámites aduaneros.',
     'av.faq_q2': '¿Tengo que pagar para calcular mis emisiones?',
     'av.faq_a2': 'El cálculo y la declaración son el servicio. La compensación del CO2 es aparte y siempre voluntaria — hoy en modalidad simulada, sin pasarela de pago real, mientras se formaliza el socio ambiental.',
     'av.faq_q3': '¿Qué necesito llevar a un punto de atención?',
@@ -196,11 +197,11 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Tu pasaporte queda público con QR',
     'av.pas_cta': 'Generar el mío ahora',
     'av.pas_chip': 'Verificable por cualquiera',
-    'av.footer_red': 'Una red operada por',
+    'av.footer_red': 'Mostrador presencial de sicr3p',
 
     // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
     'pos.tramite_registrado': 'Trámite registrado',
-    'pos.comprobante_sub': 'Comprobante Aduana Verde · plataforma sicr3p',
+    'pos.comprobante_sub': 'Comprobante sicr3p · atención presencial',
     'pos.cliente': 'Cliente',
     'pos.total_calculado': 'Total calculado',
     'pos.compensacion': 'Compensación',
@@ -301,7 +302,7 @@ const DICCIONARIOS = {
     'lote.rol.productor': 'Productor',
     'lote.rol.proveedor': 'Proveedor',
     'lote.rol.comercio': 'Comercio',
-    'lote.rol.punto_aduana_verde': 'Punto Aduana Verde',
+    'lote.rol.punto_aduana_verde': 'Punto sicr3p',
     'lote.rol.origen': 'Origen',
     'lote.rol.deposito': 'Depósito',
     'lote.rol.frontera': 'Frontera',
@@ -434,7 +435,7 @@ const DICCIONARIOS = {
   },
 
   // ---------- Inglés ----------
-  // "Aduana Verde" se mantiene como marca; el subtítulo dice "green
+  // "sicr3p" se mantiene como marca; el subtítulo dice "green
   // document processing" y el disclaimer aclara que no es aduana estatal.
   en: {
     'layout.comienza': 'Start now',
@@ -461,7 +462,7 @@ const DICCIONARIOS = {
     'calc.nota': 'Reference estimate using the real factors of the sicr3p engine and the current rate — your exact number comes from your documents.',
     'calc.cta': 'Calculate yours with your invoices',
     'calc.en_oficina_pre': 'or at an',
-    'calc.en_oficina_link': 'Aduana Verde office',
+    'calc.en_oficina_link': 'sicr3p office',
 
     'ver.error_titulo': 'Document not found',
     'ver.error_texto': 'We could not verify the traceability of this document.',
@@ -508,7 +509,7 @@ const DICCIONARIOS = {
     'av.paso4_t': '4. Take your record with you',
     'av.paso4_d': 'A report of your carbon accounting and a label with a verifiable QR. When your buyer scans it, they see the same thing you do.',
     'av.cuenta_titulo': 'The math is short',
-    'av.cuenta_sub': 'No fine print: the entire Aduana Verde model fits in four numbers.',
+    'av.cuenta_sub': 'No fine print: the entire sicr3p model fits in four numbers.',
     'av.stat_1eq': 'One tonne calculated is one tonne offset. You pay according to the documents scanned during your visit, at a reference rate per t CO2e.',
     'av.stat_1eq_nota': 'Reference rate — confirmed at the office before you pay.',
     'av.stat_visita': 'visit is enough to leave with a report and QR label',
@@ -525,13 +526,13 @@ const DICCIONARIOS = {
     'av.prov_texto': 'If you sell to buyers or large companies that request REP and emissions information, and so far you answer with emails and spreadsheets, this changes the conversation: from a single visit you leave with both declarations backed and verifiable. At your next tender, you show the QR and that is it.',
     'av.prov_cta': 'I want to know more',
     'av.pre_titulo': 'We are building the network',
-    'av.pre_texto': 'Aduana Verde is in pre-launch: we have not published office addresses yet. The first spots go to founding clients and point operators. Write to us today — it is just an email — and we will hold yours: when we open near you, you will be among the first at the counter.',
+    'av.pre_texto': 'sicr3p is in pre-launch: we have not published office addresses yet. The first spots go to founding clients and point operators. Write to us today — it is just an email — and we will hold yours: when we open near you, you will be among the first at the counter.',
     'av.pre_cta1': 'Hold a founding spot for me',
     'av.pre_cta2': 'I want to operate a point',
-    // Honestidad: "Aduana Verde" es marca de tramitación verde de documentos,
+    // Honestidad: "sicr3p" es marca de tramitación verde de documentos,
     // no una aduana estatal — se dice explícitamente en inglés.
-    'av.disclaimer': '"Aduana Verde" is a green document processing brand, not affiliated with any national customs service. It does not file paperwork with customs authorities and does not constitute an accredited third-party verification: it is green processing of your commercial documents on the sicr3p platform.',
-    'av.quien_titulo': 'Who is Aduana Verde for?',
+    'av.disclaimer': '"sicr3p" is a green document processing brand, not affiliated with any national customs service. It does not file paperwork with customs authorities and does not constitute an accredited third-party verification: it is green processing of your commercial documents, in person or online.',
+    'av.quien_titulo': 'Who is sicr3p for?',
     'av.quien_sub': 'If any of these three sound familiar, it\u2019s for you.',
     'av.quien_1t': 'Your client asked for emissions data',
     'av.quien_1d': 'An email saying "we need your emissions report" and you don\u2019t know where to start. You leave with the report and the QR in the same visit.',
@@ -540,8 +541,8 @@ const DICCIONARIOS = {
     'av.quien_3t': 'You want to export and need traceability',
     'av.quien_3d': 'Destination markets already ask for verifiable product data. Your Digital Passport captures that format starting today.',
     'av.faq_titulo': 'Frequently asked questions',
-    'av.faq_q1': 'Is Aduana Verde the national customs service?',
-    'av.faq_a1': 'No. It\u2019s a commercial green-processing network operated by sicr3p, unrelated to that public body. We do not handle customs paperwork.',
+    'av.faq_q1': 'Is sicr3p the national customs service?',
+    'av.faq_a1': 'No. sicr3p is a commercial green-processing network, unrelated to that public body. We do not handle customs paperwork.',
     'av.faq_q2': 'Do I have to pay to calculate my emissions?',
     'av.faq_a2': 'The calculation and declaration are the service. CO2 offsetting is separate and always voluntary \u2014 today in simulated mode, with no real payment gateway, while the environmental partner is formalized.',
     'av.faq_q3': 'What do I need to bring to a service point?',
@@ -613,10 +614,10 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Your passport goes public with a QR',
     'av.pas_cta': 'Generate mine now',
     'av.pas_chip': 'Verifiable by anyone',
-    'av.footer_red': 'A network operated by',
+    'av.footer_red': 'sicr3p in-person service counter',
 
     'pos.tramite_registrado': 'Transaction recorded',
-    'pos.comprobante_sub': 'Aduana Verde receipt · sicr3p platform',
+    'pos.comprobante_sub': 'sicr3p receipt · in-person service',
     'pos.cliente': 'Client',
     'pos.total_calculado': 'Calculated total',
     'pos.compensacion': 'Offset',
@@ -717,7 +718,7 @@ const DICCIONARIOS = {
     'lote.rol.productor': 'Producer',
     'lote.rol.proveedor': 'Supplier',
     'lote.rol.comercio': 'Retailer',
-    'lote.rol.punto_aduana_verde': 'Aduana Verde point',
+    'lote.rol.punto_aduana_verde': 'sicr3p point',
     'lote.rol.origen': 'Origin',
     'lote.rol.deposito': 'Warehouse',
     'lote.rol.frontera': 'Border',
@@ -875,7 +876,7 @@ const DICCIONARIOS = {
     'calc.nota': 'Estimativa referencial com os fatores reais do motor sicr3p e a tarifa vigente — seu número exato sai dos seus documentos.',
     'calc.cta': 'Calcule o seu com suas faturas',
     'calc.en_oficina_pre': 'ou em um',
-    'calc.en_oficina_link': 'escritório Aduana Verde',
+    'calc.en_oficina_link': 'escritório sicr3p',
 
     'ver.error_titulo': 'Documento não encontrado',
     'ver.error_texto': 'Não foi possível verificar a rastreabilidade deste documento.',
@@ -922,7 +923,7 @@ const DICCIONARIOS = {
     'av.paso4_t': '4. Leve o respaldo na mão',
     'av.paso4_d': 'Relatório da sua contabilidade de carbono e etiqueta com QR verificável. Quando seu contratante escanear, verá o mesmo que você.',
     'av.cuenta_titulo': 'A conta é curta',
-    'av.cuenta_sub': 'Sem letras miúdas: o modelo completo do Aduana Verde cabe em quatro números.',
+    'av.cuenta_sub': 'Sem letras miúdas: o modelo completo do sicr3p cabe em quatro números.',
     'av.stat_1eq': 'Uma tonelada calculada é uma tonelada compensada. Você paga conforme os documentos escaneados na sua visita, com tarifa referencial por t CO2e.',
     'av.stat_1eq_nota': 'Tarifa referencial — confirmada no escritório antes de pagar.',
     'av.stat_visita': 'visita basta para sair com relatório e etiqueta QR',
@@ -939,11 +940,11 @@ const DICCIONARIOS = {
     'av.prov_texto': 'Se você vende para contratantes ou grandes empresas que pedem informações REP e de emissões, e até agora responde com e-mails e planilhas, isto muda a conversa: de uma única visita você sai com as duas declarações respaldadas e verificáveis. Na sua próxima licitação, mostra o QR e pronto.',
     'av.prov_cta': 'Quero saber mais',
     'av.pre_titulo': 'Estamos montando a rede',
-    'av.pre_texto': 'O Aduana Verde está em pré-lançamento: ainda não publicamos endereços de escritórios. As primeiras vagas são para clientes fundadores e operadores de ponto. Escreva hoje — é só um e-mail — e guardamos a sua: quando abrirmos perto de você, você será um dos primeiros a passar pelo balcão.',
+    'av.pre_texto': 'O sicr3p está em pré-lançamento: ainda não publicamos endereços de escritórios. As primeiras vagas são para clientes fundadores e operadores de ponto. Escreva hoje — é só um e-mail — e guardamos a sua: quando abrirmos perto de você, você será um dos primeiros a passar pelo balcão.',
     'av.pre_cta1': 'Guarde uma vaga de fundador para mim',
     'av.pre_cta2': 'Quero operar um ponto',
-    'av.disclaimer': 'O Aduana Verde não realiza trâmites junto a nenhum serviço nacional de alfândega nem constitui uma verificação de terceira parte acreditada: é o processamento verde dos seus documentos comerciais na plataforma sicr3p.',
-    'av.quien_titulo': 'Para quem é o Aduana Verde?',
+    'av.disclaimer': 'O sicr3p não realiza trâmites junto a nenhum serviço nacional de alfândega nem constitui uma verificação de terceira parte acreditada: é o processamento verde dos seus documentos comerciais, presencial ou on-line.',
+    'av.quien_titulo': 'Para quem é o sicr3p?',
     'av.quien_sub': 'Se alguma destas três situações soa familiar, é para você.',
     'av.quien_1t': 'Seu contratante pediu dados de emissões',
     'av.quien_1d': 'Um e-mail dizendo "precisamos do seu relatório de emissões" e você não sabe por onde começar. Você sai com o relatório e o QR na mesma visita.',
@@ -952,8 +953,8 @@ const DICCIONARIOS = {
     'av.quien_3t': 'Você quer exportar e pedem rastreabilidade',
     'av.quien_3d': 'Os mercados de destino já pedem dados de produto verificáveis. Seu Passaporte Digital captura esse formato desde hoje.',
     'av.faq_titulo': 'Perguntas frequentes',
-    'av.faq_q1': 'O Aduana Verde é o Serviço Nacional de Alfândega?',
-    'av.faq_a1': 'Não. É uma rede comercial de processamento verde operada pela sicr3p, sem relação com esse órgão público. Não realizamos trâmites alfandegários.',
+    'av.faq_q1': 'O sicr3p é o Serviço Nacional de Alfândega?',
+    'av.faq_a1': 'Não. O sicr3p é uma rede comercial de processamento verde, sem relação com esse órgão público. Não realizamos trâmites alfandegários.',
     'av.faq_q2': 'Tenho que pagar para calcular minhas emissões?',
     'av.faq_a2': 'O cálculo e a declaração são o serviço. A compensação de CO2 é à parte e sempre voluntária — hoje em modo simulado, sem gateway de pagamento real, enquanto o parceiro ambiental é formalizado.',
     'av.faq_q3': 'O que preciso levar a um ponto de atendimento?',
@@ -1025,7 +1026,7 @@ const DICCIONARIOS = {
     'av.pas_p3': 'Seu passaporte fica público com QR',
     'av.pas_cta': 'Gerar o meu agora',
     'av.pas_chip': 'Verificável por qualquer pessoa',
-    'av.footer_red': 'Uma rede operada por',
+    'av.footer_red': 'Balcão de atendimento presencial do sicr3p',
 
     // Passaporte Digital de Produto (/pasaporte/:id)
     'pas.titulo': 'Passaporte Digital de Produto',
@@ -1095,7 +1096,7 @@ const DICCIONARIOS = {
     'lote.rol.productor': 'Produtor',
     'lote.rol.proveedor': 'Fornecedor',
     'lote.rol.comercio': 'Comércio',
-    'lote.rol.punto_aduana_verde': 'Ponto Aduana Verde',
+    'lote.rol.punto_aduana_verde': 'Ponto sicr3p',
     'lote.rol.origen': 'Origem',
     'lote.rol.deposito': 'Depósito',
     'lote.rol.frontera': 'Fronteira',

@@ -1,7 +1,7 @@
 // ============================================================
 // Utilidades REP — Ley 20.920 (Responsabilidad Extendida del Productor).
 // Funciones puras para la declaración de envases y embalajes que hace el
-// operador en el terminal "Aduana Verde": composición por componentes
+// operador en el terminal del mostrador presencial de sicr3p: composición por componentes
 // (material, peso, cantidad, reciclabilidad) y % de reciclabilidad en vivo,
 // siguiendo la fórmula del packaging-calculator de SICREP:
 //   % reciclabilidad = peso reciclable / peso total × 100.

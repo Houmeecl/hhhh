@@ -7,13 +7,13 @@ import DeclaracionEmbalaje, { NIVEL_BADGE } from '../components/DeclaracionEmbal
 import { t } from '../lib/i18n.js';
 
 // ============================================================
-// Terminal POS "Aduana Verde" (tablet) — la cara al público de sicr3p.
+// Terminal POS de sicr3p (tablet) — el mostrador presencial de la plataforma.
 //
 // Modelo: patrón dispositivo de VecinoXpress/NotaryPro. El terminal es un
-// DISPOSITIVO registrado que se conecta con serial + clave (AV-XXXX) y opera
-// con marca de dos capas: "Aduana Verde" para el público, "by sicr3p" como
-// sistema. El terminal solo CAPTURA documentos y COBRA; el reconocimiento y
-// el cálculo de CO2e ocurren en la plataforma sicr3p (POST /api/sesiones).
+// DISPOSITIVO registrado que se conecta con serial + clave (AV-XXXX), marca
+// única sicr3p. El terminal solo CAPTURA documentos y COBRA; el
+// reconocimiento y el cálculo de CO2e ocurren en la plataforma sicr3p
+// (POST /api/sesiones).
 //
 // Cobro = compensación del CO2 calculado: monto = t CO2e × tarifa por
 // tonelada (referencial, editable). El pago es SIMULADO y se dice siempre:
@@ -296,11 +296,11 @@ export default function PosTerminal() {
   );
 }
 
-// ---------- Header persistente: marca de dos capas ----------
+// ---------- Header persistente: marca única sicr3p ----------
 function HeaderAv({ pos, paso }) {
   return (
     <header
-      aria-label={`Terminal Aduana Verde — paso: ${PASO_LABEL[paso] || paso}`}
+      aria-label={`Terminal sicr3p — paso: ${PASO_LABEL[paso] || paso}`}
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         padding: '14px 20px', background: '#fff', borderBottom: '1px solid var(--border)',
@@ -309,14 +309,7 @@ function HeaderAv({ pos, paso }) {
         <span style={{ color: 'var(--green-600)', display: 'inline-flex', flexShrink: 0 }}>
           <Icon.Leaf size={26} />
         </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={{ fontWeight: 800, fontSize: 19, color: 'var(--navy)', whiteSpace: 'nowrap' }}>
-            Aduana Verde
-          </span>
-          <span className="muted" style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            by <Logo size={13} />
-          </span>
-        </div>
+        <Logo size={19} />
       </div>
       <div style={{ flexShrink: 0 }}>
         {pos?.terminal && (
@@ -364,7 +357,7 @@ function Volver({ onClick, children = '← Volver' }) {
 function Inicio({ onConectar, onVerificar }) {
   return (
     <div style={{ marginTop: '14vh' }}>
-      <h1 style={{ fontSize: 26, textAlign: 'center', margin: '10px 0 4px' }}>Terminal Aduana Verde</h1>
+      <h1 style={{ fontSize: 26, textAlign: 'center', margin: '10px 0 4px' }}>Terminal sicr3p</h1>
       <p className="muted" style={{ textAlign: 'center', marginTop: 0, marginBottom: 24 }}>
         Captura y compensación de CO2e en el punto de atención.
       </p>
@@ -423,7 +416,7 @@ function Conexion({ onVolver, onConectado, onDemo }) {
       <div className="card card-pad">
         <h2 style={{ marginTop: 0 }}>Conectar terminal</h2>
         <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-          Cada terminal Aduana Verde es un dispositivo registrado en la plataforma sicr3p.
+          Cada terminal sicr3p es un dispositivo registrado en la plataforma.
         </p>
         <form onSubmit={conectar}>
           <div className="field">

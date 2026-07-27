@@ -4,7 +4,7 @@ import { api, fmtFecha } from '../api.js';
 const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
 
 // Declaraciones de embalaje REP (Ley 20.920) ya registradas por el flujo
-// de Aduana Verde — listado de solo lectura sobre declaraciones_embalaje
+// del mostrador presencial — listado de solo lectura sobre declaraciones_embalaje
 // (el % y el nivel ya se calcularon en el servidor al crear cada una).
 export default function RepAv() {
   const [items, setItems] = useState(null);

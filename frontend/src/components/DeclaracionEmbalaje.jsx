@@ -9,7 +9,7 @@ import {
 } from '../lib/rep.js';
 
 // Color del badge según nivel de reciclabilidad REP. Compartido entre el
-// terminal POS (Aduana Verde) y el flujo web público.
+// terminal POS del mostrador presencial y el flujo web público.
 export const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'badge-red' };
 
 // Sección plegable: pre-declaración de embalaje por componentes (Ley 20.920)

@@ -4,10 +4,11 @@ import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authAv } from '../api.js';
 
-// Login propio del panel Aduana Verde — mismo endpoint /auth/login que el
-// panel sicrep, pero mandando panel:'aduana_verde' (el backend rechaza con
-// 403 si la cuenta no pertenece a este panel) y guardando la sesión en el
-// almacén separado authAv (frontend/src/api.js), no en auth.
+// Login propio del panel del mostrador presencial de sicr3p — mismo
+// endpoint /auth/login que el panel núcleo, pero mandando
+// panel:'aduana_verde' (el backend rechaza con 403 si la cuenta no
+// pertenece a este panel) y guardando la sesión en el almacén separado
+// authAv (frontend/src/api.js), no en auth.
 export default function LoginAv() {
   const nav = useNavigate();
   const [email, setEmail] = useState('');
@@ -34,13 +35,13 @@ export default function LoginAv() {
       <div style={{ width: '100%', maxWidth: 430 }} className="fade-up">
         <div style={{ textAlign: 'center', marginBottom: 24, position: 'relative', zIndex: 2 }}>
           <Logo size={48} light />
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginTop: 4 }}>Aduana Verde — Panel operativo</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--green)', marginTop: 4 }}>Panel del mostrador presencial</div>
         </div>
         <form className="login-card" onSubmit={submit}>
-          <h2>Acceso — Aduana Verde</h2>
+          <h2>Acceso — Panel mostrador</h2>
           <div className="field" style={{ marginBottom: 14 }}>
             <label>Usuario / Correo</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="operador@aduanaverde.cl" autoFocus />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="operador@sicr3p.cl" autoFocus />
           </div>
           <div className="field" style={{ marginBottom: 10 }}>
             <label>Contraseña</label>
