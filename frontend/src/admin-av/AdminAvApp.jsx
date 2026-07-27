@@ -7,12 +7,14 @@ import ResumenAv from './ResumenAv.jsx';
 import CargarAv from './CargarAv.jsx';
 import RepAv from './RepAv.jsx';
 import CompensacionAv from './CompensacionAv.jsx';
+import CapacitacionAv from './CapacitacionAv.jsx';
 
 const NAV = [
   { to: '/panel-verde', end: true, ico: Icon.Chart, label: 'Resumen' },
   { to: '/panel-verde/cargar', ico: Icon.Doc, label: 'Cargar documento' },
   { to: '/panel-verde/rep', ico: Icon.Leaf, label: 'REP' },
   { to: '/panel-verde/compensacion', ico: Icon.Coin, label: 'Compensación' },
+  { to: '/panel-verde/capacitacion', ico: Icon.Book, label: 'Capacitación' },
 ];
 
 // El panel del mostrador presencial de sicr3p es su propia "app" instalable,
@@ -103,6 +105,7 @@ export default function AdminAvApp() {
           <Route path="cargar" element={<CargarAv />} />
           <Route path="rep" element={<RepAv />} />
           <Route path="compensacion" element={<CompensacionAv />} />
+          <Route path="capacitacion/*" element={<CapacitacionAv />} />
           <Route path="*" element={<Navigate to="/panel-verde" replace />} />
         </Routes>
       </main>

@@ -257,6 +257,21 @@ export const api = {
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
   misSesiones: () => request('/mis-sesiones', { cliente: true }),
+
+  // Capacitación interna — compartida por /admin y /panel-verde (el flag
+  // `av` elige el almacén de token correcto, sin tocar request()).
+  cursos: (av = false) => request('/admin/capacitacion/cursos', { [av ? 'authedAv' : 'authed']: true }),
+  curso: (slug, av = false) => request(`/admin/capacitacion/cursos/${slug}`, { [av ? 'authedAv' : 'authed']: true }),
+  inscribirCurso: (slug, av = false) =>
+    request(`/admin/capacitacion/cursos/${slug}/inscribir`, { method: 'POST', [av ? 'authedAv' : 'authed']: true }),
+  completarLeccion: (slug, leccionId, av = false) =>
+    request(`/admin/capacitacion/cursos/${slug}/lecciones/${leccionId}/completar`, { method: 'POST', [av ? 'authedAv' : 'authed']: true }),
+  quizCurso: (slug, av = false) => request(`/admin/capacitacion/cursos/${slug}/quiz`, { [av ? 'authedAv' : 'authed']: true }),
+  responderQuiz: (slug, respuestas, av = false) =>
+    request(`/admin/capacitacion/cursos/${slug}/quiz/responder`, { method: 'POST', body: { respuestas }, [av ? 'authedAv' : 'authed']: true }),
+  constanciaUrl: (serial) => `/api/capacitacion/constancias/${serial}.pdf`,
+  constanciaQrUrl: (serial) => `/api/capacitacion/constancias/${serial}/qr.png`,
+  constanciaPublica: (serial) => request(`/capacitacion/constancias/${serial}`),
 };
 
 async function abrirPdfAuth(url) {

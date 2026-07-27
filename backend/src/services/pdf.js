@@ -1,5 +1,5 @@
 import PDFDocument from 'pdfkit';
-import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl } from './qr.js';
+import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
@@ -1101,6 +1101,52 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     'sella datos desde los documentos tributarios reales del presentador, con integridad garantizada por una cadena ' +
     'de hash pública. Esta carpeta se emitió para acompañar una entrega física; su versión digital siempre prevalece.',
     48, Math.max(py, 620), { width: W }
+  );
+
+  return bufferDoc(doc);
+}
+
+// ---------- CONSTANCIA DE CAPACITACIÓN ----------
+// Diploma A4 apaisado para un operador que aprobó un curso interno
+// (ver services/capacitacion.js). El QR apunta a /constancia/{serial} —
+// verificación pública, sin login, igual que la credencial de tarjeta
+// de viaje. Nunca se llama "certificación": es participación interna.
+export async function generateConstanciaCurso({ constancia, curso, usuario }) {
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+  const W = doc.page.width;
+  const H = doc.page.height;
+  const qr = await qrBufferDe(constanciaUrl(constancia.serial));
+
+  doc.rect(0, 0, W, H).fill('#ffffff');
+  doc.roundedRect(24, 24, W - 48, H - 48, 6).lineWidth(2).stroke(GREEN);
+  doc.roundedRect(34, 34, W - 68, H - 68, 4).lineWidth(0.75).stroke(BORDER);
+
+  drawLogo(doc, 60, 66, 22);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(constancia.serial, W - 220, 68, { width: 160, align: 'right' });
+
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(GREEN)
+    .text('CONSTANCIA DE PARTICIPACIÓN', 0, 130, { width: W, align: 'center', characterSpacing: 1.5 });
+  doc.font('Helvetica').fontSize(11).fillColor(GRAY)
+    .text('Se otorga a', 0, 168, { width: W, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(26).fillColor(NAVY)
+    .text(String(usuario?.nombre || '—'), 0, 190, { width: W, align: 'center' });
+  doc.font('Helvetica').fontSize(11).fillColor(GRAY)
+    .text('por completar el curso interno', 0, 232, { width: W, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(17).fillColor(NAVY)
+    .text(String(curso?.titulo || '—'), 60, 254, { width: W - 120, align: 'center' });
+  doc.font('Helvetica').fontSize(10).fillColor(GRAY)
+    .text(`Evaluación aprobada con ${nfp(constancia.puntaje_pct)}% · ${fechaCorta(constancia.emitida_at)}`,
+      0, 288, { width: W, align: 'center' });
+
+  doc.image(qr, W - 190, H - 190, { width: 100, height: 100 });
+  doc.font('Helvetica').fontSize(7).fillColor(GRAY)
+    .text('Escanee para verificar', W - 190, H - 84, { width: 100, align: 'center' });
+
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+    'Constancia de participación interna emitida por sicr3p — no constituye una certificación acreditada de ' +
+    'terceros. Verificable con el QR o en sicr3p.cl/constancia/' + constancia.serial + '.',
+    60, H - 76, { width: W - 260 }
   );
 
   return bufferDoc(doc);

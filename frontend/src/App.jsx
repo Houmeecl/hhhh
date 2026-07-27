@@ -14,6 +14,7 @@ import MisSesiones from './pages/MisSesiones.jsx';
 import AduanaVerde from './pages/AduanaVerde.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
 import Cadena from './pages/Cadena.jsx';
+import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
 import Activar from './admin/Activar.jsx';
 import LoginAv from './admin-av/LoginAv.jsx';
@@ -55,6 +56,7 @@ export default function App() {
       <Route path="/aduana-verde" element={<AduanaVerde />} />
       <Route path="/corredor" element={<CorredorLanding />} />
       <Route path="/cadena" element={<Cadena />} />
+      <Route path="/constancia/:serial" element={<ConstanciaPublica />} />
 
       {/* Admin — panel sicrep (núcleo/plataforma) */}
       <Route path="/admin/login" element={<Login />} />

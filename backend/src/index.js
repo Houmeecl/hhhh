@@ -20,6 +20,7 @@ import motorRoutes from './routes/motor.js';
 import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
 import origenRoutes, { tarjetaRouter, torreRouter } from './routes/origen.js';
+import capacitacionRoutes from './routes/capacitacion.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/admin/pos', posAdminRoutes);
 app.use('/api/admin/origen', origenRoutes);
 app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
 app.use('/api/torre', apiLimiter, torreRouter);
+app.use('/api/admin/capacitacion', capacitacionRoutes);
 // '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
 // hace match de app.use por prefijo en orden de registro, así que si fuera
 // primero, requireHomePanel('sicrep') de este router interceptaría TODAS

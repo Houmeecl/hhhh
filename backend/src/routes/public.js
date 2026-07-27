@@ -4,8 +4,8 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante } from '../services/pdf.js';
-import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl } from '../services/qr.js';
+import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso } from '../services/pdf.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
   filtrarPorVisibilidad, enmascararRut, balanceMasas,
@@ -1157,6 +1157,59 @@ router.get('/v/:serial/qr.png', async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
     res.type('png').send(await qrBufferDe(tarjetaUrl(rows[0].serial)));
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/capacitacion/constancias/:serial — verificación pública ----------
+// El serial ES la credencial (mismo principio que /v/:serial): cualquiera
+// que lo tenga puede verificar la constancia, sin login. Nunca se llama
+// "certificación": es participación interna (ver services/capacitacion.js).
+router.get('/capacitacion/constancias/:serial([A-Za-z0-9-]+)', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT co.serial, co.puntaje_pct, co.emitida_at, cu.titulo AS curso_titulo, u.nombre AS usuario_nombre
+       FROM constancias co
+       JOIN inscripciones i ON i.id = co.inscripcion_id
+       JOIN cursos cu ON cu.id = i.curso_id
+       JOIN usuarios u ON u.id = i.usuario_id
+       WHERE co.serial = $1`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Constancia no encontrada' });
+    res.json({ constancia: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.get('/capacitacion/constancias/:serial([A-Za-z0-9-]+)/qr.png', async (req, res, next) => {
+  try {
+    const serial = String(req.params.serial || '').trim().toUpperCase();
+    const { rows } = await query(`SELECT serial FROM constancias WHERE serial = $1`, [serial]);
+    if (!rows[0]) return res.status(404).json({ error: 'Constancia no encontrada' });
+    res.type('png').send(await qrBufferDe(constanciaUrl(rows[0].serial)));
+  } catch (err) { next(err); }
+});
+
+router.get('/capacitacion/constancias/:serial([A-Za-z0-9-]+).pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT co.*, cu.titulo AS curso_titulo, u.nombre AS usuario_nombre
+       FROM constancias co
+       JOIN inscripciones i ON i.id = co.inscripcion_id
+       JOIN cursos cu ON cu.id = i.curso_id
+       JOIN usuarios u ON u.id = i.usuario_id
+       WHERE co.serial = $1`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Constancia no encontrada' });
+    const c = rows[0];
+    const pdf = await generateConstanciaCurso({
+      constancia: c,
+      curso: { titulo: c.curso_titulo },
+      usuario: { nombre: c.usuario_nombre },
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-constancia-${c.serial}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 
