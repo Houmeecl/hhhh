@@ -5,6 +5,8 @@ import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
 import { agregarAlcance3, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
 import { filasACsv } from '../services/csv.js';
+import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
+import { citaFuente, generateReporteCbam } from '../services/pdf.js';
 
 // ============================================================
 // API pública para MANDANTES (auth por header X-Api-Key).
@@ -184,6 +186,81 @@ router.get('/export/alcance3', async (req, res, next) => {
     const detalle = { rut_mandante: req.mandante.rut, anio, n_filas: filas.length, formato: req.query.formato === 'csv' ? 'csv' : 'json' };
     logActividad({ usuarioId: null, accion: 'export_alcance3_mandante', entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip });
     bigquery.exportAcceso({ tipo: 'export_alcance3_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/mandante/export/cbam?formato=csv|json ----------
+// Export de apoyo CBAM (Reglamento UE 2023/956) de los lotes minerales del
+// mandante exportador, reusando tal cual el cálculo ya construido en
+// pasaporteOrigen.js — este endpoint solo lo expone como documento.
+//
+// A diferencia de /export/alcance3 (que ancla la consulta en
+// f.rut_receptor = el propio RUT del mandante, y la whitelist SOLO acota
+// más), lotes_minerales no tiene ningún campo "receptor": el titular del
+// lote (rut_titular) es un tercero cuya relación con el mandante existe
+// SOLO si está en mandante_proveedores. Por eso aquí la whitelist no es
+// opcional — sin ella no hay ninguna forma segura de decidir qué lotes le
+// pertenecen a este mandante, así que una whitelist vacía devuelve un
+// export vacío (nunca "todos los lotes") para no filtrar datos de terceros.
+async function lotesCbamDelMandante(req) {
+  const permitidos = await proveedoresPermitidos(req.mandante.id);
+  if (!permitidos.length) return [];
+  const { rows } = await query(
+    `SELECT codigo, pais_origen, material, codigo_nc, cantidad, unidad, faena_origen,
+            emisiones_directas_tco2e_t, emisiones_indirectas_tco2e_t, metodo_emisiones,
+            estado, created_at
+       FROM lotes_minerales
+      WHERE ${NORM('rut_titular')} = ANY($1)
+      ORDER BY created_at DESC LIMIT 500`,
+    [permitidos]
+  );
+  return rows.map((l) => ({ ...l, cbam: resumenNormativo(l, []).cbam }));
+}
+
+router.get('/export/cbam', async (req, res, next) => {
+  try {
+    const rn = rutNorm(req.mandante.rut);
+    const lotes = await lotesCbamDelMandante(req);
+    const metodologia = citaFuente({
+      organismo: 'Unión Europea',
+      documento: 'Reglamento (UE) 2023/956 — Mecanismo de Ajuste en Frontera por Carbono (CBAM)',
+      version_anio: '2023',
+    });
+
+    if (req.query.formato === 'csv') {
+      const headers = ['codigo', 'pais_origen', 'material', 'codigo_nc', 'cbam_aplicable', 'metodo_emisiones', 'emisiones_directas_tco2e_t', 'emisiones_indirectas_tco2e_t', 'cbam_listo', 'cbam_faltantes'];
+      const csv = filasACsv(headers, lotes.map(filaCbamCsv));
+      const filaMeta = `\r\n"${metodologia.replace(/"/g, '""')} — datos de apoyo, no sustituye verificación acreditada."\r\n`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="cbam_${rn}.csv"`);
+      res.send('\uFEFF' + csv + filaMeta);
+    } else {
+      res.json({
+        mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa },
+        periodo: { generado: new Date().toISOString() },
+        metodologia,
+        lotes,
+      });
+    }
+
+    const detalle = { rut_mandante: req.mandante.rut, n_lotes: lotes.length, formato: req.query.formato === 'csv' ? 'csv' : 'json' };
+    logActividad({ usuarioId: null, accion: 'export_cbam_mandante', entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip });
+    bigquery.exportAcceso({ tipo: 'export_cbam_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/mandante/export/cbam.pdf ----------
+router.get('/export/cbam.pdf', async (req, res, next) => {
+  try {
+    const lotes = await lotesCbamDelMandante(req);
+    const buffer = await generateReporteCbam({ mandante: req.mandante, lotes });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="cbam_${rutNorm(req.mandante.rut)}.pdf"`);
+    res.send(buffer);
+
+    const detalle = { rut_mandante: req.mandante.rut, n_lotes: lotes.length, formato: 'pdf' };
+    logActividad({ usuarioId: null, accion: 'export_cbam_mandante', entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip });
+    bigquery.exportAcceso({ tipo: 'export_cbam_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
   } catch (err) { next(err); }
 });
 

@@ -897,6 +897,102 @@ export async function generateCredencialTarjeta({ tarjeta, lote }) {
   return bufferDoc(doc);
 }
 
+// ---------- REPORTE CBAM PARA EL MANDANTE — export de apoyo, no certificación ----------
+// El mandante exportador pide evidencia de sus lotes (lotes_minerales) para
+// armar su propia declaración CBAM ante la UE. Reusa tal cual el cálculo de
+// pasaporteOrigen.js (cbamAplicable/resumenNormativo) — este PDF solo lo
+// imprime en una tabla, sin recalcular nada.
+export async function generateReporteCbam({ mandante, lotes }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const W = doc.page.width - 96;
+  const destinatario = sanearNombreMandante(mandante?.nombre_empresa) || 'su empresa mandante';
+
+  // ---- Portada ----
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`Emitido: ${fechaCorta(new Date())}`, 380, 48, { width: 167, align: 'right' });
+  doc.moveTo(48, 78).lineTo(547, 78).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY)
+    .text('REPORTE DE APOYO CBAM', 48, 106);
+  doc.font('Helvetica').fontSize(10.5).fillColor(GRAY)
+    .text('Datos de trazabilidad y emisiones incorporadas de tus lotes, para tu declaración ante la UE', 48, 130, { width: W });
+
+  doc.roundedRect(48, 158, W, 46, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('PREPARADO PARA', 64, 170);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text(destinatario, 64, 183);
+
+  // ---- Tabla de lotes ----
+  let y = 224;
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('LOTES', 48, y);
+  y += 18;
+  doc.rect(48, y, W, 18).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff');
+  doc.text('Código', 54, y + 5).text('País', 130, y + 5).text('Material', 160, y + 5)
+    .text('NC', 240, y + 5).text('CBAM', 275, y + 5).text('Método', 315, y + 5)
+    .text('Directas', 375, y + 5).text('Indirectas', 425, y + 5).text('Estado', 480, y + 5);
+  y += 18;
+
+  doc.font('Helvetica').fontSize(7.5).fillColor(NAVY);
+  let zebra = false;
+  for (const l of lotes || []) {
+    if (y > 750) {
+      doc.addPage();
+      y = 60;
+      doc.rect(48, y, W, 18).fill(NAVY);
+      doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff');
+      doc.text('Código', 54, y + 5).text('País', 130, y + 5).text('Material', 160, y + 5)
+        .text('NC', 240, y + 5).text('CBAM', 275, y + 5).text('Método', 315, y + 5)
+        .text('Directas', 375, y + 5).text('Indirectas', 425, y + 5).text('Estado', 480, y + 5);
+      y += 18;
+      doc.font('Helvetica').fontSize(7.5).fillColor(NAVY);
+    }
+    if (zebra) { doc.rect(48, y, W, 16).fill(LIGHT); doc.fillColor(NAVY); }
+    zebra = !zebra;
+    const estado = l.cbam?.aplicable ? (l.cbam.listo ? 'Completo' : 'Incompleto') : 'No aplica';
+    doc.font('Helvetica').fontSize(7.5).fillColor(NAVY)
+      .text(String(l.codigo), 54, y + 4, { width: 74 })
+      .text(String(l.pais_origen || '—'), 130, y + 4, { width: 26 })
+      .text(String(l.material || '—').slice(0, 18), 160, y + 4, { width: 78 })
+      .text(String(l.codigo_nc || '—'), 240, y + 4, { width: 33 })
+      .text(l.cbam?.aplicable ? 'Sí' : 'No', 275, y + 4, { width: 38 })
+      .text(String(l.metodo_emisiones || '—').slice(0, 14), 315, y + 4, { width: 58 })
+      .text(l.emisiones_directas_tco2e_t != null ? nf(l.emisiones_directas_tco2e_t, 3) : '—', 375, y + 4, { width: 48 })
+      .text(l.emisiones_indirectas_tco2e_t != null ? nf(l.emisiones_indirectas_tco2e_t, 3) : '—', 425, y + 4, { width: 52 })
+      .text(estado, 480, y + 4, { width: 63 });
+    y += 16;
+  }
+  if (!(lotes || []).length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin lotes en el período consultado.', 54, y + 4);
+    y += 20;
+  }
+
+  // ---- Metodología ----
+  y += 14;
+  if (y > 700) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('METODOLOGÍA', 48, y);
+  y += 16;
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(
+    `Fuente: ${citaFuente({ organismo: 'Unión Europea', documento: 'Reglamento (UE) 2023/956 — Mecanismo de Ajuste en Frontera por Carbono (CBAM)', version_anio: '2023' })}. ` +
+    'Aplicabilidad determinada por el código NC de la mercancía (Anexo I vigente: cemento, electricidad, hidrógeno, fertilizantes, hierro y acero, aluminio — el cobre no está incluido).',
+    48, y, { width: W }
+  );
+  y = doc.y + 12;
+
+  // ---- Disclaimer legal (obligatorio, honestidad del proyecto) ----
+  if (y > 700) { doc.addPage(); y = 60; }
+  doc.roundedRect(48, y, W, 60, 6).fillAndStroke('#fff8e6', '#d97706');
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('IMPORTANTE', 60, y + 10);
+  doc.font('Helvetica').fontSize(8).fillColor(NAVY).text(
+    'Datos de apoyo para la declaración CBAM del importador de la UE — no sustituye la verificación por un ' +
+    'verificador acreditado exigida por el Art. 8 y el Art. 10 del Reglamento (UE) 2023/956 bajo el régimen ' +
+    'definitivo (vigente desde el 1 de enero de 2026). sicr3p no es certificador ni verificador de tercera parte.',
+    60, y + 24, { width: W - 24 }
+  );
+
+  return bufferDoc(doc);
+}
+
 // ---------- CARPETA PARA EL MANDANTE — evidencia física por trámite ----------
 // Las mineras y grandes empresas piden la evidencia EN PAPEL. Esta carpeta
 // es el entregable único imprimible del trámite: portada dirigida al

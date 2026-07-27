@@ -326,6 +326,25 @@ export function resumenNormativo(lote, declaraciones = []) {
   };
 }
 
+// ---------- Export CBAM para mandantes (mandante.js) ----------
+// Aplana un lote YA anotado con su `cbam` (ver resumenNormativo) a la fila
+// plana que consume el CSV del export — mapeo puro, testeable sin BD, mismo
+// espíritu que agregarAlcance3() en alcanceGhg.js.
+export function filaCbamCsv(loteConCbam) {
+  return {
+    codigo: loteConCbam.codigo,
+    pais_origen: loteConCbam.pais_origen,
+    material: loteConCbam.material,
+    codigo_nc: loteConCbam.codigo_nc ?? '',
+    cbam_aplicable: loteConCbam.cbam.aplicable ? 'si' : 'no',
+    metodo_emisiones: loteConCbam.metodo_emisiones ?? '',
+    emisiones_directas_tco2e_t: loteConCbam.emisiones_directas_tco2e_t ?? '',
+    emisiones_indirectas_tco2e_t: loteConCbam.emisiones_indirectas_tco2e_t ?? '',
+    cbam_listo: loteConCbam.cbam.listo ? 'si' : 'no',
+    cbam_faltantes: loteConCbam.cbam.faltantes.join(';'),
+  };
+}
+
 // ---------- Código de lote ----------
 export function generarCodigoLote(anio, correlativo) {
   return `LM-${anio}-${String(correlativo).padStart(6, '0')}`;
