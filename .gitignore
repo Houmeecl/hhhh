@@ -28,6 +28,7 @@ backend/generated/
 # Video: solo se versiona el entregable final, no los clips crudos/intermedios
 docs/video/raw/
 docs/video/build/
+docs/video/build-story/
 
 # Logs
 *.log
