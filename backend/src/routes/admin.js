@@ -1,14 +1,12 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { sendMail, activationEmail } from '../services/mailer.js';
+import { enviarActivacion } from '../services/cuentas.js';
 
 const router = express.Router();
-const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 // Todas las rutas de admin requieren sesión.
 router.use(requireAuth, requireHomePanel('sicrep'));
@@ -161,30 +159,6 @@ router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Envía (o reenvía) el correo de activación para un usuario ya insertado.
-// No lanza si el correo falla: registra el error y avisa al llamador, para
-// que la cuenta no quede "atascada" sin ningún enlace visible en ninguna parte.
-async function enviarActivacion({ usuarioId, email, nombre }) {
-  const raw = crypto.randomBytes(32).toString('hex');
-  const expira = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
-  await query(
-    `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
-    [usuarioId, hashToken(raw), expira]
-  );
-  const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
-  let correoEnviado = true;
-  try {
-    await sendMail({ to: email, ...activationEmail({ nombre, link }) });
-  } catch (err) {
-    correoEnviado = false;
-    console.error('[activacion] no se pudo enviar el correo:', err.message);
-  }
-  // Sin Resend (dev) o si el envío real falló: devolvemos el link para que
-  // el admin lo pueda compartir a mano en vez de perderlo.
-  const mostrarLink = !config.resend.apiKey || !correoEnviado;
-  return { link, correoEnviado, dev_activation_link: mostrarLink ? link : undefined };
-}
-
 // CREAR CUENTA: genera usuario + envía link de activación (must_reset_password=true).
 // Si ya existe un usuario "pendiente" con ese correo (p.ej. porque el envío
 // anterior falló), reintenta el envío en vez de bloquear con un 409.
@@ -212,7 +186,7 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
       uRows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
     }
 
-    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: uRows[0].id, email, nombre });
+    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: uRows[0].id, email, nombre, panel: 'sicrep' });
     await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email, correo_enviado: correoEnviado }, ip: req.ip });
 
     res.status(201).json({ ok: true, usuario_id: uRows[0].id, correo_enviado: correoEnviado, dev_activation_link });
@@ -391,7 +365,7 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
       rows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
     }
 
-    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: rows[0].id, email: rows[0].email, nombre });
+    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: rows[0].id, email: rows[0].email, nombre, panel: rows[0].panel });
     await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
 
     res.status(201).json({
@@ -414,7 +388,7 @@ router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, nex
       return res.status(400).json({ error: 'Este usuario ya activó su cuenta.' });
     }
     const { correoEnviado, dev_activation_link } = await enviarActivacion({
-      usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre,
+      usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre, panel: usuario.panel,
     });
     await logActividad({ usuarioId: req.user.sub, accion: 'reenviar_activacion', entidad: 'usuario', entidadId: usuario.id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
     res.json({ ok: true, correo_enviado: correoEnviado, dev_activation_link });

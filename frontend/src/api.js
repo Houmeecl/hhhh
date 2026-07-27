@@ -26,6 +26,25 @@ export const authAv = {
   clear() { localStorage.removeItem(TOKEN_AV_KEY); localStorage.removeItem(REFRESH_AV_KEY); },
 };
 
+// Sesiones de los paneles exclusivos de Puerto y Mandante — mismo patrón
+// que authAv (storage propio, para poder tener varias sesiones de panel
+// abiertas a la vez en el mismo navegador).
+function crearAlmacenSesion(prefijo) {
+  const K = `sicr3p_${prefijo}_access`;
+  const R = `sicr3p_${prefijo}_refresh`;
+  return {
+    get access() { return localStorage.getItem(K); },
+    get refresh() { return localStorage.getItem(R); },
+    set(access, refresh) {
+      if (access) localStorage.setItem(K, access);
+      if (refresh) localStorage.setItem(R, refresh);
+    },
+    clear() { localStorage.removeItem(K); localStorage.removeItem(R); },
+  };
+}
+export const authPuerto = crearAlmacenSesion('puerto');
+export const authMandante = crearAlmacenSesion('mandante');
+
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
 const CLIENTE_EMAIL_KEY = 'sicr3p_cliente_email';
@@ -39,11 +58,12 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, cliente = false } = {}) {
-  const store = authedAv ? authAv : auth;
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : auth;
+  const anyAuthed = authed || authedAv || authedPuerto || authedMandante;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
-  if ((authed || authedAv) && store.access) headers['Authorization'] = `Bearer ${store.access}`;
+  if (anyAuthed && store.access) headers['Authorization'] = `Bearer ${store.access}`;
   if (cliente && clienteAuth.token) headers['Authorization'] = `Bearer ${clienteAuth.token}`;
 
   let res = await fetch(`/api${path}`, {
@@ -53,7 +73,7 @@ async function request(path, { method = 'GET', body, formData, authed = false, a
   });
 
   // Reintento con refresh si el token expiró.
-  if (res.status === 401 && (authed || authedAv) && store.refresh) {
+  if (res.status === 401 && anyAuthed && store.refresh) {
     const r = await fetch('/api/auth/refresh', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -179,6 +199,8 @@ export const api = {
   login: (email, password, panel) => request('/auth/login', { method: 'POST', body: { email, password, panel } }),
   me: () => request('/auth/me', { authed: true }),
   meAv: () => request('/auth/me', { authedAv: true }),
+  mePuerto: () => request('/auth/me', { authedPuerto: true }),
+  meMandante: () => request('/auth/me', { authedMandante: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
 
@@ -256,9 +278,11 @@ export const api = {
   proveedoresMandante: (id) => request(`/admin/accesos/mandantes/${id}/proveedores`, { authed: true }),
   agregarProveedorMandante: (id, rut_proveedor) => request(`/admin/accesos/mandantes/${id}/proveedores`, { method: 'POST', body: { rut_proveedor }, authed: true }),
   quitarProveedorMandante: (id, proveedorId) => request(`/admin/accesos/mandantes/${id}/proveedores/${proveedorId}`, { method: 'DELETE', authed: true }),
+  crearCuentaMandante: (id, b) => request(`/admin/accesos/mandantes/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
   puertos: () => request('/admin/accesos/puertos', { authed: true }),
   crearPuerto: (b) => request('/admin/accesos/puertos', { method: 'POST', body: b, authed: true }),
   editarPuerto: (id, b) => request(`/admin/accesos/puertos/${id}`, { method: 'PUT', body: b, authed: true }),
+  crearCuentaPuerto: (id, b) => request(`/admin/accesos/puertos/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
   codigos: () => request('/admin/accesos/codigos', { authed: true }),
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
@@ -296,16 +320,48 @@ export const api = {
   constanciaUrl: (serial) => `/api/capacitacion/constancias/${serial}.pdf`,
   constanciaQrUrl: (serial) => `/api/capacitacion/constancias/${serial}/qr.png`,
   constanciaPublica: (serial) => request(`/capacitacion/constancias/${serial}`),
+
+  // --- Panel exclusivo del puerto (/panel-puerto) — misma API que la
+  // integración X-Api-Key, autenticada con la sesión propia authedPuerto.
+  puertoTransitos: () => request('/puerto/transitos', { authedPuerto: true }),
+  puertoTransito: (codigo) => request(`/puerto/transitos/${encodeURIComponent(codigo)}`, { authedPuerto: true }),
+
+  // --- Panel exclusivo del mandante (/panel-mandante) — misma API que la
+  // integración X-Api-Key, autenticada con la sesión propia authedMandante.
+  mandanteProveedores: () => request('/mandante/proveedores', { authedMandante: true }),
+  mandanteProveedorResumen: (rut, qs = '') => request(`/mandante/proveedor/${encodeURIComponent(rut)}/resumen${qs}`, { authedMandante: true }),
+  mandanteExportarAlcance3Csv: (qs = '') => descargarAuth(`/api/mandante/export/alcance3?formato=csv${qs}`, authMandante, `alcance3${qs.replace(/[?&]/g, '_')}.csv`),
+  mandanteExportarCbamCsv: () => descargarAuth('/api/mandante/export/cbam?formato=csv', authMandante, 'cbam.csv'),
+  mandanteExportarCbamPdf: () => abrirPdfAuth('/api/mandante/export/cbam.pdf', authMandante),
 };
 
-async function abrirPdfAuth(url) {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${auth.access}` } });
+async function abrirPdfAuth(url, store = auth) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${store.access}` } });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'No se pudo generar el PDF');
   }
   const blobUrl = URL.createObjectURL(await res.blob());
   window.open(blobUrl, '_blank');
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+
+// Descarga autenticada de un archivo (CSV/PDF) que no es JSON — el
+// servidor exige Authorization: Bearer, que un <a href> normal no puede
+// mandar. Se trae como blob y se dispara la descarga con un <a> temporal.
+async function descargarAuth(url, store, filename) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${store.access}` } });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'No se pudo generar el archivo');
+  }
+  const blobUrl = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 }
 

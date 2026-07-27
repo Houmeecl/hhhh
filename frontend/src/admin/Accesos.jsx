@@ -128,6 +128,7 @@ function Mandantes({ flash }) {
   const [tokenNuevo, setTokenNuevo] = useState(null);
   const [creando, setCreando] = useState(false);
   const [gestion, setGestion] = useState(null); // mandante siendo gestionado (webhook + proveedores)
+  const [cuentaWeb, setCuentaWeb] = useState(null); // mandante al que se le está creando el acceso web
 
   const cargar = () => api.mandantes().then((r) => setItems(r.mandantes)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -175,7 +176,7 @@ function Mandantes({ flash }) {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
           <tbody>
             {items.map((m) => (
               <tr key={m.id}>
@@ -183,19 +184,92 @@ function Mandantes({ flash }) {
                 <td>{m.rut}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{m.ultimo_uso ? fmtFecha(m.ultimo_uso) : 'Nunca'}</td>
                 <td><span className={`badge ${m.activo ? 'badge-green' : 'badge-gray'}`}>{m.activo ? 'Activa' : 'Inactiva'}</span></td>
+                <td>
+                  {m.tiene_cuenta_web
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(m)}>Crear acceso web</button>}
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="btn btn-outline btn-sm" onClick={() => setGestion(m)}>Gestionar</button>{' '}
                   <button className="btn btn-outline btn-sm" onClick={() => toggle(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
                 </td>
               </tr>
             ))}
-            {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin mandantes registrados.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin mandantes registrados.</td></tr>}
           </tbody>
         </table>
         </div>
       </div>
 
       {gestion && <GestionMandante mandante={gestion} flash={flash} onClose={() => { setGestion(null); cargar(); }} />}
+      {cuentaWeb && (
+        <CrearCuentaWeb
+          entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre_empresa}
+          crear={api.crearCuentaMandante}
+          onCreada={cargar}
+          onClose={() => setCuentaWeb(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Modal: crear el acceso web (login propio) de un puerto o mandante ----------
+// Distinto de la API key (integración de sistemas): esto crea una cuenta
+// humana (email+contraseña) atada solo a ESTA entidad, que entra por su
+// propio panel (/panel-puerto o /panel-mandante) — mismo flujo de
+// activación por correo que las cuentas sicrep/aduana_verde.
+function CrearCuentaWeb({ entidad, nombreEntidad, crear, onClose, onCreada }) {
+  const [email, setEmail] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState('');
+  const [resultado, setResultado] = useState(null);
+
+  async function submit() {
+    setEnviando(true);
+    setError('');
+    try {
+      const r = await crear(entidad.id, { email, nombre });
+      setResultado(r);
+      onCreada();
+    } catch (e) { setError(e.message); }
+    finally { setEnviando(false); }
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && onClose()}>
+      <div className="modal" style={{ maxWidth: 440 }}>
+        <h2 style={{ marginTop: 0 }}>Acceso web de {nombreEntidad}</h2>
+        {resultado ? (
+          <>
+            <div className="badge badge-green" style={{ display: 'block', padding: 12, marginBottom: 10 }}>
+              Cuenta creada. {resultado.correo_enviado ? 'Se envió un correo de activación.' : 'No se pudo enviar el correo — comparte este enlace a mano:'}
+            </div>
+            {resultado.dev_activation_link && (
+              <div style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                {resultado.dev_activation_link}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              Crea un login propio (email + contraseña) para que {nombreEntidad} entre a su panel web —
+              distinto de la API key, que sigue sirviendo para integraciones de sistemas.
+            </p>
+            <div className="field"><label>Correo</label><input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="contacto@empresa.cl" /></div>
+            <div className="field" style={{ marginBottom: 14 }}><label>Nombre</label><input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Persona de contacto" /></div>
+            {error && <div className="badge badge-red" style={{ display: 'block', padding: 10, marginBottom: 12 }}>{error}</div>}
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={submit} disabled={enviando || !email || !nombre}>
+              {enviando ? <span className="spinner" /> : 'Crear acceso web'}
+            </button>
+          </>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -281,6 +355,7 @@ function Puertos({ flash }) {
   const [form, setForm] = useState({ nombre: '', punto_id: '' });
   const [tokenNuevo, setTokenNuevo] = useState(null);
   const [creando, setCreando] = useState(false);
+  const [cuentaWeb, setCuentaWeb] = useState(null); // puerto al que se le está creando el acceso web
 
   const cargar = () => api.puertos().then((r) => setItems(r.puertos)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -336,7 +411,7 @@ function Puertos({ flash }) {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Punto</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Punto</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
           <tbody>
             {items.map((p) => (
               <tr key={p.id}>
@@ -344,14 +419,27 @@ function Puertos({ flash }) {
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.punto_id}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{p.ultimo_uso ? fmtFecha(p.ultimo_uso) : 'Nunca'}</td>
                 <td><span className={`badge ${p.activo ? 'badge-green' : 'badge-gray'}`}>{p.activo ? 'Activa' : 'Inactiva'}</span></td>
+                <td>
+                  {p.tiene_cuenta_web
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(p)}>Crear acceso web</button>}
+                </td>
                 <td><button className="btn btn-outline btn-sm" onClick={() => toggle(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button></td>
               </tr>
             ))}
-            {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin puertos registrados.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin puertos registrados.</td></tr>}
           </tbody>
         </table>
         </div>
       </div>
+      {cuentaWeb && (
+        <CrearCuentaWeb
+          entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre}
+          crear={api.crearCuentaPuerto}
+          onCreada={cargar}
+          onClose={() => setCuentaWeb(null)}
+        />
+      )}
     </div>
   );
 }

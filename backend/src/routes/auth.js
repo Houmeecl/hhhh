@@ -7,10 +7,13 @@ import { query } from '../lib/db.js';
 import { signAccess, signRefresh, requireAuth, logActividad } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { sendMail, resetEmail, magicEmail } from '../services/mailer.js';
+import { RUTA_ACTIVAR } from '../services/cuentas.js';
 
 const router = express.Router();
 
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
+
+const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante'];
 
 // ---------- POST /api/auth/login ----------
 router.post('/login', loginLimiter, async (req, res, next) => {
@@ -18,7 +21,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     const { email, password } = req.body;
     // El frontend de cada panel siempre manda el panel esperado; sin
     // panel en el body (clientes API viejos) se asume 'sicrep'.
-    const panelEsperado = req.body.panel === 'aduana_verde' ? 'aduana_verde' : 'sicrep';
+    const panelEsperado = PANELES_VALIDOS.includes(req.body.panel) ? req.body.panel : 'sicrep';
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios' });
 
     const { rows } = await query(`SELECT * FROM usuarios WHERE email = $1`, [String(email).toLowerCase()]);
@@ -33,11 +36,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' });
     if (user.panel !== panelEsperado) {
-      return res.status(403).json({
-        error: panelEsperado === 'aduana_verde'
-          ? 'Esta cuenta no pertenece al panel del mostrador presencial.'
-          : 'Esta cuenta no pertenece al panel sicrep.',
-      });
+      return res.status(403).json({ error: 'Esta cuenta no pertenece a este panel.' });
     }
 
     await query(`UPDATE usuarios SET ultimo_login = now() WHERE id = $1`, [user.id]);
@@ -52,6 +51,8 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         nombre: user.nombre,
         rol: user.rol,
         panel: user.panel,
+        puerto_id: user.puerto_id,
+        mandante_id: user.mandante_id,
         must_reset_password: user.must_reset_password,
       },
     });
@@ -78,7 +79,7 @@ router.post('/refresh', async (req, res) => {
 // ---------- GET /api/auth/me ----------
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT id, email, nombre, rol, panel, cliente_id, must_reset_password FROM usuarios WHERE id = $1`,
+    `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, must_reset_password FROM usuarios WHERE id = $1`,
     [req.user.sub]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -129,7 +130,8 @@ router.post('/solicitar-reset', loginLimiter, async (req, res, next) => {
         `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'reset',$3)`,
         [user.id, hashToken(raw), expira]
       );
-      const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
+      const ruta = RUTA_ACTIVAR[user.panel] || RUTA_ACTIVAR.sicrep;
+      const link = `${config.publicAppUrl}${ruta}?token=${raw}`;
       const mail = resetEmail({ nombre: user.nombre, link });
       await sendMail({ to: user.email, ...mail });
     }

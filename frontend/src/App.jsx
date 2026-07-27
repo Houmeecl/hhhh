@@ -17,8 +17,10 @@ import CorredorLanding from './pages/CorredorLanding.jsx';
 import Cadena from './pages/Cadena.jsx';
 import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
-import Activar from './admin/Activar.jsx';
+import ActivarCuenta from './components/ActivarCuenta.jsx';
 import LoginAv from './admin-av/LoginAv.jsx';
+import LoginPuerto from './panel-puerto/LoginPuerto.jsx';
+import LoginMandante from './panel-mandante/LoginMandante.jsx';
 
 // Code-splitting: los paneles admin son la mitad del bundle y solo los
 // usan operadores logueados — se cargan bajo demanda para que las
@@ -26,6 +28,8 @@ import LoginAv from './admin-av/LoginAv.jsx';
 // teléfono de un tercero que escanea un QR.
 const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
 const AdminAvApp = lazy(() => import('./admin-av/AdminAvApp.jsx'));
+const PuertoApp = lazy(() => import('./panel-puerto/PuertoApp.jsx'));
+const MandanteApp = lazy(() => import('./panel-mandante/MandanteApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
@@ -62,12 +66,23 @@ export default function App() {
 
       {/* Admin — panel sicrep (núcleo/plataforma) */}
       <Route path="/admin/login" element={<Login />} />
-      <Route path="/admin/activar" element={<Activar />} />
+      <Route path="/admin/activar" element={<ActivarCuenta loginPath="/admin/login" />} />
       <Route path="/admin/*" element={<AdminApp />} />
 
       {/* Panel del mostrador presencial — compensación, tarifa y REP, cuentas propias */}
       <Route path="/panel-verde/login" element={<LoginAv />} />
+      <Route path="/panel-verde/activar" element={<ActivarCuenta loginPath="/panel-verde/login" titulo="el panel del mostrador presencial" />} />
       <Route path="/panel-verde/*" element={<AdminAvApp />} />
+
+      {/* Panel de Puerto — lectura completa de tránsitos por su propio punto del Corredor */}
+      <Route path="/panel-puerto/login" element={<LoginPuerto />} />
+      <Route path="/panel-puerto/activar" element={<ActivarCuenta loginPath="/panel-puerto/login" titulo="el panel de Puerto" />} />
+      <Route path="/panel-puerto/*" element={<PuertoApp />} />
+
+      {/* Panel de Mandante — trazabilidad y CO2e de sus proveedores */}
+      <Route path="/panel-mandante/login" element={<LoginMandante />} />
+      <Route path="/panel-mandante/activar" element={<ActivarCuenta loginPath="/panel-mandante/login" titulo="el panel de Mandante" />} />
+      <Route path="/panel-mandante/*" element={<MandanteApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

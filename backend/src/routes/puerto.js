@@ -1,4 +1,6 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { hashApiKey } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
@@ -7,7 +9,12 @@ import { filtrarPorVisibilidad } from '../services/pasaporteOrigen.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 
 // ============================================================
-// API pública para PUERTOS (auth por header X-Api-Key, migración 040).
+// API para PUERTOS — dos caminos de acceso a los MISMOS datos:
+//  1) X-Api-Key (migración 040): integración de sistemas externos.
+//  2) Sesión (Bearer JWT, panel='puerto', migración 042): el operador
+//     humano del puerto entra por /panel-puerto/login con su propia
+//     cuenta (email+contraseña), atada a esta MISMA fila de `puertos`
+//     vía usuarios.puerto_id — nunca ve datos de otro puerto.
 // A diferencia de mandante.js (acceso por RUT receptor sobre facturas
 // nacionales), un puerto ve el tránsito del Corredor Bioceánico que pasa
 // por SU punto (lotes tipo 'documental' con al menos un eslabón cuyo
@@ -19,8 +26,25 @@ const router = express.Router();
 
 async function requirePuerto(req, res, next) {
   try {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      let payload;
+      try {
+        payload = jwt.verify(authHeader.slice(7), config.jwt.accessSecret);
+      } catch {
+        return res.status(401).json({ error: 'Sesión expirada o inválida.' });
+      }
+      if (payload.panel !== 'puerto' || !payload.puerto_id) {
+        return res.status(403).json({ error: 'Esta cuenta no tiene acceso al panel de puerto.' });
+      }
+      const { rows } = await query(`SELECT * FROM puertos WHERE id = $1`, [payload.puerto_id]);
+      const p = rows[0];
+      if (!p || !p.activo) return res.status(401).json({ error: 'Puerto inactivo.' });
+      req.puerto = p;
+      return next();
+    }
     const key = req.headers['x-api-key'];
-    if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key.' });
+    if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key o una sesión.' });
     const { rows } = await query(`SELECT * FROM puertos WHERE token_hash = $1`, [hashApiKey(key)]);
     const p = rows[0];
     if (!p || !p.activo) return res.status(401).json({ error: 'API key inválida o inactiva.' });

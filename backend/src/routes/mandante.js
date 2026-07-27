@@ -1,4 +1,6 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
@@ -9,7 +11,12 @@ import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
 import { citaFuente, generateReporteCbam } from '../services/pdf.js';
 
 // ============================================================
-// API pública para MANDANTES (auth por header X-Api-Key).
+// API para MANDANTES — dos caminos de acceso a los MISMOS datos:
+//  1) X-Api-Key: integración de sistemas externos.
+//  2) Sesión (Bearer JWT, panel='mandante', migración 042): el operador
+//     humano del mandante entra por /panel-mandante/login con su propia
+//     cuenta (email+contraseña), atada a esta MISMA fila de `mandantes`
+//     vía usuarios.mandante_id — nunca ve datos de otro mandante.
 // Una empresa mandante consulta la trazabilidad y CO2e que sus
 // proveedores le han emitido. Solo ve relaciones donde ella es
 // la receptora de los documentos.
@@ -19,11 +26,28 @@ const router = express.Router();
 const rutNorm = normalizarRut;
 const NORM = (col) => `regexp_replace(COALESCE(${col},''), '[^0-9kK]', '', 'g')`;
 
-// Autenticación por API key.
+// Autenticación por API key o por sesión de panel.
 async function requireMandante(req, res, next) {
   try {
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      let payload;
+      try {
+        payload = jwt.verify(authHeader.slice(7), config.jwt.accessSecret);
+      } catch {
+        return res.status(401).json({ error: 'Sesión expirada o inválida.' });
+      }
+      if (payload.panel !== 'mandante' || !payload.mandante_id) {
+        return res.status(403).json({ error: 'Esta cuenta no tiene acceso al panel de mandante.' });
+      }
+      const { rows } = await query(`SELECT * FROM mandantes WHERE id = $1`, [payload.mandante_id]);
+      const m = rows[0];
+      if (!m || !m.activo) return res.status(401).json({ error: 'Mandante inactivo.' });
+      req.mandante = m;
+      return next();
+    }
     const key = req.headers['x-api-key'];
-    if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key.' });
+    if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key o una sesión.' });
     const { rows } = await query(`SELECT * FROM mandantes WHERE token_hash = $1`, [hashApiKey(key)]);
     const m = rows[0];
     if (!m || !m.activo) return res.status(401).json({ error: 'API key inválida o inactiva.' });

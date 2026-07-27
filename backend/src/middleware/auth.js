@@ -5,7 +5,7 @@ import { query } from '../lib/db.js';
 export function signAccess(user) {
   return jwt.sign(
     { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null,
-      panel: user.panel || 'sicrep' },
+      panel: user.panel || 'sicrep', puerto_id: user.puerto_id || null, mandante_id: user.mandante_id || null },
     config.jwt.accessSecret,
     { expiresIn: config.jwt.accessTtl }
   );

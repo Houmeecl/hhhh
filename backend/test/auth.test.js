@@ -21,6 +21,29 @@ test('signAccess respeta panel="aduana_verde" cuando el usuario lo trae', () => 
   assert.equal(payload.panel, 'aduana_verde');
 });
 
+test('signAccess incluye puerto_id cuando el usuario es panel="puerto"', () => {
+  const token = signAccess({ id: 'u3', rol: 'operador', email: 'op@puerto.cl', panel: 'puerto', puerto_id: 'pto-1' });
+  const payload = jwt.verify(token, config.jwt.accessSecret);
+  assert.equal(payload.panel, 'puerto');
+  assert.equal(payload.puerto_id, 'pto-1');
+  assert.equal(payload.mandante_id, null);
+});
+
+test('signAccess incluye mandante_id cuando el usuario es panel="mandante"', () => {
+  const token = signAccess({ id: 'u4', rol: 'operador', email: 'op@mandante.cl', panel: 'mandante', mandante_id: 'mnd-1' });
+  const payload = jwt.verify(token, config.jwt.accessSecret);
+  assert.equal(payload.panel, 'mandante');
+  assert.equal(payload.mandante_id, 'mnd-1');
+  assert.equal(payload.puerto_id, null);
+});
+
+test('signAccess sin puerto_id/mandante_id los deja en null (no undefined)', () => {
+  const token = signAccess({ id: 'u5', rol: 'admin', email: 'a@sicrep.cl' });
+  const payload = jwt.verify(token, config.jwt.accessSecret);
+  assert.equal(payload.puerto_id, null);
+  assert.equal(payload.mandante_id, null);
+});
+
 function mockRes() {
   const res = { statusCode: null, body: null };
   res.status = (n) => { res.statusCode = n; return res; };
