@@ -9,8 +9,7 @@ import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 
 // ---------- Sello compartible ----------
 // El sello SVG lo sirve el backend (GET /api/sesiones/:id/sello.svg). Estas
-// funciones son locales (no van en api.js, que se edita en paralelo) y se
-// duplican a propósito en PosTerminal.jsx.
+// funciones son locales (no van en api.js, que se edita en paralelo).
 
 // Snippet HTML que el cliente pega en su sitio: el sello enlaza a la
 // verificación pública de la primera factura de la sesión.

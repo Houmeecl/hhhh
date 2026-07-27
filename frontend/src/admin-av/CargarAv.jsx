@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import Dropzone from '../components/Dropzone.jsx';
+import DeclaracionEmbalaje from '../components/DeclaracionEmbalaje.jsx';
+import CompensacionCobro from '../components/CompensacionCobro.jsx';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
 import { api, fmt } from '../api.js';
@@ -43,6 +45,9 @@ export default function CargarAv() {
   const [procesando, setProcesando] = useState(false);
   const [resultado, setResultado] = useState(null); // { sesion, facturas }
   const [envio, setEnvio] = useState(null); // comprobante por correo: null | 'enviando' | 'ok' | 'error'
+  const [embComponentes, setEmbComponentes] = useState([]);
+  const [embalajeGuardado, setEmbalajeGuardado] = useState(null);
+  const [compensacion, setCompensacion] = useState(null);
 
   const rutValido = form.rut === '' || validarRut(form.rut);
   const emailValido = form.email === '' || EMAIL_RE.test(form.email);
@@ -85,6 +90,7 @@ export default function CargarAv() {
 
   function nuevoTramite() {
     setResultado(null); setFiles([]); setForm({ rut: '', empresa: '', email: '' }); setError(''); setEnvio(null);
+    setEmbComponentes([]); setEmbalajeGuardado(null); setCompensacion(null);
   }
 
   async function enviarCorreo() {
@@ -134,7 +140,22 @@ export default function CargarAv() {
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+        <DeclaracionEmbalaje
+          sesionId={sesion.id}
+          componentes={embComponentes} setComponentes={setEmbComponentes}
+          guardada={embalajeGuardado}
+          onGuardada={setEmbalajeGuardado}
+          onModificar={() => setEmbalajeGuardado(null)}
+        />
+
+        <CompensacionCobro
+          sesionId={sesion.id}
+          totalCo2e={sesion.total_co2e}
+          compensacion={compensacion}
+          onCompensacion={setCompensacion}
+        />
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginTop: 16 }}>
           {facturas.map((f) => (
             <div className="card card-pad" key={f.id} style={{ textAlign: 'center' }}>
               <b style={{ fontSize: 14 }}>{f.numero_venta || f.archivo_original}</b>

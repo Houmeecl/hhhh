@@ -41,11 +41,12 @@ http://<tu-dominio-o-IP>/docs/libro/el-libro-sicr3p.pdf
 SIN ABOGADO"). Si algo falla, el script se detiene y te dice exactamente
 dónde.
 
-**App de tablet (terminal de mostrador):** el frontend ya es una PWA
-instalable, pero los navegadores exigen HTTPS para instalarla. Cuando
-quieras la tablet de mostrador: apunta el DNS del dominio a la IP y corre
-`bash deploy/instalar-vps.sh app.sicr3p.cl` (activa nginx + certbot). Guía
-completa de instalación y modo kiosco: `docs/TABLET.md`.
+**Mostrador presencial:** el terminal físico (`/pos`, tablet dedicada) se
+descontinuó — el mostrador opera 100% desde `/panel-verde` en cualquier
+navegador, con un operador logueado. Sigue siendo instalable como PWA
+propia (`manifest-aduana-verde.webmanifest`, `start_url: /panel-verde`)
+si se quiere un acceso directo en el equipo del mostrador; los navegadores
+exigen HTTPS para instalarla (`bash deploy/instalar-vps.sh app.sicr3p.cl`).
 
 ---
 

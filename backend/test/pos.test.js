@@ -6,8 +6,6 @@ import {
   serialValido,
   ALFABETO_CLAVE,
   LARGO_CLAVE,
-  clampDocumentos,
-  MAX_DOCS_TRAMITE,
 } from '../src/services/posTerminal.js';
 
 // ---------- generarSerial ----------
@@ -88,29 +86,4 @@ test('serialValido no lanza con entradas no string', () => {
   assert.equal(serialValido(undefined), false);
   assert.equal(serialValido(1234), false);
   assert.equal(serialValido({}), false);
-});
-
-// ---------- clampDocumentos ----------
-
-test('clampDocumentos acepta el rango válido 1..MAX_DOCS_TRAMITE', () => {
-  assert.equal(clampDocumentos(1), 1);
-  assert.equal(clampDocumentos(3), 3);
-  assert.equal(clampDocumentos(MAX_DOCS_TRAMITE), MAX_DOCS_TRAMITE);
-});
-
-test('clampDocumentos limita valores sobre el tope al máximo', () => {
-  assert.equal(clampDocumentos(MAX_DOCS_TRAMITE + 1), MAX_DOCS_TRAMITE);
-  assert.equal(clampDocumentos(9999), MAX_DOCS_TRAMITE);
-});
-
-test('clampDocumentos devuelve 1 ante entradas inválidas', () => {
-  assert.equal(clampDocumentos(undefined), 1);   // body sin campo (compatibilidad)
-  assert.equal(clampDocumentos(null), 1);
-  assert.equal(clampDocumentos(0), 1);
-  assert.equal(clampDocumentos(-4), 1);
-  assert.equal(clampDocumentos(2.5), 1);         // no entero
-  assert.equal(clampDocumentos('3'), 3);         // string numérico sí se acepta
-  assert.equal(clampDocumentos('abc'), 1);
-  assert.equal(clampDocumentos({}), 1);
-  assert.equal(clampDocumentos(Infinity), 1);
 });

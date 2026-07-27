@@ -1,3 +1,9 @@
+> **NOTA (2026-07-27):** este guion describe el flujo del terminal físico `/pos`
+> (`PosTerminal.jsx`), descontinuado en favor del panel `/panel-verde` con
+> operador logueado. El video ya fue entregado al usuario y no se regraba;
+> esta nota es solo para que quede claro que el flujo grabado ya no existe
+> en el producto.
+
 # Guion — Video corto "Mostrador presencial sicr3p" (recorrido real del mostrador)
 
 **Duración total aproximada:** ~2 min 35 s
