@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Portafolio de informes, proceso y apoyo</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">PORTAFOLIO DE INFORMES · PROCESO Y APOYO</div>
+    <h1>Todo lo que la plataforma<br>genera por ti — y cómo<br>se llega a cada documento</h1>
+    <p class="bajada">Un catálogo completo de los informes, expedientes, credenciales y
+    exports que sicr3p produce hoy, el proceso que los respalda de punta a punta, y el
+    apoyo disponible para empezar a usarlos. Cada documento de este catálogo existe y
+    se genera en la plataforma operativa — ninguno es una promesa futura.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. EL PROCESO -->
+<div class="pagina">
+  <h2>1. El proceso: de un documento a evidencia verificable</h2>
+
+  <p>Todos los informes del catálogo salen del mismo proceso. No hay planillas
+  intermedias ni digitación manual: lo que entra es un documento real, lo que sale es
+  evidencia sellada.</p>
+
+  <div class="flujo">
+    <div class="paso"><span class="num">1</span><div class="txt"><b>Entra el documento real.</b>
+      XML de DTE del SII, PDF, foto o escaneo — por la web, por el mostrador presencial,
+      o cargado por la agencia de aduanas en el caso del Corredor Bioceánico.</div></div>
+    <div class="paso"><span class="num">2</span><div class="txt"><b>Lectura automática.</b>
+      La plataforma lee el documento (texto directo u OCR) y extrae emisor, receptor,
+      ítems y montos. Si un documento no entrega señal suficiente, se rechaza y el
+      rechazo queda registrado — nunca se inventan ni se corrigen datos a mano.</div></div>
+    <div class="paso"><span class="num">3</span><div class="txt"><b>Cálculo con factores citados.</b>
+      Cada ítem se clasifica y se calcula su CO2e con factores de emisión que citan su
+      fuente metodológica. El método usado (físico o por gasto) queda registrado ítem
+      por ítem.</div></div>
+    <div class="paso"><span class="num">4</span><div class="txt"><b>Sellado en cadena de integridad.</b>
+      Cada registro genera un eslabón con hash SHA-256 encadenado al anterior, en una
+      cadena de solo-agregado. Alterar un registro histórico rompe la cadena de forma
+      visible para cualquiera.</div></div>
+    <div class="paso"><span class="num">5</span><div class="txt"><b>Salen los informes y la verificación pública.</b>
+      Con el registro sellado, la plataforma emite los documentos de este catálogo, cada
+      uno con su página pública de verificación por QR — sin cuenta y sin permiso.</div></div>
+  </div>
+
+  <div class="caja-alerta">
+    <strong>Una excepción, acotada y declarada.</strong> En el expediente documental del
+    Corredor Bioceánico, un documento que no se pudo leer con confianza pasa a una cola
+    de revisión donde una persona lo <em>aprueba o rechaza</em> — nunca corrige datos a
+    mano. En el flujo de autoservicio web esa cola no existe: lo ilegible se rechaza
+    directamente y queda en la bitácora de rechazos.
+  </div>
+</div>
+
+<!-- 2. CATÁLOGO -->
+<div class="pagina seccion">
+  <h2>2. Los informes que genera la plataforma, uno por uno</h2>
+
+  <h3>2.1 Para tu empresa</h3>
+  <table>
+    <tr><th style="width:38%;">Documento</th><th>Qué contiene y para qué sirve</th></tr>
+    <tr><td><strong>Informe de carbono</strong> (por trámite y consolidado mensual)</td>
+      <td>El libro mayor de tus emisiones: cada factura con sus ítems, factores citados a
+      su fuente, alcances GHG, y el hash y eslabón de cada documento en la cadena de
+      integridad, más el estado de verificación de la cadena completa. Incluye tu
+      declaración REP de embalaje cuando existe.</td></tr>
+    <tr><td><strong>Etiqueta con QR</strong></td>
+      <td>Etiqueta imprimible para la carpeta física o el producto: escaneada, lleva a la
+      página pública de verificación del trámite.</td></tr>
+    <tr><td><strong>Balance de Capital Natural</strong></td>
+      <td>Las seis cuentas (agua, energía, CO2e, materiales, suelo, biodiversidad) con
+      sus movimientos derivados de documentos reales y un sello de integridad por
+      cuenta.</td></tr>
+  </table>
+
+  <h3>2.2 Para tu mandante o comprador</h3>
+  <table>
+    <tr><th style="width:38%;">Documento</th><th>Qué contiene y para qué sirve</th></tr>
+    <tr><td><strong>Carpeta del mandante</strong></td>
+      <td>Un solo PDF de evidencia por trámite: documento, cálculo, declaración REP,
+      contrapartes relacionadas y verificación de integridad — lo que el mandante
+      archiva como respaldo.</td></tr>
+    <tr><td><strong>Export Alcance 3 GHG</strong> (CSV / JSON)</td>
+      <td>Las emisiones de sus proveedores en formato listo para consolidar en su propio
+      reporte corporativo (contexto ISSB / NCG 461), vía API con clave propia.</td></tr>
+    <tr><td><strong>Reporte CBAM</strong> (PDF / CSV / JSON)</td>
+      <td>Estado CBAM de los lotes del mandante: código NC, aplicabilidad según el
+      Reglamento (UE) 2023/956, método de emisiones y datos faltantes. Es un insumo de
+      apoyo para la declaración del importador — no sustituye la verificación por un
+      verificador acreditado que exige el régimen definitivo europeo.</td></tr>
+  </table>
+
+  <h3>2.3 Trazabilidad y Corredor Bioceánico</h3>
+  <table>
+    <tr><th style="width:38%;">Documento</th><th>Qué contiene y para qué sirve</th></tr>
+    <tr><td><strong>Expediente de lote</strong> (Pasaporte de Origen)</td>
+      <td>La cadena de custodia completa del lote: eslabones sellados, documentos del
+      expediente (factura, packing list, carta de porte, MIC/DTA, certificado de origen,
+      documentos SAG, seguro, pesajes, fotografías, comprobantes fronterizos), semáforo
+      de completitud, carbono logístico y el hash final anclado a la cadena
+      pública.</td></tr>
+    <tr><td><strong>Credencial de Tarjeta de Viaje</strong></td>
+      <td>Credencial imprimible por camión, con QR: el transportista registra su tramo
+      del viaje con serial y clave propios, sin cuenta en la plataforma.</td></tr>
+    <tr><td><strong>Credencial de atestación</strong> (proveedor / puerto)</td>
+      <td>Permite que un actor externo firme una sola vez su eslabón del lote, con
+      identidad fijada al emitir la credencial. No es una firma electrónica con validez
+      legal (Ley N° 19.799): es una atestación sellada por hash, y así lo dice impreso
+      en la propia credencial.</td></tr>
+  </table>
+
+  <h3>2.4 Interno</h3>
+  <table>
+    <tr><th style="width:38%;">Documento</th><th>Qué contiene y para qué sirve</th></tr>
+    <tr><td><strong>Constancia de capacitación</strong></td>
+      <td>Al aprobar la evaluación de un curso interno, el operador recibe una constancia
+      con serial y verificación pública. Es una constancia de participación interna
+      emitida por sicr3p — no una certificación acreditada de terceros.</td></tr>
+  </table>
+
+  <p class="ref">Todos los documentos anteriores se generan hoy en la plataforma operativa.
+  Los formatos de export (CSV/JSON) incluyen la cita metodológica y el disclaimer que
+  corresponde a cada uno.</p>
+</div>
+
+<!-- 3. VERIFICACIÓN -->
+<div class="pagina seccion">
+  <h2>3. Cómo se comprueba cada documento</h2>
+
+  <p>Ningún informe de sicr3p pide que confíes en la palabra de nadie. Cada documento
+  tiene una página pública de verificación, accesible con el QR impreso o con su enlace,
+  sin crear cuenta:</p>
+
+  <table>
+    <tr><th style="width:44%;">Documento</th><th>Dónde se verifica</th></tr>
+    <tr><td>Informe de carbono / etiqueta / carpeta</td><td>Página pública del trámite (QR de la etiqueta o del informe).</td></tr>
+    <tr><td>Expediente de lote</td><td>Pasaporte público del lote — muestra eslabones, semáforo y estado de documentos <em>sin exponer los archivos privados</em>.</td></tr>
+    <tr><td>Tarjeta de Viaje / atestación</td><td>Página pública del serial impreso en la credencial.</td></tr>
+    <tr><td>Constancia de capacitación</td><td>Página pública del serial de la constancia.</td></tr>
+    <tr><td>La cadena completa</td><td>Explorador público de la cadena de integridad, anonimizado: cualquiera puede recorrer los eslabones y comprobar que cuadran.</td></tr>
+  </table>
+
+  <div class="caja-navy">
+    <strong>Divulgación selectiva.</strong> Verificable no significa expuesto: la página
+    pública muestra que el registro existe, cuándo se selló y que la cadena cuadra — los
+    datos comerciales sensibles y los archivos del expediente siguen siendo privados, y
+    cada eslabón de un lote se puede marcar como público, visible solo para la cadena, o
+    privado.
+  </div>
+</div>
+
+<!-- 4. APOYO -->
+<div class="pagina seccion">
+  <h2>4. El apoyo disponible</h2>
+
+  <p>La plataforma no se entrega sola. Esto es lo que existe hoy como acompañamiento:</p>
+
+  <div class="flujo">
+    <div class="paso"><span class="num">1</span><div class="txt"><b>Verificación en vivo.</b>
+      Antes de cualquier reunión, puedes comprobar la plataforma operativa por tu cuenta:
+      el explorador de cadena y las páginas públicas de verificación están abiertas.</div></div>
+    <div class="paso"><span class="num">2</span><div class="txt"><b>Demostración de 30 minutos.</b>
+      Con tus propios documentos si quieres: cargas una factura real y ves el cálculo, el
+      sellado y la verificación en el momento. Se agenda escribiendo a
+      contacto@sicrep.cl.</div></div>
+    <div class="paso"><span class="num">3</span><div class="txt"><b>Piloto acotado.</b>
+      Alcance y duración definidos contigo, con los documentos de tu operación real.</div></div>
+  </div>
+
+  <h3>4.1 Material y formación que acompañan la plataforma</h3>
+  <table>
+    <tr><th style="width:38%;">Apoyo</th><th>Qué es</th></tr>
+    <tr><td><strong>Manual de uso operativo</strong></td><td>Manual sección por sección de los paneles, con capturas reales de cada pantalla, para el equipo que opera la plataforma.</td></tr>
+    <tr><td><strong>Guía metodológica pública</strong></td><td>Documento que explica cómo se calcula: orígenes del dato, método físico vs. por gasto, factores y sus fuentes, y las decisiones de diseño declaradas.</td></tr>
+    <tr><td><strong>Capacitación interna con evaluación</strong></td><td>Cursos dentro de la propia plataforma para los operadores, con evaluación y constancia verificable al aprobar.</td></tr>
+    <tr><td><strong>Soporte directo</strong></td><td>contacto@sicrep.cl — el mismo canal para dudas de uso, verificación o colaboración.</td></tr>
+  </table>
+
+  <div class="caja-alerta">
+    <strong>Lo que este catálogo no promete.</strong> sicr3p no es un organismo
+    certificador ni un verificador de tercera parte acreditado, no es autoridad, no
+    emite bonos de carbono, no realiza tramitación aduanera (la agencia de aduanas real
+    sigue haciendo el despacho oficial; sicr3p aporta la capa documental y de
+    trazabilidad) y no usa blockchain especulativa. Lo que sí hace: dejar cada dato
+    calculado, citado y sellado, para que un tercero pueda comprobarlo.
+  </div>
+
+  <div class="pie-doc">
+    Documento informativo. No constituye oferta comercial ni solicitud administrativa.
+    sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl · Julio 2026
+  </div>
+</div>
+
+</body>
+</html>

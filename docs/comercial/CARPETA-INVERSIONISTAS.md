@@ -1,7 +1,7 @@
 # Qué documento enviar según a quién
 
 Índice rápido de la carpeta comercial (`docs/comercial/*.pdf`) para no mandar
-los 11 PDFs sueltos sin criterio. No es contenido nuevo — solo el orden en
+los 12 PDFs sueltos sin criterio. No es contenido nuevo — solo el orden en
 que ya existen.
 
 ## Para venture capital / inversionistas
@@ -19,7 +19,8 @@ las que trae por defecto son ilustrativas.
 
 1. **07 · Propuesta de piloto** — alcance, condiciones (sin costo de licencias durante el piloto), qué pide cada actor. Ajustar el nombre/región si no es Antofagasta.
 2. **09 · Brochure corredor** (o **08 · Brochure plataforma** si el piloto no es del Corredor Bioceánico) — una página visual.
-3. Opcional: **11 · Valorización del proyecto** — solo si la contraparte pregunta por la viabilidad financiera de sicr3p como empresa (no del piloto en sí, que no tiene costo).
+3. **12 · Portafolio de informes** — el catálogo de todo lo que la plataforma entrega (informes, expedientes, credenciales, exports), el proceso y el apoyo disponible. Útil cuando la contraparte pregunta "¿y qué recibo yo, concretamente?".
+4. Opcional: **11 · Valorización del proyecto** — solo si la contraparte pregunta por la viabilidad financiera de sicr3p como empresa (no del piloto en sí, que no tiene costo).
 
 ## Para autoridades / marco regulatorio
 
@@ -40,3 +41,4 @@ las que trae por defecto son ilustrativas.
 | 09 | Brochure corredor | Clientes del Corredor Bioceánico |
 | 10 | Manual de beneficios | Clientes, recorrido end-to-end |
 | 11 | Valorización del proyecto (TIR) | Inversionistas — complemento numérico del 06 |
+| 12 | Portafolio de informes, proceso y apoyo | Clientes y pilotos — qué documentos entrega la plataforma |
