@@ -7,19 +7,41 @@ necesita acceso al VPS (lo tienes tú) o solo el navegador.
 ---
 
 ## 1. Cerrar la versión en el VPS
-**Acceso:** VPS (SSH)
+**Acceso:** VPS (SSH — PuTTY a `138.36.237.61`, puerto **5595**, usuario `root`)
 **Por qué va primero:** todo lo demás (paso 2 y 5) depende de que el código
 esté corriendo en producción.
+
+Primero confirma en qué caso estás:
+
+```bash
+ls /opt/sicr3p >/dev/null 2>&1 && echo "YA INSTALADO → Caso A" || echo "VPS VIRGEN → Caso B"
+```
+
+**Caso A — ya instalado (actualizar):**
 
 ```bash
 cd /opt/sicr3p && git pull && bash deploy/finalizar-vps.sh
 ```
 
-Este único comando instala los binarios del motor total (tesseract, poppler,
-libheif), aplica las migraciones 001→019, corre los 185 tests del backend
-en el propio VPS, compila el frontend, reinicia el servicio, instala el cron
-de auto-deploy (si falta), corre el smoke E2E contra tu producción real, y
-**expone los PDFs comerciales y de metodología por nginx** (paso 6/6) en:
+**Caso B — VPS virgen (instalar desde cero):** `instalar-vps.sh` NO clona el
+repo — hay que clonarlo primero, en la rama de producción:
+
+```bash
+git clone -b claude/sicr3p-etapa-1-complete-caqhpl https://github.com/Houmeecl/hhhh.git /opt/sicr3p
+cd /opt/sicr3p
+bash deploy/instalar-vps.sh sicr3p.cl   # con dominio → nginx + HTTPS (certbot); el DNS debe apuntar ya a 138.36.237.61
+bash deploy/finalizar-vps.sh
+```
+
+Las credenciales del admin de producción quedan en
+`/root/sicr3p-credenciales.txt` (chmod 600) — no son las del entorno local.
+
+`finalizar-vps.sh` instala los binarios del motor total (tesseract, poppler,
+libheif), aplica todas las migraciones (001→047, idempotentes), corre la
+suite completa de tests del backend en el propio VPS, compila el frontend,
+reinicia el servicio, instala el cron de auto-deploy (si falta), corre el
+smoke E2E contra tu producción real, y **expone los PDFs comerciales y de
+metodología por nginx** (paso 6/6) en:
 
 ```
 http://<tu-dominio-o-IP>/docs/comercial/01-sicr3p-plataforma.pdf
