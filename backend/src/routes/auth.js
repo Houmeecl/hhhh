@@ -35,7 +35,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     if (user.panel !== panelEsperado) {
       return res.status(403).json({
         error: panelEsperado === 'aduana_verde'
-          ? 'Esta cuenta no pertenece al panel Aduana Verde.'
+          ? 'Esta cuenta no pertenece al panel del mostrador presencial.'
           : 'Esta cuenta no pertenece al panel sicrep.',
       });
     }

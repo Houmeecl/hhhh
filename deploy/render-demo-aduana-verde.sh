@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# sicr3p — Post-proceso del video "Aduana Verde" (wrapper).
+# sicr3p — Post-proceso del video del mostrador (wrapper).
 #
 # Arma docs/video/aduana-verde-demo.mp4 a partir del .webm real grabado
 # por deploy/grabar-demo-aduana-verde.mjs (docs/video/raw/*.webm +

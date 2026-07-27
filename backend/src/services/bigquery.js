@@ -128,7 +128,7 @@ export function rowDeclaracionEmbalaje(decl, sesion) {
   };
 }
 
-// Compensación del POS Aduana Verde — una por sesión en Postgres; un
+// Compensación del POS de mostrador — una por sesión en Postgres; un
 // re-cobro del mismo trámite reemplaza la fila allá, pero acá cada
 // versión queda como fila propia (insertId id+created_at, mismo patrón
 // que las declaraciones de embalaje): el historial de cobros es trazable.

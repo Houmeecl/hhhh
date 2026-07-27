@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================
-// sicr3p — Grabación REAL (Playwright) del mostrador "Aduana Verde".
+// sicr3p — Grabación REAL (Playwright) del mostrador presencial de sicr3p.
 //
 // Recorre con un navegador real la app real ya levantada (frontend Vite
 // en :5173, backend en :4000, Postgres con seed ya aplicado) siguiendo el
@@ -111,7 +111,7 @@ function verificarVideo(videoPath, checks) {
 async function main() {
   await mkdir(RAW_DIR, { recursive: true });
 
-  console.log('sicr3p — grabación real Aduana Verde');
+  console.log('sicr3p — grabación real del mostrador');
   console.log(`Frontend: ${FRONT}`);
   console.log(`Documento DTE: ${XML_PATH}`);
 
@@ -234,14 +234,14 @@ async function grabarSesionA(browser, intentoNum) {
     console.log(`   duración real: ${((end - start) / 1000).toFixed(1)}s (objetivo ${(targetMs / 1000).toFixed(1)}s)`);
   }
 
-  await escena(1, 'Landing Aduana Verde', [
-    'Aduana Verde. — by sicr3p',
+  await escena(1, 'Landing sicr3p', [
+    'sicr3p.',
     'Atención presencial: trazabilidad que sí se ve.',
     'Tu factura entra. Tu Pasaporte Digital sale.',
     'Cálculo de CO2e, declaración REP y un QR que cualquiera revisa.',
   ], 15000, async () => {
     await page.goto(`${FRONT}/aduana-verde`, { waitUntil: 'load' });
-    await page.waitForSelector('text=Aduana Verde', { timeout: 15000 });
+    await page.waitForSelector('text=sicr3p', { timeout: 15000 });
     await idle(1600);
     for (let i = 0; i < 6; i++) {
       await page.mouse.wheel(0, 350);
@@ -253,11 +253,11 @@ async function grabarSesionA(browser, intentoNum) {
 
   await escena(2, 'Login del terminal (modo demostración)', [
     'En el mostrador, el operador conecta el terminal.',
-    'Cada dispositivo Aduana Verde tiene su propio ID y clave.',
+    'Cada dispositivo del mostrador tiene su propio ID y clave.',
     'Grabación sin credenciales de dispositivo: modo demostración — el procesamiento que sigue es real.',
   ], 15000, async () => {
     await page.goto(`${FRONT}/pos`, { waitUntil: 'load' });
-    await page.waitForSelector('h1:has-text("Terminal Aduana Verde")');
+    await page.waitForSelector('h1:has-text("Terminal sicr3p")');
     await idle(1300);
     await page.locator('button:has-text("Conectar terminal")').click();
     await page.waitForSelector('h2:has-text("Conectar terminal")');
@@ -359,7 +359,7 @@ async function grabarSesionB(browser, intentoNum, totalCo2eEsperado) {
 
   console.log('   repitiendo el trámite (rápido, se recorta del video final)...');
   await page.goto(`${FRONT}/pos`, { waitUntil: 'load' });
-  await page.waitForSelector('h1:has-text("Terminal Aduana Verde")');
+  await page.waitForSelector('h1:has-text("Terminal sicr3p")');
   await page.locator('button:has-text("Conectar terminal")').click();
   await page.waitForSelector('h2:has-text("Conectar terminal")');
   await page.locator('button:has-text("Entrar en modo demostración")').click();
@@ -470,13 +470,13 @@ async function grabarSesionB(browser, intentoNum, totalCo2eEsperado) {
   });
 
   await escena(10, 'Cierre', [
-    'Aduana Verde no certifica ni reemplaza a un verificador acreditado.',
+    'sicr3p no certifica ni reemplaza a un verificador acreditado.',
     'Entrega evidencia trazable y verificable de tu contabilidad de carbono.',
     'Un trámite. Un mostrador presencial. Un Pasaporte Digital.',
-    'sicr3p.cl — Aduana Verde.',
+    'sicr3p.cl',
   ], 12000, async () => {
     await page.goto(`${FRONT}/aduana-verde`, { waitUntil: 'load' });
-    await page.waitForSelector('text=Aduana Verde');
+    await page.waitForSelector('text=sicr3p');
     await idle(3200);
   });
 

@@ -88,7 +88,7 @@ test('exportDeclaracionEmbalaje apagado es no-op silencioso', async () => {
   assert.equal(res, false);
 });
 
-// ---------- rowCompensacion (POS Aduana Verde) ----------
+// ---------- rowCompensacion (POS de mostrador) ----------
 
 test('rowCompensacion mapea el cobro completo con RUT normalizado', () => {
   const comp = {

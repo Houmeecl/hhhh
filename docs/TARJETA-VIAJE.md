@@ -13,10 +13,10 @@ con su propio catálogo de rubros/materiales y de roles de la cadena:
 | Tipo | Para qué | Ejemplos de rubro | Roles de la cadena |
 |---|---|---|---|
 | **`documental`** | **Corredor Bioceánico**: trazabilidad de la CARGA y sus DOCUMENTOS por tramos (no del mineral en sí) | carga general, refrigerada, granel, contenedor, documentos | origen, transporte, depósito, frontera, puerto, destino |
-| **`producto`** | **Ciudad → Aduana Verde**: productos de comercios urbanos de **cualquier rubro** | alimentos, bebidas, textil, embalajes, manufactura, químicos | productor, proveedor, transporte, comercio, punto Aduana Verde, comprador |
+| **`producto`** | **Ciudad → mostrador sicr3p**: productos de comercios urbanos de **cualquier rubro** | alimentos, bebidas, textil, embalajes, manufactura, químicos | productor, proveedor, transporte, comercio, punto sicr3p, comprador |
 | **`mineral`** | Cadena minera (cobre, litio, oro…) | cátodos de cobre, concentrado, litio, oro | mina, planta, refinería, transporte, comerciante, exportador, comprador |
 
-**Importante**: el tipo `producto` (Aduana Verde) NUNCA usa materiales ni
+**Importante**: el tipo `producto` (mostrador sicr3p) NUNCA usa materiales ni
 roles de minería — es deliberadamente genérico para cualquier comercio de la
 ciudad. El checklist normativo OECD Due Diligence de minerales solo aparece
 en pasaportes tipo `mineral`; los otros dos tipos muestran CBAM y DPP (que

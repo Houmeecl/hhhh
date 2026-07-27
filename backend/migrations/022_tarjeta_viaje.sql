@@ -1,7 +1,7 @@
 -- ============================================================
 -- 022: Tarjeta de Viaje NFC/RFID + anclaje de lotes en la cadena global.
 --
--- Contexto: Aduana Verde no puede obligar a la carga a pasar por puntos
+-- Contexto: el mostrador presencial no puede obligar a la carga a pasar por puntos
 -- fijos. El modelo se invierte: al inicio del corredor se ENTREGA una
 -- tarjeta física (NFC NTAG / RFID) grabada con la URL /v/{serial}. La
 -- tarjeta viaja CON la carga; cualquiera que la lea VE el pasaporte del

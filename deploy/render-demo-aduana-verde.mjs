@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================
-// sicr3p — Post-proceso del video "Aduana Verde" (recorrido real).
+// sicr3p — Post-proceso del video del mostrador (recorrido real).
 //
 // Toma los .webm reales + docs/video/raw/escenas.json que produce
 // deploy/grabar-demo-aduana-verde.mjs y arma el video final:
@@ -63,7 +63,7 @@ const ESCENA_0 = {
     'Cada mes llegan más boletas y facturas de las que alcanzas a ordenar.',
     'Sin tiempo para pasarlas a una planilla, papel por papel.',
     'Y sin nada real que mostrar cuando te piden el dato.',
-    'Esto es Aduana Verde — el mostrador de sicr3p.',
+    'Esto es sicr3p — el mostrador presencial.',
   ],
 };
 
@@ -115,7 +115,7 @@ async function main() {
 
   await mkdir(BUILD_DIR, { recursive: true });
 
-  console.log('sicr3p — render final "Aduana Verde"');
+  console.log('sicr3p — render final del mostrador');
   console.log(`t CO2e real capturado en la grabación: ${meta.totalCo2eReal}`);
   console.log(`Documento id: ${meta.docId}`);
   console.log(`Videos de origen: ${meta.videos.length}`);

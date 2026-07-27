@@ -15,8 +15,8 @@ documentos tributarios que el cliente carga (XML DTE, PDF, fotos), calcula
 emisiones de CO2 equivalente con metodología del GHG Protocol y factores de
 emisión con fuente citada, y entrega informes, etiquetas QR verificables,
 sellos digitales y trazabilidad encadenada. Incluye la red de oficinas
-físicas "Aduana Verde" (tramitación presencial con terminal POS) y la
-captura de declaraciones de embalaje para la gestión REP (Ley 20.920).
+físicas de mostrador de sicr3p (tramitación presencial con terminal POS) y
+la captura de declaraciones de embalaje para la gestión REP (Ley 20.920).
 
 ## 2. Qué NO es el servicio (aceptación expresa del cliente)
 
@@ -26,8 +26,8 @@ El cliente entiende y acepta que sicr3p:
    contabilidad trazable; NO son una verificación de tercera parte
    acreditada (ISO 14064-3) ni un certificado oficial.
 2. **No es un organismo público** ni actúa ante el Servicio Nacional de
-   Aduanas; "Aduana Verde" es una marca privada de tramitación verde de
-   documentos comerciales.
+   Aduanas; sicr3p es un servicio privado de tramitación verde de
+   documentos comerciales, con o sin mostrador presencial.
 3. **No es un sistema de gestión REP** ni presenta declaraciones oficiales
    ante el Ministerio del Medio Ambiente a nombre del cliente; entrega el
    dato ordenado y trazable para que el cliente cumpla sus obligaciones.
@@ -88,8 +88,8 @@ nuevos registros (nunca reescribiendo los anteriores).
 ## 7. Propiedad
 
 - Los documentos y datos cargados son del cliente.
-- La plataforma, el motor de cálculo, las marcas sicr3p y Aduana Verde y los
-  informes generados (en su formato y diseño) son de sicr3p SpA.
+- La plataforma, el motor de cálculo, la marca sicr3p y los informes
+  generados (en su formato y diseño) son de sicr3p SpA.
 - El cliente puede usar libremente sus informes, etiquetas y sellos,
   incluida su publicación, siempre que no altere su contenido.
 

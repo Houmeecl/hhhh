@@ -21,7 +21,7 @@
     <li><a href="#cap-2"><span class="n">2</span>Las tres olas regulatorias</a></li>
     <li><a href="#cap-3"><span class="n">3</span>El motor: del documento al dato</a></li>
     <li><a href="#cap-4"><span class="n">4</span>La cadena pública de integridad</a></li>
-    <li><a href="#cap-5"><span class="n">5</span>Aduana Verde: la red urbana</a></li>
+    <li><a href="#cap-5"><span class="n">5</span>El mostrador: la red urbana</a></li>
     <li><a href="#cap-6"><span class="n">6</span>Los tres pasaportes</a></li>
     <li><a href="#cap-7"><span class="n">7</span>La Tarjeta de Viaje</a></li>
     <li><a href="#cap-8"><span class="n">8</span>El Corredor Bioceánico</a></li>
@@ -178,13 +178,13 @@
 
 <!-- CAPÍTULO 5 -->
 <section class="cap" id="cap-5">
-  <div class="cap-head"><span class="num">5</span><h2>Aduana Verde: la red urbana</h2></div>
+  <div class="cap-head"><span class="num">5</span><h2>El mostrador: la red urbana</h2></div>
   <p class="cap-resumen">El mostrador donde el comercio de ciudad resuelve REP y carbono en una visita.</p>
 
-  <p><strong>Aduana Verde es la marca de tramitación verde de documentos comerciales</strong> —
-  y cada superficie pública aclara que no realiza trámites ante ningún servicio nacional de
-  aduanas ni constituye verificación acreditada. Es la capa de distribución física de sicr3p:
-  puntos de atención con terminales donde un comercio llega con sus facturas y sale con:</p>
+  <p><strong>El mostrador presencial es la capa de distribución física de sicr3p</strong> para
+  tramitación verde de documentos comerciales — y cada superficie pública aclara que no realiza
+  trámites ante ningún servicio nacional de aduanas ni constituye verificación acreditada.
+  Puntos de atención con terminales donde un comercio llega con sus facturas y sale con:</p>
   <ul>
     <li>Su cálculo de emisiones (t CO2e) desde sus documentos reales.</li>
     <li>Su <strong>declaración REP de embalajes</strong>: componentes, pesos y porcentaje de
@@ -217,7 +217,7 @@
   <table>
     <tr><th>Tipo</th><th>Para qué</th><th>Roles de la cadena</th></tr>
     <tr><td><strong>Documental</strong></td><td>Corredor Bioceánico: la carga y sus documentos por tramos.</td><td>origen → transporte → depósito → frontera → puerto → destino</td></tr>
-    <tr><td><strong>Producto</strong></td><td>Comercios de ciudad (Aduana Verde): cualquier rubro — alimentos, textil, embalajes, manufactura. Sin nada de minería.</td><td>productor → proveedor → transporte → comercio → punto Aduana Verde → comprador</td></tr>
+    <tr><td><strong>Producto</strong></td><td>Comercios de ciudad (mostrador sicr3p): cualquier rubro — alimentos, textil, embalajes, manufactura. Sin nada de minería.</td><td>productor → proveedor → transporte → comercio → punto sicr3p → comprador</td></tr>
     <tr><td><strong>Mineral</strong></td><td>Cadena minera de exportación.</td><td>mina → planta → refinería → comerciante → exportador → comprador</td></tr>
   </table>
 
@@ -365,14 +365,14 @@
   <table>
     <tr><th>Línea</th><th>Mecánica</th><th>Estado</th></tr>
     <tr><td><strong>Suscripción SaaS</strong></td><td>Plan mensual por empresa según volumen.</td><td>Pre-lanzamiento (códigos de cliente fundador)</td></tr>
-    <tr><td><strong>Tramitación Aduana Verde</strong></td><td>Tarifa por trámite + compensación voluntaria.</td><td>Operativa en modalidad simulada</td></tr>
+    <tr><td><strong>Tramitación en mostrador</strong></td><td>Tarifa por trámite + compensación voluntaria.</td><td>Operativa en modalidad simulada</td></tr>
     <tr><td><strong>Pasaportes de origen</strong></td><td>Por lote emitido, con credenciales y expedientes.</td><td>Operativo, listo para pilotos pagados</td></tr>
     <tr><td><strong>API mandantes</strong></td><td>Licencia anual para grandes empresas.</td><td>Operativa (v2)</td></tr>
   </table>
 
   <h3>Hoja de ruta tecnológica</h3>
   <ol>
-    <li>Pasarela de pago real (VirtualPos) en la red Aduana Verde.</li>
+    <li>Pasarela de pago real (VirtualPos) en la red de mostradores.</li>
     <li>Portal del mandante (interfaz propia para la gran empresa).</li>
     <li>Exportación EPCIS 2.0 (el estándar GS1 de eventos de trazabilidad) y pases nativos de
     billetera móvil para las credenciales.</li>
@@ -429,7 +429,7 @@
   <ol>
     <li><strong>Congelar el desarrollo de features nuevas</strong> hasta que UN cliente real use
     la plataforma un mes completo. El producto ya sobra para vender.</li>
-    <li><strong>Elegir una sola cuña de entrada: Aduana Verde con comercios.</strong> Es el ciclo
+    <li><strong>Elegir una sola cuña de entrada: el mostrador con comercios.</strong> Es el ciclo
     de venta más corto (visita → trámite → resultado en el momento), el precio más simple de
     explicar, y cada trámite alimenta el grafo que después se le vende a los mandantes. El
     corredor y la minería son apuestas más grandes pero más lentas: que esperen su turno.</li>
@@ -471,14 +471,14 @@
     <tr><td>Cadena de integridad</td><td>/cadena</td></tr>
     <tr><td>Pasaportes de origen (3 tipos)</td><td>/lote/LM-… · expediente PDF</td></tr>
     <tr><td>Tarjeta de Viaje</td><td>/v/TV-…</td></tr>
-    <tr><td>Terminal Aduana Verde</td><td>/pos · /aduana-verde</td></tr>
+    <tr><td>Terminal de mostrador</td><td>/pos · /aduana-verde</td></tr>
     <tr><td>Calculadora pública</td><td>portada del sitio</td></tr>
     <tr><td>Panel de administración</td><td>/admin (operadores)</td></tr>
   </table>
 
   <h3>Biblioteca del proyecto</h3>
   <ul>
-    <li>Ficha de plataforma, Aduana Verde, REP y correo — <code>/docs/comercial/01…04</code></li>
+    <li>Ficha de plataforma, mostrador presencial, REP y correo — <code>/docs/comercial/01…04</code></li>
     <li>Informe para autoridades — <code>/docs/comercial/05-informe-autoridades.pdf</code></li>
     <li>Informe para financiamiento — <code>/docs/comercial/06-informe-financiamiento.pdf</code></li>
     <li>Guía Metodológica sicr3p — <code>/docs/metodologia/guia-metodologica-sicr3p.pdf</code></li>

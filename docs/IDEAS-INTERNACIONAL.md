@@ -1,7 +1,8 @@
-# Ideas de internacionalización — Aduana Verde imprescindible
+# Ideas de internacionalización — sicr3p imprescindible
 
-Ideas **evaluadas** (no lluvia genérica) para que Aduana Verde y la plataforma sicr3p
-se vuelvan imprescindibles para exportadores y mandantes con exposición internacional.
+Ideas **evaluadas** (no lluvia genérica) para que sicr3p (mostrador presencial y
+plataforma online, una sola marca) se vuelva imprescindible para exportadores y
+mandantes con exposición internacional.
 Cada idea declara: qué es, por qué vuelve imprescindible el servicio, **qué organismo o
 norma avala la metodología** (nunca a sicr3p — regla de honestidad del repo), qué existe
 ya en el repositorio como base, qué falta para hacerla real y el esfuerzo estimado
@@ -27,10 +28,10 @@ desde 2026 — la simplificación aprobada por la UE en 2025 agregó un umbral d
 (~50 t/año por importador) y desplazó la compra efectiva de certificados CBAM a 2027:
 **validar contra el texto consolidado vigente antes de citar fechas a un cliente**.
 
-**Por qué vuelve imprescindible a Aduana Verde.** El declarante CBAM es el importador
+**Por qué vuelve imprescindible a sicr3p.** El declarante CBAM es el importador
 europeo, pero el dato lo tiene (o no lo tiene) el exportador: si no entrega emisiones
 incorporadas reales y trazables, el importador usa valores por defecto castigados y el
-producto chileno pierde competitividad. Aduana Verde es el **punto de captura del dato
+producto chileno pierde competitividad. sicr3p es el **punto de captura del dato
 por embarque**: el exportador sale del mostrador con sus emisiones calculadas, encadenadas
 con hash y verificables por QR — legibles en inglés por el importador (i18n de este ciclo).
 El gancho natural en la región: los proyectos de hidrógeno verde de Antofagasta con
@@ -50,10 +51,10 @@ emisiones de las operaciones de la cadena de transporte; el GLEC Framework v3 (S
 Freight Centre, alineado con ISO 14083) es su implementación práctica y **el idioma de
 los freight forwarders**: emisiones por envío, por modo y por tramo, en t-km.
 
-**Por qué vuelve imprescindible a Aduana Verde.** El corredor bioceánico
+**Por qué vuelve imprescindible a sicr3p.** El corredor bioceánico
 (Antofagasta ↔ AR/PY/BR) mueve carga que cruza cuatro jurisdicciones; los operadores
 logísticos internacionales ya cotizan y reportan en lenguaje GLEC. Si el comprobante
-Aduana Verde de un embarque habla ese idioma (t CO2e por envío con factor por modo
+de sicr3p de un embarque habla ese idioma (t CO2e por envío con factor por modo
 citado), el forwarder y el dueño de la carga pueden usarlo directamente en sus propios
 reportes — nadie más ofrece eso en un mostrador del corredor.
 
@@ -72,10 +73,10 @@ sociedades listadas a incluir sostenibilidad en la memoria anual, y la CMF ha se
 la convergencia hacia ISSB (validar el estado normativo vigente antes de afirmarlo a un
 cliente). El Alcance 3 de un mandante son las emisiones de sus **proveedores**.
 
-**Por qué vuelve imprescindible a Aduana Verde.** El mandante listado (minera, retail)
+**Por qué vuelve imprescindible a sicr3p.** El mandante listado (minera, retail)
 no puede inventar su Alcance 3: necesita datos de proveedores, y sus proveedores chicos
-no responden plataformas web — sí pasan por un mostrador. El dato capturado en Aduana
-Verde ya llega al mandante por la API de sicr3p (clave propia, lista blanca por RUT,
+no responden plataformas web — sí pasan por un mostrador. El dato capturado en el
+mostrador ya llega al mandante por la API de sicr3p (clave propia, lista blanca por RUT,
 webhooks) con trazabilidad por documento. Falta solo el formato que su equipo de
 reporte pueda citar.
 
@@ -94,8 +95,8 @@ otorga reconocimientos a las organizaciones — el primero es el sello de cuanti
 El reconocimiento se lo da el MMA **al cliente** que postula con su inventario; nunca a
 sicr3p ni a través de sicr3p.
 
-**Por qué vuelve imprescindible a Aduana Verde.** Es el camino de reconocimiento local
-más concreto: el cliente que tramita sus documentos todo el año en Aduana Verde acumula,
+**Por qué vuelve imprescindible a sicr3p.** Es el camino de reconocimiento local
+más concreto: el cliente que tramita sus documentos todo el año en el mostrador acumula,
 sin darse cuenta, el insumo de su inventario (datos por documento, factores citados,
 alcances clasificados). sicr3p **prepara el expediente** ordenado y trazable;
 HuellaChile reconoce. Para el cliente, el mismo trámite de mostrador se convierte en la
@@ -110,12 +111,12 @@ antesala de un reconocimiento estatal visible.
 
 ## 5. Comprobante y verificación multilingüe + sello `?lang=en` (este ciclo)
 
-**Qué es.** Las superficies públicas (verificador, calculadora, landing Aduana Verde,
-POS) en es/en/pt y el sello SVG con etiquetas en inglés vía `?lang=en`. Este ciclo lo
+**Qué es.** Las superficies públicas (verificador, calculadora, landing, POS) en
+es/en/pt y el sello SVG con etiquetas en inglés vía `?lang=en`. Este ciclo lo
 construye: `frontend/src/lib/i18n.js` (es/en/pt, `?lang=` en la URL) y
 `services/sello.js` (`ETIQUETAS` es/en).
 
-**Por qué vuelve imprescindible a Aduana Verde.** Es la llave de todo lo anterior: el
+**Por qué vuelve imprescindible a sicr3p.** Es la llave de todo lo anterior: el
 proveedor chileno le muestra el QR a su mandante extranjero **y el mandante lo LEE**.
 Un comprobante verificable que el destinatario no entiende no sirve de nada en una
 licitación internacional; uno en su idioma convierte cada trámite de mostrador en un
@@ -123,7 +124,7 @@ dato utilizable en Rotterdam o São Paulo sin intermediarios.
 
 | Campo | Detalle |
 |-------|---------|
-| Aval | No es una norma en sí: es hacer legible la metodología ya avalada. La terminología GHG Protocol / ISO 14083 es nativa en inglés, así que la versión en inglés cita los estándares en su idioma original. Regla de honestidad mantenida en todos los idiomas: jamás "certified" ni "accredited", y "Aduana Verde" no se traduce como "customs". |
+| Aval | No es una norma en sí: es hacer legible la metodología ya avalada. La terminología GHG Protocol / ISO 14083 es nativa en inglés, así que la versión en inglés cita los estándares en su idioma original. Regla de honestidad mantenida en todos los idiomas: jamás "certified" ni "accredited". |
 | Base en el repo | i18n liviano es/en/pt con fallback a español (`lib/i18n.js`), sello con `lang` es/en (`services/sello.js`), verificador público ya traducido (`pages/Verificar.jsx`). |
 | Qué falta | Cerrar este ciclo. Siguientes pasos naturales: comprobante por correo y PDF en el idioma elegido, y `pt` en las etiquetas del sello (hoy es/en). |
 | Esfuerzo | **S** (en curso este ciclo; extensiones también S). |
@@ -135,7 +136,7 @@ referencial cuando el admin fija a mano el tipo de cambio (`config_pos.tipo_camb
 migración 018; `NULL` = no se muestra USD). Este ciclo lo construye. A futuro:
 multi-moneda por país del corredor (ARS/PYG/BRL).
 
-**Por qué vuelve imprescindible a Aduana Verde.** El ancla de la tarifa referencial es
+**Por qué vuelve imprescindible a sicr3p.** El ancla de la tarifa referencial es
 el impuesto verde chileno (Ley 20.780 art. 8), que está definido **en dólares**
 (US$5/t): mostrar USD no es cosmética, es coherencia con el ancla y es el número que el
 mandante o comprador extranjero entiende de inmediato. En el corredor, cotizar la

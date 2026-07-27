@@ -1,5 +1,5 @@
 -- ============================================================
--- sicr3p — Terminales físicos de la red "Aduana Verde" (oficinas).
+-- sicr3p — Terminales físicos de la red de mostradores (oficinas).
 -- El terminal se autentica como DISPOSITIVO (serial + clave), no como
 -- persona — patrón VecinoXpress/NotaryPro (pos_devices).
 -- La clave solo se guarda hasheada (bcrypt); se muestra UNA vez al crear

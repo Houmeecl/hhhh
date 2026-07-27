@@ -377,9 +377,9 @@ ejemplo, un derecho de agua en l/s con un precio cotizado por m3).
 
 ---
 
-## Terminal POS "Aduana Verde" (`/pos`) y landing (`/aduana-verde`)
+## Terminal POS de mostrador (`/pos`) y landing (`/aduana-verde`)
 
-Red de oficinas físicas de tramitación verde que operan con sicr3p por dentro. El
+Red de oficinas físicas de tramitación verde de sicr3p. El
 terminal es un **dispositivo** (patrón VecinoXpress/NotaryPro): se conecta con
 serial + clave (`POST /api/pos/auth`, tabla `pos_terminales`, gestión en panel →
 Accesos externos → Terminales; la clave se muestra una sola vez al crearlo). El flujo

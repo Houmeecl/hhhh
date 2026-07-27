@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
 // ============================================================
-// Terminales POS "Aduana Verde" — helpers puros (sin BD).
+// Terminales POS de mostrador — helpers puros (sin BD).
 // El terminal se autentica como dispositivo con serial + clave,
 // patrón VecinoXpress/NotaryPro (pos_devices).
 // ============================================================

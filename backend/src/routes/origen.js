@@ -618,7 +618,7 @@ router.post('/demo-torre', adminOnly, async (req, res, next) => {
         });
       }
 
-      // Terminal torre (rol pos): misma tabla y login que Aduana Verde.
+      // Terminal torre (rol pos): misma tabla y login que el mostrador sicr3p.
       let torre = null;
       for (let intento = 0; intento < 5 && !torre; intento++) {
         try {
@@ -753,7 +753,7 @@ tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res
 // ============================================================
 // Router de la TORRE DE CONTROL — montado en /api/torre. La torre se
 // autentica con la credencial de un terminal (rol 'pos', el mismo login
-// de dispositivo de Aduana Verde vía POST /api/pos/auth) y envía
+// de dispositivo del mostrador vía POST /api/pos/auth) y envía
 // instrucciones operativas al camión de un lote: dirigirse al puerto
 // seco o al puerto. Los mensajes son APPEND-ONLY y NO entran en la
 // cadena de hash del lote (son operación, no custodia — migración 024).

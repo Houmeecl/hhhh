@@ -1,5 +1,5 @@
 -- ============================================================
--- sicr3p — Compensaciones del POS "Aduana Verde" + tarifa configurable.
+-- sicr3p — Compensaciones del POS de mostrador + tarifa configurable.
 --
 -- config_pos: configuración única del POS (fila 1 forzada por CHECK).
 -- La tarifa parte en $5.000 CLP por t CO2e como REFERENCIA (ancla del

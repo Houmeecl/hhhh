@@ -9,7 +9,7 @@ import { actualizarDolar } from '../services/tipoCambio.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 
 // ============================================================
-// Terminales POS "Aduana Verde" — patrón pos_devices de NotaryPro:
+// Terminales POS de mostrador — patrón pos_devices de NotaryPro:
 // el DISPOSITIVO inicia sesión con serial + clave (no una persona).
 //  - Router público: /auth (login del terminal) y /actividad (contador).
 //  - adminRouter: gestión de terminales (crear, listar, activar,

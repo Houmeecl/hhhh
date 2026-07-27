@@ -659,9 +659,9 @@ export async function generateLabel({ sesion, factura, declaracion }) {
 const ROL_EXPEDIENTE = {
   mina: 'Mina', planta: 'Planta', refineria: 'Refinería', transporte: 'Transporte',
   comerciante: 'Comerciante', exportador: 'Exportador', comprador: 'Comprador',
-  // tipo producto (ciudad / Aduana Verde)
+  // tipo producto (ciudad / mostrador sicr3p)
   productor: 'Productor', proveedor: 'Proveedor', comercio: 'Comercio',
-  punto_aduana_verde: 'Punto Aduana Verde',
+  punto_aduana_verde: 'Punto sicr3p',
   // tipo documental (Corredor)
   origen: 'Origen', deposito: 'Depósito', frontera: 'Frontera', puerto: 'Puerto', destino: 'Destino',
 };

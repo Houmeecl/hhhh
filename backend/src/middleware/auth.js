@@ -42,7 +42,7 @@ export function requireRole(...roles) {
 
 // Exige que la cuenta pertenezca al panel indicado (sicrep | aduana_verde).
 // Se combina con requireAuth/requireRole, no los reemplaza: separa el
-// panel núcleo sicrep del panel Aduana Verde sin tocar el rol interno.
+// panel núcleo sicrep del panel del mostrador presencial sin tocar el rol interno.
 export function requireHomePanel(panel) {
   return (req, res, next) => {
     if (!req.user || req.user.panel !== panel) {

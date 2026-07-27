@@ -41,7 +41,7 @@ http://<tu-dominio-o-IP>/docs/libro/el-libro-sicr3p.pdf
 SIN ABOGADO"). Si algo falla, el script se detiene y te dice exactamente
 dónde.
 
-**App de tablet (terminal Aduana Verde):** el frontend ya es una PWA
+**App de tablet (terminal de mostrador):** el frontend ya es una PWA
 instalable, pero los navegadores exigen HTTPS para instalarla. Cuando
 quieras la tablet de mostrador: apunta el DNS del dominio a la IP y corre
 `bash deploy/instalar-vps.sh app.sicr3p.cl` (activa nginx + certbot). Guía

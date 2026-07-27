@@ -62,7 +62,7 @@ app.use('/api/torre', apiLimiter, torreRouter);
 // '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
 // hace match de app.use por prefijo en orden de registro, así que si fuera
 // primero, requireHomePanel('sicrep') de este router interceptaría TODAS
-// las rutas /api/admin/pos/* (panel Aduana Verde) antes de que lleguen a
+// las rutas /api/admin/pos/* (panel del mostrador presencial) antes de que lleguen a
 // su propio router con requireHomePanel('aduana_verde').
 app.use('/api/admin', adminRoutes);
 

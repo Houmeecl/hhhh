@@ -1,4 +1,4 @@
-# La app de tablet — terminal Aduana Verde como webapp instalable (PWA)
+# La app de tablet — terminal de mostrador sicr3p como webapp instalable (PWA)
 
 El terminal `/pos` ahora es una **aplicación instalable**: en la tablet del
 punto de atención se instala con su propio ícono, abre a pantalla completa
@@ -24,7 +24,7 @@ terminal funciona igual en el navegador — solo que sin instalación ni ícono.
 
 **Android (recomendado — Chrome):**
 1. Abrir `https://<tu-dominio>/pos` en Chrome.
-2. Menú ⋮ → **"Instalar aplicación"** (o el aviso "Agregar Aduana Verde a la
+2. Menú ⋮ → **"Instalar aplicación"** (o el aviso "Agregar sicr3p a la
    pantalla principal").
 3. La app queda con el ícono de sicr3p y abre directo en el login del
    terminal, a pantalla completa.

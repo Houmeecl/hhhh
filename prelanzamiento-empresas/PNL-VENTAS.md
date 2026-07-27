@@ -1,6 +1,6 @@
-# Guión de venta presencial — Oficinas Aduana Verde
+# Guión de venta presencial — Oficinas de mostrador sicr3p
 
-Guión para el mesón de una oficina Aduana Verde (powered by sicr3p). Aplica técnicas de
+Guión para el mesón de una oficina presencial de sicr3p. Aplica técnicas de
 PNL de forma **ética y transparente**: cada sección indica entre paréntesis QUÉ técnica se
 usa, para que el vendedor entienda lo que hace y nunca manipule. Español de Chile, cercano
 pero profesional. La promesa es una sola y viene del landing: **"Lo que calculas es lo que

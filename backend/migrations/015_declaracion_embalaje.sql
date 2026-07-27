@@ -1,7 +1,7 @@
 -- ============================================================
 -- sicr3p — Declaración de envases y embalajes REP (Ley 20.920).
 -- Persiste la pre-declaración operativa que el operador arma en el
--- terminal "Aduana Verde" (/pos): composición por componentes
+-- terminal de mostrador (/pos): composición por componentes
 -- (material, peso, cantidad, reciclabilidad) y el % de reciclabilidad
 -- calculado en el SERVIDOR con la fórmula del packaging-calculator
 -- de SICREP: % = peso reciclable / peso total × 100, con nivel

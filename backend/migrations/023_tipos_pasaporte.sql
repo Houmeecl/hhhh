@@ -3,7 +3,7 @@
 -- amarrado a minería:
 --   · 'documental' → Corredor Bioceánico: trazabilidad de carga y
 --     documentos por tramos (vinculable a documentos_corredor).
---   · 'producto'   → ciudad / Aduana Verde: productos de comercios de
+--   · 'producto'   → ciudad / mostrador sicr3p: productos de comercios de
 --     cualquier rubro (alimentos, textil, embalajes, …).
 --   · 'mineral'    → lo construido en 021 queda como un tipo más.
 --

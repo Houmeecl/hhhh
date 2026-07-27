@@ -79,7 +79,7 @@ function nfClp(n, dec = 0) {
   return Number(n || 0).toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
-// Comprobante del POS Aduana Verde. `estado`: 'simulado' | 'omitido'.
+// Comprobante del POS de mostrador. `estado`: 'simulado' | 'omitido'.
 export async function enviarComprobantePos({ para, empresa, t_co2e, monto_clp, estado, metodo, verificarUrl, informeUrl }) {
   const total = nfClp(t_co2e, 2);
   const compensacion = estado === 'simulado'
@@ -90,11 +90,11 @@ export async function enviarComprobantePos({ para, empresa, t_co2e, monto_clp, e
         <p style="margin:4px 0"><b>Sin cobro en esta visita.</b></p>`;
   return sendMail({
     to: para,
-    subject: `Comprobante Aduana Verde — ${empresa}`,
+    subject: `Comprobante sicr3p — ${empresa}`,
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
-        <h2 style="color:#0f1f2e">Comprobante de tu visita — Aduana Verde · by sicr3p</h2>
-        <p>Hola${empresa ? ` <b>${empresa}</b>` : ''}, este es el resumen de tu paso por el POS Aduana Verde.</p>
+        <h2 style="color:#0f1f2e">Comprobante de tu visita — sicr3p</h2>
+        <p>Hola${empresa ? ` <b>${empresa}</b>` : ''}, este es el resumen de tu paso por el mostrador sicr3p.</p>
         <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:12px 0">
           <div style="font-size:12px;color:#218838;font-weight:700">RESULTADO INCORPORADO</div>
           <div style="font-size:22px;font-weight:800">${total} t CO2e</div>

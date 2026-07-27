@@ -1,5 +1,5 @@
 -- ============================================================
--- sicr3p — Panel diferenciado sicrep / Aduana Verde.
+-- sicr3p — Panel diferenciado sicrep / mostrador presencial.
 -- Agrega el ámbito de acceso de cada cuenta admin, ortogonal al rol
 -- (admin/operador/cliente) que ya usan decenas de requireRole(...) — no
 -- se toca esa columna para no auditar cada uso existente.

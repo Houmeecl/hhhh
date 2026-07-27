@@ -1,5 +1,5 @@
 // ============================================================
-// Compensaciones POS "Aduana Verde" — helpers PUROS (sin BD, sin red).
+// Compensaciones POS de mostrador — helpers PUROS (sin BD, sin red).
 // El monto SIEMPRE se calcula en el SERVIDOR: t CO2e de la sesión ×
 // tarifa vigente (config_pos), redondeado a pesos enteros. Jamás se
 // confía en montos calculados por el cliente.

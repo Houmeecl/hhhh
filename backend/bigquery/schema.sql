@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.declaraciones_embalaje` (
   created_at         TIMESTAMP NOT NULL
 );
 
--- Compensaciones del POS Aduana Verde — una fila por VERSIÓN del cobro
+-- Compensaciones del POS de mostrador — una fila por VERSIÓN del cobro
 -- (en Postgres solo vive el cobro vigente por sesión; acá el historial).
 CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.compensaciones` (
   id               STRING NOT NULL,

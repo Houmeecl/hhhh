@@ -21,7 +21,7 @@ const rutNormalizadoValido = (rutNorm) =>
 
 // ---------- Tipos de pasaporte (migración 023) ----------
 // 'mineral'    → cadena minera (lo original de 021).
-// 'producto'   → productos de comercios de ciudad (Aduana Verde) —
+// 'producto'   → productos de comercios de ciudad (mostrador sicr3p) —
 //                cualquier rubro, jamás amarrado a minería.
 // 'documental' → Corredor Bioceánico: trazabilidad de carga/documentos
 //                por tramos (vinculable a documentos_corredor).

@@ -641,7 +641,7 @@ function terminalIdOpcional(req) {
   }
 }
 
-// ---------- POST /api/sesiones/:id/compensacion — cobro del POS Aduana Verde ----------
+// ---------- POST /api/sesiones/:id/compensacion — cobro del POS de mostrador ----------
 // El SERVIDOR toma las toneladas de la sesión y la tarifa vigente de
 // config_pos y calcula el monto (ROUND(t CO2e × tarifa); $0 si 'omitido').
 // Nunca se acepta un monto calculado por el cliente. Una compensación por

@@ -18,7 +18,7 @@ Responsable del servidor Express (`backend/`), la base de datos PostgreSQL y la 
   mis-sesiones), `valorizacion.js` (inventario FIFO/PMP), `transporte.js`
   (Cat. 7), `mandante.js` (API X-Api-Key) + `accesos.js` (gestión de mandantes,
   códigos y terminales), `motor.js` (motor propio), `cadena.js` (verificación
-  de la cadena de hash), `pos.js` (terminales Aduana Verde: auth de dispositivo
+  de la cadena de hash), `pos.js` (terminales de mostrador: auth de dispositivo
   con `loginLimiter` + adminRouter).
 - **Servicios** (`src/services/`): `simpleApi.js` (motor externo + mock),
   `motorPropio.js` (cálculo propio para DTE XML), `capitalNatural.js`
