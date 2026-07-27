@@ -107,6 +107,15 @@
   y al llegar queda un expediente imprimible anclado a la cadena pública. Sin GPS, sin hardware
   costoso: la ruta es la secuencia de pasos verificables.</p>
 
+  <p>Cada embarque puede además reunir su <strong>expediente documental completo</strong> —
+  factura, packing list, carta de porte, MIC/DTA, certificado de origen, documentos SAG, seguro,
+  pesajes, fotografías y comprobantes fronterizos — cada documento sellado en su propia cadena de
+  hash, con un <strong>semáforo de completitud</strong> visible en el pasaporte público (qué
+  documentos ya están y cuáles faltan). Este expediente lo carga la <strong>agencia de aduanas
+  real</strong> que la empresa ya contrata para su tramitación oficial: sicr3p aporta la capa
+  documental y de trazabilidad, la agencia sigue haciendo el despacho — sicr3p no reemplaza a la
+  agencia ni se presenta como una.</p>
+
   <h3>3.2 Comercio urbano — red de mostradores presenciales</h3>
   <p>El comercio de ciudad enfrenta la REP y las exigencias de sus mandantes sin equipos técnicos.
   En un mostrador presencial de sicr3p, un comercio sale en una sola visita con: su cálculo de emisiones desde
@@ -126,6 +135,25 @@
   <p>El proyecto se desarrolla y opera desde Antofagasta. El modelo de red de mostradores
   presenciales contempla operadores de punto locales (personas y pymes de servicio), y toda la
   documentación técnica y metodológica es pública en español, inglés y portugués.</p>
+
+  <h3>3.5 Ejemplo: un tránsito documental verificable</h3>
+  <div class="caja-alerta">
+    <strong>Ejemplo ilustrativo con datos ficticios.</strong> El embarque y la agencia siguientes
+    no existen; se describen solo para mostrar cómo se ve el proceso.
+  </div>
+  <p>Una agencia de aduanas sube al panel de sicr3p tres documentos de un embarque que cruza el
+  corredor: <strong>factura, packing list y carta de porte</strong>. La factura y la carta de
+  porte se leen automáticamente y quedan selladas de inmediato en la cadena de hash del
+  expediente. El packing list llega con baja calidad de escaneo y <strong>no se completa
+  automáticamente</strong>: en vez de aceptarlo a ciegas o descartarlo, queda en una cola de
+  revisión acotada a este flujo, donde un operador de sicrep lo confirma o lo rechaza —
+  nunca se corrige a mano un dato que la lectura automática no pudo leer. Una vez aprobado,
+  entra a la misma cadena de hash con su propio sello.</p>
+  <p>El pasaporte público del embarque muestra en todo momento un <strong>semáforo de
+  completitud</strong> (qué documentos ya están, cuáles faltan) y, por cada documento presente,
+  su fecha y su hash — sin exponer el archivo original a quien no tenga permiso para verlo.
+  Cualquiera con el código del embarque comprueba en línea que el expediente no fue alterado,
+  incluso mientras sigue abierto.</p>
 </div>
 
 <!-- 4. PROTECCIÓN DE DATOS Y COLABORACIÓN -->
@@ -151,6 +179,22 @@
     <tr><td><strong>Mesa técnica de datos</strong></td><td>Revisión conjunta del formato de los registros (REP, emisiones, origen) para que sirvan a estudios y fiscalización.</td><td>Horas técnicas.</td></tr>
     <tr><td><strong>Verificación abierta</strong></td><td>Acceso permanente de la autoridad a la cadena pública y a los pasaportes — ya disponible hoy, sin convenio, porque es público.</td><td>Ninguno.</td></tr>
   </table>
+
+  <h3>5.1 Cómo iniciar la colaboración</h3>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Revise la verificación en
+    vivo.</b> Sin pedir acceso ni coordinar nada: la cadena de integridad, el explorador de
+    eslabones y los pasaportes de ejemplo son públicos hoy mismo en el sitio de la plataforma
+    (sección "Cadena de integridad" y páginas /lote y /verificar).</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Agende una demostración de 30
+    minutos.</b> Un correo a contacto@sicrep.cl indicando la institución y el interés (REP,
+    Corredor Bioceánico, exportación, fiscalización) — se coordina una sesión en línea o en
+    Antofagasta.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Defina alcance y duración de un
+    piloto.</b> Con la institución interesada, se acota qué comercios o qué tramo del corredor
+    participan y por cuánto tiempo — sin costo de licencias durante el piloto (ver tabla
+    anterior).</div></div>
+  </div>
 
   <div class="caja">
     <strong>Verificación en vivo:</strong> el estado de la cadena de integridad, el explorador de
