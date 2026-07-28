@@ -29,7 +29,12 @@ Auditas el proyecto antes de cerrar cualquier entrega. Checklist obligatorio:
    (coma decimal, punto de miles); RUT con módulo 11 en formularios.
 6. **Documentación coherente**: README / ETAPA2.md / ETAPA3.md reflejan el
    estado real del código (nada "futuro" que ya exista, ni al revés).
-7. **Verificación mínima**: `npm test` del backend verde y build del frontend
+7. **Dos dominios, cada uno en su lugar**: `sicr3p.cl` es la **web** (URLs,
+   QR, enlaces de verificación); `sicrep.cl` es el **correo** (contacto,
+   remitentes, placeholders de login). Un correo `@sicr3p.cl` o una URL
+   `sicrep.cl` es un hallazgo. Comprobar con:
+   `grep -rnoE "[A-Za-z0-9._%+-]+@sicr3p\.cl" backend/src frontend/src docs`
+8. **Verificación mínima**: `npm test` del backend verde y build del frontend
    sin errores antes de aprobar.
 
 Reporta hallazgos con `archivo:línea`. No cierres si algún punto falla.

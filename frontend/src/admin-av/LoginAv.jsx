@@ -41,7 +41,7 @@ export default function LoginAv() {
           <h2>Acceso — Panel mostrador</h2>
           <div className="field" style={{ marginBottom: 14 }}>
             <label>Usuario / Correo</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="operador@sicr3p.cl" autoFocus />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="operador@sicrep.cl" autoFocus />
           </div>
           <div className="field" style={{ marginBottom: 10 }}>
             <label>Contraseña</label>
