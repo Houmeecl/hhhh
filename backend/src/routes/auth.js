@@ -13,7 +13,7 @@ const router = express.Router();
 
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
-const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia'];
+const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador'];
 
 // ---------- POST /api/auth/login ----------
 router.post('/login', loginLimiter, async (req, res, next) => {
