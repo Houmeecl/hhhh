@@ -5,7 +5,7 @@ import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasa
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
-import { metodologiaDeVersiones } from './motorVersiones.js';
+import { metodologiaDeVersiones, versionVigente } from './motorVersiones.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -617,9 +617,21 @@ export async function generateBalanceNatural({ balance, movimientos, activos, in
   if (y > 610) { doc.addPage(); y = 48; }
   doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metodología', 48, y);
   y += 18;
+  // El factor de electricidad sale de la versión VIGENTE del motor, no de
+  // una constante en el texto: escrito a mano, el día que alguien lo edita
+  // en el panel este balance sigue afirmando 0,2421 y se contradice con el
+  // motor que produjo sus propios movimientos.
+  //
+  // Se dice "vigente" y no "el que produjo estas cifras" a propósito:
+  // `movimientos_naturales` todavía no lleva sello de versión, así que un
+  // balance que abarque un cambio de factor no puede afirmar cuál usó cada
+  // movimiento. Sellarlos como se hizo con `facturas` es la ronda que falta.
+  const factorElec = lineaFactorElectricidad(
+    await metodologiaDeVersiones([(await versionVigente())?.id]).catch(() => null)
+  ).trim();
   const metod = [
     'Marco de referencia: SEEA — Sistema de Contabilidad Ambiental y Económica (ONU), Marco Central y Cuentas de Ecosistemas; Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
-    'Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Electricidad SEN 2023: 0,2421 kgCO2e/kWh.',
+    `Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Factor vigente — ${factorElec}`,
     'Flujos: derivados de documentos tributarios capturados, con traza al documento de origen. Cantidades físicas estimadas mediante factores de conversión editables por cuenta.',
     'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP — manual cuando se ingresa directamente, o automática (extensión × precio unitario citado por cuenta, marcada "auto") cuando la cuenta define un precio de referencia.',
   ];

@@ -1,0 +1,3 @@
+﻿codigo,pais_origen,material,codigo_nc,cbam_aplicable,metodo_emisiones,emisiones_directas_tco2e_t,emisiones_indirectas_tco2e_t,cbam_listo,cbam_faltantes
+LM-2026-000318,CL,Concentrado de cobre,2603,si,motor propio,28.4000,13.4000,si,
+LM-2026-000402,CL,Cátodos de cobre,7403,si,motor propio,55.1000,20.9000,no,instalación de origen

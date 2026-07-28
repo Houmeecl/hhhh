@@ -1,0 +1,47 @@
+{
+  "mandante": {
+    "rut": "96.520.100-3",
+    "nombre": "Comercializadora Pacífico"
+  },
+  "anio": 2026,
+  "marco": "GHG Protocol Corporate Value Chain (Scope 3) Standard — contexto ISSB / NCG 461",
+  "nota": "Emisiones de proveedores calculadas por sicr3p sobre documentos tributarios reales. No constituye una verificación de tercera parte acreditada.",
+  "filas": [
+    {
+      "rut_proveedor": "96.800.570-7",
+      "categoria_numero": 3,
+      "categoria_nombre": "Actividades relacionadas con combustibles y energía",
+      "descripcion_motor": "Energía eléctrica",
+      "n_documentos": 1,
+      "total_tco2e": 3.8412,
+      "fuente_factor": "MMA Chile — HuellaChile (2023)"
+    },
+    {
+      "rut_proveedor": "81.201.000-K",
+      "categoria_numero": 3,
+      "categoria_nombre": "Actividades relacionadas con combustibles y energía",
+      "descripcion_motor": "Combustibles",
+      "n_documentos": 1,
+      "total_tco2e": 3.216,
+      "fuente_factor": "IPCC — Guías 2006 (v2)"
+    },
+    {
+      "rut_proveedor": "77.905.310-4",
+      "categoria_numero": 4,
+      "categoria_nombre": "Transporte y distribución aguas arriba",
+      "descripcion_motor": "Transporte y logística",
+      "n_documentos": 1,
+      "total_tco2e": 1.74,
+      "fuente_factor": "Smart Freight Centre — GLEC Framework (v3)"
+    },
+    {
+      "rut_proveedor": "76.115.220-9",
+      "categoria_numero": 1,
+      "categoria_nombre": "Bienes y servicios adquiridos",
+      "descripcion_motor": "Bienes y servicios",
+      "n_documentos": 1,
+      "total_tco2e": 0.4185,
+      "fuente_factor": "WRI/WBCSD — GHG Protocol Corporate Standard (2004)"
+    }
+  ]
+}
