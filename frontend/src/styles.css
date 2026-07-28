@@ -1010,8 +1010,30 @@ table.data tr:hover td { background: #f3f8f5; }
   .av2-bento-card:hover { transform: none; }
 }
 
+/* Landing: video del proyecto embebido en el hero oscuro */
+.land-video-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.land-video {
+  width: 100%;
+  max-width: 560px;
+  display: block;
+  background: #000;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+.land-video-chip {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+
 @media (max-width: 900px) {
   .av2-hero-grid { grid-template-columns: 1fr; padding: 48px 0 56px; }
+  .land-video-wrap { align-items: center; }
   .av2-h1 { font-size: 40px; }
   .av2-t2 { font-size: 20px; }
   .av2-pas-wrap { justify-content: center; }

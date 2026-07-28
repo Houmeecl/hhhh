@@ -81,50 +81,47 @@ export default function Landing() {
 
   return (
     <PublicLayout>
-      <div className="container" ref={heroRef}>
-        <section className="hero">
-          <div className="fade-up">
-            <h1>
-              {t('landing.hero_titulo1')}<br />
-              {t('landing.hero_titulo2')}<span style={{ color: 'var(--green)' }}>.</span>
-            </h1>
-            <p className="lead-green">{t('landing.hero_lead')}</p>
-            <p className="sub">{t('landing.hero_sub')}</p>
-            <div className="hero-actions">
-              <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
-              <a href="mailto:contacto@sicrep.cl" className="btn btn-outline">{t('landing.cta_contacto')}</a>
+      {/* HERO oscuro estilo producto (mismo sistema av2 de /aduana-verde y
+          /corredor): titular nuevo y el video real del proyecto como pieza
+          central — grabado de la plataforma en vivo, no una animación. */}
+      <div className="av2-hero" ref={heroRef}>
+        <div className="container">
+          <section className="av2-hero-grid">
+            <div className="fade-up">
+              <span className="av2-eyebrow"><span className="av-led" /> {t('landing.hero_eyebrow')}</span>
+              <h1 className="av2-h1">
+                sicr3p<span style={{ color: 'var(--green)' }}>.</span>
+              </h1>
+              <p className="av2-t2">
+                {t('landing.hero2_t1')} <span className="av2-grad">{t('landing.hero2_t2')}</span>
+              </p>
+              <p className="av2-sub">{t('landing.hero2_sub')}</p>
+              <div className="hero-actions">
+                <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
+                  {t('landing.cta_comenzar')}
+                </Link>
+                <a href="#video-proyecto" className="btn av2-btn-ghost">{t('landing.cta_video')}</a>
+              </div>
+              <div className="av2-trust">
+                <span><Icon.Shield size={15} /> GHG Protocol</span>
+                <span><Icon.CheckCircle size={15} /> ISO 14064-1</span>
+                <span><Icon.Leaf size={15} /> Factores HuellaChile</span>
+              </div>
             </div>
-            <p className="muted" style={{ marginTop: 22, fontSize: 14 }}>
-              {t('landing.hero_nota1')}
-              <br />{t('landing.hero_nota2')}
-            </p>
-            <div className="trust-bar">
-              <span className="item"><Icon.Shield size={17} /> GHG Protocol</span>
-              <span className="item"><Icon.CheckCircle size={17} /> ISO 14064-1</span>
-              <span className="item"><Icon.Leaf size={17} /> Factores HuellaChile</span>
-            </div>
-          </div>
 
-          {/* Vista previa de la app */}
-          <div className="preview-card fade-up d2">
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>{t('landing.preview_titulo')}</div>
-            <div className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
-              <b style={{ color: 'var(--green-600)' }}>{t('landing.preview_etapa')}</b> {t('landing.preview_etapa_desc')}
+            <div className="land-video-wrap fade-up d2" id="video-proyecto">
+              <video
+                className="land-video"
+                controls
+                preload="none"
+                playsInline
+                poster="/video/sicr3p-proyecto-poster.jpg"
+                src="/video/sicr3p-proyecto.mp4"
+              />
+              <span className="land-video-chip">▶ {t('landing.video_chip')}</span>
             </div>
-            <div className="dropzone" style={{ padding: '28px 16px' }}>
-              <div style={{ color: 'var(--green-600)' }}><Icon.Cloud size={40} /></div>
-              <div style={{ fontWeight: 600, marginTop: 6 }}>{t('landing.preview_drop_titulo')}</div>
-              <div className="muted" style={{ fontSize: 13 }}>{t('landing.preview_drop_formatos')}</div>
-            </div>
-            <div className="flow">
-              <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Doc size={22} /></div><b>{t('landing.flow1_t')}</b><span>{t('landing.flow1_d')}</span></div>
-              <div className="arrow"><Icon.ArrowRight size={18} /></div>
-              <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Cog size={22} /></div><b>{t('landing.flow2_t')}</b><span>{t('landing.flow2_d')}</span></div>
-              <div className="arrow"><Icon.ArrowRight size={18} /></div>
-              <div className="node"><div className="c" style={{ color: 'var(--green-600)' }}><Icon.Tag size={22} /></div><b>{t('landing.flow3_t')}</b><span>{t('landing.flow3_d')}</span></div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
 
       {/* Números vivos de la plataforma (solo si el backend responde) */}
@@ -192,6 +189,22 @@ export default function Landing() {
           <div style={{ textAlign: 'center', marginTop: 36 }}>
             <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
           </div>
+        </div>
+      </section>
+
+      {/* Banda oscura de verificación: el argumento central del producto —
+          nada pide confianza, todo se comprueba en las páginas públicas. */}
+      <section className="av2-pasaporte" style={{ padding: '64px 0' }}>
+        <div className="container" style={{ textAlign: 'center', maxWidth: 760 }}>
+          <h2 style={{ color: '#fff', fontSize: 30, margin: '0 0 12px' }}>
+            {t('landing.verif_titulo')}<span style={{ color: 'var(--green)' }}>.</span>
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: 15.5, lineHeight: 1.7, margin: '0 auto 24px', maxWidth: 640 }}>
+            {t('landing.verif_sub')}
+          </p>
+          <Link to="/cadena" className="btn av2-btn-ghost">
+            {t('landing.verif_cta')} <Icon.ArrowRight size={15} />
+          </Link>
         </div>
       </section>
 
