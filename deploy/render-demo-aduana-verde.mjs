@@ -16,6 +16,10 @@
 // Sin audio (no hay texto-a-voz ni micrófono en este entorno): el video
 // final no lleva pista de voz, solo los subtítulos quemados.
 //
+// OBSOLETO (2026-07-28): arma el video de /aduana-verde, página que ya no
+// existe — la ruta redirige a "/". Se conserva como referencia del pipeline;
+// el video ya producido sigue en docs/video/aduana-verde-demo.mp4.
+//
 // Uso: node deploy/render-demo-aduana-verde.mjs
 // (o vía el wrapper deploy/render-demo-aduana-verde.sh)
 // ============================================================

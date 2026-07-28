@@ -110,7 +110,7 @@ if (ESCRITURA) {
     const fd = new FormData();
     fd.append('rut', '76.123.456-0');
     fd.append('empresa', 'SMOKE TEST — sicr3p');
-    fd.append('email', 'smoke@sicr3p.cl');
+    fd.append('email', 'smoke@sicrep.cl');
     fd.append('archivos', new Blob([fixture], { type: 'application/pdf' }), 'smoke-factura.pdf');
     const r = await pedir(`${API}/sesiones`, { method: 'POST', body: fd });
     const j = await r.json().catch(() => ({}));

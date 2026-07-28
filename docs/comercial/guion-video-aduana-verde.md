@@ -1,3 +1,8 @@
+> **NOTA (2026-07-28):** además de lo de abajo, la landing `/aduana-verde`
+> que este guion abre tampoco existe: se plegó en la portada y la ruta
+> redirige a `/`. Las URLs `sicr3p.cl/aduana-verde` de más abajo quedan
+> como registro de lo que se grabó, no como instrucción.
+>
 > **NOTA (2026-07-27):** este guion describe el flujo del terminal físico `/pos`
 > (`PosTerminal.jsx`), descontinuado en favor del panel `/panel-verde` con
 > operador logueado. El video ya fue entregado al usuario y no se regraba;

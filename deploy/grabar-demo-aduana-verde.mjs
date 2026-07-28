@@ -84,7 +84,7 @@ const fmtCo2e = (n) => Number(n || 0).toLocaleString('es-CL', { minimumFractionD
 const CLIENTE = {
   rut: '11.111.111-1',
   empresa: 'Cliente Prueba E2E SpA',
-  email: 'demo.aduanaverde@sicr3p.cl',
+  email: 'demo@sicrep.cl',
 };
 
 // ---------- Verificación post-grabación: ¿el video real quedó "pegado"? ----------

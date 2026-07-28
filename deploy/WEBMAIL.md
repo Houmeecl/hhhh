@@ -112,7 +112,12 @@ dig -x 138.36.237.61 +short    # debe responder: mail.sicr3p.cl.
 
 ---
 
-## 4. Primer arranque: asistente, DKIM y buzones
+## 4. Primer arranque: asistente, DKIM y buzones — camino descartado (Poste.io)
+
+> Igual que la sección 3: esto quedó del plan de autoalojar Poste.io,
+> **descartado** (ver sección 9). Se conserva de referencia; no seguir estos
+> pasos. Si algún día se retomara, los buzones van en `sicrep.cl` —el
+> dominio de correo— y no en `sicr3p.cl`, que es solo el sitio.
 
 ### 4.1 Asistente inicial
 
@@ -138,8 +143,8 @@ abre `http://localhost:8090/admin/install`).
 En el admin: **Virtual domains → sicr3p.cl → Email accounts → Create new**.
 Crea al menos:
 
-- `contacto@sicr3p.cl` — el buzón "humano" principal.
-- `postmaster@sicr3p.cl` — recibe los reportes DMARC y avisos de otros
+- `contacto@sicrep.cl` — el buzón "humano" principal.
+- `postmaster@sicrep.cl` — recibe los reportes DMARC y avisos de otros
   servidores (puede ser un alias hacia `contacto@` si prefieres:
   **Redirections → Create new**).
 
@@ -147,7 +152,7 @@ Crea al menos:
 
 - **Webmail (Roundcube)**: <https://mail.sicr3p.cl> → botón *Webmail*
   (o directo <https://mail.sicr3p.cl/webmail/>). Usuario = la dirección
-  completa (`contacto@sicr3p.cl`), clave = la del buzón.
+  completa (`contacto@sicrep.cl`), clave = la del buzón.
 - **Cliente de escritorio/celular** (opcional):
   - IMAP: `mail.sicr3p.cl`, puerto 993, SSL/TLS.
   - SMTP: `mail.sicr3p.cl`, puerto 465 (SSL) o 587 (STARTTLS).
@@ -157,7 +162,7 @@ Crea al menos:
 ## 5. Prueba final de entregabilidad
 
 1. Entra a <https://www.mail-tester.com> y copia la dirección que te da.
-2. Desde el webmail (`contacto@sicr3p.cl`) envíale un correo con asunto y
+2. Desde el webmail (`contacto@sicrep.cl`) envíale un correo con asunto y
    cuerpo reales (no "test": los filtros castigan mensajes vacíos).
 3. Aprieta *Check your score*. **Objetivo: ≥ 9/10.**
 
@@ -179,7 +184,7 @@ las notificaciones/recuperaciones por **Resend** (`RESEND_API_KEY` y
 tocar nada).
 
 Poste.io es para el correo **humano**: recibir y leer lo que llegue a
-`contacto@sicr3p.cl`, responder desde el webmail, etc. Son dos canales
+`contacto@sicrep.cl`, responder desde el webmail, etc. Son dos canales
 separados a propósito:
 
 - **Resend** → envíos automáticos de la app (mejor entregabilidad, cero riesgo
@@ -228,23 +233,25 @@ Microsoft 365, Fastmail.)
 1. Crea la cuenta en <https://www.zoho.com/mail/> → *Forever Free Plan*
    (está algo escondido, abajo en la página de precios; requiere verificación
    por dominio, no por tarjeta).
-2. Agrega el dominio `sicr3p.cl` y verifica la propiedad con el TXT que Zoho
-   te indique (algo como `zoho-verification=zb…`).
-3. Crea los buzones `contacto@sicr3p.cl` y `postmaster@sicr3p.cl`.
+2. Agrega el dominio **`sicrep.cl`** —el de correo, no `sicr3p.cl`, que es
+   el del sitio— y verifica la propiedad con el TXT que Zoho te indique
+   (algo como `zoho-verification=zb…`).
+3. Crea los buzones `contacto@sicrep.cl` y `postmaster@sicrep.cl`.
 
 ### 7.2 DNS equivalente para Zoho
 
 | Tipo | Nombre / Host           | Valor                                                      | Prioridad |
 |------|-------------------------|------------------------------------------------------------|-----------|
 | TXT  | `@`                     | *(el TXT de verificación que te dé Zoho)*                  | —         |
-| MX   | `@` (sicr3p.cl)         | `mx.zoho.com`                                              | 10        |
-| MX   | `@` (sicr3p.cl)         | `mx2.zoho.com`                                             | 20        |
-| MX   | `@` (sicr3p.cl)         | `mx3.zoho.com`                                             | 50        |
-| TXT  | `@` (sicr3p.cl)         | `v=spf1 include:zohomail.com ~all`                         | —         |
+| MX   | `@` (sicrep.cl)         | `mx.zoho.com`                                              | 10        |
+| MX   | `@` (sicrep.cl)         | `mx2.zoho.com`                                             | 20        |
+| MX   | `@` (sicrep.cl)         | `mx3.zoho.com`                                             | 50        |
+| TXT  | `@` (sicrep.cl)         | `v=spf1 include:zohomail.com ~all`                         | —         |
 | TXT  | `zmail._domainkey`      | *(DKIM: se genera en el panel de Zoho → copiar tal cual)*  | —         |
-| TXT  | `_dmarc`                | `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicr3p.cl`  | —         |
+| TXT  | `_dmarc`                | `v=DMARC1; p=quarantine; rua=mailto:postmaster@sicrep.cl`  | —         |
 
-> Con Zoho **no** se crean el registro A de `mail.sicr3p.cl` ni los MX hacia
+> Toda esta zona es la de `sicrep.cl`. Con Zoho **no** se crean el registro
+> A de `mail.sicrep.cl` ni los MX hacia
 > el VPS, y **no se corre** `instalar-webmail.sh`. El rDNS tampoco importa:
 > los servidores que envían son de Zoho, con reputación propia.
 >

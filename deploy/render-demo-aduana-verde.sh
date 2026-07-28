@@ -11,6 +11,10 @@
 # tiempos reales de cada escena y llama a ffmpeg); este script es solo el
 # punto de entrada.
 #
+# OBSOLETO (2026-07-28): arma el video de /aduana-verde, página que ya no
+# existe — la ruta redirige a "/". Se conserva como referencia del pipeline;
+# el video ya producido sigue en docs/video/aduana-verde-demo.mp4.
+#
 # Uso: deploy/render-demo-aduana-verde.sh
 # Requiere: ffmpeg/ffprobe en PATH (con soporte libass/subtitles) y haber
 # corrido antes deploy/grabar-demo-aduana-verde.mjs.

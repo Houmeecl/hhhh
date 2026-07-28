@@ -111,6 +111,14 @@ server {
         client_max_body_size 20m;
     }
 
+    # /aduana-verde fue una segunda portada; su contenido vive hoy en "/".
+    # El router de la SPA ya redirige, pero eso es de cliente: este 301 lo
+    # resuelve antes de servir el bundle, que es lo que esperan los enlaces
+    # ya repartidos y los buscadores.
+    location = /aduana-verde {
+        return 301 /;
+    }
+
     location / {
         try_files \$uri /index.html;
     }

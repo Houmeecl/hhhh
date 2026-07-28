@@ -54,10 +54,19 @@ function FranjaCadena({ t }) {
 // /pasaporte/:id tal como la ve cualquiera que escanee el QR (datos de una
 // operación de demostración). El chip lo dice explícitamente para que la
 // imagen no se lea como una ilustración aspiracional.
-function PasaportePreview({ t }) {
+//
+// El `alt` describe la pantalla en vez de quedar vacío: es la prueba del
+// argumento de la sección, no un adorno — con lector de pantalla, marcarla
+// decorativa dejaba el bloque sin su evidencia.
+function PasaportePreview({ t, prioridad = false }) {
   return (
     <div className="av2-pas-card av2-pas-shot">
-      <img src="/img/plataforma/pasaporte-real.png" alt="" loading="lazy" aria-hidden="true" />
+      <img
+        src="/img/plataforma/pasaporte-real.webp"
+        alt={t('landing.shot_alt')}
+        loading={prioridad ? 'eager' : 'lazy'}
+        decoding="async"
+      />
       <span className="av2-pas-chip">✓ {t('landing.shot_chip')}</span>
     </div>
   );
@@ -95,10 +104,10 @@ export default function Landing() {
   return (
     <PublicLayout>
       {/* HERO oscuro estilo producto (mismo sistema av2 que /corredor): el
-          titular real va en el <h1> — la marca ya está en el header, no
-          necesita ocupar el encabezado de la página — y el video real del
-          proyecto es la pieza central: grabado de la plataforma en vivo,
-          no una animación. */}
+          titular real va en el <h1> —la marca ya está en el header, no
+          necesita ocupar el encabezado de la página— y la pieza central es
+          la pantalla real del Pasaporte Digital, que es el entregable del
+          que habla el titular. */}
       <div className="av2-hero" ref={heroRef}>
         <div className="container">
           <section className="av2-hero-grid">
@@ -111,7 +120,7 @@ export default function Landing() {
                 <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
                   {t('landing.cta_comenzar')}
                 </Link>
-                <a href="#video-proyecto" className="btn av2-btn-ghost">{t('landing.cta_video')}</a>
+                <Link to="/cadena" className="btn av2-btn-ghost">{t('landing.verif_cta')}</Link>
               </div>
               <div className="av2-trust">
                 <span><Icon.Shield size={15} /> {t('landing.trust_1')}</span>
@@ -120,16 +129,8 @@ export default function Landing() {
               </div>
             </div>
 
-            <div className="land-video-wrap fade-up d2" id="video-proyecto">
-              <video
-                className="land-video"
-                controls
-                preload="none"
-                playsInline
-                poster="/video/sicr3p-proyecto-poster.jpg"
-                src="/video/sicr3p-proyecto.mp4"
-              />
-              <span className="land-video-chip">▶ {t('landing.video_chip')}</span>
+            <div className="av2-pas-wrap fade-up d2">
+              <PasaportePreview t={t} prioridad />
             </div>
           </section>
         </div>
@@ -221,30 +222,27 @@ export default function Landing() {
 
       {/* Banda oscura de verificación: el argumento central del producto —
           nada pide confianza, todo se comprueba en las páginas públicas. La
-          captura de la derecha es la pantalla real del Pasaporte Digital, que
-          es exactamente lo que se está prometiendo en el texto. */}
+          captura que respalda esta promesa ya está en el hero, así que aquí
+          va centrada y sin repetirla. */}
       <section className="av2-pasaporte sec-pad">
-        <div className="container">
-          <div className="av2-pas-secgrid">
-            <div className="av2-reveal">
-              <h2 style={{ fontSize: 30, margin: '0 0 12px', color: '#fff' }}>
-                {t('landing.verif_titulo')}<span style={{ color: 'var(--green)' }}>.</span>
-              </h2>
-              <p style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.7, maxWidth: 480 }}>{t('landing.verif_sub')}</p>
-              <ol className="av2-pas-pasos">
-                <li><span>1</span>{t('landing.verif_p1')}</li>
-                <li><span>2</span>{t('landing.verif_p2')}</li>
-                <li><span>3</span>{t('landing.verif_p3')}</li>
-              </ol>
-              <div className="hero-actions">
-                <Link to="/cadena" className="btn av2-btn-ghost">
-                  {t('landing.verif_cta')} <Icon.ArrowRight size={15} />
-                </Link>
-                <span className="badge badge-green" style={{ alignSelf: 'center' }}>{t('landing.verif_chip')}</span>
-              </div>
-            </div>
-            <div className="av2-pas-wrap av2-reveal" style={{ justifyContent: 'center' }}>
-              <PasaportePreview t={t} />
+        <div className="container" style={{ textAlign: 'center', maxWidth: 760 }}>
+          <div className="av2-reveal">
+            <h2 style={{ fontSize: 30, margin: '0 0 12px', color: '#fff' }}>
+              {t('landing.verif_titulo')}<span style={{ color: 'var(--green)' }}>.</span>
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: 15.5, lineHeight: 1.7, margin: '0 auto 8px', maxWidth: 640 }}>
+              {t('landing.verif_sub')}
+            </p>
+            <ol className="av2-pas-pasos av2-pas-pasos-centro">
+              <li><span>1</span>{t('landing.verif_p1')}</li>
+              <li><span>2</span>{t('landing.verif_p2')}</li>
+              <li><span>3</span>{t('landing.verif_p3')}</li>
+            </ol>
+            <div className="hero-actions" style={{ justifyContent: 'center' }}>
+              <Link to="/cadena" className="btn av2-btn-ghost">
+                {t('landing.verif_cta')} <Icon.ArrowRight size={15} />
+              </Link>
+              <span className="badge badge-green" style={{ alignSelf: 'center' }}>{t('landing.verif_chip')}</span>
             </div>
           </div>
         </div>

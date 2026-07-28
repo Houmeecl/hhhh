@@ -4,10 +4,11 @@ import { query } from '../lib/db.js';
 import { sendMail, activationEmail } from './mailer.js';
 
 // ============================================================
-// Activación de cuenta compartida por los 4 paneles (sicrep, mostrador
-// presencial, puerto, mandante) — la fila de `usuarios` y el flujo de
+// Activación de cuenta compartida por los 5 paneles (sicrep, terreno,
+// puerto, mandante, agencia) — la fila de `usuarios` y el flujo de
 // token+correo son idénticos; solo cambia a qué login se vuelve tras
-// definir la contraseña.
+// definir la contraseña. Los cinco logins comparten `PanelLogin.jsx`, que
+// ofrece el botón de recuperar clave apoyado justamente en este mapa.
 // ============================================================
 export const RUTA_ACTIVAR = {
   sicrep: '/admin/activar',
