@@ -45,6 +45,7 @@ function crearAlmacenSesion(prefijo) {
 export const authPuerto = crearAlmacenSesion('puerto');
 export const authMandante = crearAlmacenSesion('mandante');
 export const authAgencia = crearAlmacenSesion('agencia');
+export const authTrazador = crearAlmacenSesion('trazador');
 
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
@@ -59,9 +60,9 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, cliente = false } = {}) {
-  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : auth;
-  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia;
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, authedTrazador = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : authedTrazador ? authTrazador : auth;
+  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia || authedTrazador;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
   if (anyAuthed && store.access) headers['Authorization'] = `Bearer ${store.access}`;
@@ -209,6 +210,7 @@ export const api = {
   mePuerto: () => request('/auth/me', { authedPuerto: true }),
   meMandante: () => request('/auth/me', { authedMandante: true }),
   meAgencia: () => request('/auth/me', { authedAgencia: true }),
+  meTrazador: () => request('/auth/me', { authedTrazador: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
 
@@ -324,6 +326,13 @@ export const api = {
   codigos: () => request('/admin/accesos/codigos', { authed: true }),
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
+  accesosTrazadores: () => request('/admin/accesos/trazadores', { authed: true }),
+  accesosCrearTrazador: (nombre) => request('/admin/accesos/trazadores', { method: 'POST', body: { nombre }, authed: true }),
+  accesosEditarTrazador: (id, b) => request(`/admin/accesos/trazadores/${id}`, { method: 'PUT', body: b, authed: true }),
+  accesosCrearCuentaTrazador: (id, b) => request(`/admin/accesos/trazadores/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
+  accesosRutsTrazador: (id) => request(`/admin/accesos/trazadores/${id}/ruts`, { authed: true }),
+  accesosAgregarRutTrazador: (id, rut) => request(`/admin/accesos/trazadores/${id}/ruts`, { method: 'POST', body: { rut }, authed: true }),
+  accesosQuitarRutTrazador: (id, rutId) => request(`/admin/accesos/trazadores/${id}/ruts/${rutId}`, { method: 'DELETE', authed: true }),
 
   // Panel del mostrador presencial (authedAv: sesión propia, separada del panel núcleo)
   editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
@@ -391,6 +400,13 @@ export const api = {
   mandanteExportarAlcance3Csv: (qs = '') => descargarAuth(`/api/mandante/export/alcance3?formato=csv${qs}`, authMandante, `alcance3${qs.replace(/[?&]/g, '_')}.csv`),
   mandanteExportarCbamCsv: () => descargarAuth('/api/mandante/export/cbam?formato=csv', authMandante, 'cbam.csv'),
   mandanteExportarCbamPdf: () => abrirPdfAuth('/api/mandante/export/cbam.pdf', authMandante),
+
+  // --- Panel exclusivo del trazador (/panel-trazador) — cuenta propia
+  // (email+contraseña) con una lista blanca de RUT fijada por el admin
+  // desde Accesos.jsx. El trazador nunca puede buscar un RUT fuera de esa
+  // lista: el backend responde 403 si se intenta.
+  trazadorRutasPermitidas: () => request('/trazador/rutas-permitidas', { authedTrazador: true }),
+  trazadorBuscar: (rut) => request(`/trazador/buscar?rut=${encodeURIComponent(rut)}`, { authedTrazador: true }),
 };
 
 async function abrirPdfAuth(url, store = auth) {

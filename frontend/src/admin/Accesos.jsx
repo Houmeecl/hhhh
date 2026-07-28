@@ -29,12 +29,14 @@ export default function Accesos() {
         <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
         <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
         <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
+        <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
       </div>
 
       {tab === 'codigos' && <Codigos flash={flash} />}
       {tab === 'mandantes' && <Mandantes flash={flash} />}
       {tab === 'puertos' && <Puertos flash={flash} />}
       {tab === 'agencias' && <Agencias flash={flash} />}
+      {tab === 'trazadores' && <Trazadores flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -534,6 +536,147 @@ function Agencias({ flash }) {
           onClose={() => setCuentaWeb(null)}
         />
       )}
+    </div>
+  );
+}
+
+// Trazadores: un tercero externo con cuenta propia (email+contraseña) al
+// que se le da una lista blanca de RUT específicos. No tiene API key —
+// solo entra a su panel web (/panel-trazador) y ve los cruces (mismo dato
+// que el buscador interno) de los RUT que tiene autorizados, ni uno más.
+function Trazadores({ flash }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ nombre: '' });
+  const [creando, setCreando] = useState(false);
+  const [cuentaWeb, setCuentaWeb] = useState(null);
+  const [gestion, setGestion] = useState(null);
+
+  const cargar = () => api.accesosTrazadores().then((r) => setItems(r.trazadores)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      await api.accesosCrearTrazador(form.nombre);
+      setForm({ nombre: '' });
+      cargar(); flash('Trazador creado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(t) {
+    try { await api.accesosEditarTrazador(t.id, { activo: !t.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div className="card card-pad">
+          <h3 style={{ marginTop: 0 }}>Nuevo trazador</h3>
+          <div className="field" style={{ marginBottom: 14 }}><label>Nombre</label><input value={form.nombre} placeholder="Trazador Ejemplo Ltda." onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre}>
+            {creando ? <span className="spinner" /> : 'Crear'}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            Un trazador solo entra por su panel web (<code>/panel-trazador</code>) — sin API key. Usa
+            "Crear acceso web" y luego "Gestionar RUT" para darle su lista blanca.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Nombre</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
+          <tbody>
+            {items.map((t) => (
+              <tr key={t.id}>
+                <td><b>{t.nombre}</b></td>
+                <td><span className={`badge ${t.activo ? 'badge-green' : 'badge-gray'}`}>{t.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td>
+                  {t.tiene_cuenta_web
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(t)}>Crear acceso web</button>}
+                </td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setGestion(t)}>Gestionar RUT</button>{' '}
+                  <button className="btn btn-outline btn-sm" onClick={() => toggle(t)}>{t.activo ? 'Desactivar' : 'Activar'}</button>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin trazadores registrados.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      {gestion && <GestionRutsTrazador trazador={gestion} flash={flash} onClose={() => { setGestion(null); cargar(); }} />}
+      {cuentaWeb && (
+        <CrearCuentaWeb
+          entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre}
+          crear={api.accesosCrearCuentaTrazador}
+          onCreada={cargar}
+          onClose={() => setCuentaWeb(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Modal: whitelist de RUT de un trazador ----------
+function GestionRutsTrazador({ trazador, flash, onClose }) {
+  const [ruts, setRuts] = useState([]);
+  const [nuevoRut, setNuevoRut] = useState('');
+  const [agregando, setAgregando] = useState(false);
+
+  const cargar = () => api.accesosRutsTrazador(trazador.id).then((r) => setRuts(r.ruts)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function agregar() {
+    setAgregando(true);
+    try {
+      await api.accesosAgregarRutTrazador(trazador.id, nuevoRut);
+      setNuevoRut(''); cargar(); flash('RUT agregado a la lista.');
+    } catch (e) { flash(e.message, true); }
+    finally { setAgregando(false); }
+  }
+
+  async function quitar(r) {
+    try { await api.accesosQuitarRutTrazador(trazador.id, r.id); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && onClose()}>
+      <div className="modal" style={{ maxWidth: 480 }}>
+        <h2 style={{ marginTop: 0 }}>{trazador.nombre}</h2>
+
+        <h3 style={{ fontSize: 15, marginBottom: 6 }}>RUT autorizados</h3>
+        <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+          El trazador solo puede consultar los cruces de los RUT que agregues aquí — cualquier otro RUT le
+          será rechazado con acceso denegado.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input value={nuevoRut} onChange={(e) => setNuevoRut(e.target.value)} placeholder="76.123.456-0" style={{ flex: 1 }} />
+          <button className="btn btn-primary btn-sm" onClick={agregar} disabled={!nuevoRut || agregando}>
+            {agregando ? <span className="spinner" /> : 'Agregar'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {ruts.map((r) => (
+            <span key={r.id} className="badge badge-gray" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {r.rut}
+              <button onClick={() => quitar(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}>×</button>
+            </span>
+          ))}
+          {ruts.length === 0 && <span className="muted" style={{ fontSize: 13 }}>Sin RUT autorizados todavía.</span>}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+          <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
     </div>
   );
 }

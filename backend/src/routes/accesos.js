@@ -256,6 +256,93 @@ router.put('/agencias/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- TRAZADORES (panel /panel-trazador — búsqueda de RUT en lista blanca) ----------
+// A diferencia de puerto/mandante/agencia, un trazador no tiene API key: es
+// siempre un login humano (migración 058), y su acceso a datos SIEMPRE
+// depende de trazador_ruts — sin filas ahí, no ve ningún RUT (nunca "todos").
+router.get('/trazadores', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT t.id, t.nombre, t.activo, t.ultimo_uso, t.created_at,
+              (u.id IS NOT NULL) AS tiene_cuenta_web
+       FROM trazadores t LEFT JOIN usuarios u ON u.trazador_id = t.id
+       ORDER BY t.created_at DESC`
+    );
+    res.json({ trazadores: rows });
+  } catch (err) { next(err); }
+});
+
+// Acceso web propio del trazador (panel /panel-trazador) — único camino de
+// acceso de este actor, no hay X-Api-Key que reemplace.
+router.post('/trazadores/:id/crear-cuenta', adminOnly, (req, res, next) =>
+  crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id }).catch(next)
+);
+
+router.post('/trazadores', adminOnly, async (req, res, next) => {
+  try {
+    const { nombre } = req.body || {};
+    if (!nombre) return res.status(400).json({ error: 'Nombre es obligatorio.' });
+    const { rows } = await query(
+      `INSERT INTO trazadores (nombre) VALUES ($1)
+       RETURNING id, nombre, activo, created_at`,
+      [nombre]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_trazador', entidad: 'trazador', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ trazador: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.put('/trazadores/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { activo } = req.body || {};
+    const { rows } = await query(
+      `UPDATE trazadores SET activo = COALESCE($2, activo) WHERE id = $1
+       RETURNING id, nombre, activo`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Trazador no encontrado' });
+    res.json({ trazador: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Lista blanca de RUT del trazador ----------
+router.get('/trazadores/:id/ruts', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM trazador_ruts WHERE trazador_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ ruts: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/trazadores/:id/ruts', adminOnly, async (req, res, next) => {
+  try {
+    const rut = normalizarRut(req.body.rut);
+    if (!rut) return res.status(400).json({ error: 'RUT obligatorio.' });
+    const { rows } = await query(
+      `INSERT INTO trazador_ruts (trazador_id, rut)
+       VALUES ($1,$2)
+       ON CONFLICT (trazador_id, rut) DO UPDATE SET activo = true
+       RETURNING *`,
+      [req.params.id, rut]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'agregar_rut_trazador', entidad: 'trazador_rut', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ rut: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.delete('/trazadores/:id/ruts/:rutId', adminOnly, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `DELETE FROM trazador_ruts WHERE id = $1 AND trazador_id = $2`,
+      [req.params.rutId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'RUT no encontrado' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // ---------- CÓDIGOS DE ACCESO (créditos) ----------
 router.get('/codigos', async (req, res, next) => {
   try {

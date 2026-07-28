@@ -44,6 +44,22 @@ test('signAccess sin puerto_id/mandante_id los deja en null (no undefined)', () 
   assert.equal(payload.mandante_id, null);
 });
 
+test('signAccess incluye trazador_id cuando el usuario es panel="trazador"', () => {
+  const token = signAccess({ id: 'u6', rol: 'operador', email: 'op@trazador.cl', panel: 'trazador', trazador_id: 'trz-1' });
+  const payload = jwt.verify(token, config.jwt.accessSecret);
+  assert.equal(payload.panel, 'trazador');
+  assert.equal(payload.trazador_id, 'trz-1');
+  assert.equal(payload.puerto_id, null);
+  assert.equal(payload.mandante_id, null);
+  assert.equal(payload.agencia_id, null);
+});
+
+test('signAccess sin trazador_id lo deja en null (no undefined)', () => {
+  const token = signAccess({ id: 'u7', rol: 'admin', email: 'a@sicrep.cl' });
+  const payload = jwt.verify(token, config.jwt.accessSecret);
+  assert.equal(payload.trazador_id, null);
+});
+
 function mockRes() {
   const res = { statusCode: null, body: null };
   res.status = (n) => { res.statusCode = n; return res; };
@@ -68,6 +84,15 @@ test('requireHomePanel rechaza con 403 una cuenta de otro panel', () => {
   assert.equal(llamoNext, false);
   assert.equal(res.statusCode, 403);
   assert.ok(res.body.error);
+});
+
+test('requireHomePanel deja pasar una cuenta del panel "trazador"', () => {
+  const req = { user: { panel: 'trazador', trazador_id: 'trz-1' } };
+  const res = mockRes();
+  let llamoNext = false;
+  requireHomePanel('trazador')(req, res, () => { llamoNext = true; });
+  assert.equal(llamoNext, true);
+  assert.equal(res.statusCode, null);
 });
 
 test('requireHomePanel rechaza cuando no hay req.user (JWT no verificado antes)', () => {

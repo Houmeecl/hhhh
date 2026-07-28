@@ -409,6 +409,22 @@ export const INVENTARIO = {
     base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
     retencion: 'Se puede dar de baja cuando termina el convenio; los expedientes quedan.',
   },
+  trazadores: {
+    clasificacion: PERSONAL, columnas: ['nombre'],
+    nota: 'Un trazador es un tercero externo (auditora, cliente final, organismo): puede ser una '
+      + 'empresa o una persona natural que audita por cuenta propia. Mismo criterio que agencias_aduana.',
+    finalidad: 'Acceso web de un tercero externo para consultar la trazabilidad de RUT autorizados.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Se puede dar de baja cuando termina el convenio del trazador.',
+  },
+  trazador_ruts: {
+    clasificacion: PERSONAL, columnas: ['rut'],
+    nota: 'Lista blanca: qué RUT de terceros puede consultar cada trazador. Mismo criterio que '
+      + 'mandante_proveedores — acota el acceso, nunca lo amplía; una whitelist vacía no ve nada.',
+    finalidad: 'Limitar qué RUT puede ver un trazador a los que un admin autorizó explícitamente.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras dure el convenio del trazador.',
+  },
 };
 
 // Las tablas donde hay que buscar cuando alguien ejerce su derecho de

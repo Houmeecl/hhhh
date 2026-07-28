@@ -4,11 +4,12 @@ import { query } from '../lib/db.js';
 import { sendMail, activationEmail } from './mailer.js';
 
 // ============================================================
-// Activación de cuenta compartida por los 5 paneles (sicrep, terreno,
-// puerto, mandante, agencia) — la fila de `usuarios` y el flujo de
-// token+correo son idénticos; solo cambia a qué login se vuelve tras
-// definir la contraseña. Los cinco logins comparten `PanelLogin.jsx`, que
-// ofrece el botón de recuperar clave apoyado justamente en este mapa.
+// Activación de cuenta compartida por los 6 paneles (sicrep, terreno,
+// puerto, mandante, agencia, trazador) — la fila de `usuarios` y el
+// flujo de token+correo son idénticos; solo cambia a qué login se
+// vuelve tras definir la contraseña. Los seis logins comparten
+// `PanelLogin.jsx`, que ofrece el botón de recuperar clave apoyado
+// justamente en este mapa.
 // ============================================================
 export const RUTA_ACTIVAR = {
   sicrep: '/admin/activar',
@@ -16,6 +17,7 @@ export const RUTA_ACTIVAR = {
   puerto: '/panel-puerto/activar',
   mandante: '/panel-mandante/activar',
   agencia: '/panel-agencia/activar',
+  trazador: '/panel-trazador/activar',
 };
 
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');

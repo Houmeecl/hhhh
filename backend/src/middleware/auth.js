@@ -6,7 +6,7 @@ export function signAccess(user) {
   return jwt.sign(
     { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null,
       panel: user.panel || 'sicrep', puerto_id: user.puerto_id || null, mandante_id: user.mandante_id || null,
-      agencia_id: user.agencia_id || null },
+      agencia_id: user.agencia_id || null, trazador_id: user.trazador_id || null },
     config.jwt.accessSecret,
     { expiresIn: config.jwt.accessTtl }
   );
