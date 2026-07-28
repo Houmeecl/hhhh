@@ -191,6 +191,11 @@ a:hover { text-decoration: underline; }
   font-family: var(--font); font-size: 14px; color: var(--navy); background: #fff;
   transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
+/* La regla de arriba está escrita para campos de texto: aplicada a una
+   casilla o un radio los estira a todo el ancho y les mete padding. */
+.field input[type="checkbox"], .field input[type="radio"] {
+  width: auto; flex: none; padding: 0; accent-color: var(--green);
+}
 .field input:hover, .field select:hover, .field textarea:hover { border-color: var(--gray-300); }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring);

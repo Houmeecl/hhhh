@@ -221,6 +221,32 @@ export const api = {
   editarCliente: (id, b) => request(`/admin/clientes/${id}`, { method: 'PUT', body: b, authed: true }),
   eliminarCliente: (id) => request(`/admin/clientes/${id}`, { method: 'DELETE', authed: true }),
   crearCuenta: (id, b) => request(`/admin/clientes/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
+  consultarRut: (rut) => request(`/admin/clientes/consultar-rut/${encodeURIComponent(rut)}`, { authed: true }),
+  // Protección de datos personales (Ley 21.719): derechos del titular y
+  // política de retención.
+  solicitarArcop: (b) => request('/arcop', { method: 'POST', body: b }),
+  solicitudesArcop: (estado) => request(`/admin/arcop${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  datosArcop: (id) => request(`/admin/arcop/${id}/datos`, { authed: true }),
+  limitesSupresion: () => request('/admin/arcop/limites-supresion', { authed: true }),
+  resolverArcop: (id, b) => request(`/admin/arcop/${id}/resolver`, { method: 'POST', body: b, authed: true }),
+  brechas: () => request('/admin/brechas', { authed: true }),
+  registrarBrecha: (b) => request('/admin/brechas', { method: 'POST', body: b, authed: true }),
+  actualizarBrecha: (id, b) => request(`/admin/brechas/${id}`, { method: 'PUT', body: b, authed: true }),
+  retencion: () => request('/admin/retencion', { authed: true }),
+  purgarAhora: () => request('/admin/retencion/purgar', { method: 'POST', authed: true }),
+
+  // Auspiciadores (Ruta sicr3p): convenio marco y, si aporta vehículo, comodato.
+  solicitarAuspicio: (b) => request('/auspicio', { method: 'POST', body: b }),
+  solicitudesAuspicio: (estado) => request(`/admin/solicitudes-auspicio${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  aceptarAuspicio: (id, b) => request(`/admin/solicitudes-auspicio/${id}/aceptar`, { method: 'POST', body: b || {}, authed: true }),
+  rechazarAuspicio: (id, motivo) => request(`/admin/solicitudes-auspicio/${id}/rechazar`, { method: 'POST', body: { motivo }, authed: true }),
+  auspiciadores: () => request('/admin/auspiciadores', { authed: true }),
+  crearAuspiciador: (b) => request('/admin/auspiciadores', { method: 'POST', body: b, authed: true }),
+  emitirContratoAuspicio: (id, tipo) => request(`/admin/auspiciadores/${id}/contrato`, { method: 'POST', body: { tipo }, authed: true }),
+  abrirContratoAuspicioPdf: (id, tipo) => abrirPdfAuth(`/api/admin/auspiciadores/${id}/contrato.pdf?tipo=${tipo}`),
+  contratoCliente: (id) => request(`/admin/clientes/${id}/contrato`, { authed: true }),
+  emitirContrato: (id) => request(`/admin/clientes/${id}/contrato`, { method: 'POST', authed: true }),
+  abrirContratoPdf: (id) => abrirPdfAuth(`/api/admin/clientes/${id}/contrato.pdf`),
   alertasContratos: () => request('/admin/contratos/alertas', { authed: true }),
   sesiones: (qs = '') => request(`/admin/sesiones${qs}`, { authed: true }),
   sesionAdmin: (id) => request(`/admin/sesiones/${id}`, { authed: true }),
@@ -312,6 +338,15 @@ export const api = {
   motorEstadisticas: () => request('/admin/motor-propio/estadisticas', { authed: true }),
   motorFuentes: () => request('/admin/motor-propio/fuentes', { authed: true }),
   guardarFuenteMotor: (id, b) => request(`/admin/motor-propio/fuentes/${id}`, { method: 'PUT', body: b, authed: true }),
+  // Historia de factores. Solo lectura a propósito: una versión emitida no
+  // se edita ni se borra, porque es lo que cita cada informe ya entregado.
+  motorVersiones: () => request('/admin/motor-propio/versiones', { authed: true }),
+  // «Actualizar»: la IA busca y propone; el motor no cambia hasta que una
+  // persona aprueba, y aprobar es lo que congela una versión nueva.
+  buscarFactoresActuales: () => request('/admin/motor-propio/actualizar', { method: 'POST', authed: true }),
+  motorPropuestas: () => request('/admin/motor-propio/propuestas', { authed: true }),
+  aprobarPropuestaFactor: (id, motivo) => request(`/admin/motor-propio/propuestas/${id}/aprobar`, { method: 'POST', body: { motivo }, authed: true }),
+  descartarPropuestaFactor: (id, motivo) => request(`/admin/motor-propio/propuestas/${id}/descartar`, { method: 'POST', body: { motivo }, authed: true }),
 
   // Acceso de clientes (magic link)
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),

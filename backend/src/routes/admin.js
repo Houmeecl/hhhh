@@ -1,10 +1,26 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
-import { query } from '../lib/db.js';
+import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { enviarActivacion } from '../services/cuentas.js';
+import {
+  PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
+  generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
+} from '../services/contrato.js';
+import { generateContrato } from '../services/pdf.js';
+import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
+import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
+import {
+  MOTOR_CLAY, SII_EXCLUIDOS, datosDeDte, admiteDte, itemsDeDte,
+  agruparLineas, resumirImportacion,
+} from '../services/clayCarbono.js';
+import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
+import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
+import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
+import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
 
 const router = express.Router();
 
@@ -115,22 +131,63 @@ router.get('/clientes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Dar de alta una empresa emite además SU CONTRATO, en la misma
+// transacción: una empresa sin contrato no debería poder existir. Sale en
+// estado 'borrador' porque la plantilla todavía tiene puntos pendientes de
+// revisión legal (ver services/contrato.js) — el documento se genera solo,
+// pero no se firma hasta que un abogado cierre esos puntos.
 router.post('/clientes', adminOnly, async (req, res, next) => {
   try {
     const { rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan } = req.body;
     if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre de empresa son obligatorios' });
-    const { rows } = await query(
-      `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan)
-       VALUES ($1,$2,$3,COALESCE($4,'piloto'),$5,$6,$7) RETURNING *`,
-      [rut, nombre_empresa, contacto_email || null, estado_contrato, fecha_inicio || null, fecha_fin || null, plan || 'piloto']
-    );
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cliente', entidad: 'cliente', entidadId: rows[0].id, ip: req.ip });
-    res.status(201).json({ cliente: rows[0] });
+
+    const { cliente, contrato } = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan)
+         VALUES ($1,$2,$3,COALESCE($4,'piloto'),$5,$6,$7) RETURNING *`,
+        [rut, nombre_empresa, contacto_email || null, estado_contrato, fecha_inicio || null, fecha_fin || null, plan || 'piloto']
+      );
+      return { cliente: rows[0], contrato: await emitirContrato(client, rows[0], req.body.tipo_contrato) };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cliente', entidad: 'cliente', entidadId: cliente.id, detalle: { contrato: contrato.numero }, ip: req.ip });
+    res.status(201).json({ cliente, contrato });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un cliente con ese RUT' });
     next(err);
   }
 });
+
+// Inserta el contrato de un cliente dentro de la transacción del llamador.
+// El número es aleatorio; ante una colisión (improbable pero posible) se
+// reintenta en vez de tumbar el alta de la empresa.
+async function emitirContrato(client, entidad, tipoPedido, sujeto = 'cliente') {
+  const permitidos = TIPOS_DE(sujeto);
+  const tipo = tipoValido(tipoPedido) && permitidos.includes(tipoPedido)
+    ? tipoPedido
+    : (sujeto === 'auspiciador' ? 'auspicio' : TIPO_POR_DEFECTO);
+  const datos = snapshotDe(entidad, tipo);
+  const columna = sujeto === 'auspiciador' ? 'auspiciador_id' : 'cliente_id';
+  for (let intento = 0; intento < 5; intento += 1) {
+    const numero = generarNumeroContrato();
+    const created_at = new Date().toISOString();
+    const hash = hashContrato({ numero, plantilla_version: PLANTILLA_VERSION, tipo, datos, created_at });
+    try {
+      const { rows } = await client.query(
+        `INSERT INTO contratos (${columna}, numero, plantilla_version, tipo, estado, datos, hash_documento, created_at)
+         VALUES ($1,$2,$3,$4,'borrador',$5,$6,$7) RETURNING *`,
+        [entidad.id, numero, PLANTILLA_VERSION, tipo, JSON.stringify(datos), hash, created_at]
+      );
+      return rows[0];
+    } catch (err) {
+      // 23505 en `numero` = colisión del aleatorio: reintentar. Cualquier
+      // otra violación (p. ej. uq_contratos_vigente) es un error real.
+      if (err.code === '23505' && String(err.constraint || '').includes('numero')) continue;
+      throw err;
+    }
+  }
+  throw new Error('No se pudo generar un número de contrato único');
+}
 
 router.put('/clientes/:id', adminOnly, async (req, res, next) => {
   try {
@@ -192,6 +249,400 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
     res.status(201).json({ ok: true, usuario_id: uRows[0].id, correo_enviado: correoEnviado, dev_activation_link });
   } catch (err) { next(err); }
 });
+
+// Consulta los datos de una empresa en Clay para prellenar el alta. Solo
+// LEE: nunca escribe en `clientes`. Quien da de alta decide si acepta lo que
+// viene o corrige — el dato que quede es el que se congela en el contrato,
+// así que no se pisa nada en silencio.
+router.get('/clientes/consultar-rut/:rut', adminOnly, async (req, res, next) => {
+  try {
+    const { datos, limites } = await clayEmpresa(req.params.rut);
+    const nombre = datos?.name || null;
+    if (!nombre) return res.status(404).json({ error: 'Clay no devolvió el nombre de esa empresa' });
+    res.json({
+      empresa: {
+        nombre_empresa: nombre,
+        rut: datos?.dv ? `${datos.rut}-${datos.dv}` : (datos?.rut || null),
+      },
+      solicitudes_restantes: limites.restantes,
+    });
+  } catch (err) {
+    // Que Clay esté apagado, sin token o caído no puede tumbar el panel: el
+    // alta manual sigue siendo el camino principal, esto es una ayuda.
+    if (err.status) return res.status(err.status === 404 ? 404 : 502).json({ error: err.message });
+    return res.status(503).json({ error: err.message });
+  }
+});
+
+// ---------- Importar la contabilidad de carbono desde Clay ----------
+// El flujo de siempre es un documento a la vez. Cuando son cientos de
+// facturas de un período eso no escala, y es exactamente el caso de un
+// cliente con contabilidad ya llevada en Clay: los DTE están ahí,
+// sincronizados desde el SII.
+//
+// Se trae el LIBRO DE COMPRAS del período (lo que la empresa compró = sus
+// emisiones aguas arriba) y se arma una sesión con todas sus facturas,
+// encadenadas contra la misma cadena global que el resto.
+//
+// El método sale POR GASTO: Clay no entrega unidad de medida en el detalle
+// de línea. Cargar el XML del documento sí habilita además el método
+// físico. Se informa en la respuesta, no se esconde.
+router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => {
+  const { desde, hasta } = req.body || {};
+  if (!desde) return res.status(400).json({ error: 'Indica la fecha `desde` (YYYY-MM-DD) del período a importar' });
+
+  try {
+    const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
+    const cliente = cRows[0];
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
+
+    // 1. Traer de Clay FUERA de la transacción: la red puede tardar y no
+    //    puede tener bloqueada la fila de cadena_estado mientras tanto —
+    //    ese lock serializa a todos los que estén subiendo documentos.
+    const { datos: dteRes } = await clayDtes({ rut: cliente.rut, recibidos: true, desde, hasta, excluirTipos: SII_EXCLUIDOS, limite: 500 });
+    const documentos = dteRes?.items || (Array.isArray(dteRes) ? dteRes : []);
+    if (!documentos.length) return res.status(404).json({ error: 'Clay no devolvió documentos de compra en ese período' });
+
+    let lineas = [];
+    try {
+      const { datos: prodRes } = await clayProductos({ rut: cliente.rut, recibidos: true, desde, hasta, limite: 500 });
+      lineas = prodRes?.items || (Array.isArray(prodRes) ? prodRes : []);
+    } catch {
+      // Sin detalle de líneas se calcula igual, con un ítem único por el
+      // neto de cada documento. Menos resolución, mismo total.
+    }
+    const porDocumento = agruparLineas(lineas);
+
+    const admitidos = [];
+    const omitidos = [];
+    for (const dte of documentos) {
+      const { admite, motivo } = admiteDte(dte);
+      if (admite) admitidos.push(dte); else omitidos.push({ clay_id: dte?.id, motivo });
+    }
+    if (!admitidos.length) {
+      return res.status(422).json({ error: 'Ningún documento del período entra al cálculo', ...resumirImportacion({ admitidos, omitidos }) });
+    }
+
+    // 2. Calcular y persistir en una transacción, encadenando cada factura.
+    const resultado = await withTx(async (client) => {
+      const categorias = await cargarCategorias((sql) => client.query(sql));
+      const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+
+      const { rows: sRows } = await client.query(
+        `INSERT INTO sesiones (rut_cliente, nombre_cliente, email_cliente) VALUES ($1,$2,$3) RETURNING *`,
+        [cliente.rut, cliente.nombre_empresa, cliente.contacto_email || null]
+      );
+      const sesion = sRows[0];
+
+      // Qué documentos ya se importaron antes. Se consulta ANTES de
+      // insertar: si se dejara que reviente el índice único, el error
+      // aborta la transacción completa en Postgres y las facturas
+      // siguientes del lote fallarían todas con "transaction is aborted".
+      // El índice queda igual, como red de seguridad ante una carrera.
+      const idsClay = admitidos.map((d) => d?.id).filter(Boolean);
+      const { rows: yaRows } = await client.query(
+        `SELECT clay_id FROM facturas WHERE clay_id = ANY($1::text[])`, [idsClay]
+      );
+      const yaImportados = new Set(yaRows.map((r) => r.clay_id));
+
+      const { rows: eRows } = await client.query(`SELECT * FROM cadena_estado WHERE id = 1 FOR UPDATE`);
+      let estado = eRows[0];
+      let total = 0;
+      let importadas = 0;
+      let repetidas = 0;
+
+      for (const dte of admitidos) {
+        const d = datosDeDte(dte);
+        if (yaImportados.has(d.clay_id)) { repetidas += 1; continue; }
+        const items = itemsDeDte(dte, porDocumento);
+        if (!items.length) { omitidos.push({ clay_id: d.clay_id, motivo: 'sin ítems calculables' }); continue; }
+
+        // `origen` queda en el valor por defecto ('texto'): sin unidad de
+        // medida el método físico no aplica, y forzar otro origen diría
+        // que sí sin poder sostenerlo.
+        const calc = calcularFactura(items, categorias);
+        const hDoc = hashDocumento({
+          numero_venta: d.numero_venta, rut_emisor: d.rut_emisor, rut_receptor: d.rut_receptor,
+          total_co2e: calc.total_co2e, categoria: calc.categoria, archivo_original: `clay:${d.clay_id}`,
+        });
+        const { hash_cadena: hCad, eslabon } = siguienteEslabon(estado, hDoc);
+
+        const { rows: fRows } = await client.query(
+            `INSERT INTO facturas
+               (sesion_id, numero_venta, archivo_original, rut_emisor, rut_receptor,
+                total_co2e, categoria, status, motor, clay_id,
+                hash_documento, hash_anterior, hash_cadena, eslabon)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'procesada',$8,$9,$10,$11,$12,$13) RETURNING *`,
+            [sesion.id, d.numero_venta, `clay:${d.clay_id}`, d.rut_emisor, d.rut_receptor,
+             calc.total_co2e, calc.categoria, MOTOR_CLAY, d.clay_id,
+             hDoc, estado.ultimo_hash, hCad, eslabon]
+        );
+        const factura = fRows[0];
+
+        estado = { ...estado, ultimo_hash: hCad, n_eslabones: eslabon };
+        for (const it of calc.items) {
+          await client.query(
+            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null]
+          );
+        }
+        await registrarMovimientos({ client, factura, fecha: sesion.fecha, cuentas: cuentasNaturales });
+        total += Number(calc.total_co2e || 0);
+        importadas += 1;
+      }
+
+      if (!importadas) {
+        const e = new Error('Todos los documentos del período ya estaban importados');
+        e.status = 409; throw e;
+      }
+
+      await client.query(
+        `UPDATE cadena_estado SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1`,
+        [estado.ultimo_hash, estado.n_eslabones]
+      );
+      await client.query(`UPDATE sesiones SET total_co2e = $1 WHERE id = $2`, [total, sesion.id]);
+      return { sesion, importadas, repetidas, total_co2e: total };
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'importar_clay', entidad: 'sesion', entidadId: resultado.sesion.id,
+      detalle: { rut: cliente.rut, desde, hasta, documentos: resultado.importadas }, ip: req.ip,
+    });
+
+    res.status(201).json({
+      sesion_id: resultado.sesion.id,
+      total_co2e: resultado.total_co2e,
+      ya_importados: resultado.repetidas,
+      ...resumirImportacion({ admitidos, omitidos }),
+      documentos: resultado.importadas,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    return next(err);
+  }
+});
+
+// Contrato vigente del cliente. Los clientes dados de alta antes de la
+// migración 043 no tienen contrato: se responde 404 y el panel ofrece
+// generarlo, en vez de fabricar uno en silencio al leer.
+router.get('/clientes/:id/contrato', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Este cliente todavía no tiene contrato' });
+    res.json({ contrato: rows[0], puntos_pendientes: PUNTOS_PENDIENTES });
+  } catch (err) { next(err); }
+});
+
+// Emite el contrato de un cliente que no lo tiene (alta anterior a la
+// migración 043). Si ya hay uno vigente devuelve 409: reemplazarlo es otra
+// operación, no un efecto secundario de pedirlo de nuevo.
+router.post('/clientes/:id/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows: cRows } = await client.query(`SELECT * FROM clientes WHERE id = $1 FOR UPDATE`, [req.params.id]);
+      if (!cRows[0]) { const e = new Error('Cliente no encontrado'); e.status = 404; throw e; }
+      const { rows: yaHay } = await client.query(
+        `SELECT id FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' LIMIT 1`, [req.params.id]
+      );
+      if (yaHay[0]) { const e = new Error('Este cliente ya tiene un contrato vigente'); e.status = 409; throw e; }
+      return emitirContrato(client, cRows[0], req.body?.tipo_contrato);
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_contrato', entidad: 'contrato', entidadId: contrato.id, ip: req.ip });
+    res.status(201).json({ contrato });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/clientes/:id/contrato.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    const contrato = rows[0];
+    if (!contrato) return res.status(404).json({ error: 'Este cliente todavía no tiene contrato' });
+    const buf = await pdfDeContrato(contrato);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${contrato.numero}.pdf"`);
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// ---------- Postulaciones de auspicio ----------
+router.get('/solicitudes-auspicio', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'aceptada', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_auspicio s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        ORDER BY s.created_at DESC LIMIT 200`,
+      [estado]
+    );
+    res.json({ solicitudes: rows });
+  } catch (err) { next(err); }
+});
+
+// Aceptar crea el auspiciador y emite sus contratos, todo en la misma
+// transacción: si algo falla, la postulación sigue pendiente en vez de
+// quedar aceptada sin auspiciador detrás.
+router.post('/solicitudes-auspicio/:id/aceptar', adminOnly, async (req, res, next) => {
+  try {
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_auspicio WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Postulación no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta postulación ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+
+      const base = auspiciadorDesdeSolicitud(sol);
+      const { rows: aRows } = await client.query(
+        `INSERT INTO auspiciadores (rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`,
+        [base.rut, base.nombre_empresa, base.contacto_email, base.aporta_vehiculo,
+         JSON.stringify(base.vehiculo), req.body?.fecha_inicio || null, req.body?.fecha_fin || null]
+      );
+      const auspiciador = aRows[0];
+
+      const contratos = [await emitirContrato(client, auspiciador, 'auspicio', 'auspiciador')];
+      if (auspiciador.aporta_vehiculo) {
+        contratos.push(await emitirContrato(client, auspiciador, 'comodato', 'auspiciador'));
+      }
+
+      await client.query(
+        `UPDATE solicitudes_auspicio
+            SET estado = 'aceptada', auspiciador_id = $2, resuelta_por = $3, resuelta_at = now()
+          WHERE id = $1`,
+        [sol.id, auspiciador.id, req.user.sub]
+      );
+      return { auspiciador, contratos };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'aceptar_auspicio', entidad: 'auspiciador', entidadId: salida.auspiciador.id, detalle: { solicitud: req.params.id }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    // Ya existía un auspiciador con ese RUT: es un caso real (postuló dos
+    // veces, o se dio de alta a mano antes), no un error del servidor.
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un auspiciador con ese RUT' });
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.post('/solicitudes-auspicio/:id/rechazar', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE solicitudes_auspicio
+          SET estado = 'rechazada', motivo_rechazo = $2, resuelta_por = $3, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, String(req.body?.motivo || '').slice(0, 500) || null, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La postulación no existe o ya fue resuelta' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'rechazar_auspicio', entidad: 'solicitud_auspicio', entidadId: req.params.id, ip: req.ip });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Auspiciadores (SICR3P-LEGAL-01 y 06) ----------
+// Un auspiciador no es un cliente: aporta recursos al programa Ruta SICR3P
+// (vehículo, dinero, difusión) y firma su propio convenio. Se le da de alta
+// con el mismo control que a un cliente — registro, contrato generado y
+// sellado — porque es exactamente lo que se pidió.
+router.get('/auspiciadores', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT a.*, (
+         SELECT json_agg(json_build_object('id', c.id, 'numero', c.numero, 'tipo', c.tipo, 'estado', c.estado))
+           FROM contratos c WHERE c.auspiciador_id = a.id AND c.estado <> 'anulado'
+       ) AS contratos
+       FROM auspiciadores a ORDER BY a.created_at DESC`
+    );
+    res.json({ auspiciadores: rows });
+  } catch (err) { next(err); }
+});
+
+// El alta emite el Convenio Marco; si además aporta vehículo, emite también
+// el comodato. Los dos en la misma transacción que el alta: un auspiciador
+// sin convenio no debería existir.
+router.post('/auspiciadores', adminOnly, async (req, res, next) => {
+  try {
+    const { rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin } = req.body || {};
+    if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre son obligatorios' });
+
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO auspiciadores (rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin)
+         VALUES ($1,$2,$3,COALESCE($4,false),COALESCE($5,'{}')::jsonb,$6,$7) RETURNING *`,
+        [rut, nombre_empresa, contacto_email || null, aporta_vehiculo, JSON.stringify(vehiculo || {}), fecha_inicio || null, fecha_fin || null]
+      );
+      const a = rows[0];
+      const contratos = [await emitirContrato(client, a, 'auspicio', 'auspiciador')];
+      if (a.aporta_vehiculo) contratos.push(await emitirContrato(client, a, 'comodato', 'auspiciador'));
+      return { auspiciador: a, contratos };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_auspiciador', entidad: 'auspiciador', entidadId: salida.auspiciador.id, detalle: { contratos: salida.contratos.map((c) => c.numero) }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un auspiciador con ese RUT' });
+    next(err);
+  }
+});
+
+// Emite un contrato de auspicio que falte (p. ej. el comodato, si el
+// vehículo se acordó después del alta).
+router.post('/auspiciadores/:id/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows } = await client.query(`SELECT * FROM auspiciadores WHERE id = $1 FOR UPDATE`, [req.params.id]);
+      if (!rows[0]) { const e = new Error('Auspiciador no encontrado'); e.status = 404; throw e; }
+      return emitirContrato(client, rows[0], req.body?.tipo, 'auspiciador');
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_contrato', entidad: 'contrato', entidadId: contrato.id, ip: req.ip });
+    res.status(201).json({ contrato });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ese contrato ya está vigente para este auspiciador' });
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/auspiciadores/:id/contrato.pdf', async (req, res, next) => {
+  try {
+    const tipo = tipoValido(req.query.tipo) ? req.query.tipo : 'auspicio';
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE auspiciador_id = $1 AND tipo = $2 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, tipo]
+    );
+    const contrato = rows[0];
+    if (!contrato) return res.status(404).json({ error: 'Ese contrato no existe para este auspiciador' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${contrato.numero}.pdf"`);
+    res.send(await pdfDeContrato(contrato));
+  } catch (err) { next(err); }
+});
+
+// Arma el PDF de un contrato ya emitido, sea de cliente o de auspiciador.
+function pdfDeContrato(contrato) {
+  const meta = TIPOS[contrato.tipo] || TIPOS[TIPO_POR_DEFECTO];
+  return generateContrato({
+    contrato,
+    titulo: meta.titulo.toUpperCase(),
+    codigo: meta.codigo,
+    clausulas: clausulas(contrato.datos, contrato.tipo),
+    pendientes: clausulasPendientes(contrato.datos, contrato.tipo).length ? PUNTOS_PENDIENTES : [],
+  });
+}
 
 // Alerta de contratos por vencer (próximos 30 días) o vencidos.
 router.get('/contratos/alertas', async (req, res, next) => {
@@ -421,6 +872,229 @@ router.get('/actividad', adminOnly, async (req, res, next) => {
        ORDER BY a.created_at DESC LIMIT 200`
     );
     res.json({ actividad: rows });
+  } catch (err) { next(err); }
+});
+
+// ---------- Retención de datos personales (Ley 21.719) ----------
+// La ley no pide tener una política de retención: pide poder demostrar
+// que se aplica. Por eso se expone el historial de purgas junto con los
+// plazos vigentes y el inventario de qué se conserva y por qué.
+router.get('/retencion', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.*, u.email AS usuario_email
+         FROM purgas p LEFT JOIN usuarios u ON u.id = p.usuario_id
+        ORDER BY p.created_at DESC LIMIT 50`
+    );
+    res.json({
+      purgas: rows,
+      plazos: PLAZOS,
+      tareas: nombresDeTareas(),
+      retenido_por_ley: retenidoPorLey(),
+      // Los plazos son valores por defecto razonables, no cifras del
+      // texto de la ley. Que quien mire el panel lo sepa.
+      nota_plazos: 'Los plazos son configurables y están pendientes de confirmación legal.',
+    });
+  } catch (err) { next(err); }
+});
+
+// Correrla a mano, sin esperar al temporizador diario.
+router.post('/retencion/purgar', adminOnly, async (req, res, next) => {
+  try {
+    const r = await purgar({ origen: 'manual', usuarioId: req.user.sub });
+    await logActividad({ usuarioId: req.user.sub, accion: 'purgar_datos', entidad: 'retencion', detalle: { filas: r.filas }, ip: req.ip });
+    res.json(r);
+  } catch (err) { next(err); }
+});
+
+// ---------- Derechos del titular (ARCOP) ----------
+router.get('/arcop', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'resuelta', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_arcop s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        -- Las pendientes primero y de la más antigua a la más nueva: hay
+        -- un plazo de respuesta y lo que lleva más días esperando es lo
+        -- que primero se pasa de él.
+        ORDER BY (s.estado = 'pendiente') DESC, s.created_at ASC
+        LIMIT 200`,
+      [estado]
+    );
+    res.json({
+      solicitudes: rows.map((s) => ({
+        ...s,
+        dias_esperando: diasEsperando(s.created_at),
+        fuera_de_plazo: s.estado === 'pendiente' && fueraDePlazo(s.created_at),
+      })),
+      plazo_dias: PLAZO_RESPUESTA_DIAS,
+      derechos: ETIQUETA_DERECHO,
+    });
+  } catch (err) { next(err); }
+});
+
+// Qué hay de este titular. Es la respuesta al derecho de ACCESO y, en el
+// mismo contenido, la de PORTABILIDAD — cambia el envase, no el dato.
+//
+// Las tablas se recorren desde el inventario, así que una tabla nueva con
+// datos personales entra sola en cuanto se clasifica (y el test obliga a
+// clasificarla).
+router.get('/arcop/:id/datos', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(`SELECT * FROM solicitudes_arcop WHERE id = $1`, [req.params.id]);
+    const sol = sRows[0];
+    if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
+
+    const hallazgos = [];
+    for (const destino of dondeBuscar(sol)) {
+      // Nombres de tabla y columna vienen del inventario, que es código
+      // del repositorio, no de la petición: no hay inyección posible por
+      // acá. Aun así se validan contra el catálogo real de Postgres.
+      const { rows: cols } = await query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1 AND column_name = ANY($2)`,
+        [destino.tabla, destino.columnas]
+      );
+      const columnas = cols.map((c) => c.column_name);
+      if (!columnas.length) continue;
+
+      const where = columnas.map((c, i) => `${c} = $${i + 1}`).join(' OR ');
+      const valores = columnas.map((c) => (/email|correo/i.test(c) ? sol.email : sol.rut));
+      const { rows: filas } = await query(
+        `SELECT * FROM ${destino.tabla} WHERE ${where} LIMIT 500`, valores
+      );
+      hallazgos.push({ tabla: destino.tabla, filas });
+    }
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'arcop_consultar_datos',
+      entidad: 'solicitud_arcop', entidadId: sol.id, ip: req.ip,
+    });
+
+    res.json(armarPaquete({
+      titular: { rut: sol.rut, email: sol.email, nombre: sol.nombre },
+      hallazgos,
+      generadoAt: new Date().toISOString(),
+    }));
+  } catch (err) { next(err); }
+});
+
+// Qué se puede borrar y qué queda retenido, con su fundamento. La
+// pantalla lo muestra ANTES de confirmar una supresión, para que la
+// respuesta al titular salga del sistema y no de la memoria de quien
+// atiende.
+router.get('/arcop/limites-supresion', async (req, res, next) => {
+  try {
+    res.json(limitesDeSupresion());
+  } catch (err) { next(err); }
+});
+
+// Resolver: se registra qué se respondió. NO ejecuta borrados automáticos
+// —cada derecho se atiende con criterio y algunos datos no se pueden
+// eliminar—, pero deja constancia de la respuesta, que es lo que la ley
+// exige poder demostrar.
+router.post('/arcop/:id/resolver', adminOnly, async (req, res, next) => {
+  try {
+    const estado = req.body?.estado === 'rechazada' ? 'rechazada' : 'resuelta';
+    const resolucion = String(req.body?.resolucion || '').trim().slice(0, 4000);
+    if (!resolucion) return res.status(400).json({ error: 'Escribe qué se respondió al titular' });
+
+    const { rows } = await query(
+      `UPDATE solicitudes_arcop
+          SET estado = $2, resolucion = $3, resuelta_por = $4, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, estado, resolucion, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La solicitud no existe o ya fue resuelta' });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'arcop_resolver', entidad: 'solicitud_arcop',
+      entidadId: req.params.id, detalle: { estado, derecho: rows[0].derecho }, ip: req.ip,
+    });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Brechas de seguridad ----------
+// Se llenan a mano: no hay detección automática y fingir que la hay sería
+// peor que no tenerla. Lo que aporta la tabla es la cronología —cuándo
+// ocurrió, cuándo se supo, cuándo se avisó—, que en una brecha es la
+// defensa.
+router.get('/brechas', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT b.*, u.nombre AS registrada_por_nombre
+         FROM brechas_seguridad b
+         LEFT JOIN usuarios u ON u.id = b.registrada_por
+        ORDER BY (b.estado <> 'cerrada') DESC, b.detectada_at DESC LIMIT 200`
+    );
+    res.json({ brechas: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/brechas', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const titulo = String(b.titulo || '').trim().slice(0, 200);
+    const descripcion = String(b.descripcion || '').trim().slice(0, 5000);
+    if (!titulo || !descripcion) {
+      return res.status(400).json({ error: 'Una brecha necesita al menos qué pasó y una descripción' });
+    }
+    const { rows } = await query(
+      `INSERT INTO brechas_seguridad
+         (titulo, descripcion, ocurrida_at, datos_afectados, titulares_afectados, riesgo, registrada_por)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6,'por_evaluar'),$7) RETURNING *`,
+      [titulo, descripcion, b.ocurrida_at || null, b.datos_afectados || null,
+       Number.isFinite(Number(b.titulares_afectados)) ? Number(b.titulares_afectados) : null,
+       b.riesgo, req.user.sub]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'registrar_brecha', entidad: 'brecha', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ brecha: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// Actualizar: riesgo, estado, medidas y las fechas de notificación. Solo
+// se tocan los campos que vienen, para que marcar "ya avisamos a la
+// Agencia" no pise el resto.
+router.put('/brechas/:id', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const { rows } = await query(
+      `UPDATE brechas_seguridad SET
+         riesgo = COALESCE($2, riesgo),
+         estado = COALESCE($3, estado),
+         medidas = COALESCE($4, medidas),
+         datos_afectados = COALESCE($5, datos_afectados),
+         titulares_afectados = COALESCE($6, titulares_afectados),
+         notificada_agencia_at = COALESCE($7, notificada_agencia_at),
+         notificados_titulares_at = COALESCE($8, notificados_titulares_at),
+         motivo_no_notificar = COALESCE($9, motivo_no_notificar),
+         updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, b.riesgo || null, b.estado || null, b.medidas || null,
+       b.datos_afectados || null,
+       Number.isFinite(Number(b.titulares_afectados)) ? Number(b.titulares_afectados) : null,
+       b.notificada_agencia_at || null, b.notificados_titulares_at || null,
+       b.motivo_no_notificar || null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Brecha no encontrada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'actualizar_brecha', entidad: 'brecha', entidadId: req.params.id, ip: req.ip });
+    res.json({ brecha: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// El registro de actividades de tratamiento, para exportarlo cuando la
+// Agencia lo pida. Sale del mismo inventario que usan la purga y ARCOP,
+// así que no puede quedar desincronizado con el código.
+router.get('/retencion/registro', async (req, res, next) => {
+  try {
+    res.json({
+      generado_at: new Date().toISOString(),
+      responsable: 'sicr3p',
+      tratamientos: Object.entries(INVENTARIO).map(([tabla, e]) => ({ tabla, ...e })),
+    });
   } catch (err) { next(err); }
 });
 

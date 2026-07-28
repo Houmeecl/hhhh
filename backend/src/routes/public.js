@@ -16,6 +16,7 @@ import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { versionVigente } from '../services/motorVersiones.js';
 import { leerDocumento, filaRechazo } from '../services/lecturaDocumento.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { contrapartesDeRut } from '../services/trazabilidad.js';
@@ -24,6 +25,7 @@ import { validarComponentes, calcularReciclabilidad, hashDeclaracionEmbalaje } f
 import { validarCompensacion, calcularMonto } from '../services/compensacion.js';
 import { generarSelloSvg } from '../services/sello.js';
 import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
+import { validarSolicitud } from '../services/auspicio.js';
 
 const router = express.Router();
 
@@ -309,6 +311,11 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
 
       // Plan de cuentas de Capital Natural (una sola carga por sesión).
       const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+
+      // Versión vigente del motor: se lee una sola vez por sesión, dentro de
+      // la transacción, y queda estampada en cada factura. null si la
+      // migración de versionado aún no corrió — no se rechaza nada por eso.
+      const versionMotorId = (await versionVigente((sql, p) => client.query(sql, p)))?.id ?? null;
       // Categorías del motor propio (una sola carga por sesión).
       const categoriasMotor = await cargarCategorias((sql) => client.query(sql));
 
@@ -407,8 +414,8 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
           `INSERT INTO facturas
              (sesion_id, invoice_id_simple, numero_venta, archivo_original,
               rut_emisor, rut_receptor, total_co2e, categoria, status, motor,
-              hash_documento, hash_anterior, hash_cadena, eslabon)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+              hash_documento, hash_anterior, hash_cadena, eslabon, motor_version_id)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -424,6 +431,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             hPrevio,
             hCad,
             nEslabon,
+            // Deja constancia de bajo qué versión del motor se produjo este
+            // número, para que el informe cite después la metodología real y
+            // no la vigente al momento de imprimirlo (services/pdf.js).
+            versionMotorId,
           ]
         );
         hashAnterior = hCad;
@@ -641,6 +652,40 @@ function terminalIdOpcional(req) {
     return null;
   }
 }
+
+// ---------- POST /api/auspicio — postular como auspiciador ----------
+// Formulario público del programa Ruta sicr3p. NO crea un auspiciador ni
+// contrato alguno: solo deja la postulación para que alguien la revise.
+// Aceptarla es una decisión humana en el panel (routes/admin.js).
+router.post('/auspicio', async (req, res, next) => {
+  try {
+    const { ok, error, datos } = validarSolicitud(req.body);
+    if (!ok) return res.status(400).json({ error });
+
+    const { rows } = await query(
+      `INSERT INTO solicitudes_auspicio
+         (rut, nombre_empresa, contacto_nombre, contacto_email, contacto_telefono,
+          aporta_vehiculo, aporta_monetario, aporta_difusion, vehiculo, ciudades, mensaje, ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12)
+       ON CONFLICT (rut) WHERE estado = 'pendiente' DO NOTHING
+       RETURNING id, created_at`,
+      [datos.rut, datos.nombre_empresa, datos.contacto_nombre, datos.contacto_email,
+       datos.contacto_telefono, datos.aporta_vehiculo, datos.aporta_monetario,
+       datos.aporta_difusion, JSON.stringify(datos.vehiculo), datos.ciudades, datos.mensaje,
+       req.ip || null]
+    );
+
+    // Sin fila devuelta = ya había una pendiente con ese RUT. Se responde
+    // igual que si fuera nueva: quien postula no tiene por qué enterarse
+    // del estado interno, y reenviar el formulario no debe verse como error.
+    res.status(201).json({
+      ok: true,
+      recibida: true,
+      mensaje: 'Recibimos tu postulación. Te contactaremos al correo indicado.',
+      id: rows[0]?.id || null,
+    });
+  } catch (err) { next(err); }
+});
 
 // ---------- POST /api/sesiones/:id/compensacion — cobro del POS de mostrador ----------
 // El SERVIDOR toma las toneladas de la sesión y la tarifa vigente de

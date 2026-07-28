@@ -8,14 +8,49 @@ import { Icon } from '../components/icons.jsx';
 export default function MotorPropio() {
   const [categorias, setCategorias] = useState([]);
   const [stats, setStats] = useState(null);
+  const [versiones, setVersiones] = useState([]);
+  const [propuestas, setPropuestas] = useState([]);
+  const [buscando, setBuscando] = useState(false);
   const [edit, setEdit] = useState(null);
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
-  const cargar = () => Promise.all([api.motorCategorias(), api.motorEstadisticas()])
-    .then(([c, s]) => { setCategorias(c.categorias); setStats(s); })
+  const cargar = () => Promise.all([
+    api.motorCategorias(), api.motorEstadisticas(), api.motorVersiones(), api.motorPropuestas(),
+  ])
+    .then(([c, s, v, p]) => {
+      setCategorias(c.categorias); setStats(s);
+      setVersiones(v.versiones || []); setPropuestas(p.propuestas || []);
+    })
     .catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
+
+  // Dispara la búsqueda de fuentes. Puede tardar: la IA hace varias
+  // búsquedas web antes de responder, por eso el botón queda deshabilitado
+  // con su propio texto en vez de un spinner suelto.
+  async function buscarActuales() {
+    setBuscando(true);
+    try {
+      const r = await api.buscarFactoresActuales();
+      await cargar();
+      const n = (r.propuestas || []).length;
+      flash(n === 0
+        ? 'Sin cambios: los factores vigentes coinciden con lo publicado.'
+        : `${n} propuesta${n === 1 ? '' : 's'} para revisar.`);
+    } catch (e) { flash(e.message, true); } finally { setBuscando(false); }
+  }
+
+  async function resolver(p, aprobar) {
+    const verbo = aprobar ? 'Aprobar' : 'Descartar';
+    const motivo = window.prompt(`${verbo} la propuesta para ${p.categoria_codigo}. Motivo (queda registrado):`, '');
+    if (motivo === null) return;
+    try {
+      if (aprobar) await api.aprobarPropuestaFactor(p.id, motivo);
+      else await api.descartarPropuestaFactor(p.id, motivo);
+      await cargar();
+      flash(aprobar ? 'Propuesta aprobada: se congeló una versión nueva del motor.' : 'Propuesta descartada.');
+    } catch (e) { flash(e.message, true); }
+  }
 
   async function guardar() {
     try {
@@ -27,6 +62,7 @@ export default function MotorPropio() {
         palabras_clave: edit.palabras.split(',').map((s) => s.trim()).filter(Boolean),
         fuente: edit.fuente,
         activo: edit.activo,
+        nota_version: edit.nota_version,
       });
       setEdit(null); cargar(); flash('Categoría actualizada.');
     } catch (e) { flash(e.message, true); }
@@ -182,12 +218,95 @@ export default function MotorPropio() {
                 factor_fisico: String(c.factor_fisico_kgco2e ?? ''),
                 factor_gasto: String(c.factor_gasto_kgco2e_clp1000),
                 palabras: (c.palabras_clave || []).join(', '),
-                fuente: c.fuente || '', activo: c.activo,
+                fuente: c.fuente || '', activo: c.activo, nota_version: '',
               })}>Editar</button>
           </div>
         ))}
         {categorias.length === 0 && <p className="muted">Sin categorías cargadas.</p>}
       </div>
+
+      {/* «Actualizar»: la IA busca la versión vigente de las fuentes ya
+          declaradas y propone. Nada entra al motor sin aprobación humana. */}
+      <div style={{ marginTop: 32 }}>
+        <div className="admin-head" style={{ marginBottom: 8 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Actualización de fuentes</h2>
+            <p className="muted" style={{ margin: '4px 0 0', fontSize: 13, maxWidth: 640 }}>
+              Busca en las publicaciones de los organismos que ya cita la metodología (MMA HuellaChile,
+              IPCC, DEFRA, GLEC, GHG Protocol) si algún factor quedó atrás. <b>Solo propone</b>: el
+              cálculo lo sigue haciendo el motor determinista, y ningún factor cambia hasta que alguien
+              lo aprueba acá con la fuente a la vista.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={buscarActuales} disabled={buscando}>
+            {buscando ? 'Buscando…' : 'Actualizar'}
+          </button>
+        </div>
+
+        {propuestas.filter((p) => p.estado === 'pendiente').length === 0 && (
+          <p className="muted" style={{ fontSize: 13 }}>Sin propuestas pendientes.</p>
+        )}
+
+        {propuestas.filter((p) => p.estado === 'pendiente').map((p) => (
+          <div key={p.id} className="card" style={{ padding: 14, marginBottom: 10 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'baseline' }}>
+              <b>{p.categoria_codigo}</b>
+              <span className="badge badge-gray" style={{ fontSize: 11 }}>{p.campo}</span>
+              <span style={{ fontSize: 14 }}>
+                <span className="muted">{p.valor_actual ?? '—'}</span>
+                {' → '}
+                <b style={{ color: 'var(--green-600)' }}>{p.valor_propuesto}</b>
+              </span>
+            </div>
+            <p style={{ fontSize: 13, margin: '8px 0 6px' }}>{p.justificacion}</p>
+            <div style={{ fontSize: 12 }}>
+              Fuente:{' '}
+              <a href={p.fuente_url} target="_blank" rel="noopener noreferrer">
+                {p.fuente_titulo || p.fuente_url}
+              </a>
+              {p.fuente_anio && <span className="muted"> ({p.fuente_anio})</span>}
+            </div>
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+              Propuesta por {p.modelo}. Verifica la fuente antes de aprobar.
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+              <button className="btn btn-primary btn-sm" onClick={() => resolver(p, true)}>Aprobar</button>
+              <button className="btn btn-outline btn-sm" onClick={() => resolver(p, false)}>Descartar</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Historial de versiones — hace visible la garantía: cada informe cita
+          los factores vigentes cuando se calculó, no los de hoy. */}
+      {versiones.length > 0 && (
+        <div style={{ marginTop: 32 }}>
+          <h2 style={{ marginBottom: 4, fontSize: 18 }}>Historial de factores</h2>
+          <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>
+            Cada edición congela una versión. Los informes ya emitidos siguen citando la
+            versión con la que se calcularon: cambiar un factor hoy no altera un informe de ayer.
+            Una versión emitida no se edita ni se borra.
+          </p>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr><th>Versión</th><th>Fecha</th><th>Motivo</th><th>Quién</th><th style={{ textAlign: 'right' }}>Facturas</th></tr>
+              </thead>
+              <tbody>
+                {versiones.map((v) => (
+                  <tr key={v.id}>
+                    <td><b>v{v.id}</b>{v.origen === 'semilla' && <span className="badge badge-gray" style={{ marginLeft: 6, fontSize: 11 }}>inicial</span>}</td>
+                    <td>{new Date(v.creada_at).toLocaleDateString('es-CL')}</td>
+                    <td style={{ maxWidth: 380 }}>{v.nota || '—'}</td>
+                    <td className="muted">{v.creada_por_nombre || '—'}</td>
+                    <td style={{ textAlign: 'right' }}>{v.n_facturas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {edit && (
         <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setEdit(null)}>
@@ -207,6 +326,9 @@ export default function MotorPropio() {
               <input value={edit.palabras} onChange={(e) => setEdit({ ...edit, palabras: e.target.value })} /></div>
             <div className="field"><label>Fuente</label>
               <input value={edit.fuente} onChange={(e) => setEdit({ ...edit, fuente: e.target.value })} /></div>
+            <div className="field"><label>Motivo del cambio (queda en el historial)</label>
+              <input value={edit.nota_version} placeholder="Ej: actualización del factor SEN publicado por el MMA"
+                onChange={(e) => setEdit({ ...edit, nota_version: e.target.value })} /></div>
             <div className="field" style={{ marginBottom: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500 }}>
                 <input type="checkbox" checked={edit.activo} onChange={(e) => setEdit({ ...edit, activo: e.target.checked })} style={{ width: 'auto' }} /> Activa

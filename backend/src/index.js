@@ -24,6 +24,7 @@ import capacitacionRoutes from './routes/capacitacion.js';
 import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
+import { iniciarPurgaAutomatica } from './services/retencion.js';
 
 const app = express();
 
@@ -90,6 +91,9 @@ async function start() {
     // Dólar observado automático: solo actúa si el admin activó el modo
     // auto en config_pos (si no, cada tick es un SELECT y nada más).
     if (config.env !== 'test') iniciarDolarAutomatico();
+    // Purga de datos personales vencidos (Ley 21.719). Ver
+    // services/retencion.js: no toca nada encadenado por hash.
+    if (config.env !== 'test') iniciarPurgaAutomatica();
     app.listen(config.port, () => {
       console.log(`\n  sicr3p backend escuchando en http://localhost:${config.port}`);
       console.log(`  Modo motor: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);

@@ -5,6 +5,7 @@ import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasa
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
+import { metodologiaDeVersiones } from './motorVersiones.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -88,6 +89,14 @@ export function citaFuente({ organismo, documento, version_anio } = {}) {
 // Tolerante en dos niveles: sin tabla/columna de fuentes se reintenta la
 // consulta original (render idéntico al actual, sin citas); si tampoco
 // existe alcance_ghg, devuelve [] y el informe sale exactamente como hoy.
+//
+// CUIDADO: esta consulta lee el estado VIGENTE del motor. Es el camino de
+// respaldo, no el principal — el informe se arma en cada descarga, así que
+// leer en vivo hacía que editar un factor cambiara la metodología de un
+// informe ya emitido, dejándolo citando una fuente que nunca produjo ese
+// cálculo. El camino correcto es metodologiaDeVersiones() a partir de
+// facturas.motor_version_id (migración 051); acá solo se cae cuando las
+// facturas no traen versión (datos anteriores al versionado).
 async function fetchAlcancesGHG() {
   try {
     const { rows } = await query(
@@ -113,6 +122,32 @@ async function fetchAlcancesGHG() {
     console.warn('[pdf] alcances GHG no disponibles:', e.message);
     return [];
   }
+}
+
+// Cita el factor de electricidad desde la versión CONGELADA del motor.
+// Antes era una constante en el texto ("SEN 2023: 0,2421 kgCO2e/kWh"), y
+// también lo es dentro de motor_categorias.fuente — dos lugares que el día
+// que alguien edite el factor en el panel quedan contradiciendo al número
+// del propio informe. El número sale del campo numérico; la fuente se cita
+// aparte, sin depender de que su texto traiga el valor.
+// PURA y exportada para test.
+export function lineaFactorElectricidad(metodologia) {
+  // Sin versión (facturas anteriores al versionado) se mantiene la línea
+  // histórica: es lo que efectivamente se usó en esos cálculos.
+  const HISTORICA = ' Electricidad — Sistema Eléctrico Nacional (SEN) 2023: 0,2421 kgCO2e/kWh.';
+  const cat = metodologia?.factores?.get?.('electricidad');
+  const variantes = (cat?.variantes || []).filter((v) => v.factor > 0);
+  if (!variantes.length) return HISTORICA;
+  const unidad = cat.unidad_fisica || 'kWh';
+  const nf = (n) => n.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 6 });
+  // Con una sola variante la línea queda como siempre. Con dos —un período
+  // que abarcó un cambio de factor— se citan ambas con su versión: decir un
+  // solo número sería falso para la mitad de las facturas del informe.
+  if (variantes.length === 1) return ` ${cat.nombre}: ${nf(variantes[0].factor)} kgCO2e/${unidad}.`;
+  const detalle = variantes
+    .map((v) => `${nf(v.factor)} kgCO2e/${unidad} (v${Math.min(...v.versiones)})`)
+    .join('; ');
+  return ` ${cat.nombre}, factor vigente en cada tramo del período: ${detalle}.`;
 }
 
 // Normaliza el JSONB de componentes (puede llegar como string).
@@ -161,10 +196,19 @@ function folio(sesion) {
 // ruta. Si viene undefined, el servicio la busca por sesion.id; con null se omite.
 // `alcances` (opcional): filas {nombre, alcance_ghg} ya consultadas — pueden
 // traer además {organismo, documento, version_anio} para citar la fuente. Si
-// viene undefined, el servicio las busca en motor_categorias; con [] se omiten.
+// viene undefined, el servicio resuelve la metodología CONGELADA de las
+// versiones del motor con que se calcularon estas facturas; con [] se omiten.
 export async function generateReport({ sesion, facturas, declaracion, alcances }) {
   const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
-  const alcancesGhg = Array.isArray(alcances) ? alcances : await fetchAlcancesGHG();
+  // Metodología congelada: sale de la versión del motor estampada en cada
+  // factura, no del estado vigente. Así el informe sigue citando lo que
+  // realmente produjo sus números aunque después se editen los factores.
+  const metodologia = Array.isArray(alcances)
+    ? null
+    : await metodologiaDeVersiones(facturas.map((f) => f.motor_version_id));
+  const alcancesGhg = Array.isArray(alcances)
+    ? alcances
+    : (metodologia?.alcances ?? await fetchAlcancesGHG());
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const totalCo2e = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
@@ -372,17 +416,31 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
       // Con fuente vinculada (migración 018) se cita "organismo — documento
       // (año)"; sin fuente la línea queda idéntica a la actual.
       const cita = citaFuente(a);
+      // `version_motor` solo viene cuando el período abarca versiones del
+      // motor que discrepan en esta categoría (ver fusionarMetodologia): se
+      // marca cuál es cuál en vez de elegir una y callar.
+      const ver = a.version_motor ? ` [v${a.version_motor}]` : '';
       doc.font('Helvetica').fontSize(9).fillColor(GRAY)
-        .text(`· ${a.nombre}: ${a.alcance_ghg}${cita ? ` · Fuente: ${cita}` : ''}`, 64, y, { width: 483 });
+        .text(`· ${a.nombre}${ver}: ${a.alcance_ghg}${cita ? ` · Fuente: ${cita}` : ''}`, 64, y, { width: 483 });
       y = doc.y + 3;
+    }
+    if (metodologia?.mixta) {
+      if (y > 760) { doc.addPage(); y = 48; }
+      doc.font('Helvetica-Oblique').fontSize(8).fillColor(GRAY)
+        .text(`Este período abarca más de una versión del motor de cálculo (${metodologia.versiones.map((v) => `v${v}`).join(', ')}). Cada factura se calculó con la versión vigente en su fecha; las categorías que cambiaron aparecen arriba con su versión.`, 64, y, { width: 483 });
+      y = doc.y + 4;
     }
     y += 3;
   } else {
     doc.text('•  Marco de referencia: GHG Protocol (Scope 3 — emisiones indirectas de la cadena de valor) e ISO 14064-1.', 48, y, { width: 499 });
     y = doc.y + 6;
   }
+  // El factor de electricidad se cita desde la versión congelada del motor,
+  // no como constante escrita a mano: el día que alguien lo edite en el
+  // panel, esta línea seguía afirmando 0,2421 y el informe se contradecía
+  // con sus propios números.
   const metod = [
-    'Factores de emisión: HuellaChile (Ministerio del Medio Ambiente). Electricidad — Sistema Eléctrico Nacional (SEN) 2023: 0,2421 kgCO2e/kWh.',
+    `Factores de emisión: HuellaChile (Ministerio del Medio Ambiente).${lineaFactorElectricidad(metodologia)}`,
     'Jerarquía de calidad del dato (4 niveles): (1) dato primario medido; (2) dato del proveedor; (3) factor nacional/sectorial; (4) factor por defecto / proxy.',
     'La asignación por ítem se realiza a partir del documento tributario cargado y su glosa, clasificada por categoría de actividad.',
   ];
@@ -1392,6 +1450,97 @@ export async function generateConstanciaCurso({ constancia, curso, usuario }) {
     'Constancia de participación interna emitida por sicr3p — no constituye una certificación acreditada de ' +
     'terceros. Verificable con el QR o en sicr3p.cl/constancia/' + constancia.serial + '.',
     60, H - 76, { width: W - 260 }
+  );
+
+  return bufferDoc(doc);
+}
+
+// ---------- CONTRATO DE SERVICIO ----------
+// Documento multipágina de texto: el cuerpo lo arma services/contrato.js
+// (puro y versionado) y aquí solo se maqueta. Las cláusulas con un vacío
+// por resolver se imprimen marcadas: un contrato en borrador tiene que
+// verse como borrador, no disimularlo.
+export async function generateContrato({ contrato, clausulas, pendientes = [], titulo = 'CONTRATO DE SERVICIO', codigo = '' }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48 });
+  const W = doc.page.width;
+  const M = 48;
+  const ANCHO = W - M * 2;
+  const borrador = contrato?.estado === 'borrador';
+
+  drawLogo(doc, M, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`${contrato?.numero || ''} · ${codigo || 'plantilla'} ${contrato?.plantilla_version || ''}`,
+      M, 50, { width: ANCHO, align: 'right' });
+
+  doc.moveDown(2);
+  doc.font('Helvetica-Bold').fontSize(14).fillColor(NAVY)
+    .text(titulo, M, 92, { width: ANCHO });
+  doc.font('Helvetica').fontSize(10).fillColor(GRAY)
+    .text(`Emitido el ${fechaCorta(contrato?.created_at)}`, M, doc.y + 4, { width: ANCHO });
+
+  let y = doc.y + 16;
+
+  if (borrador) {
+    const alto = 56;
+    doc.roundedRect(M, y, ANCHO, alto, 4).fillAndStroke('#fff7ed', '#f59e0b');
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#b45309')
+      .text('BORRADOR — NO FIRMAR', M + 12, y + 10, { width: ANCHO - 24 });
+    doc.font('Helvetica').fontSize(8.5).fillColor('#92400e').text(
+      'Este documento se genera automáticamente al dar de alta la empresa, con las condiciones ya ' +
+      'decididas. Las cláusulas marcadas siguen con puntos por definir y requieren revisión legal ' +
+      'antes de firmar.',
+      M + 12, y + 24, { width: ANCHO - 24 }
+    );
+    y += alto + 18;
+  }
+
+  for (const c of clausulas || []) {
+    if (y > doc.page.height - 140) { doc.addPage(); y = M; }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+      .text(`${c.n}. ${c.titulo}`, M, y, { width: ANCHO });
+    y = doc.y + 2;
+    if (c.pendiente) {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#b45309')
+        .text('PENDIENTE DE REVISIÓN LEGAL', M, y, { width: ANCHO });
+      y = doc.y + 2;
+    }
+    for (const p of c.parrafos || []) {
+      if (y > doc.page.height - 110) { doc.addPage(); y = M; }
+      doc.font('Helvetica').fontSize(9.5).fillColor(NAVY)
+        .text(p, M, y, { width: ANCHO, align: 'justify' });
+      y = doc.y + 5;
+    }
+    y += 8;
+  }
+
+  if (pendientes.length) {
+    if (y > doc.page.height - 200) { doc.addPage(); y = M; }
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+      .text('Puntos por definir antes de firmar', M, y, { width: ANCHO });
+    y = doc.y + 6;
+    for (const p of pendientes) {
+      doc.font('Helvetica').fontSize(9.5).fillColor(GRAY)
+        .text(`•  ${p}`, M + 8, y, { width: ANCHO - 8 });
+      y = doc.y + 3;
+    }
+    y += 12;
+  }
+
+  if (y > doc.page.height - 150) { doc.addPage(); y = M; }
+  doc.font('Helvetica').fontSize(9.5).fillColor(NAVY)
+    .text('Firmas', M, y, { width: ANCHO });
+  y = doc.y + 34;
+  doc.moveTo(M, y).lineTo(M + 200, y).lineWidth(0.75).stroke(BORDER);
+  doc.moveTo(W - M - 200, y).lineTo(W - M, y).stroke(BORDER);
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text('sicr3p SpA', M, y + 6, { width: 200 })
+    .text(contrato?.datos?.razon_social || 'El cliente', W - M - 200, y + 6, { width: 200, align: 'right' });
+
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+    `Sello del documento (SHA-256): ${contrato?.hash_documento || ''}. Acredita que este PDF corresponde ` +
+    'a estas condiciones y a esta versión de plantilla; no es una firma electrónica con validez legal ' +
+    '(Ley N° 19.799) ni una certificación de terceros.',
+    M, doc.page.height - 78, { width: ANCHO }
   );
 
   return bufferDoc(doc);

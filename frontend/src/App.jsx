@@ -14,6 +14,8 @@ import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import AduanaVerde from './pages/AduanaVerde.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
+import SolicitarAuspicio from './pages/SolicitarAuspicio.jsx';
+import MisDatos from './pages/MisDatos.jsx';
 import Cadena from './pages/Cadena.jsx';
 import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
@@ -63,6 +65,10 @@ export default function App() {
       <Route path="/mis-sesiones" element={<MisSesiones />} />
       <Route path="/aduana-verde" element={<AduanaVerde />} />
       <Route path="/corredor" element={<CorredorLanding />} />
+      <Route path="/auspicio" element={<SolicitarAuspicio />} />
+      {/* Ejercicio de derechos ARCOP sin cuenta: el titular se identifica
+          por RUT o correo (Ley 21.719). */}
+      <Route path="/mis-datos" element={<MisDatos />} />
       <Route path="/cadena" element={<Cadena />} />
       <Route path="/constancia/:serial" element={<ConstanciaPublica />} />
 
