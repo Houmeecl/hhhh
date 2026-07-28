@@ -5,7 +5,7 @@ import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasa
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
-import { metodologiaDeVersiones, versionVigente } from './motorVersiones.js';
+import { metodologiaDeVersiones } from './motorVersiones.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -122,32 +122,6 @@ async function fetchAlcancesGHG() {
     console.warn('[pdf] alcances GHG no disponibles:', e.message);
     return [];
   }
-}
-
-// Cita el factor de electricidad desde la versión CONGELADA del motor.
-// Antes era una constante en el texto ("SEN 2023: 0,2421 kgCO2e/kWh"), y
-// también lo es dentro de motor_categorias.fuente — dos lugares que el día
-// que alguien edite el factor en el panel quedan contradiciendo al número
-// del propio informe. El número sale del campo numérico; la fuente se cita
-// aparte, sin depender de que su texto traiga el valor.
-// PURA y exportada para test.
-export function lineaFactorElectricidad(metodologia) {
-  // Sin versión (facturas anteriores al versionado) se mantiene la línea
-  // histórica: es lo que efectivamente se usó en esos cálculos.
-  const HISTORICA = ' Electricidad — Sistema Eléctrico Nacional (SEN) 2023: 0,2421 kgCO2e/kWh.';
-  const cat = metodologia?.factores?.get?.('electricidad');
-  const variantes = (cat?.variantes || []).filter((v) => v.factor > 0);
-  if (!variantes.length) return HISTORICA;
-  const unidad = cat.unidad_fisica || 'kWh';
-  const nf = (n) => n.toLocaleString('es-CL', { minimumFractionDigits: 0, maximumFractionDigits: 6 });
-  // Con una sola variante la línea queda como siempre. Con dos —un período
-  // que abarcó un cambio de factor— se citan ambas con su versión: decir un
-  // solo número sería falso para la mitad de las facturas del informe.
-  if (variantes.length === 1) return ` ${cat.nombre}: ${nf(variantes[0].factor)} kgCO2e/${unidad}.`;
-  const detalle = variantes
-    .map((v) => `${nf(v.factor)} kgCO2e/${unidad} (v${Math.min(...v.versiones)})`)
-    .join('; ');
-  return ` ${cat.nombre}, factor vigente en cada tramo del período: ${detalle}.`;
 }
 
 // Normaliza el JSONB de componentes (puede llegar como string).
@@ -397,68 +371,9 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     // Nota al pie de la sección.
     doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
       // Nota: las fuentes core de pdfkit (WinAnsi) no tienen el glifo "≥"; se usa ">=".
-      .text('Clasificación referencial según composición declarada (umbrales: Alto >= 70%, Medio >= 50%, Bajo < 50%). No constituye una verificación de tercera parte acreditada.', 48, y, { width: 499 });
+      .text('Clasificación según composición declarada (umbrales: Alto >= 70%, Medio >= 50%, Bajo < 50%).', 48, y, { width: 499 });
     y = doc.y + 12;
   }
-
-  // --- Metodología ---
-  if (y > 620) { doc.addPage(); y = 48; }
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metodología', 48, y);
-  y += 18;
-  doc.font('Helvetica').fontSize(9).fillColor(GRAY);
-  // Marco de referencia: con alcances declarados por categoría se citan los
-  // alcances GHG reales; sin datos se mantiene la línea genérica de siempre.
-  if (alcancesGhg.length) {
-    doc.text('•  Marco de referencia: GHG Protocol Corporate Standard e ISO 14064-1. Clasificación por alcance según categoría:', 48, y, { width: 499 });
-    y = doc.y + 4;
-    for (const a of alcancesGhg) {
-      if (y > 760) { doc.addPage(); y = 48; }
-      // Con fuente vinculada (migración 018) se cita "organismo — documento
-      // (año)"; sin fuente la línea queda idéntica a la actual.
-      const cita = citaFuente(a);
-      // `version_motor` solo viene cuando el período abarca versiones del
-      // motor que discrepan en esta categoría (ver fusionarMetodologia): se
-      // marca cuál es cuál en vez de elegir una y callar.
-      const ver = a.version_motor ? ` [v${a.version_motor}]` : '';
-      doc.font('Helvetica').fontSize(9).fillColor(GRAY)
-        .text(`· ${a.nombre}${ver}: ${a.alcance_ghg}${cita ? ` · Fuente: ${cita}` : ''}`, 64, y, { width: 483 });
-      y = doc.y + 3;
-    }
-    if (metodologia?.mixta) {
-      if (y > 760) { doc.addPage(); y = 48; }
-      doc.font('Helvetica-Oblique').fontSize(8).fillColor(GRAY)
-        .text(`Este período abarca más de una versión del motor de cálculo (${metodologia.versiones.map((v) => `v${v}`).join(', ')}). Cada factura se calculó con la versión vigente en su fecha; las categorías que cambiaron aparecen arriba con su versión.`, 64, y, { width: 483 });
-      y = doc.y + 4;
-    }
-    y += 3;
-  } else {
-    doc.text('•  Marco de referencia: GHG Protocol (Scope 3 — emisiones indirectas de la cadena de valor) e ISO 14064-1.', 48, y, { width: 499 });
-    y = doc.y + 6;
-  }
-  // El factor de electricidad se cita desde la versión congelada del motor,
-  // no como constante escrita a mano: el día que alguien lo edite en el
-  // panel, esta línea seguía afirmando 0,2421 y el informe se contradecía
-  // con sus propios números.
-  const metod = [
-    `Factores de emisión: HuellaChile (Ministerio del Medio Ambiente).${lineaFactorElectricidad(metodologia)}`,
-    'Jerarquía de calidad del dato (4 niveles): (1) dato primario medido; (2) dato del proveedor; (3) factor nacional/sectorial; (4) factor por defecto / proxy.',
-    'La asignación por ítem se realiza a partir del documento tributario cargado y su glosa, clasificada por categoría de actividad.',
-  ];
-  doc.font('Helvetica').fontSize(9).fillColor(GRAY);
-  for (const m of metod) {
-    if (y > 750) { doc.addPage(); y = 48; doc.font('Helvetica').fontSize(9).fillColor(GRAY); }
-    doc.text('•  ' + m, 48, y, { width: 499 });
-    y = doc.y + 6;
-  }
-
-  // --- Disclaimer ---
-  y += 6;
-  if (y > 720) { doc.addPage(); y = 48; }
-  doc.roundedRect(48, y, 499, 40, 6).fillAndStroke('#fffbeb', '#fde68a');
-  doc.font('Helvetica-Oblique').fontSize(9).fillColor('#92400e')
-    .text('Este informe no constituye una verificación de tercera parte acreditada.', 60, y + 8, { width: 475 });
-  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
-    .text('Documento generado por sicr3p como contabilidad de carbono trazable, base para su gestión y decisiones.', 60, y + 24, { width: 475 });
 
   // --- Pie de página en todas las páginas ---
   // Se anula el margen inferior temporalmente para poder escribir en el pie
@@ -497,7 +412,7 @@ export async function generateBalanceNatural({ balance, movimientos, activos, in
 
   doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text('Estado de Capital Natural', 48, 106);
   doc.font('Helvetica').fontSize(10).fillColor(GRAY)
-    .text(`Período: ${rango} · Cuentas ambientales según SEEA (ONU)`, 48, 130);
+    .text(`Período: ${rango}`, 48, 130);
 
   // --- Resumen por cuenta (tarjetas) ---
   let y = 156;
@@ -612,43 +527,6 @@ export async function generateBalanceNatural({ balance, movimientos, activos, in
     }
     y += 8;
   }
-
-  // --- Metodología ---
-  if (y > 610) { doc.addPage(); y = 48; }
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metodología', 48, y);
-  y += 18;
-  // El factor de electricidad sale de la versión VIGENTE del motor, no de
-  // una constante en el texto: escrito a mano, el día que alguien lo edita
-  // en el panel este balance sigue afirmando 0,2421 y se contradice con el
-  // motor que produjo sus propios movimientos.
-  //
-  // Se dice "vigente" y no "el que produjo estas cifras" a propósito:
-  // `movimientos_naturales` todavía no lleva sello de versión, así que un
-  // balance que abarque un cambio de factor no puede afirmar cuál usó cada
-  // movimiento. Sellarlos como se hizo con `facturas` es la ronda que falta.
-  const factorElec = lineaFactorElectricidad(
-    await metodologiaDeVersiones([(await versionVigente())?.id]).catch(() => null)
-  ).trim();
-  const metod = [
-    'Marco de referencia: Plan Nacional de Cuentas Ambientales de Chile (Comité de Capital Natural — MMA, Hacienda, Economía), basado en SEEA Marco Central y SEEA Cuentas de Ecosistemas (ONU); Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
-    `Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Factor vigente — ${factorElec}`,
-    'Flujos: derivados de documentos tributarios capturados, con traza al documento de origen. Cantidades físicas estimadas mediante factores de conversión editables por cuenta.',
-    'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP — manual cuando se ingresa directamente, o automática (extensión × precio unitario citado por cuenta, marcada "auto") cuando la cuenta define un precio de referencia.',
-  ];
-  doc.font('Helvetica').fontSize(9).fillColor(GRAY);
-  for (const m of metod) {
-    doc.text('•  ' + m, 48, y, { width: 499 });
-    y = doc.y + 6;
-  }
-
-  // --- Disclaimer ---
-  y += 6;
-  if (y > 720) { doc.addPage(); y = 48; }
-  doc.roundedRect(48, y, 499, 40, 6).fillAndStroke('#fffbeb', '#fde68a');
-  doc.font('Helvetica-Oblique').fontSize(9).fillColor('#92400e')
-    .text('Este informe no constituye una verificación de tercera parte acreditada.', 60, y + 8, { width: 475 });
-  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
-    .text('Documento generado por sicr3p como contabilidad de capital natural trazable, base para su gestión y decisiones.', 60, y + 24, { width: 475 });
 
   // --- Pie de página ---
   const range = doc.bufferedPageRange();
@@ -949,10 +827,6 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
       .text(`⚠ Declarado y trazado difieren en ${nfp(emisiones.divergencia_pct)}%`, 48, y);
     y += 14;
   }
-  if (emisiones?.fuente) {
-    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`Fuente metodológica: ${citaFuente(emisiones.fuente)}`, 48, y);
-    y += 14;
-  }
 
   // ---- Alineación normativa ----
   y += 8;
@@ -988,13 +862,8 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
   }
   y += (anclaje ? 96 : 72) + 12;
 
-  const marcos = normativo.oecd
-    ? 'la Guía de Debida Diligencia OCDE para minerales, al Reglamento CBAM (UE) 2023/956 y al concepto de Pasaporte Digital de Producto (ESPR)'
-    : 'el Reglamento CBAM (UE) 2023/956 y el concepto de Pasaporte Digital de Producto (ESPR)';
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
-    `Verificación en línea: ${loteUrl(lote.codigo)} — la cadena pública de sicr3p permite comprobar que este expediente no fue alterado. ` +
-    `Formato alineado a ${marcos}. ` +
-    'sicr3p no es certificador, auditor ni autoridad: registra y estructura declaraciones y documentos verificables de los actores de la cadena.',
+    `Verificación en línea: ${loteUrl(lote.codigo)} — la cadena pública de sicr3p permite comprobar que este expediente no fue alterado.`,
     48, y, { width: W }
   );
 
@@ -1122,29 +991,6 @@ export async function generateReporteCbam({ mandante, lotes }) {
     doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin lotes en el período consultado.', 54, y + 4);
     y += 20;
   }
-
-  // ---- Metodología ----
-  y += 14;
-  if (y > 700) { doc.addPage(); y = 60; }
-  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('METODOLOGÍA', 48, y);
-  y += 16;
-  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(
-    `Fuente: ${citaFuente({ organismo: 'Unión Europea', documento: 'Reglamento (UE) 2023/956 — Mecanismo de Ajuste en Frontera por Carbono (CBAM)', version_anio: '2023' })}. ` +
-    'Aplicabilidad determinada por el código NC de la mercancía (Anexo I vigente: cemento, electricidad, hidrógeno, fertilizantes, hierro y acero, aluminio — el cobre no está incluido).',
-    48, y, { width: W }
-  );
-  y = doc.y + 12;
-
-  // ---- Disclaimer legal (obligatorio, honestidad del proyecto) ----
-  if (y > 700) { doc.addPage(); y = 60; }
-  doc.roundedRect(48, y, W, 60, 6).fillAndStroke('#fff8e6', '#d97706');
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('IMPORTANTE', 60, y + 10);
-  doc.font('Helvetica').fontSize(8).fillColor(NAVY).text(
-    'Datos de apoyo para la declaración CBAM del importador de la UE — no sustituye la verificación por un ' +
-    'verificador acreditado exigida por el Art. 8 y el Art. 10 del Reglamento (UE) 2023/956 bajo el régimen ' +
-    'definitivo (vigente desde el 1 de enero de 2026). sicr3p no es certificador ni verificador de tercera parte.',
-    60, y + 24, { width: W - 24 }
-  );
 
   return bufferDoc(doc);
 }
@@ -1383,7 +1229,7 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     tablaContraparte('Compradores (recibieron documentos de este RUT)', contrapartes.compradores || []);
 
     doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
-      .text('Datos derivados de documentos ya procesados por sicr3p; no constituye una verificación de tercera parte acreditada.', 48, cy, { width: W });
+      .text('Datos derivados de documentos ya procesados por sicr3p.', 48, cy, { width: W });
   }
 
   // ---- Hoja de verificación para el receptor ----
@@ -1412,9 +1258,9 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     py += 78;
   }
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
-    'sicr3p no es un organismo certificador ni un verificador de tercera parte acreditado: registra, calcula y ' +
-    'sella datos desde los documentos tributarios reales del presentador, con integridad garantizada por una cadena ' +
-    'de hash pública. Esta carpeta se emitió para acompañar una entrega física; su versión digital siempre prevalece.',
+    'sicr3p registra, calcula y sella datos desde los documentos tributarios reales del presentador, con integridad ' +
+    'garantizada por una cadena de hash pública. Esta carpeta se emitió para acompañar una entrega física; su versión ' +
+    'digital siempre prevalece.',
     48, Math.max(py, 620), { width: W }
   );
 
@@ -1459,8 +1305,8 @@ export async function generateConstanciaCurso({ constancia, curso, usuario }) {
     .text('Escanee para verificar', W - 190, H - 84, { width: 100, align: 'center' });
 
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
-    'Constancia de participación interna emitida por sicr3p — no constituye una certificación acreditada de ' +
-    'terceros. Verificable con el QR o en sicr3p.cl/constancia/' + constancia.serial + '.',
+    'Constancia de participación interna emitida por sicr3p. Verificable con el QR o en ' +
+    'sicr3p.cl/constancia/' + constancia.serial + '.',
     60, H - 76, { width: W - 260 }
   );
 

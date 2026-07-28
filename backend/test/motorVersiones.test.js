@@ -4,8 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { fusionarMetodologia, fusionarFactores } from '../src/services/motorVersiones.js';
-import { lineaFactorElectricidad } from '../src/services/pdf.js';
+import { fusionarMetodologia } from '../src/services/motorVersiones.js';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -75,51 +74,6 @@ test('fusionarMetodologia tolera vacío y basura sin lanzar', () => {
     const r = fusionarMetodologia(entrada);
     assert.deepEqual(r, { alcances: [], versiones: [], mixta: false });
   }
-});
-
-test('el factor de electricidad del PDF sale de la versión, no de una constante', () => {
-  const factores = fusionarFactores([
-    { version_id: 5, codigo: 'electricidad', nombre: 'Energía eléctrica', unidad_fisica: 'kWh', factor_fisico_kgco2e: '0.3100' },
-  ]);
-  const linea = lineaFactorElectricidad({ factores });
-  assert.match(linea, /0,31/);
-  // El valor viejo NO puede seguir apareciendo cuando la versión dice otra cosa.
-  assert.ok(!linea.includes('0,2421'), `la línea quedó citando el factor viejo: ${linea}`);
-});
-
-test('dos versiones con factores distintos citan los dos, no el primero que llegue', () => {
-  // Sin esto, la línea dependía del orden en que Postgres devolviera las
-  // filas: el MISMO informe podía imprimir un factor distinto entre descargas.
-  const filas = [
-    { version_id: 1, codigo: 'electricidad', nombre: 'Energía eléctrica', unidad_fisica: 'kWh', factor_fisico_kgco2e: '0.2421' },
-    { version_id: 2, codigo: 'electricidad', nombre: 'Energía eléctrica', unidad_fisica: 'kWh', factor_fisico_kgco2e: '0.3100' },
-  ];
-  const linea = lineaFactorElectricidad({ factores: fusionarFactores(filas) });
-  assert.match(linea, /0,2421/);
-  assert.match(linea, /0,31/);
-  assert.match(linea, /v1/);
-  assert.match(linea, /v2/);
-  // Y el orden no depende de cómo lleguen las filas.
-  const alReves = lineaFactorElectricidad({ factores: fusionarFactores([...filas].reverse()) });
-  assert.equal(linea, alReves);
-});
-
-test('dos versiones con el MISMO factor no ensucian la línea', () => {
-  const factores = fusionarFactores([
-    { version_id: 1, codigo: 'electricidad', nombre: 'Energía eléctrica', unidad_fisica: 'kWh', factor_fisico_kgco2e: '0.2421' },
-    { version_id: 2, codigo: 'electricidad', nombre: 'Energía eléctrica', unidad_fisica: 'kWh', factor_fisico_kgco2e: '0.2421' },
-  ]);
-  const linea = lineaFactorElectricidad({ factores });
-  assert.ok(!linea.includes('v1'), `la línea marcó versiones sin necesidad: ${linea}`);
-});
-
-test('sin versión estampada se conserva la línea histórica', () => {
-  // Facturas anteriores al versionado: 0,2421 es lo que efectivamente se usó
-  // en esos cálculos, así que decir otra cosa sería peor.
-  assert.match(lineaFactorElectricidad(null), /0,2421/);
-  assert.match(lineaFactorElectricidad({ factores: new Map() }), /0,2421/);
-  const sinFactor = fusionarFactores([{ version_id: 1, codigo: 'electricidad', factor_fisico_kgco2e: 0 }]);
-  assert.match(lineaFactorElectricidad({ factores: sinFactor }), /0,2421/);
 });
 
 // ---------- Guardas sobre el código, no sobre la lógica ----------
