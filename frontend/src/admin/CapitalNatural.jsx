@@ -23,7 +23,7 @@ export default function CapitalNatural() {
             <span style={{ color: 'var(--green-600)' }}><Icon.Leaf size={24} /></span> Capital Natural
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Cuentas ambientales SEEA: flujos derivados de documentos + activos naturales (stocks). Agua, energía, carbono y materiales.
+            Cuentas ambientales del Plan Nacional de Cuentas Ambientales de Chile (MMA), basado en SEEA (ONU): flujos derivados de documentos + activos naturales (stocks). Agua, energía, carbono y materiales.
           </p>
         </div>
       </div>
@@ -321,7 +321,7 @@ function Libro({ flash }) {
               {descargando ? <span className="spinner" /> : 'Estado de Capital Natural (PDF)'}
             </button>
             <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-              Balance por cuenta con movimientos del período, activos naturales y metodología SEEA citada.
+              Balance por cuenta con movimientos del período, activos naturales y metodología citada (Plan Nacional de Cuentas Ambientales de Chile / SEEA).
             </p>
           </div>
         </div>

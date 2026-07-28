@@ -630,7 +630,7 @@ export async function generateBalanceNatural({ balance, movimientos, activos, in
     await metodologiaDeVersiones([(await versionVigente())?.id]).catch(() => null)
   ).trim();
   const metod = [
-    'Marco de referencia: SEEA — Sistema de Contabilidad Ambiental y Económica (ONU), Marco Central y Cuentas de Ecosistemas; Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
+    'Marco de referencia: Plan Nacional de Cuentas Ambientales de Chile (Comité de Capital Natural — MMA, Hacienda, Economía), basado en SEEA Marco Central y SEEA Cuentas de Ecosistemas (ONU); Natural Capital Protocol (Capitals Coalition); TNFD para reporte corporativo.',
     `Cuenta de carbono (CO2E): GHG Protocol (Scope 3) e ISO 14064-1; factores HuellaChile (MMA). Factor vigente — ${factorElec}`,
     'Flujos: derivados de documentos tributarios capturados, con traza al documento de origen. Cantidades físicas estimadas mediante factores de conversión editables por cuenta.',
     'Stocks: activos naturales registrados con extensión, condición (0–100) y valorización CLP — manual cuando se ingresa directamente, o automática (extensión × precio unitario citado por cuenta, marcada "auto") cuando la cuenta define un precio de referencia.',

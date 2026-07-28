@@ -84,12 +84,12 @@ async function seed() {
   if (cnCount[0].n === 0) {
     await query(
       `INSERT INTO cuentas_naturales (codigo, nombre, unidad, tipo, activo, factores, marco, fuente, notas) VALUES
-       ('AGUA','Agua','m3','flujo', true,  $1,'SEEA Marco Central (ONU)','Factor referencial agua potable — editable','Consumo hídrico derivado de documentos.'),
-       ('ENER','Energía','kWh','flujo', true, $2,'SEEA Marco Central (ONU)','HuellaChile — SEN 2023','Energía eléctrica estimada desde facturas.'),
+       ('AGUA','Agua','m3','flujo', true,  $1,'Plan Nacional de Cuentas Ambientales de Chile (MMA) — SEEA Marco Central (ONU)','Factor referencial agua potable — editable','Consumo hídrico derivado de documentos.'),
+       ('ENER','Energía','kWh','flujo', true, $2,'Plan Nacional de Cuentas Ambientales de Chile (MMA) — SEEA Marco Central (ONU)','HuellaChile — SEN 2023','Energía eléctrica estimada desde facturas.'),
        ('CO2E','Carbono','tCO2e','flujo', true, '{}'::jsonb,'GHG Protocol · ISO 14064-1','HuellaChile (MMA)','Cuenta espejo del Libro Mayor de Carbono.'),
-       ('MATR','Materiales y residuos','t','flujo', true, $3,'SEEA / Ley REP','Factor genérico de insumos — editable','Conecta con trazabilidad Ley REP.'),
-       ('SUEL','Suelo y ecosistemas','ha','stock', false, '{}'::jsonb,'SEEA Cuentas de Ecosistemas','—','Solo activos (stock); sin flujo automático en v1.'),
-       ('BIOD','Biodiversidad','índice','stock', false, '{}'::jsonb,'TNFD / SEEA EA','—','Índice de condición 0–100 por activo; sin flujo automático en v1.')`,
+       ('MATR','Materiales y residuos','t','flujo', true, $3,'Plan Nacional de Cuentas Ambientales de Chile (MMA) — SEEA / Ley REP','Factor genérico de insumos — editable','Conecta con trazabilidad Ley REP.'),
+       ('SUEL','Suelo y ecosistemas','ha','stock', false, '{}'::jsonb,'Plan Nacional de Cuentas Ambientales de Chile (MMA) — SEEA Cuentas de Ecosistemas','—','Solo activos (stock); sin flujo automático en v1.'),
+       ('BIOD','Biodiversidad','índice','stock', false, '{}'::jsonb,'Plan Nacional de Cuentas Ambientales de Chile (MMA) — TNFD / SEEA EA','—','Índice de condición 0–100 por activo; sin flujo automático en v1.')`,
       [
         JSON.stringify({ agua_kgco2e_m3: 0.344 }),
         JSON.stringify({ electricidad_kgco2e_kwh: 0.2421 }),
