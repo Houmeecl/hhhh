@@ -125,6 +125,12 @@ server {
 
     # Documentos comerciales y metodológicos — público a propósito.
     # docs/legal/ NUNCA se sirve aquí (borradores sin revisión de abogado).
+    # El documento 2 se llamaba 02-aduana-verde.pdf y ese enlace ya salió
+    # repartido a empresas. El archivo cambió de nombre con la marca; el 301
+    # lo resuelve para que el PDF entregado siga abriendo.
+    location = /docs/comercial/02-aduana-verde.pdf {
+        return 301 /docs/comercial/02-terreno.pdf;
+    }
     location /docs/comercial/ {
         alias $DIR/docs/comercial/;
         autoindex on;

@@ -19,7 +19,11 @@ import { useIdioma } from '../lib/i18n.js';
 // omite en vez de mostrar un cálculo inventado. label/unidad son claves i18n.
 const ENTRADAS = [
   { codigo: 'electricidad', tipo: 'fisico', labelKey: 'calc.electricidad', unidadKey: 'calc.u.kwh', icon: 'Plug', inicial: '2.500' },
-  { codigo: 'combustibles', tipo: 'fisico', labelKey: 'calc.combustibles', unidadKey: 'calc.u.litros', icon: 'Cog', inicial: '300' },
+  // `combustible` en singular: es el código de la categoría en el motor
+  // (migración 010), no el rótulo. Estuvo en plural y como la fila se omite
+  // cuando el código no existe, la entrada desaparecía sin avisar y la
+  // estimación salía casi a la mitad para quien quema combustible.
+  { codigo: 'combustible', tipo: 'fisico', labelKey: 'calc.combustibles', unidadKey: 'calc.u.litros', icon: 'Cog', inicial: '300' },
   { codigo: 'transporte', tipo: 'fisico', labelKey: 'calc.transporte', unidadKey: 'calc.u.km', icon: 'Package', inicial: '1.000' },
   { codigo: 'servicios', tipo: 'gasto', labelKey: 'calc.otros_gastos', unidadKey: 'calc.u.clp', icon: 'CreditCard', inicial: '500.000' },
 ];

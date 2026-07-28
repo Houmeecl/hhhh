@@ -45,7 +45,7 @@ metodología por nginx** (paso 6/6) en:
 
 ```
 http://<tu-dominio-o-IP>/docs/comercial/01-sicr3p-plataforma.pdf
-http://<tu-dominio-o-IP>/docs/comercial/02-aduana-verde.pdf
+http://<tu-dominio-o-IP>/docs/comercial/02-terreno.pdf
 http://<tu-dominio-o-IP>/docs/comercial/03-rep-ley-20920.pdf
 http://<tu-dominio-o-IP>/docs/comercial/04-correo-corporativo.pdf
 http://<tu-dominio-o-IP>/docs/metodologia/guia-metodologica-sicr3p.pdf

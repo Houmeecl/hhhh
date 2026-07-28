@@ -4,7 +4,7 @@
 // formatos, a partir de lo grabado por deploy/grabar-story-proyecto.mjs
 // (docs/video/raw/story: .webm + escenas-story.json).
 //
-// Pipeline (ffmpeg del sistema, mismo estilo que render-demo-aduana-verde.mjs):
+// Pipeline (ffmpeg del sistema):
 //   1. Tarjetas narrativas: fondo navy generado con lavfi + texto centrado
 //      quemado como subtítulos .srt (libass, force_style).
 //   2. Escena "paneles": capturas PNG reales de docs/manual/fuente/img/

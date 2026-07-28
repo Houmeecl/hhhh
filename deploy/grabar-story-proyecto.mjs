@@ -9,7 +9,7 @@
 // en pantalla es la app real corriendo (frontend :5173 + backend :4000
 // + Postgres): el CO2e del resultado lo calcula el motor en vivo.
 //
-// Igual que grabar-demo-aduana-verde.mjs, cada sesión de navegador se
+// Cada sesión de navegador se
 // mantiene corta (<60 s) y se VERIFICA después de grabar (peso de un
 // frame en un punto donde se sabe qué pantalla debe verse; una pantalla
 // "congelada" en un estado anterior pesa mucho menos) — si falla, esa

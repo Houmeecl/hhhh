@@ -1,7 +1,12 @@
-> **NOTA (2026-07-28):** además de lo de abajo, la landing `/aduana-verde`
-> que este guion abre tampoco existe: se plegó en la portada y la ruta
-> redirige a `/`. Las URLs `sicr3p.cl/aduana-verde` de más abajo quedan
-> como registro de lo que se grabó, no como instrucción.
+> **NOTA (2026-07-28):** este archivo pasa a ser **registro histórico**, no
+> instrucción. La landing `/aduana-verde` que el guion abre ya no existe —se
+> plegó en la portada y la ruta redirige a `/`—, y los tres scripts que
+> grababan y montaban el video (`grabar-demo-*`, `render-demo-*`) se
+> eliminaron: apuntaban a pantallas que ya no están. Las URLs
+> `sicr3p.cl/aduana-verde` de más abajo describen lo que se filmó en su
+> momento; se dejan tal cual a propósito, porque reescribirlas falsearía el
+> registro. El video resultante quedó en
+> `docs/video/demo-presencial-2026-07.mp4`.
 >
 > **NOTA (2026-07-27):** este guion describe el flujo del terminal físico `/pos`
 > (`PosTerminal.jsx`), descontinuado en favor del panel `/panel-verde` con
@@ -9,7 +14,7 @@
 > esta nota es solo para que quede claro que el flujo grabado ya no existe
 > en el producto.
 
-# Guion — Video corto "Mostrador presencial sicr3p" (recorrido real del mostrador)
+# Guion — Video corto del canal presencial, julio 2026 (registro histórico)
 
 **Duración total aproximada:** ~2 min 35 s
 **Fuente reutilizada:** `docs/comercial/fuente/10-manual-beneficios.html` (Recorrido A, capturas
