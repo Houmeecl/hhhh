@@ -3,7 +3,7 @@ import { api, fmtFecha } from '../api.js';
 
 const ROLES = ['admin', 'operador', 'cliente'];
 const PANELES = ['sicrep', 'aduana_verde'];
-const PANEL_LABEL = { sicrep: 'sicrep', aduana_verde: 'sicr3p (mostrador)' };
+const PANEL_LABEL = { sicrep: 'sicrep', aduana_verde: 'sicr3p (terreno)' };
 
 export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);

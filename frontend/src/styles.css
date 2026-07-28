@@ -31,7 +31,7 @@
 
 h1, h2, h3, .logo { font-family: var(--font-head); }
 
-/* Tokens del panel del mostrador presencial — scope .theme-av, no toca
+/* Tokens del panel de terreno — scope .theme-av, no toca
    --navy/--green globales (compartidos con la landing pública ni con el
    panel núcleo). Solo repinta el sidebar del shell admin ya existente,
    mismo layout. */
@@ -102,22 +102,9 @@ a:hover { text-decoration: underline; }
 /* ---------- Cards ---------- */
 .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); transition: box-shadow 0.2s var(--ease); }
 .card-pad { padding: 24px; }
-/* Utilidades de elevación / superficie (aditivas) */
-.elevation-2 { box-shadow: var(--shadow-2); }
-.glass {
-  background: rgba(255, 255, 255, 0.85);
-  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-}
-.hover-lift { transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease); }
-.hover-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
 .btn:active { transform: translateY(1px); }
-.result-card, .stat, .paso .ico { transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease); }
+.result-card, .stat { transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease); }
 .result-card:hover, .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--gray-300); }
-.paso:hover .ico { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--green); color: var(--green-600); }
-.trust-bar { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; padding: 16px 0; border-top: 1px solid var(--border); margin-top: 24px; }
-.trust-bar .item { display: flex; align-items: center; gap: 8px; color: var(--gray); font-size: 13px; font-weight: 600; }
-.trust-bar .item svg { color: var(--green-600); }
 
 /* ---------- Layout público ---------- */
 .pub-header {
@@ -146,26 +133,11 @@ a:hover { text-decoration: underline; }
 /* Tarjeta angosta centrada (Prueba, Ingresar, Acceso, Mis sesiones…) */
 .narrow-page { max-width: 460px; margin: 60px auto; padding: 0 20px; }
 
-/* ---------- Hero landing ---------- */
-.hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; padding: 64px 0; }
-.hero h1 { font-size: 62px; line-height: 1.02; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 20px; color: var(--navy); }
-.hero .lead-green { color: var(--navy); font-size: 24px; font-weight: 700; margin: 0 0 18px; }
-.hero p.sub { color: var(--gray); font-size: 17px; line-height: 1.6; max-width: 460px; margin: 0 0 30px; }
 .hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
-
-.preview-card {
-  background: #fff; border: 1px solid var(--border); border-radius: 18px;
-  box-shadow: var(--shadow-lg); padding: 22px; transform: perspective(1400px) rotateY(-3deg);
-}
 
 /* ---------- Pasos ---------- */
 .pasos { background: var(--bg); padding: 56px 0; }
 .pasos h2 { text-align: center; font-size: 30px; margin: 0 0 40px; }
-.pasos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-.paso { text-align: center; }
-.paso .ico { width: 64px; height: 64px; border-radius: 16px; background: #fff; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
-.paso h3 { margin: 0 0 8px; font-size: 18px; }
-.paso p { color: var(--gray); font-size: 14px; line-height: 1.5; margin: 0; }
 
 /* ---------- Carga / dropzone ---------- */
 .dropzone {
@@ -204,14 +176,6 @@ a:hover { text-decoration: underline; }
 .file-list { margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
 .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; font-size: 14px; }
 .file-item .rm { color: #b91c1c; cursor: pointer; font-weight: 600; }
-
-/* ---------- Flujo 3 pasos inline ---------- */
-.flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 22px 0; }
-.flow .node { text-align: center; flex: 1; }
-.flow .node .c { width: 52px; height: 52px; border-radius: 50%; background: #eaf6ef; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 22px; }
-.flow .arrow { color: var(--gray-300); font-size: 22px; }
-.flow .node b { display: block; font-size: 13px; }
-.flow .node span { font-size: 11px; color: var(--gray); }
 
 /* ---------- Resultado cards ---------- */
 .resultado-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
@@ -308,7 +272,6 @@ table.data tr:hover td { background: #f3f8f5; }
   -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 75%);
   mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 75%);
 }
-.login-wrap .glow { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.5; }
 .login-card {
   position: relative; z-index: 2; width: 100%; max-width: 430px;
   background: rgba(255,255,255,0.96); backdrop-filter: blur(14px);
@@ -357,13 +320,7 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; }
-  /* Sin esto, el .flow de 3 nodos del preview-card fija un mínimo intrínseco
-     (~353px) que ensancha la columna del hero 2px sobre el viewport chico. */
-  .hero > * { min-width: 0; }
-  .flow { overflow-x: auto; }
-  .hero h1 { font-size: 44px; }
-  .pasos-grid, .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
+  .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
   .admin-head { flex-wrap: wrap; gap: 10px; }
 
   /* Admin: barra superior + menú lateral deslizante (drawer).
@@ -402,29 +359,10 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 
 /* ============================================================
-   Mostrador presencial de sicr3p — landing de oficinas físicas (clases .av-*)
-   Solo aditivo: no modifica clases existentes.
+   Bloques .av-* nacidos en la landing del canal presencial. Esa página ya
+   no existe (su contenido se plegó en la portada), pero estas clases sí:
+   las usan la portada (/) y la landing del Corredor (/corredor).
    ============================================================ */
-
-/* Hero con gradiente radial verde sutil (misma técnica que .login-wrap, en claro) */
-.av-hero {
-  background:
-    radial-gradient(860px 480px at 82% -12%, rgba(40, 167, 69, 0.13), transparent 62%),
-    radial-gradient(640px 440px at -8% 106%, rgba(40, 167, 69, 0.07), transparent 58%);
-}
-
-/* "by sicr3p" elegante bajo el título */
-.av-kicker {
-  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--gray); margin: 0 0 18px;
-}
-.av-kicker .av-brand {
-  font-family: var(--font-head); font-weight: 700; font-size: 15px;
-  letter-spacing: -0.02em; text-transform: none; color: var(--navy);
-}
-.av-kicker .av-brand:hover { text-decoration: none; color: var(--green-600); }
-.av-kicker .av-dot { color: var(--green); }
 
 /* Franja "terminal físico": diagrama del flujo sobre fondo navy con grilla */
 .av-terminal {
@@ -448,7 +386,11 @@ table.data tr:hover td { background: #f3f8f5; }
   font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
   color: rgba(148, 163, 184, 0.9); margin: 0 0 10px;
 }
-.av-term-label .av-led {
+/* Punto LED del eyebrow. Sin ancestro a propósito: la regla vivía dentro
+   de .av-term-label y en .av2-eyebrow (portada y /corredor) el <span> se
+   renderizaba con tamaño cero — el punto verde no se veía en ninguna de
+   las dos portadas. */
+.av-led {
   width: 8px; height: 8px; border-radius: 50%; background: var(--green);
   box-shadow: 0 0 8px rgba(40, 167, 69, 0.9); flex: none;
 }
@@ -496,16 +438,6 @@ table.data tr:hover td { background: #f3f8f5; }
 .av-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
 .av-card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--green); }
 
-/* Ilustración del stand físico en el hero */
-.av-stand-wrap { min-width: 0; }
-.av-stand-wrap svg { filter: drop-shadow(0 14px 30px rgba(15, 31, 46, 0.14)); }
-.av-stand-note {
-  display: flex; gap: 10px; align-items: flex-start;
-  background: #fff; border: 1px solid var(--border); border-radius: 12px;
-  padding: 14px 16px; margin-top: 16px; font-size: 13px; line-height: 1.5;
-  box-shadow: var(--shadow);
-}
-
 /* Responsive .av-* (colapsos bajo 900px; verificado a 375px sin desborde) */
 @media (max-width: 900px) {
   .av-flow { grid-template-columns: 1fr; gap: 6px; }
@@ -528,6 +460,15 @@ table.data tr:hover td { background: #f3f8f5; }
    shorthand padding y esta ganaría, borrando los 24px laterales). */
 .sec-pad { padding: 64px 0; }
 .sec-alt { background: var(--bg); }
+/* Encabezado de sección: título + bajada. Existe porque las landings
+   repetían estos mismos valores inline en cada bloque (fontSize 30 /
+   maxWidth 520 / margin '0 auto 32px'); no hay tokens de escala
+   tipográfica todavía, así que esta clase es el mínimo para no repetirlos. */
+.sec-head { text-align: center; font-size: 30px; margin: 0 0 10px; }
+.sec-head-sub {
+  text-align: center; color: var(--gray); font-size: 15px;
+  line-height: 1.6; max-width: 520px; margin: 0 auto 32px;
+}
 
 /* Franja de números vivos de la plataforma (landing principal). Solo datos
    reales de GET /api/publico/cadena; si el fetch falla no se renderiza. */
@@ -554,16 +495,6 @@ table.data tr:hover td { background: #f3f8f5; }
    visualmente bajo 640px y entra cuando el hero salió de pantalla. */
 .mobile-cta { display: none; }
 
-/* Stand del mostrador presencial: colgante "PRONTO" con balanceo leve desde su bisagra
-   (transform-box: view-box → el origin se expresa en coordenadas del viewBox)
-   y número del tótem con fade-in de solo opacidad (no pisa el rotate del grupo). */
-@keyframes avSwing { from { transform: rotate(2.4deg); } to { transform: rotate(-2.4deg); } }
-.av-swing {
-  transform-box: view-box; transform-origin: 421px 181px;
-  animation: avSwing 2.4s ease-in-out infinite alternate;
-}
-.av-fade-slow { animation: fadeIn 0.9s ease 0.5s both; }
-
 @media (max-width: 640px) {
   .sec-pad { padding: 44px 0; }
   .mobile-cta {
@@ -579,9 +510,8 @@ table.data tr:hover td { background: #f3f8f5; }
   .mobile-cta .btn { width: 100%; }
 }
 
-/* Accesibilidad: sin animación de balanceo/aparición ni deslizamiento del CTA */
+/* Accesibilidad: sin deslizamiento del CTA flotante */
 @media (prefers-reduced-motion: reduce) {
-  .av-swing, .av-fade-slow { animation: none; }
   .mobile-cta { transition: none; }
 }
 
@@ -817,9 +747,10 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 
 /* ============================================================
-   Landing v2 del mostrador presencial — estilo producto moderno.
-   Hero oscuro con brillos, bento de entregables, mock del
-   Pasaporte Digital y aparición al hacer scroll.
+   Sistema visual .av2-* de las landings públicas — estilo producto
+   moderno: hero oscuro con brillos, bento de entregables, captura del
+   Pasaporte Digital y aparición al hacer scroll. Lo comparten la
+   portada (/) y /corredor.
    ============================================================ */
 .av2-hero {
   position: relative;
@@ -1085,64 +1016,6 @@ table.data tr:hover td { background: #f3f8f5; }
   .av2-pas-card { transform: rotate(0); }
   .av2-bento { grid-template-columns: 1fr; }
   .av2-pas-secgrid { grid-template-columns: 1fr; }
-}
-
-/* Header y footer propios de la landing del mostrador presencial. */
-.av2-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-  padding: 16px 40px;
-  background: var(--navy);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.av2-logo { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
-.av2-logo-hoja {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  color: #4ade80;
-  background: rgba(40, 167, 69, 0.16);
-  border: 1px solid rgba(40, 167, 69, 0.4);
-  flex-shrink: 0;
-}
-.av2-footer .av2-logo-hoja { width: 28px; height: 28px; }
-.av2-logo-nombre {
-  font-family: var(--font-head);
-  font-weight: 800;
-  font-size: 20px;
-  color: #fff;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-}
-.av2-logo-by { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12px; font-weight: 600; color: #94a3b8; }
-.av2-logo-by:hover { text-decoration: none; color: #cbd5e1; }
-.av2-nav { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.av2-nav-link { color: #cbd5e1; font-weight: 600; font-size: 14px; }
-.av2-nav-link:hover { color: #fff; text-decoration: none; }
-.av2-header .lang-switch button { color: #64748b; }
-.av2-header .lang-switch button:hover { color: #cbd5e1; }
-.av2-header .lang-switch button.on { color: #4ade80; }
-.av2-footer {
-  background: var(--navy);
-  color: #cbd5e1;
-  padding: 26px 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 13px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-@media (max-width: 700px) {
-  .av2-header { padding: 14px 18px; }
-  .av2-footer { padding: 22px 18px; justify-content: center; text-align: center; }
 }
 
 /* Pasaporte real embebido en el hero/sección resultado (av2-pas-shot):

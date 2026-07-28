@@ -15,7 +15,7 @@ import Dropzone from '../components/Dropzone.jsx';
 
 const TIPO_LABEL = {
   mineral: 'Mineral (minería)',
-  producto: 'Producto (ciudad / mostrador sicr3p)',
+  producto: 'Producto (ciudad / terreno sicr3p)',
   documental: 'Documental (Corredor Bioceánico)',
 };
 const ROL_LABEL = {

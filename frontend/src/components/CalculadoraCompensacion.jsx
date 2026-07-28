@@ -31,7 +31,7 @@ const parseCL = (s) => {
 };
 const fmt3 = (n) => (Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
+export default function CalculadoraCompensacion() {
   const { t } = useIdioma();
   const [data, setData] = useState(null);
   const [estado, setEstado] = useState('cargando'); // cargando | ok | error
@@ -94,8 +94,6 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
   // Sin datos no hay calculadora — y el landing sigue intacto.
   if (estado === 'error' || filas.length === 0) return null;
 
-  const enAduana = contexto === 'aduana';
-
   return (
     <div className="card card-pad" style={{ maxWidth: 920, margin: '0 auto' }}>
       <div className="two-col-grid" style={{ gap: 28, alignItems: 'start' }}>
@@ -156,9 +154,6 @@ export default function CalculadoraCompensacion({ contexto = 'sicr3p' }) {
           </div>
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
             <Link to="/cargar" className="btn btn-primary">{t('calc.cta')}</Link>
-            {!enAduana && (
-              <span className="muted" style={{ fontSize: 13 }}>{t('calc.en_oficina_pre')} <Link to="/aduana-verde">{t('calc.en_oficina_link')}</Link></span>
-            )}
           </div>
         </div>
       </div>

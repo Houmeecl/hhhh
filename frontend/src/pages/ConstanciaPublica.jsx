@@ -68,7 +68,7 @@ export default function ConstanciaPublica() {
             </div>
 
             <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
-              Constancia de participación interna emitida por sicr3p para su personal de mostrador. No constituye una
+              Constancia de participación interna emitida por sicr3p para su personal de terreno. No constituye una
               certificación acreditada de terceros.
             </p>
           </div>

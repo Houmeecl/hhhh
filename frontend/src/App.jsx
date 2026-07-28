@@ -12,7 +12,6 @@ import Ingresar from './pages/Ingresar.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
-import AduanaVerde from './pages/AduanaVerde.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
 import SolicitarAuspicio from './pages/SolicitarAuspicio.jsx';
 import MisDatos from './pages/MisDatos.jsx';
@@ -63,7 +62,12 @@ export default function App() {
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />
       <Route path="/mis-sesiones" element={<MisSesiones />} />
-      <Route path="/aduana-verde" element={<AduanaVerde />} />
+      {/* /aduana-verde era una segunda landing del canal presencial, con sus
+          propios header y footer y los mismos destinos que la portada. Su
+          contenido útil vive ahora en "/". La ruta se conserva como
+          redirección porque el enlace ya salió repartido en material impreso
+          y en versiones anteriores del sitio. */}
+      <Route path="/aduana-verde" element={<Navigate to="/" replace />} />
       <Route path="/corredor" element={<CorredorLanding />} />
       <Route path="/auspicio" element={<SolicitarAuspicio />} />
       {/* Ejercicio de derechos ARCOP sin cuenta: el titular se identifica
@@ -77,9 +81,9 @@ export default function App() {
       <Route path="/admin/activar" element={<ActivarCuenta loginPath="/admin/login" />} />
       <Route path="/admin/*" element={<AdminApp />} />
 
-      {/* Panel del mostrador presencial — compensación, tarifa y REP, cuentas propias */}
+      {/* Panel de terreno — compensación, tarifa y REP, cuentas propias */}
       <Route path="/panel-verde/login" element={<LoginAv />} />
-      <Route path="/panel-verde/activar" element={<ActivarCuenta loginPath="/panel-verde/login" titulo="el panel del mostrador presencial" />} />
+      <Route path="/panel-verde/activar" element={<ActivarCuenta loginPath="/panel-verde/login" titulo="el panel de terreno" />} />
       <Route path="/panel-verde/*" element={<AdminAvApp />} />
 
       {/* Panel de Puerto — lectura completa de tránsitos por su propio punto del Corredor */}

@@ -1,70 +1,14 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Logo from '../components/Logo.jsx';
-import { Icon } from '../components/icons.jsx';
-import { api, auth } from '../api.js';
+import PanelLogin from '../components/PanelLogin.jsx';
+import { auth } from '../api.js';
 
 export default function Login() {
-  const nav = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [resetMsg, setResetMsg] = useState('');
-
-  async function submit(e) {
-    e.preventDefault();
-    setError(''); setLoading(true);
-    try {
-      const { accessToken, refreshToken } = await api.login(email, password, 'sicrep');
-      auth.set(accessToken, refreshToken);
-      nav('/admin');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function pedirReset() {
-    if (!email) { setError('Ingresa tu correo para restablecer la contraseña.'); return; }
-    try {
-      await api.solicitarReset(email);
-      setResetMsg('Si el correo existe, enviamos instrucciones para restablecer tu contraseña.');
-    } catch (err) { setError(err.message); }
-  }
-
   return (
-    <div className="login-wrap">
-      <div style={{ width: '100%', maxWidth: 430 }} className="fade-up">
-        <div style={{ textAlign: 'center', marginBottom: 24, position: 'relative', zIndex: 2 }}>
-          <Logo size={48} tagline light />
-        </div>
-        <form className="login-card" onSubmit={submit}>
-          <h2>Acceso — sicrep</h2>
-          <div className="field" style={{ marginBottom: 14 }}>
-            <label>Usuario / Correo</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@sicrep.cl" autoFocus />
-          </div>
-          <div className="field" style={{ marginBottom: 10 }}>
-            <label>Contraseña</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Contraseña" />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-            <span className="muted" style={{ fontSize: 13, cursor: 'pointer' }} onClick={pedirReset}>¿Olvidaste tu contraseña?</span>
-          </div>
-          {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{error}</div>}
-          {resetMsg && <div className="badge badge-green" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{resetMsg}</div>}
-          <button className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-            {loading ? <span className="spinner" /> : 'Iniciar sesión'}
-          </button>
-        </form>
-        <div className="login-badges">
-          <span className="b"><Icon.Shield size={14} /> Acceso seguro</span>
-          <span className="b"><Icon.CheckCircle size={14} /> JWT + bcrypt</span>
-          <span className="b"><Icon.Building size={14} /> Antofagasta, Chile</span>
-        </div>
-      </div>
-    </div>
+    <PanelLogin
+      panel="sicrep"
+      authStore={auth}
+      redirect="/admin"
+      titulo="Acceso — sicrep"
+      placeholder="admin@sicrep.cl"
+    />
   );
 }

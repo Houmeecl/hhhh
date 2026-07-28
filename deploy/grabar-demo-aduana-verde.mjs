@@ -32,6 +32,12 @@
 //     cada escena + subtítulos + datos reales capturados, para que
 //     render-demo-aduana-verde.mjs arme el video final con esos tiempos)
 //
+// OBSOLETO (2026-07-28): graba /aduana-verde, que ya no existe — esa ruta
+// redirige a "/" y las secciones que este guion busca se plegaron en la
+// portada. Se conserva como referencia del pipeline de grabación; para un
+// video nuevo hay que reescribir las escenas contra la portada actual. El
+// video ya producido sigue en docs/video/aduana-verde-demo.mp4.
+//
 // Uso: node deploy/grabar-demo-aduana-verde.mjs
 // Variables opcionales:
 //   FRONT_URL   (default http://localhost:5173)

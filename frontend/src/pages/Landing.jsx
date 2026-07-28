@@ -50,6 +50,19 @@ function FranjaCadena({ t }) {
   );
 }
 
+// Captura REAL del Pasaporte Digital — no un mock dibujado: es la pantalla
+// /pasaporte/:id tal como la ve cualquiera que escanee el QR (datos de una
+// operación de demostración). El chip lo dice explícitamente para que la
+// imagen no se lea como una ilustración aspiracional.
+function PasaportePreview({ t }) {
+  return (
+    <div className="av2-pas-card av2-pas-shot">
+      <img src="/img/plataforma/pasaporte-real.png" alt="" loading="lazy" aria-hidden="true" />
+      <span className="av2-pas-chip">✓ {t('landing.shot_chip')}</span>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { t } = useIdioma();
   const heroRef = useRef(null);
@@ -81,20 +94,18 @@ export default function Landing() {
 
   return (
     <PublicLayout>
-      {/* HERO oscuro estilo producto (mismo sistema av2 de /aduana-verde y
-          /corredor): titular nuevo y el video real del proyecto como pieza
-          central — grabado de la plataforma en vivo, no una animación. */}
+      {/* HERO oscuro estilo producto (mismo sistema av2 que /corredor): el
+          titular real va en el <h1> — la marca ya está en el header, no
+          necesita ocupar el encabezado de la página — y el video real del
+          proyecto es la pieza central: grabado de la plataforma en vivo,
+          no una animación. */}
       <div className="av2-hero" ref={heroRef}>
         <div className="container">
           <section className="av2-hero-grid">
             <div className="fade-up">
               <span className="av2-eyebrow"><span className="av-led" /> {t('landing.hero_eyebrow')}</span>
-              <h1 className="av2-h1">
-                sicr3p<span style={{ color: 'var(--green)' }}>.</span>
-              </h1>
-              <p className="av2-t2">
-                {t('landing.hero2_t1')} <span className="av2-grad">{t('landing.hero2_t2')}</span>
-              </p>
+              <h1 className="av2-h1">{t('landing.hero2_t1')}</h1>
+              <p className="av2-t2"><span className="av2-grad">{t('landing.hero2_t2')}</span></p>
               <p className="av2-sub">{t('landing.hero2_sub')}</p>
               <div className="hero-actions">
                 <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
@@ -103,9 +114,9 @@ export default function Landing() {
                 <a href="#video-proyecto" className="btn av2-btn-ghost">{t('landing.cta_video')}</a>
               </div>
               <div className="av2-trust">
-                <span><Icon.Shield size={15} /> GHG Protocol</span>
-                <span><Icon.CheckCircle size={15} /> ISO 14064-1</span>
-                <span><Icon.Leaf size={15} /> Factores HuellaChile</span>
+                <span><Icon.Shield size={15} /> {t('landing.trust_1')}</span>
+                <span><Icon.CheckCircle size={15} /> {t('landing.trust_2')}</span>
+                <span><Icon.Leaf size={15} /> {t('landing.trust_3')}</span>
               </div>
             </div>
 
@@ -131,10 +142,8 @@ export default function Landing() {
           enlazando a algo real (no un catálogo aspiracional). */}
       <section className="sec-pad">
         <div className="container">
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('landing.servicios_titulo')}</h2>
-          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
-            {t('landing.servicios_sub')}
-          </p>
+          <h2 className="sec-head">{t('landing.servicios_titulo')}</h2>
+          <p className="sec-head-sub">{t('landing.servicios_sub')}</p>
           <div className="av2-bento">
             <div className="av2-bento-card av2-bento-a av2-reveal">
               <div className="av2-bento-ico"><Icon.Chart size={24} /></div>
@@ -152,19 +161,16 @@ export default function Landing() {
               <p>{t('landing.serv3_d')}</p>
             </div>
             <div className="av2-bento-card av2-bento-b av2-reveal">
-              <div className="av2-bento-ico"><Icon.Building size={24} /></div>
+              <div className="av2-bento-ico"><Icon.Users size={24} /></div>
               <h3>{t('landing.serv4_t')}</h3>
               <p>{t('landing.serv4_d')}</p>
-              <Link to="/aduana-verde" className="av2-nav-link" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                {t('landing.serv4_link')} <Icon.ArrowRight size={14} />
-              </Link>
             </div>
           </div>
         </div>
       </section>
 
       {/* Corredor Bioceánico: la línea transfronteriza, con landing propia */}
-      <section className="sec-pad" style={{ paddingTop: 0 }}>
+      <section className="sec-pad sec-alt">
         <div className="container">
           <div className="land-corr av2-reveal">
             <div>
@@ -188,10 +194,8 @@ export default function Landing() {
 
       <section className="sec-pad">
         <div className="container">
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('landing.pasos_titulo')}</h2>
-          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 520, margin: '0 auto 32px', lineHeight: 1.6 }}>
-            {t('landing.pasos_sub')}
-          </p>
+          <h2 className="sec-head">{t('landing.pasos_titulo')}</h2>
+          <p className="sec-head-sub">{t('landing.pasos_sub')}</p>
           <div className="av2-bento av2-bento-3">
             <div className="av2-bento-card av2-bento-a av2-reveal">
               <div className="av2-bento-ico"><Icon.Cloud size={24} /></div>
@@ -216,36 +220,109 @@ export default function Landing() {
       </section>
 
       {/* Banda oscura de verificación: el argumento central del producto —
-          nada pide confianza, todo se comprueba en las páginas públicas. */}
-      <section className="av2-pasaporte" style={{ padding: '64px 0' }}>
-        <div className="container" style={{ textAlign: 'center', maxWidth: 760 }}>
-          <h2 style={{ color: '#fff', fontSize: 30, margin: '0 0 12px' }}>
-            {t('landing.verif_titulo')}<span style={{ color: 'var(--green)' }}>.</span>
-          </h2>
-          <p style={{ color: '#94a3b8', fontSize: 15.5, lineHeight: 1.7, margin: '0 auto 24px', maxWidth: 640 }}>
-            {t('landing.verif_sub')}
-          </p>
-          <Link to="/cadena" className="btn av2-btn-ghost">
-            {t('landing.verif_cta')} <Icon.ArrowRight size={15} />
-          </Link>
+          nada pide confianza, todo se comprueba en las páginas públicas. La
+          captura de la derecha es la pantalla real del Pasaporte Digital, que
+          es exactamente lo que se está prometiendo en el texto. */}
+      <section className="av2-pasaporte sec-pad">
+        <div className="container">
+          <div className="av2-pas-secgrid">
+            <div className="av2-reveal">
+              <h2 style={{ fontSize: 30, margin: '0 0 12px', color: '#fff' }}>
+                {t('landing.verif_titulo')}<span style={{ color: 'var(--green)' }}>.</span>
+              </h2>
+              <p style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.7, maxWidth: 480 }}>{t('landing.verif_sub')}</p>
+              <ol className="av2-pas-pasos">
+                <li><span>1</span>{t('landing.verif_p1')}</li>
+                <li><span>2</span>{t('landing.verif_p2')}</li>
+                <li><span>3</span>{t('landing.verif_p3')}</li>
+              </ol>
+              <div className="hero-actions">
+                <Link to="/cadena" className="btn av2-btn-ghost">
+                  {t('landing.verif_cta')} <Icon.ArrowRight size={15} />
+                </Link>
+                <span className="badge badge-green" style={{ alignSelf: 'center' }}>{t('landing.verif_chip')}</span>
+              </div>
+            </div>
+            <div className="av2-pas-wrap av2-reveal" style={{ justifyContent: 'center' }}>
+              <PasaportePreview t={t} />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* La cuenta es corta: el modelo comercial completo en cuatro números,
+          sin letra chica. La tarifa se dice referencial siempre. */}
+      <section className="sec-pad">
+        <div className="container">
+          <h2 className="sec-head">{t('landing.cuenta_titulo')}</h2>
+          <p className="sec-head-sub">{t('landing.cuenta_sub')}</p>
+          <div className="av-cuenta-grid">
+            <div className="av-stat av-tarifa fade-up d1">
+              <div className="n">1 = 1</div>
+              <div className="l">{t('landing.stat_1eq')}</div>
+              <div className="av-nota">{t('landing.stat_1eq_nota')}</div>
+            </div>
+            <div className="av-stat fade-up d2">
+              <div className="n">1</div>
+              <div className="l">{t('landing.stat_carga')}</div>
+            </div>
+            <div className="av-stat fade-up d3">
+              <div className="n">2</div>
+              <div className="l">{t('landing.stat_decls')}</div>
+            </div>
+            <div className="av-stat fade-up d4">
+              <div className="n">0</div>
+              <div className="l">{t('landing.stat_cero')}</div>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Calculadora pública: estimación en vivo con los factores reales del motor */}
+      <section className="sec-pad sec-alt">
+        <div className="container">
+          <h2 className="sec-head">{t('landing.calc_titulo')}</h2>
+          <p className="sec-head-sub">{t('landing.calc_sub')}</p>
+          <CalculadoraCompensacion />
+        </div>
+      </section>
+
+      {/* REP (Ley 20.920): la segunda declaración sale de la misma carga */}
       <section className="sec-pad">
         <div className="container">
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 10px' }}>{t('landing.calc_titulo')}</h2>
-          <p className="muted" style={{ textAlign: 'center', fontSize: 15, maxWidth: 560, margin: '0 auto 28px', lineHeight: 1.6 }}>
-            {t('landing.calc_sub')}
-          </p>
-          <CalculadoraCompensacion contexto="sicr3p" />
+          <div className="two-col-grid" style={{ gap: 28, alignItems: 'stretch' }}>
+            <div className="card card-pad av-card-hover av2-reveal">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.List size={24} /></span>
+                <h3 style={{ margin: 0 }}>{t('landing.rep_titulo')}</h3>
+              </div>
+              <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                {t('landing.rep_texto')}
+              </p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                <span className="badge badge-green">{t('landing.rep_alta')}</span>
+                <span className="badge badge-amber">{t('landing.rep_media')}</span>
+                <span className="badge badge-red">{t('landing.rep_baja')}</span>
+              </div>
+            </div>
+            <div className="card card-pad av-card-hover av2-reveal">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <span style={{ color: 'var(--green-600)', display: 'inline-flex' }}><Icon.Users size={24} /></span>
+                <h3 style={{ margin: 0 }}>{t('landing.prov_titulo')}</h3>
+              </div>
+              <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+                {t('landing.prov_texto')}
+              </p>
+              <a href="mailto:contacto@sicrep.cl?subject=sicr3p%20-%20Declaraci%C3%B3n%20REP" className="btn btn-outline btn-sm">{t('landing.prov_cta')}</a>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Preguntas frecuentes — honestas, sin evasivas */}
-      <section className="sec-pad">
+      <section className="sec-pad sec-alt">
         <div className="container" style={{ maxWidth: 760 }}>
-          <h2 style={{ textAlign: 'center', fontSize: 30, margin: '0 0 28px' }}>{t('landing.faq_titulo')}</h2>
+          <h2 className="sec-head" style={{ marginBottom: 28 }}>{t('landing.faq_titulo')}</h2>
           <div className="av2-faq">
             {[1, 2, 3, 4].map((n) => (
               <details key={n} className="av2-faq-item av2-reveal">
@@ -257,16 +334,31 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Cierre: mismo par de CTAs del hero, para no terminar en seco */}
-      <section className="pasos">
-        <div className="container" style={{ textAlign: 'center' }}>
-          <h2 style={{ margin: '0 0 10px' }}>{t('landing.cierre_titulo')}</h2>
-          <p className="muted" style={{ fontSize: 15, maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
-            {t('landing.cierre_sub')}
-          </p>
-          <div className="hero-actions" style={{ justifyContent: 'center' }}>
-            <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
-            <a href="mailto:contacto@sicrep.cl" className="btn btn-outline">{t('landing.cta_contacto')}</a>
+      {/* Cierre honesto: el estado real del proyecto va con badge, arriba del
+          CTA, no escondido en el pie. La compensación se declara simulada
+          mientras no haya socio ambiental formalizado. */}
+      <section className="sec-pad">
+        <div className="container">
+          <div className="card card-pad av-card-hover" style={{ textAlign: 'center' }}>
+            <span className="badge badge-amber">{t('landing.pre_badge')}</span>
+            <h2 style={{ margin: '14px 0 10px', fontSize: 26 }}>{t('landing.pre_titulo')}</h2>
+            <p className="muted" style={{ fontSize: 15, lineHeight: 1.6, maxWidth: 560, margin: '0 auto 20px' }}>
+              {t('landing.pre_texto')}
+            </p>
+            <div className="hero-actions" style={{ justifyContent: 'center' }}>
+              <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
+              <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20sicr3p" className="btn btn-outline">{t('landing.pre_cta1')}</a>
+            </div>
+
+            <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span className="badge badge-gray" style={{ fontSize: 11 }}>{t('comun.proximamente')}</span>
+              <span className="muted" style={{ fontSize: 12 }}>{t('comun.socio_ambiental')}</span>
+            </div>
+            {/* Honestidad de marca: en inglés incluye "not affiliated with any
+                national customs service" (sicr3p no es aduana ni autoridad). */}
+            <p className="muted" style={{ fontSize: 12, marginTop: 8, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
+              {t('landing.disclaimer')}
+            </p>
           </div>
         </div>
       </section>

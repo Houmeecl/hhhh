@@ -63,10 +63,10 @@ http://<tu-dominio-o-IP>/docs/libro/el-libro-sicr3p.pdf
 SIN ABOGADO"). Si algo falla, el script se detiene y te dice exactamente
 dónde.
 
-**Mostrador presencial:** el terminal físico (`/pos`, tablet dedicada) se
-descontinuó — el mostrador opera 100% desde `/panel-verde` en cualquier
+**Canal de terreno:** el terminal físico (`/pos`, tablet dedicada) se
+descontinuó — el canal opera 100% desde `/panel-verde` en cualquier
 navegador, con un operador logueado. Sigue siendo instalable como PWA
-propia (`manifest-aduana-verde.webmanifest`, `start_url: /panel-verde`)
+propia (`manifest-terreno.webmanifest`, `start_url: /panel-verde`)
 si se quiere un acceso directo en el equipo del mostrador; los navegadores
 exigen HTTPS para instalarla (`bash deploy/instalar-vps.sh app.sicr3p.cl`).
 

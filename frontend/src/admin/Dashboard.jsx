@@ -163,7 +163,7 @@ export default function Dashboard() {
             </>
           ) : (
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              Aún no hay compensaciones registradas desde los terminales del mostrador presencial o el flujo web.
+              Aún no hay compensaciones registradas desde el panel de terreno o el flujo web.
             </p>
           )}
           <p className="muted" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>

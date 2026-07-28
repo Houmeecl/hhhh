@@ -17,7 +17,7 @@ const NAV = [
   { to: '/panel-verde/capacitacion', ico: Icon.Book, label: 'Capacitación' },
 ];
 
-// El panel del mostrador presencial de sicr3p es su propia "app" instalable,
+// El panel de terreno de sicr3p es su propia "app" instalable,
 // distinta del panel núcleo (que usa /manifest-admin.webmanifest) — mismo
 // service worker (sw.js), solo cambia el manifest mientras esta ruta está
 // montada. Mismo patrón que useManifestAdmin en admin/AdminApp.jsx.
@@ -26,7 +26,7 @@ function useManifestAv() {
     const link = document.querySelector('link[rel="manifest"]');
     if (!link) return undefined;
     const original = link.getAttribute('href');
-    link.setAttribute('href', '/manifest-aduana-verde.webmanifest');
+    link.setAttribute('href', '/manifest-terreno.webmanifest');
     return () => link.setAttribute('href', original);
   }, []);
 }
@@ -39,7 +39,7 @@ export default function AdminAvApp() {
 
   useManifestAv();
 
-  useEffect(() => { document.title = 'sicr3p — Panel mostrador'; }, []);
+  useEffect(() => { document.title = 'sicr3p — Panel de terreno'; }, []);
 
   useEffect(() => {
     if (!authAv.access) { nav('/panel-verde/login'); return; }
@@ -80,7 +80,7 @@ export default function AdminAvApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo size={26} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Mostrador presencial</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Panel de terreno</div>
         </div>
         <nav>
           {NAV.map((n) => {

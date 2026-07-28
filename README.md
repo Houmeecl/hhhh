@@ -377,21 +377,29 @@ ejemplo, un derecho de agua en l/s con un precio cotizado por m3).
 
 ---
 
-## Terminal POS de mostrador (`/pos`) y landing (`/aduana-verde`)
+## Canal de terreno (`/panel-verde`)
 
-Red de oficinas físicas de tramitación verde de sicr3p. El
-terminal es un **dispositivo** (patrón VecinoXpress/NotaryPro): se conecta con
-serial + clave (`POST /api/pos/auth`, tabla `pos_terminales`, gestión en panel →
-Accesos externos → Terminales; la clave se muestra una sola vez al crearlo). El flujo
-del mesón: datos del cliente → captura de documentos con la cámara de la tablet →
-**el reconocimiento y cálculo ocurren en la plataforma** (`POST /api/sesiones`, motor
-propio para DTE XML) → **el cobro es la compensación del CO2 calculado** (t CO2e ×
-tarifa referencial CLP 5.000/t, editable y marcada "referencial") → comprobante con QR
-verificable (`/verificar/:id`, cadena de hash). Incluye declaración de embalajes
-**REP Ley 20.920** (componentes por material → % reciclabilidad Alto/Medio/Bajo) y un
-modo "Verificación en recepción" para mandantes. El **pago es simulado** hasta
-integrar una pasarela real (VirtualPos, pendiente de credenciales); todo lo demás es
-real contra el backend.
+El canal presencial de sicr3p: un operador con cuenta propia captura los documentos
+del cliente donde el cliente está —faena, bodega, punto de despacho— desde cualquier
+navegador. No hay dispositivo dedicado: el terminal físico `/pos` y la tabla
+`pos_terminales` se descontinuaron; el operador entra con correo y clave
+(`panel = 'aduana_verde'` en `usuarios`, valor de la migración 027) y trabaja en
+`CargarAv.jsx`.
+
+El flujo: datos del cliente → captura de documentos → **el reconocimiento y el
+cálculo ocurren en la plataforma** (`POST /api/sesiones`, motor propio para DTE XML)
+→ declaración de embalajes **REP Ley 20.920** (componentes por material → %
+reciclabilidad Alto/Medio/Bajo) → **compensación del CO2 calculado** (t CO2e × tarifa
+referencial, editable y marcada "referencial") → comprobante con QR verificable
+(`/verificar/:id`, cadena de hash). El **pago es simulado** hasta integrar una
+pasarela real (VirtualPos, pendiente de credenciales); todo lo demás es real contra
+el backend.
+
+Este canal no tiene landing propia: `/aduana-verde` era una segunda portada con su
+propio header y los mismos destinos que `/`, y **hoy redirige a `/`** (la ruta se
+conserva porque el enlace ya salió repartido). Su contenido útil —tarjetas REP, fila
+de cifras del modelo, captura real del Pasaporte Digital y el bloque de estado
+honesto— vive ahora en la portada.
 
 ---
 

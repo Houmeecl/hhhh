@@ -1,7 +1,7 @@
 {
-  "name": "sicr3p — Panel mostrador",
-  "short_name": "sicr3p mostrador",
-  "description": "Panel operativo del mostrador presencial de sicr3p — compensación, tarifa y declaraciones REP.",
+  "name": "sicr3p — Panel de terreno",
+  "short_name": "sicr3p terreno",
+  "description": "Panel operativo de terreno de sicr3p — compensación, tarifa y declaraciones REP.",
   "lang": "es-CL",
   "start_url": "/panel-verde",
   "scope": "/panel-verde",

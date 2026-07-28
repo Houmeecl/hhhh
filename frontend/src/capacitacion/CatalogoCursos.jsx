@@ -22,7 +22,7 @@ export default function CatalogoCursos({ av, basePath }) {
         <div>
           <h1 style={{ margin: 0 }}>Capacitación</h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Cursos internos para el personal de mostrador. Al aprobar la evaluación de un
+            Cursos internos para el personal de terreno. Al aprobar la evaluación de un
             curso recibes una constancia de participación con QR verificable.
           </p>
         </div>

@@ -63,7 +63,7 @@ export default function CompensacionAv() {
       <div className="card card-pad" style={{ maxWidth: 520 }}>
         <h3 style={{ marginTop: 0 }}>Tarifa de compensación y tipo de cambio</h3>
         <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-          CLP por t CO2e con que el flujo del mostrador presencial calcula el cobro de compensación
+          CLP por t CO2e con que el flujo de terreno calcula el cobro de compensación
           (pago simulado — sin pasarela conectada). El tipo de cambio define el equivalente en USD
           que se muestra junto a los montos.
         </p>
