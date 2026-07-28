@@ -1,10 +1,12 @@
 import express from 'express';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 import { sanearPuntoId } from '../services/pasaporteOrigen.js';
-import { enviarActivacion } from '../services/cuentas.js';
+import { generarPasswordTemporal } from '../services/cuentas.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -17,45 +19,43 @@ router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin');
 const hashToken = hashApiKey; // misma función que verifica routes/mandante.js — no pueden desincronizarse
 
-// Crea (o reintenta el envío de) el login web de un actor externo (puerto o
-// mandante): una fila de `usuarios` atada a SU entidad vía puerto_id/
-// mandante_id (migración 042) — reusa el mismo flujo de activación por
-// correo que ya usan las cuentas sicrep/aduana_verde. Un solo login por
-// entidad (UNIQUE parcial en la migración): reintentar con el mismo correo
-// mientras siga "pendiente" no falla; un email distinto para una entidad
-// que ya tiene cuenta sí falla con 409.
+// Crea el login web de un actor externo (puerto, mandante, agencia o
+// trazador): una fila de `usuarios` atada a SU entidad vía puerto_id/
+// mandante_id/agencia_id/trazador_id (migraciones 042/046/058).
+//
+// El correo no se envía: el mail saliente no es confiable, así que el
+// admin genera aquí mismo una contraseña temporal (generarPasswordTemporal)
+// que se muestra UNA sola vez en este response — la cuenta queda activa de
+// inmediato con must_reset_password=true, y el usuario la cambia por la
+// suya en su primer inicio de sesión (PUT /api/auth/password). Un solo
+// login por entidad (UNIQUE parcial en la migración de cada panel).
 async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId }) {
   const email = String(req.body.email || '').toLowerCase().trim();
   const nombre = String(req.body.nombre || '').trim();
   if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios.' });
 
+  const password = generarPasswordTemporal();
+  const hash = await bcrypt.hash(password, config.bcryptRounds);
   let rows;
   try {
     ({ rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, panel, ${columnaFk}, estado, must_reset_password)
-       VALUES ($1,$2,'operador',$3,$4,'pendiente',true)
-       ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [email, nombre, panel, entidadId]
+      `INSERT INTO usuarios (email, nombre, rol, panel, ${columnaFk}, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,'operador',$3,$4,'activo',$5,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id`,
+      [email, nombre, panel, entidadId, hash]
     ));
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Esta entidad ya tiene un acceso web creado.' });
     throw e;
   }
-  if (!rows[0]) {
-    const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [email]);
-    const existente = existentes[0];
-    if (!existente || existente.estado !== 'pendiente' || existente[columnaFk] !== entidadId) {
-      return res.status(409).json({ error: 'Ya existe un usuario con ese correo.' });
-    }
-    rows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
-  }
+  if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo.' });
 
-  const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: rows[0].id, email, nombre, panel });
+  // La contraseña NUNCA se guarda en el log de actividad, solo su hash en `usuarios`.
   await logActividad({
     usuarioId: req.user.sub, accion: `crear_cuenta_${panel}`, entidad: 'usuario',
-    entidadId: rows[0].id, detalle: { correo_enviado: correoEnviado }, ip: req.ip,
+    entidadId: rows[0].id, detalle: { email }, ip: req.ip,
   });
-  res.status(201).json({ ok: true, usuario_id: rows[0].id, correo_enviado: correoEnviado, dev_activation_link });
+  res.status(201).json({ ok: true, usuario_id: rows[0].id, email, password });
 }
 
 // ---------- MANDANTES ----------

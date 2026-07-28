@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authAv } from '../api.js';
+import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import ResumenAv from './ResumenAv.jsx';
 import CargarAv from './CargarAv.jsx';
 import RepAv from './RepAv.jsx';
@@ -65,6 +66,16 @@ export default function AdminAvApp() {
   function salir() { authAv.clear(); nav('/panel-verde/login'); }
 
   if (checking) return <div style={{ padding: 60 }}><span className="spinner dark" /> Cargando panel…</div>;
+
+  if (user?.must_reset_password) {
+    return (
+      <CambiarPasswordObligatorio
+        subtitulo="Panel de terreno"
+        cambiar={api.cambiarPasswordAv}
+        onCambiada={() => api.meAv().then((d) => setUser(d.user))}
+      />
+    );
+  }
 
   return (
     <div className="admin-shell theme-av">

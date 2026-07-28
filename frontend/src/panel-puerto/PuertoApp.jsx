@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authPuerto } from '../api.js';
+import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import Transitos from './Transitos.jsx';
 
 const NAV = [
@@ -41,6 +42,16 @@ export default function PuertoApp() {
   function salir() { authPuerto.clear(); nav('/panel-puerto/login'); }
 
   if (checking) return <div style={{ padding: 60 }}><span className="spinner dark" /> Cargando panel…</div>;
+
+  if (user?.must_reset_password) {
+    return (
+      <CambiarPasswordObligatorio
+        subtitulo="Panel de Puerto"
+        cambiar={api.cambiarPasswordPuerto}
+        onCambiada={() => api.mePuerto().then((d) => setUser(d.user))}
+      />
+    );
+  }
 
   return (
     <div className="admin-shell">

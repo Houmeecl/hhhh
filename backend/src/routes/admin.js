@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { enviarActivacion } from '../services/cuentas.js';
+import { generarPasswordTemporal } from '../services/cuentas.js';
 import {
   PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
   generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
@@ -216,9 +216,10 @@ router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// CREAR CUENTA: genera usuario + envía link de activación (must_reset_password=true).
-// Si ya existe un usuario "pendiente" con ese correo (p.ej. porque el envío
-// anterior falló), reintenta el envío en vez de bloquear con un 409.
+// CREAR CUENTA: el correo no se envía (correo saliente no confiable). Se
+// genera aquí una contraseña temporal que se muestra UNA sola vez en este
+// response; la cuenta queda activa de inmediato con must_reset_password=true
+// (mismo criterio que crearCuentaEntidad de routes/accesos.js).
 router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
   try {
     const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
@@ -228,25 +229,19 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
     if (!email) return res.status(400).json({ error: 'Se requiere un correo de contacto' });
 
     const nombre = req.body.nombre || cliente.nombre_empresa;
-    let { rows: uRows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
-       VALUES ($1,$2,'cliente',$3,'pendiente',true)
-       ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [email, nombre, cliente.id]
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
+    const { rows: uRows } = await query(
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,'cliente',$3,'activo',$4,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id`,
+      [email, nombre, cliente.id, hash]
     );
-    if (!uRows[0]) {
-      const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [email]);
-      const existente = existentes[0];
-      if (!existente || existente.estado !== 'pendiente') {
-        return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
-      }
-      uRows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
-    }
+    if (!uRows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
 
-    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: uRows[0].id, email, nombre, panel: 'sicrep' });
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email, correo_enviado: correoEnviado }, ip: req.ip });
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email }, ip: req.ip });
 
-    res.status(201).json({ ok: true, usuario_id: uRows[0].id, correo_enviado: correoEnviado, dev_activation_link });
+    res.status(201).json({ ok: true, usuario_id: uRows[0].id, email, password });
   } catch (err) { next(err); }
 });
 
@@ -796,53 +791,53 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Alta general de usuario interno para cualquier panel. El correo no se
+// envía: se genera aquí una contraseña temporal que se muestra UNA sola vez
+// en este response; la cuenta queda activa de inmediato con
+// must_reset_password=true (mismo criterio que crearCuentaEntidad de
+// routes/accesos.js). Para 'puerto'/'mandante'/'agencia'/'trazador' este
+// endpoint no resuelve la entidad (puerto_id/mandante_id/agencia_id/
+// trazador_id): esos paneles se dan de alta por routes/accesos.js, que ya
+// trae la entidad resuelta — si igual se intenta aquí sin ese id, el CHECK
+// usuarios_panel_entidad_check de la migración correspondiente rechaza el
+// INSERT tal cual lo hacía antes.
 router.post('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { email, nombre, rol, cliente_id, panel } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
     const emailNorm = String(email).toLowerCase();
-    let { rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, estado, must_reset_password)
-       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),'pendiente',true)
-       ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [emailNorm, nombre, rol, cliente_id || null, panel]
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
+    const { rows } = await query(
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),'activo',$6,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id, email, nombre, rol`,
+      [emailNorm, nombre, rol, cliente_id || null, panel, hash]
     );
-    if (!rows[0]) {
-      const { rows: existentes } = await query(`SELECT * FROM usuarios WHERE email = $1`, [emailNorm]);
-      const existente = existentes[0];
-      if (!existente || existente.estado !== 'pendiente') {
-        return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
-      }
-      rows = [existente]; // pendiente: reintenta el envío en vez de bloquear.
-    }
+    if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
 
-    const { correoEnviado, dev_activation_link } = await enviarActivacion({ usuarioId: rows[0].id, email: rows[0].email, nombre, panel: rows[0].panel });
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, ip: req.ip });
 
-    res.status(201).json({
-      usuario: { id: rows[0].id, email: rows[0].email, nombre, rol: rows[0].rol },
-      correo_enviado: correoEnviado,
-      dev_activation_link,
-    });
+    res.status(201).json({ usuario: rows[0], password });
   } catch (err) { next(err); }
 });
 
-// Reenvía el correo de activación a un usuario "pendiente" (invitación creada
-// pero el envío falló o se perdió) — sin esto quedaba un usuario atascado
-// sin ningún enlace visible para activarlo.
+// Genera una contraseña temporal NUEVA para un usuario ya existente (deja
+// must_reset_password=true) — reemplaza al antiguo reenvío de correo de
+// activación, que perdió sentido: con el alta ya sin estado 'pendiente' no
+// hay ninguna cuenta "atascada" esperando un enlace. Sirve también como
+// recuperación general, dado que el correo de reset tampoco es confiable.
 router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, next) => {
   try {
-    const { rows } = await query(`SELECT * FROM usuarios WHERE id = $1`, [req.params.id]);
+    const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
-    if (usuario.estado !== 'pendiente') {
-      return res.status(400).json({ error: 'Este usuario ya activó su cuenta.' });
-    }
-    const { correoEnviado, dev_activation_link } = await enviarActivacion({
-      usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre, panel: usuario.panel,
-    });
-    await logActividad({ usuarioId: req.user.sub, accion: 'reenviar_activacion', entidad: 'usuario', entidadId: usuario.id, detalle: { correo_enviado: correoEnviado }, ip: req.ip });
-    res.json({ ok: true, correo_enviado: correoEnviado, dev_activation_link });
+
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
+    await query(`UPDATE usuarios SET password_hash = $1, must_reset_password = true WHERE id = $2`, [hash, usuario.id]);
+    await logActividad({ usuarioId: req.user.sub, accion: 'regenerar_password', entidad: 'usuario', entidadId: usuario.id, ip: req.ip });
+    res.json({ ok: true, password });
   } catch (err) { next(err); }
 });
 

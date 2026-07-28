@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
+import PasswordUnaVez from '../components/PasswordUnaVez.jsx';
 
 const ROLES = ['admin', 'operador', 'cliente'];
 const PANELES = ['sicrep', 'aduana_verde'];
@@ -9,6 +10,10 @@ export default function Usuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
+  // Contraseña temporal a mostrar una sola vez (creación o "generar nueva").
+  // Distinto del `toast`: esto no se autocierra, porque el valor no vuelve
+  // a estar disponible una vez cerrado.
+  const [pwdResultado, setPwdResultado] = useState(null);
 
   const cargar = () => api.usuarios().then((r) => setUsuarios(r.usuarios)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -18,7 +23,9 @@ export default function Usuarios() {
     try {
       const r = await api.crearUsuario(modal);
       setModal(null); cargar();
-      if (r.dev_activation_link) {
+      if (r.password) {
+        setPwdResultado({ titulo: 'Usuario creado', password: r.password });
+      } else if (r.dev_activation_link) {
         const motivo = r.correo_enviado === false ? 'No se pudo enviar el correo. Comparte este link a mano' : 'Link activación (dev)';
         flash(`Usuario creado. ${motivo}: ${r.dev_activation_link}`, r.correo_enviado === false, true);
       } else flash('Usuario creado. Enviamos el correo de activación.');
@@ -30,7 +37,10 @@ export default function Usuarios() {
   async function reenviar(u) {
     try {
       const r = await api.reenviarActivacion(u.id);
-      if (r.dev_activation_link) {
+      if (r.password) {
+        setPwdResultado({ titulo: `Contraseña nueva para ${u.nombre}`, password: r.password });
+        cargar();
+      } else if (r.dev_activation_link) {
         const motivo = r.correo_enviado === false ? 'No se pudo enviar el correo. Comparte este link a mano' : 'Link activación (dev)';
         flash(`${motivo}: ${r.dev_activation_link}`, r.correo_enviado === false, true);
       } else flash('Reenviamos el correo de activación.');
@@ -73,9 +83,12 @@ export default function Usuarios() {
                 <td className="muted">{u.cliente || '—'}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{u.ultimo_login ? fmtFecha(u.ultimo_login) : 'Nunca'}</td>
                 <td>
-                  {u.estado === 'pendiente' && (
-                    <button className="btn btn-sm btn-outline" onClick={() => reenviar(u)}>Reenviar activación</button>
-                  )}
+                  {/* Ya no hay estado "pendiente" atascado esperando un correo:
+                      el alta deja la cuenta activa de inmediato con
+                      must_reset_password=true. Este botón sirve igual como
+                      recuperación general (el correo de reset tampoco es
+                      confiable), así que no se limita por estado. */}
+                  <button className="btn btn-sm btn-outline" onClick={() => reenviar(u)}>Generar contraseña nueva</button>
                 </td>
               </tr>
             ))}
@@ -88,7 +101,7 @@ export default function Usuarios() {
         <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setModal(null)}>
           <div className="modal">
             <h2 style={{ marginTop: 0 }}>Nuevo usuario</h2>
-            <p className="muted">Se envía un enlace de activación por correo (must_reset_password). No hay auto-registro.</p>
+            <p className="muted">Se genera una contraseña temporal que se muestra una sola vez al crear la cuenta. No hay auto-registro; la persona debe cambiarla en su primer inicio de sesión.</p>
             <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
               <div className="field"><label>Nombre</label><input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} /></div>
               <div className="field"><label>Email</label><input value={modal.email} onChange={(e) => setModal({ ...modal, email: e.target.value })} /></div>
@@ -97,7 +110,19 @@ export default function Usuarios() {
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={crear}>Crear y enviar</button>
+              <button className="btn btn-primary" onClick={crear}>Crear usuario</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pwdResultado && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setPwdResultado(null)}>
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <h2 style={{ marginTop: 0 }}>{pwdResultado.titulo}</h2>
+            <PasswordUnaVez password={pwdResultado.password} />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn btn-outline" onClick={() => setPwdResultado(null)}>Cerrar</button>
             </div>
           </div>
         </div>

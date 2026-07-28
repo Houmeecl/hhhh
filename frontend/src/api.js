@@ -213,6 +213,13 @@ export const api = {
   meTrazador: () => request('/auth/me', { authedTrazador: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
+  // Candado de contraseña temporal (must_reset_password): mismo endpoint
+  // genérico /auth/password, uno por almacén de sesión de panel.
+  cambiarPasswordAv: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedAv: true }),
+  cambiarPasswordPuerto: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedPuerto: true }),
+  cambiarPasswordMandante: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedMandante: true }),
+  cambiarPasswordAgencia: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedAgencia: true }),
+  cambiarPasswordTrazador: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedTrazador: true }),
 
   // Admin
   dashboard: () => request('/admin/dashboard', { authed: true }),

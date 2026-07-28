@@ -46,3 +46,18 @@ export async function enviarActivacion({ usuarioId, email, nombre, panel }) {
   const mostrarLink = !config.resend.apiKey || !correoEnviado;
   return { link, correoEnviado, dev_activation_link: mostrarLink ? link : undefined };
 }
+
+// Alfabeto sin caracteres ambiguos (sin 0/O, 1/l/I) — se pensó para
+// transcribirse a mano, no solo para copiar/pegar.
+const ALFABETO_PASSWORD = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+// Contraseña temporal para el panel trazador (migración 058): a diferencia
+// de los otros cinco paneles, este NUNCA envía correo — el admin la genera
+// y la ve UNA sola vez en el mismo response de creación de cuenta, para
+// entregarla a mano. La cuenta queda con must_reset_password=true.
+export function generarPasswordTemporal(largo = 12) {
+  const bytes = crypto.randomBytes(largo);
+  let out = '';
+  for (let i = 0; i < largo; i++) out += ALFABETO_PASSWORD[bytes[i] % ALFABETO_PASSWORD.length];
+  return out;
+}

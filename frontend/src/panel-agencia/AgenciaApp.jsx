@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authAgencia } from '../api.js';
+import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import Expedientes from './Expedientes.jsx';
 import CapturarDocumentos from './CapturarDocumentos.jsx';
 
@@ -43,6 +44,16 @@ export default function AgenciaApp() {
   function salir() { authAgencia.clear(); nav('/panel-agencia/login'); }
 
   if (checking) return <div style={{ padding: 60 }}><span className="spinner dark" /> Cargando panel…</div>;
+
+  if (user?.must_reset_password) {
+    return (
+      <CambiarPasswordObligatorio
+        subtitulo="Panel de Agencia"
+        cambiar={api.cambiarPasswordAgencia}
+        onCambiada={() => api.meAgencia().then((d) => setUser(d.user))}
+      />
+    );
+  }
 
   return (
     <div className="admin-shell">

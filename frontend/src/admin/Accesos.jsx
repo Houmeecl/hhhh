@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
+import PasswordUnaVez from '../components/PasswordUnaVez.jsx';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 
 // Accesos externos: API para mandantes + códigos de prueba con créditos.
@@ -247,16 +248,20 @@ function CrearCuentaWeb({ entidad, nombreEntidad, crear, onClose, onCreada }) {
       <div className="modal" style={{ maxWidth: 440 }}>
         <h2 style={{ marginTop: 0 }}>Acceso web de {nombreEntidad}</h2>
         {resultado ? (
-          <>
-            <div className="badge badge-green" style={{ display: 'block', padding: 12, marginBottom: 10 }}>
-              Cuenta creada. {resultado.correo_enviado ? 'Se envió un correo de activación.' : 'No se pudo enviar el correo — comparte este enlace a mano:'}
-            </div>
-            {resultado.dev_activation_link && (
-              <div style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
-                {resultado.dev_activation_link}
+          resultado.password ? (
+            <PasswordUnaVez password={resultado.password} />
+          ) : (
+            <>
+              <div className="badge badge-green" style={{ display: 'block', padding: 12, marginBottom: 10 }}>
+                Cuenta creada. {resultado.correo_enviado ? 'Se envió un correo de activación.' : 'No se pudo enviar el correo — comparte este enlace a mano:'}
               </div>
-            )}
-          </>
+              {resultado.dev_activation_link && (
+                <div style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                  {resultado.dev_activation_link}
+                </div>
+              )}
+            </>
+          )
         ) : (
           <>
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>

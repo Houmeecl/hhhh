@@ -3,6 +3,7 @@ import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, authMandante } from '../api.js';
+import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import Proveedores from './Proveedores.jsx';
 
 const NAV = [
@@ -38,6 +39,16 @@ export default function MandanteApp() {
   function salir() { authMandante.clear(); nav('/panel-mandante/login'); }
 
   if (checking) return <div style={{ padding: 60 }}><span className="spinner dark" /> Cargando panel…</div>;
+
+  if (user?.must_reset_password) {
+    return (
+      <CambiarPasswordObligatorio
+        subtitulo="Panel de Mandante"
+        cambiar={api.cambiarPasswordMandante}
+        onCambiada={() => api.meMandante().then((d) => setUser(d.user))}
+      />
+    );
+  }
 
   return (
     <div className="admin-shell">
