@@ -27,7 +27,14 @@ RAMA="${SICR3P_RAMA:-claude/sicr3p-etapa-1-complete-caqhpl}"
 LOG="${SICR3P_LOG:-/var/log/sicr3p-actualizar.log}"
 PM2_APP="sicr3p-backend"
 HEALTH_URL="${SICR3P_HEALTH_URL:-http://localhost:4000/api/health}"
-FRONT_URL="${SICR3P_FRONT_URL:-http://localhost/}"
+# https://sicr3p.cl/, NO http://localhost/: el nginx del VPS solo sirve la
+# portada bajo Host sicr3p.cl por HTTPS — el bloque de Certbot para el
+# puerto 80 devuelve 404 fijo a cualquier otro Host (incluido "localhost").
+# Con el default viejo el check de "¿carga el frontend?" fallaba SIEMPRE,
+# sin importar el deploy, y cada corrida terminaba en rollback (visto en
+# producción: /api/health respondía "ok":true pero el deploy igual se
+# revertía por este chequeo).
+FRONT_URL="${SICR3P_FRONT_URL:-https://sicr3p.cl/}"
 BACKUP_DIR="${SICR3P_BACKUP_DIR:-/root/backups}"
 LOCK="${SICR3P_LOCK:-/run/sicr3p-actualizar.lock}"
 RESTART_CMD="${SICR3P_RESTART_CMD:-pm2 restart $PM2_APP}"

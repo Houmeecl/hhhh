@@ -20,7 +20,9 @@
 //      sesión queda marcada "SMOKE TEST — sicr3p".
 //
 // Env: SICR3P_SMOKE_API (default http://localhost:4000/api)
-//      SICR3P_SMOKE_FRONT (default http://localhost/)
+//      SICR3P_SMOKE_FRONT (default https://sicr3p.cl/ — NO localhost: el
+//        nginx del VPS solo sirve la portada bajo Host sicr3p.cl por HTTPS,
+//        cualquier otro Host cae en el 404 fijo de Certbot para el puerto 80)
 //      SICR3P_SMOKE_ESCRITURA=1 para el nivel de escritura.
 // Salida: una línea por check; exit 0 si todo pasó, 1 si algo falló.
 // ============================================================
@@ -29,7 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const API = (process.env.SICR3P_SMOKE_API || 'http://localhost:4000/api').replace(/\/$/, '');
-const FRONT = (process.env.SICR3P_SMOKE_FRONT || 'http://localhost/').replace(/\/$/, '');
+const FRONT = (process.env.SICR3P_SMOKE_FRONT || 'https://sicr3p.cl/').replace(/\/$/, '');
 const ESCRITURA = process.env.SICR3P_SMOKE_ESCRITURA === '1';
 const TIMEOUT_MS = 10_000;
 
