@@ -51,11 +51,19 @@ export async function enviarActivacion({ usuarioId, email, nombre, panel }) {
 // transcribirse a mano, no solo para copiar/pegar.
 const ALFABETO_PASSWORD = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 
-// Contraseña temporal para el panel trazador (migración 058): a diferencia
-// de los otros cinco paneles, este NUNCA envía correo — el admin la genera
-// y la ve UNA sola vez en el mismo response de creación de cuenta, para
-// entregarla a mano. La cuenta queda con must_reset_password=true.
+// Contraseña temporal para cualquier creación de cuenta (todos los
+// paneles): el correo no es confiable, así que el admin la genera y la ve
+// UNA sola vez en el mismo response de creación, para entregarla a mano.
+// La cuenta queda con must_reset_password=true.
+//
+// Con SEED_DEMO=true (mismo flag que guarda la siembra de clientes/
+// prospectos ficticios en este archivo, nunca activo en producción) se
+// devuelve un valor fijo "demo123" en vez de aleatorio — solo para que
+// probar el flujo de creación de cuentas en local no obligue a copiar una
+// contraseña generada cada vez. En producción SEED_DEMO no está definido:
+// siempre sale la aleatoria real.
 export function generarPasswordTemporal(largo = 12) {
+  if (config.seedDemo) return 'demo123';
   const bytes = crypto.randomBytes(largo);
   let out = '';
   for (let i = 0; i < largo; i++) out += ALFABETO_PASSWORD[bytes[i] % ALFABETO_PASSWORD.length];
