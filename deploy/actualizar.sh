@@ -115,10 +115,16 @@ reiniciar() {
 }
 
 health_ok() {
-  # Reintenta hasta 30 s (15 × 2 s): el backend debe responder "ok":true
-  # y el frontend (nginx) debe entregar la portada.
+  # Reintenta hasta 80 s (40 × 2 s): el backend debe responder "ok":true
+  # y el frontend (nginx) debe entregar la portada. Antes eran 30 s (15×2s),
+  # pero el arranque corre runMigrations() de forma síncrona antes de
+  # escuchar (backend/src/index.js) — con 60+ migraciones y un disco lento
+  # en el VPS real, se vieron arranques que pasaban los 30 s y el script
+  # hacía rollback de un deploy que en realidad sí iba a levantar bien
+  # (visto en producción: el health respondía OK a mano minutos después
+  # del rollback "fallido").
   local i
-  for i in $(seq 1 15); do
+  for i in $(seq 1 40); do
     if curl -fs "$HEALTH_URL" 2>/dev/null | grep -q '"ok":true'; then
       if curl -fs -o /dev/null "$FRONT_URL" 2>/dev/null; then
         return 0
@@ -208,5 +214,5 @@ if health_ok; then
   log "ERROR: el smoke E2E post-deploy falló aunque el health estaba OK — el deploy se revierte."
   rollback
 fi
-log "ERROR: el health no respondió \"ok\":true en 30 s ($HEALTH_URL) o el frontend no carga ($FRONT_URL)."
+log "ERROR: el health no respondió \"ok\":true en 80 s ($HEALTH_URL) o el frontend no carga ($FRONT_URL)."
 rollback

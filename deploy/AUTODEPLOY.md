@@ -14,7 +14,7 @@ fetch → ¿commits nuevos en origin/<rama>? → no: sale en silencio
           → git pull --ff-only        (jamás merge ni force)
           → build backend (npm ci --omit=dev) + frontend (vite build)
           → pm2 restart sicr3p-backend
-          → health: /api/health debe responder "ok":true (reintenta 30 s)
+          → health: /api/health debe responder "ok":true (reintenta 80 s)
                     y la portada debe cargar
           → OK: log "actualizado A → B"
           → FALLO: ROLLBACK al commit previo (rebuild + restart + re-health)
