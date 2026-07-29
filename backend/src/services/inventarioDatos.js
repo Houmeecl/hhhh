@@ -428,8 +428,8 @@ export const INVENTARIO = {
   credenciales_webauthn: {
     clasificacion: PERSONAL, columnas: ['nombre_dispositivo'],
     nota: '`public_key`/`credential_id`/`counter` son material criptográfico de la llave FIDO2, no '
-      + 'un dato de la persona (la huella jamás llega a este servidor — se valida dentro del '
-      + 'hardware). `nombre_dispositivo` sí es personal: lo escribe un admin y en la práctica suele '
+      + 'un dato de la persona (el dato biométrico jamás llega a este servidor — se valida dentro '
+      + 'del hardware). `nombre_dispositivo` sí es personal: lo escribe un admin y en la práctica suele '
       + 'llevar el nombre de su dueño (ej. "YubiKey de Juan Pérez").',
     finalidad: 'Permitir el login sin contraseña de esa cuenta con su llave USB física.',
     base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
