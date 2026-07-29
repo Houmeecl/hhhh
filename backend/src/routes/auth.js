@@ -19,10 +19,18 @@ const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agenci
 router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    // El frontend de cada panel siempre manda el panel esperado; sin
-    // panel en el body (clientes API viejos) se asume 'sicrep'.
-    const panelEsperado = PANELES_VALIDOS.includes(req.body.panel) ? req.body.panel : 'sicrep';
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios' });
+    // Los seis logins propios de cada panel SIEMPRE mandan su panel
+    // esperado y siguen exigiendo coincidencia exacta (comportamiento de
+    // siempre: evita que alguien entre "por accidente" a la pantalla de
+    // otro panel). El login general (pages/IngresarPanel.jsx) no manda
+    // panel: no exige coincidencia, detecta el panel real de la cuenta
+    // (ya viaja en `user.panel` de la respuesta) y el frontend redirige
+    // solo con ese dato.
+    const panelPedido = req.body.panel;
+    if (panelPedido !== undefined && !PANELES_VALIDOS.includes(panelPedido)) {
+      return res.status(400).json({ error: 'Panel inválido' });
+    }
 
     const { rows } = await query(`SELECT * FROM usuarios WHERE email = $1`, [String(email).toLowerCase()]);
     const user = rows[0];
@@ -35,7 +43,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
     const ok = await bcrypt.compare(password, user.password_hash);
     if (!ok) return res.status(401).json({ error: 'Credenciales inválidas' });
-    if (user.panel !== panelEsperado) {
+    if (panelPedido && user.panel !== panelPedido) {
       return res.status(403).json({ error: 'Esta cuenta no pertenece a este panel.' });
     }
 

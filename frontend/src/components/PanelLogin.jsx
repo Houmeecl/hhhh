@@ -125,6 +125,15 @@ export default function PanelLogin({
           </button>
         </form>
 
+        {/* Solo un atajo para quien no recuerda en qué panel entra: el
+            backend detecta el panel real de la cuenta y esta redirige
+            sola (ver pages/IngresarPanel.jsx). No reemplaza esta pantalla
+            —cada panel sigue teniendo su propia URL directa—, solo evita
+            que alguien se quede trabado por no saber cuál usar. */}
+        <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>
+          ¿No sabes en qué panel entrar? <a href="/panel/ingresar">Usa el acceso general</a>
+        </p>
+
         <div className="login-badges">
           <span className="b"><Icon.Shield size={14} /> Acceso seguro</span>
           <span className="b"><Icon.CheckCircle size={14} /> JWT + bcrypt</span>

@@ -9,6 +9,7 @@ import PasaporteLote from './pages/PasaporteLote.jsx';
 import TarjetaViaje from './pages/TarjetaViaje.jsx';
 import FirmaProveedor from './pages/FirmaProveedor.jsx';
 import Ingresar from './pages/Ingresar.jsx';
+import IngresarPanel from './pages/IngresarPanel.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
@@ -61,6 +62,7 @@ export default function App() {
       <Route path="/torre" element={<TorreFlota />} />
       <Route path="/torre/:codigo" element={<Torre />} />
       <Route path="/ingresar" element={<Ingresar />} />
+      <Route path="/panel/ingresar" element={<IngresarPanel />} />
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />
       <Route path="/mis-sesiones" element={<MisSesiones />} />
