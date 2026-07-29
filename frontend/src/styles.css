@@ -112,17 +112,16 @@ a:hover { text-decoration: underline; }
   padding: 22px 40px; border-bottom: 1px solid var(--border); background: #fff;
 }
 .pub-header nav { display: flex; gap: 18px; align-items: center; }
-/* Selector de idioma discreto del header público (ES · EN · PT).
-   Texto plano, sin bordes: no compite con los CTA y no desborda a 375px
-   (el header ya hace wrap en móvil). */
-.lang-switch { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray-300); white-space: nowrap; }
+/* Selector de idioma/mercado del header público, banderas clicables.
+   Sin bordes: no compite con los CTA y no desborda a 375px (el header ya
+   hace wrap en móvil). Opacidad marca cuál está activa sin depender de color. */
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .lang-switch button {
-  background: none; border: none; padding: 2px 3px; cursor: pointer;
-  font-family: var(--font); font-size: 12px; font-weight: 600;
-  color: var(--gray); letter-spacing: 0.04em;
+  background: none; border: none; padding: 2px 4px; cursor: pointer;
+  font-size: 17px; line-height: 1; border-radius: 6px; opacity: 0.45;
 }
-.lang-switch button:hover { color: var(--navy); }
-.lang-switch button.on { color: var(--green-600); }
+.lang-switch button:hover { opacity: 0.75; }
+.lang-switch button.on { opacity: 1; background: var(--bg); }
 .pub-footer {
   background: var(--navy); color: #cbd5e1;
   padding: 28px 40px; display: flex; align-items: center; justify-content: space-between;

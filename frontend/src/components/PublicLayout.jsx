@@ -3,28 +3,31 @@ import { Link } from 'react-router-dom';
 import Logo from './Logo.jsx';
 import { IDIOMAS, useIdioma } from '../lib/i18n.js';
 
-// Nombre legible de cada idioma para el aria-label de los botones.
-const NOMBRE_IDIOMA = { es: 'Español', en: 'English', pt: 'Português' };
+// Nombre legible de cada idioma/variante para el aria-label de los botones
+// (las banderas no son accesibles por sí solas para lectores de pantalla).
+const NOMBRE_IDIOMA = { es: 'Español (Chile)', en: 'English', pt: 'Português', pe: 'Español (Perú)' };
+// 'pe' no es un idioma nuevo: mismo español, con RUC/Sol/Huella de Carbono
+// Perú en vez de RUT/CLP/HuellaChile (ver comentario en lib/i18n.js).
+const BANDERA_IDIOMA = { es: '🇨🇱', en: '🇺🇸', pt: '🇧🇷', pe: '🇵🇪' };
 
-// Selector discreto "ES · EN · PT". Se usa en este layout y en el layout
+// Selector de banderas clicables. Se usa en este layout y en el layout
 // propio del canal presencial; jamás aparece en /admin.
 export function SelectorIdioma() {
   const { idioma, setIdioma, t } = useIdioma();
   return (
     <span className="lang-switch" role="group" aria-label={t('layout.idioma')}>
-      {IDIOMAS.map((l, i) => (
-        <Fragment key={l}>
-          {i > 0 && <span aria-hidden="true">·</span>}
-          <button
-            type="button"
-            className={idioma === l ? 'on' : ''}
-            aria-pressed={idioma === l}
-            aria-label={NOMBRE_IDIOMA[l]}
-            onClick={() => setIdioma(l)}
-          >
-            {l.toUpperCase()}
-          </button>
-        </Fragment>
+      {IDIOMAS.map((l) => (
+        <button
+          key={l}
+          type="button"
+          className={idioma === l ? 'on' : ''}
+          aria-pressed={idioma === l}
+          aria-label={NOMBRE_IDIOMA[l]}
+          title={NOMBRE_IDIOMA[l]}
+          onClick={() => setIdioma(l)}
+        >
+          <span aria-hidden="true">{BANDERA_IDIOMA[l]}</span>
+        </button>
       ))}
     </span>
   );

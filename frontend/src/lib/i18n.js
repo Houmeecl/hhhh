@@ -12,7 +12,7 @@
 // ============================================================
 import { useSyncExternalStore } from 'react';
 
-export const IDIOMAS = ['es', 'en', 'pt'];
+export const IDIOMAS = ['es', 'en', 'pt', 'pe'];
 const STORAGE_IDIOMA = 'idioma';
 
 const DICCIONARIOS = {
@@ -1306,6 +1306,22 @@ const DICCIONARIOS = {
     'torre.error': 'Não foi possível carregar o lote. Verifique o código ou tente novamente.',
     'torre.perdiste_clave': 'Perdeu sua chave?',
     'torre.perdiste_clave_link': 'Escreva para nós e nós a regeneramos',
+  },
+
+  // ---------- Español (Perú): variante de mercado sobre 'es' ----------
+  // Solo lleva las claves donde el dato ES DISTINTO Y VERIFICADO para Perú
+  // (identificador tributario, moneda, cita de factor eléctrico). Todo lo
+  // demás cae a 'es' automáticamente (ver t(), fallback por clave) — en
+  // particular, el Corredor Bioceánico (cor.*) NO se adapta: es una ruta
+  // real Brasil-Paraguay-Argentina-Chile que geográficamente no pasa por
+  // Perú, y los sellos de documento tributario (SII) describen una
+  // capacidad real del motor sobre el DTE chileno, no el comprobante
+  // electrónico peruano — adaptar esas claves sería afirmar algo falso.
+  pe: {
+    'ver.rut': 'RUC',
+    'pas.rut': 'RUC',
+    'calc.u.clp': 'S//mes',
+    'landing.trust_3': 'Huella de Carbono Perú (MINAM)',
   },
 };
 
