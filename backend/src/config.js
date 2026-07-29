@@ -49,6 +49,17 @@ export const config = {
   },
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
 
+  // Login con llave USB FIDO2 (WebAuthn) — ver migración 061 y
+  // routes/webauthn.js. OJO: el rpID queda atado al dominio para
+  // siempre — si en producción cambia el dominio del panel, todas las
+  // llaves ya registradas se invalidan y hay que re-registrarlas.
+  webauthn: {
+    rpID: process.env.WEBAUTHN_RP_ID || new URL(process.env.PUBLIC_APP_URL || 'http://localhost:5173').hostname,
+    rpName: 'sicr3p',
+    origin: process.env.PUBLIC_APP_URL || 'http://localhost:5173',
+    challengeTtlMs: 2 * 60 * 1000,
+  },
+
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
     from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>',

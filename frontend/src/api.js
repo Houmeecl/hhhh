@@ -205,6 +205,9 @@ export const api = {
 
   // Auth
   login: (email, password, panel) => request('/auth/login', { method: 'POST', body: { email, password, panel } }),
+  // Login sin contraseña con llave USB FIDO2 (huella) — ver pages/IngresarPanel.jsx.
+  webauthnLoginOpciones: (email) => request('/auth/webauthn/login/opciones', { method: 'POST', body: { email } }),
+  webauthnLoginVerificar: (email, respuesta) => request('/auth/webauthn/login/verificar', { method: 'POST', body: { email, respuesta } }),
   me: () => request('/auth/me', { authed: true }),
   meAv: () => request('/auth/me', { authedAv: true }),
   mePuerto: () => request('/auth/me', { authedPuerto: true }),
@@ -270,6 +273,12 @@ export const api = {
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   reenviarActivacion: (id) => request(`/admin/usuarios/${id}/reenviar-activacion`, { method: 'POST', authed: true }),
+  // Llaves USB de huella (WebAuthn/FIDO2) — registro lo hace un admin.
+  llavesUsb: (usuarioId) => request(`/admin/usuarios/${usuarioId}/webauthn`, { authed: true }),
+  webauthnRegistroOpciones: (usuarioId) => request(`/admin/usuarios/${usuarioId}/webauthn/opciones`, { method: 'POST', authed: true }),
+  webauthnRegistroVerificar: (usuarioId, respuesta, nombreDispositivo) =>
+    request(`/admin/usuarios/${usuarioId}/webauthn/verificar`, { method: 'POST', body: { respuesta, nombre_dispositivo: nombreDispositivo }, authed: true }),
+  webauthnEliminar: (usuarioId, credencialId) => request(`/admin/usuarios/${usuarioId}/webauthn/${credencialId}`, { method: 'DELETE', authed: true }),
   actividad: () => request('/admin/actividad', { authed: true }),
 
   // Corredor Bioceánico

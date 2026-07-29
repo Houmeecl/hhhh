@@ -21,6 +21,7 @@ import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
 import origenRoutes, { tarjetaRouter, torreRouter, firmaProveedorRouter } from './routes/origen.js';
 import capacitacionRoutes from './routes/capacitacion.js';
+import webauthnRoutes from './routes/webauthn.js';
 import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
 import trazadorRoutes from './routes/trazador.js';
@@ -45,6 +46,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, mock: config.simple.mo
 // Rutas
 app.use('/api', apiLimiter, publicRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/auth/webauthn', webauthnRoutes);
 app.use('/api/admin/corredor', corredorRoutes);
 app.use('/api/admin/capital', capitalRoutes);
 app.use('/api/admin/informes', informesRoutes);

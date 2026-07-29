@@ -1,5 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
+import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
@@ -783,7 +784,8 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
-              u.created_at, c.nombre_empresa AS cliente
+              u.created_at, c.nombre_empresa AS cliente,
+              (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
        ORDER BY u.created_at DESC`
     );
@@ -853,6 +855,122 @@ router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     await logActividad({ usuarioId: req.user.sub, accion: 'editar_usuario', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
     res.json({ usuario: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Llaves USB de huella (WebAuthn/FIDO2) — ver migración 061 ----------
+// El registro lo hace un admin, no el propio usuario (autoservicio queda
+// pendiente, no es parte de esta ronda). El login con la llave ya
+// registrada es público: vive en routes/webauthn.js.
+router.get('/usuarios/:id/webauthn', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre_dispositivo, created_at, last_used_at
+       FROM credenciales_webauthn WHERE usuario_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ llaves: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/webauthn/opciones', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const { rows: existentes } = await query(
+      `SELECT credential_id, transports FROM credenciales_webauthn WHERE usuario_id = $1`,
+      [usuario.id]
+    );
+
+    const options = await generateRegistrationOptions({
+      rpName: config.webauthn.rpName,
+      rpID: config.webauthn.rpID,
+      userName: usuario.email,
+      userID: Buffer.from(usuario.id),
+      attestationType: 'none',
+      authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
+      excludeCredentials: existentes.map((c) => ({ id: c.credential_id, transports: c.transports || undefined })),
+    });
+
+    await query(
+      `INSERT INTO webauthn_challenges (usuario_id, tipo, challenge, expires_at)
+       VALUES ($1,'registro',$2,$3)
+       ON CONFLICT (usuario_id, tipo) DO UPDATE SET challenge = EXCLUDED.challenge, expires_at = EXCLUDED.expires_at, created_at = now()`,
+      [usuario.id, options.challenge, new Date(Date.now() + config.webauthn.challengeTtlMs)]
+    );
+
+    res.json(options);
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/webauthn/verificar', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const respuesta = req.body.respuesta;
+    const nombreDispositivo = String(req.body.nombre_dispositivo || '').trim() || null;
+    if (!respuesta) return res.status(400).json({ error: 'Falta la respuesta de la llave' });
+
+    const { rows: desafios } = await query(
+      `SELECT * FROM webauthn_challenges WHERE usuario_id = $1 AND tipo = 'registro'`,
+      [usuario.id]
+    );
+    const desafio = desafios[0];
+    if (!desafio || new Date(desafio.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'El desafío expiró, intenta nuevamente' });
+    }
+
+    let verificacion;
+    try {
+      verificacion = await verifyRegistrationResponse({
+        response: respuesta,
+        expectedChallenge: desafio.challenge,
+        expectedOrigin: config.webauthn.origin,
+        expectedRPID: config.webauthn.rpID,
+      });
+    } catch {
+      return res.status(400).json({ error: 'Respuesta de la llave inválida' });
+    }
+    if (!verificacion.verified) return res.status(400).json({ error: 'No se pudo verificar la llave' });
+
+    await query(`DELETE FROM webauthn_challenges WHERE id = $1`, [desafio.id]);
+
+    const { credential, credentialDeviceType, credentialBackedUp } = verificacion.registrationInfo;
+    const { rows: creadas } = await query(
+      `INSERT INTO credenciales_webauthn
+         (usuario_id, credential_id, public_key, counter, device_type, backed_up, transports, nombre_dispositivo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, nombre_dispositivo, created_at`,
+      [
+        usuario.id,
+        credential.id,
+        Buffer.from(credential.publicKey).toString('base64'),
+        credential.counter,
+        credentialDeviceType,
+        credentialBackedUp,
+        JSON.stringify(credential.transports || []),
+        nombreDispositivo,
+      ]
+    );
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'registrar_llave_webauthn', entidad: 'usuario', entidadId: usuario.id, ip: req.ip });
+    res.status(201).json({ credencial: creadas[0] });
+  } catch (err) { next(err); }
+});
+
+router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `DELETE FROM credenciales_webauthn WHERE id = $1 AND usuario_id = $2`,
+      [req.params.credencialId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'eliminar_llave_webauthn', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

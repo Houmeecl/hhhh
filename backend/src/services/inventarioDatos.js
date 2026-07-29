@@ -425,6 +425,16 @@ export const INVENTARIO = {
     base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
     retencion: 'Mientras dure el convenio del trazador.',
   },
+  credenciales_webauthn: {
+    clasificacion: PERSONAL, columnas: ['nombre_dispositivo'],
+    nota: '`public_key`/`credential_id`/`counter` son material criptográfico de la llave FIDO2, no '
+      + 'un dato de la persona (la huella jamás llega a este servidor — se valida dentro del '
+      + 'hardware). `nombre_dispositivo` sí es personal: lo escribe un admin y en la práctica suele '
+      + 'llevar el nombre de su dueño (ej. "YubiKey de Juan Pérez").',
+    finalidad: 'Permitir el login sin contraseña de esa cuenta con su llave USB física.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Un admin la elimina cuando la llave se pierde o el usuario deja de usarla; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
+  },
 };
 
 // Las tablas donde hay que buscar cuando alguien ejerce su derecho de
