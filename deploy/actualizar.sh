@@ -77,14 +77,26 @@ fi
 
 # ---------- 3. ¿Hay commits nuevos en la rama? ----------
 cd "$REPO_DIR"
-git fetch --quiet origin "$RAMA"
-COMMIT_PREVIO="$(git rev-parse HEAD)"
-COMMIT_REMOTO="$(git rev-parse "origin/$RAMA")"
-if [ "$COMMIT_PREVIO" = "$COMMIT_REMOTO" ]; then
-  log "sin cambios (HEAD ya es origin/$RAMA en ${COMMIT_PREVIO:0:7})."
-  exit 0
+if [ -n "${SICR3P_REEXEC_COMMIT:-}" ]; then
+  # Re-invocación automática (ver "Auto-actualización" más abajo, tras el
+  # pull): el fetch/pull y la detección de cambios ya se hicieron en el
+  # proceso padre. Se retoma directo con esos valores para no repetirlos
+  # ni volver a evaluar "¿hay cambios?" (ya no los habría: el pull local
+  # ya está al día con origin, así que ese chequeo daría falso "sin
+  # cambios" y abortaría el deploy a mitad de camino).
+  COMMIT_REMOTO="$SICR3P_REEXEC_COMMIT"
+  COMMIT_PREVIO="${SICR3P_REEXEC_PREVIO:?}"
+  log "retomando build/restart/health tras auto-actualización de actualizar.sh (${COMMIT_PREVIO:0:7} → ${COMMIT_REMOTO:0:7})."
+else
+  git fetch --quiet origin "$RAMA"
+  COMMIT_PREVIO="$(git rev-parse HEAD)"
+  COMMIT_REMOTO="$(git rev-parse "origin/$RAMA")"
+  if [ "$COMMIT_PREVIO" = "$COMMIT_REMOTO" ]; then
+    log "sin cambios (HEAD ya es origin/$RAMA en ${COMMIT_PREVIO:0:7})."
+    exit 0
+  fi
+  log "cambio detectado: ${COMMIT_PREVIO:0:7} → ${COMMIT_REMOTO:0:7}; iniciando actualización."
 fi
-log "cambio detectado: ${COMMIT_PREVIO:0:7} → ${COMMIT_REMOTO:0:7}; iniciando actualización."
 
 # ---------- Helpers de build / restart / health ----------
 construir() {
@@ -176,23 +188,38 @@ rollback() {
   exit 2
 }
 
-# ---------- 4. Respaldo BD pre-deploy (no bloquea el deploy) ----------
-if command -v pg_dump >/dev/null 2>&1 && sudo -u postgres psql -d sicr3p -c 'SELECT 1' >/dev/null 2>&1; then
-  mkdir -p "$BACKUP_DIR"
-  RESPALDO="$BACKUP_DIR/pre-deploy-$(date +%F-%H%M).sql.gz"
-  if sudo -u postgres pg_dump sicr3p | gzip > "$RESPALDO" 2>>"$LOG"; then
-    log "respaldo pre-deploy OK: $RESPALDO"
+if [ -z "${SICR3P_REEXEC_COMMIT:-}" ]; then
+  # ---------- 4. Respaldo BD pre-deploy (no bloquea el deploy) ----------
+  if command -v pg_dump >/dev/null 2>&1 && sudo -u postgres psql -d sicr3p -c 'SELECT 1' >/dev/null 2>&1; then
+    mkdir -p "$BACKUP_DIR"
+    RESPALDO="$BACKUP_DIR/pre-deploy-$(date +%F-%H%M).sql.gz"
+    if sudo -u postgres pg_dump sicr3p | gzip > "$RESPALDO" 2>>"$LOG"; then
+      log "respaldo pre-deploy OK: $RESPALDO"
+    else
+      log "ADVERTENCIA: falló el respaldo pre-deploy; el deploy continúa (no toca datos y las migraciones son aditivas)."
+    fi
   else
-    log "ADVERTENCIA: falló el respaldo pre-deploy; el deploy continúa (no toca datos y las migraciones son aditivas)."
+    log "ADVERTENCIA: pg_dump o la BD sicr3p no están disponibles; se omite el respaldo pre-deploy."
   fi
-else
-  log "ADVERTENCIA: pg_dump o la BD sicr3p no están disponibles; se omite el respaldo pre-deploy."
-fi
 
-# ---------- 5. Pull (solo fast-forward: jamás merge ni force) ----------
-if ! git pull --ff-only --quiet origin "$RAMA" >> "$LOG" 2>&1; then
-  log "ERROR: git pull --ff-only falló — la historia local divergió de origin/$RAMA. No se hace merge ni push forzado: revisar a mano en $REPO_DIR (git status / git log --oneline -5)."
-  exit 1
+  # ---------- 5. Pull (solo fast-forward: jamás merge ni force) ----------
+  HASH_SCRIPT_ANTES="$(sha256sum "$SCRIPT_DIR/actualizar.sh" 2>/dev/null | awk '{print $1}')"
+  if ! git pull --ff-only --quiet origin "$RAMA" >> "$LOG" 2>&1; then
+    log "ERROR: git pull --ff-only falló — la historia local divergió de origin/$RAMA. No se hace merge ni push forzado: revisar a mano en $REPO_DIR (git status / git log --oneline -5)."
+    exit 1
+  fi
+  HASH_SCRIPT_DESPUES="$(sha256sum "$SCRIPT_DIR/actualizar.sh" 2>/dev/null | awk '{print $1}')"
+  if [ "$HASH_SCRIPT_ANTES" != "$HASH_SCRIPT_DESPUES" ]; then
+    # El pull cambió este mismo archivo mientras bash ya lo tenía leído en
+    # memoria: si seguimos, el resto de la corrida ejecuta con el código
+    # VIEJO (visto en producción: seguía logueando "en 30 s" después de un
+    # pull que ya había traído el cambio a "80 s" en disco). Se re-invoca
+    # el script para que el resto corra con el contenido ya actualizado,
+    # pasando el commit ya detectado para no repetir fetch/pull/respaldo
+    # ni caer en el falso "sin cambios" (local y origin ya quedaron iguales).
+    log "actualizar.sh cambió en este pull; re-ejecutando la versión nueva para el resto del deploy."
+    exec env SICR3P_REEXEC_COMMIT="$COMMIT_REMOTO" SICR3P_REEXEC_PREVIO="$COMMIT_PREVIO" bash "$SCRIPT_DIR/actualizar.sh"
+  fi
 fi
 
 # ---------- 6. Build backend + frontend ----------
