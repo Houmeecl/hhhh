@@ -25,6 +25,7 @@ import LoginPuerto from './panel-puerto/LoginPuerto.jsx';
 import LoginMandante from './panel-mandante/LoginMandante.jsx';
 import LoginAgencia from './panel-agencia/LoginAgencia.jsx';
 import LoginTrazador from './panel-trazador/LoginTrazador.jsx';
+import LoginProveedor from './panel-proveedor/LoginProveedor.jsx';
 
 // Code-splitting: los paneles admin son la mitad del bundle y solo los
 // usan operadores logueados — se cargan bajo demanda para que las
@@ -36,6 +37,7 @@ const PuertoApp = lazy(() => import('./panel-puerto/PuertoApp.jsx'));
 const MandanteApp = lazy(() => import('./panel-mandante/MandanteApp.jsx'));
 const AgenciaApp = lazy(() => import('./panel-agencia/AgenciaApp.jsx'));
 const TrazadorApp = lazy(() => import('./panel-trazador/TrazadorApp.jsx'));
+const ProveedorApp = lazy(() => import('./panel-proveedor/ProveedorApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
@@ -109,6 +111,12 @@ export default function App() {
       <Route path="/panel-trazador/login" element={<LoginTrazador />} />
       <Route path="/panel-trazador/activar" element={<ActivarCuenta loginPath="/panel-trazador/login" titulo="el panel de Trazador" />} />
       <Route path="/panel-trazador/*" element={<TrazadorApp />} />
+
+      {/* Panel de Proveedor — entidad persistente con login FIDO2; firma
+          los lotes tipo 'producto' que le asignó el admin desde Origen.jsx */}
+      <Route path="/panel-proveedor/login" element={<LoginProveedor />} />
+      <Route path="/panel-proveedor/activar" element={<ActivarCuenta loginPath="/panel-proveedor/login" titulo="el panel de Proveedor" />} />
+      <Route path="/panel-proveedor/*" element={<ProveedorApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

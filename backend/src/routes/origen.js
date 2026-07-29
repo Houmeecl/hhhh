@@ -870,6 +870,88 @@ router.put('/credenciales-proveedor/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- Proveedor persistente (migración 062) — asignación de qué ----------
+// lote tipo 'producto' puede firmar cada proveedor con su cuenta FIDO2
+// (/panel-proveedor). No reemplaza credenciales-proveedor (arriba, migración
+// 038, de un solo uso): un proveedor puede tener AMBOS caminos vivos a la
+// vez sobre el mismo lote — son mecanismos independientes que convergen en
+// el mismo anexarEslabonTx.
+router.get('/lotes/:id/proveedores-asignados', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT pl.id, pl.proveedor_id, pl.lote_id, pl.activo, pl.firmado_at, pl.eslabon_id, pl.created_at,
+              p.nombre_empresa, p.rut
+       FROM proveedor_lotes pl JOIN proveedores p ON p.id = pl.proveedor_id
+       WHERE pl.lote_id = $1 ORDER BY pl.created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ asignaciones: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/lotes/:id/proveedores-asignados', adminOnly, async (req, res, next) => {
+  try {
+    const { rows: lRows } = await query(`SELECT id, tipo, estado FROM lotes_minerales WHERE id = $1`, [req.params.id]);
+    if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
+    if (!loteAdmiteRol(lRows[0], 'proveedor')) {
+      return res.status(400).json({
+        error: `Este lote (tipo '${lRows[0].tipo}') no tiene el rol 'proveedor' en su cadena de custodia.`,
+      });
+    }
+    if (lRows[0].estado !== 'abierto') return res.status(409).json({ error: 'El lote está cerrado.' });
+
+    const proveedorId = req.body?.proveedor_id;
+    if (!proveedorId) return res.status(400).json({ error: 'proveedor_id es obligatorio.' });
+    const { rows: pRows } = await query(`SELECT id FROM proveedores WHERE id = $1 AND activo = true`, [proveedorId]);
+    if (!pRows[0]) return res.status(400).json({ error: 'proveedor_id no existe o está inactivo.' });
+
+    // Idempotente: si la asignación ya existe, no se duplica. Si ya firmó,
+    // 409 (una asignación firmada es irrepetible, igual que credenciales-proveedor).
+    const { rows } = await query(
+      `INSERT INTO proveedor_lotes (proveedor_id, lote_id) VALUES ($1,$2)
+       ON CONFLICT (proveedor_id, lote_id) DO NOTHING
+       RETURNING id, proveedor_id, lote_id, activo, firmado_at, eslabon_id, created_at`,
+      [proveedorId, req.params.id]
+    );
+    if (rows[0]) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'asignar_proveedor_lote', entidad: 'proveedor_lote',
+        entidadId: rows[0].id, detalle: { lote_id: req.params.id, proveedor_id: proveedorId }, ip: req.ip,
+      });
+      return res.status(201).json({ asignacion: rows[0] });
+    }
+    const { rows: existente } = await query(
+      `SELECT id, proveedor_id, lote_id, activo, firmado_at, eslabon_id, created_at
+       FROM proveedor_lotes WHERE proveedor_id = $1 AND lote_id = $2`,
+      [proveedorId, req.params.id]
+    );
+    if (existente[0]?.firmado_at) return res.status(409).json({ error: 'Este proveedor ya firmó este lote.' });
+    return res.status(200).json({ asignacion: existente[0] });
+  } catch (err) { next(err); }
+});
+
+// Desasignar (togglear activo) — solo si aún no firmó: una asignación
+// firmada queda fija, igual criterio que credenciales-proveedor.
+router.put('/proveedores-asignados/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { rows: existente } = await query(`SELECT firmado_at FROM proveedor_lotes WHERE id = $1`, [req.params.id]);
+    if (!existente[0]) return res.status(404).json({ error: 'Asignación no encontrada' });
+    if (existente[0].firmado_at) return res.status(409).json({ error: 'Esta asignación ya firmó: no se puede modificar.' });
+
+    const { activo } = req.body || {};
+    const { rows } = await query(
+      `UPDATE proveedor_lotes SET activo = COALESCE($2, activo) WHERE id = $1
+       RETURNING id, proveedor_id, lote_id, activo, firmado_at`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null]
+    );
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'editar_proveedor_lote', entidad: 'proveedor_lote',
+      entidadId: rows[0].id, detalle: { activo: rows[0].activo }, ip: req.ip,
+    });
+    res.json({ asignacion: rows[0] });
+  } catch (err) { next(err); }
+});
+
 // ---------- GET /lotes/:id/verificar — recalcular la cadena del lote ----------
 router.get('/lotes/:id/verificar', async (req, res, next) => {
   try {
@@ -1229,6 +1311,96 @@ firmaProveedorRouter.post('/firmar', requireAuth, requireRole('firma_proveedor')
       await logActividad({
         accion: 'firma_proveedor_firmar', entidad: 'lote_eslabon', entidadId: resultado.body.eslabon.id,
         detalle: { eslabon: resultado.body.eslabon.eslabon }, ip: req.ip,
+      });
+    }
+    res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// Router del PANEL DE PROVEEDOR PERSISTENTE — montado en
+// /api/panel-proveedor con requireAuth + requireHomePanel('proveedor')
+// (migración 062, login FIDO2 de la Fase 1). A diferencia de
+// firmaProveedorRouter (arriba: credencial serial+clave de un solo uso),
+// acá el proveedor es una cuenta estable que puede tener varias
+// asignaciones (proveedor_lotes) vivas a la vez, una por lote. Ambos
+// caminos convergen en el mismo anexarEslabonTx.
+// ============================================================
+export const proveedorPanelRouter = express.Router();
+proveedorPanelRouter.use(requireAuth, requireHomePanel('proveedor'));
+
+// GET /api/panel-proveedor/lotes — asignaciones del proveedor logueado,
+// separadas en pendientes (aún no firma) y firmadas.
+proveedorPanelRouter.get('/lotes', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT pl.id AS asignacion_id, pl.activo, pl.firmado_at, pl.eslabon_id, pl.created_at,
+              l.id AS lote_id, l.codigo, l.tipo, l.material, l.cantidad, l.unidad, l.estado
+       FROM proveedor_lotes pl JOIN lotes_minerales l ON l.id = pl.lote_id
+       WHERE pl.proveedor_id = $1
+       ORDER BY pl.created_at DESC`,
+      [req.user.proveedor_id]
+    );
+    res.json({
+      pendientes: rows.filter((r) => !r.firmado_at),
+      firmadas: rows.filter((r) => r.firmado_at),
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/panel-proveedor/lotes/:asignacionId/firmar — la identidad
+// SIEMPRE sale de la fila `proveedores` (rut/nombre_empresa), nunca del
+// body: el firmante no puede declarar quién es, igual que el camino viejo.
+proveedorPanelRouter.post('/lotes/:asignacionId/firmar', async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const resultado = await withTx(async (client) => {
+      const { rows: aRows } = await client.query(
+        `SELECT * FROM proveedor_lotes WHERE id = $1 AND proveedor_id = $2 FOR UPDATE`,
+        [req.params.asignacionId, req.user.proveedor_id]
+      );
+      const asignacion = aRows[0];
+      if (!asignacion) return { status: 404, body: { error: 'Asignación no encontrada' } };
+      if (!asignacion.activo) return { status: 409, body: { error: 'Esta asignación está inactiva.' } };
+      if (asignacion.firmado_at) return { status: 409, body: { error: 'Ya firmaste este lote.' } };
+
+      const { rows: pRows } = await client.query(`SELECT * FROM proveedores WHERE id = $1`, [req.user.proveedor_id]);
+      const proveedor = pRows[0];
+      if (!proveedor || !proveedor.activo) return { status: 403, body: { error: 'Cuenta de proveedor inactiva.' } };
+
+      const { rows: lRows } = await client.query(
+        `SELECT * FROM lotes_minerales WHERE id = $1 FOR UPDATE`, [asignacion.lote_id]
+      );
+      const lote = lRows[0];
+      if (!lote) return { status: 404, body: { error: 'Lote no encontrado' } };
+      if (lote.estado !== 'abierto') return { status: 409, body: { error: 'El lote está cerrado.' } };
+
+      const r = await anexarEslabonTx(client, lote, {
+        rol: 'proveedor',
+        rut_empresa: proveedor.rut,           // identidad de PROVEEDORES, nunca del body
+        nombre_empresa: proveedor.nombre_empresa,
+        pais: b.pais || 'CL',
+        fecha: b.fecha || new Date().toISOString().slice(0, 10),
+        cantidad: b.cantidad,
+        co2e_aportado: b.co2e_aportado ?? 0,
+        visibilidad: b.visibilidad || 'publico',
+        datos: { ...(b.datos || {}), proveedor_id: proveedor.id },
+      });
+      if (r.status === 201) {
+        await client.query(
+          `UPDATE proveedor_lotes SET firmado_at = now(), eslabon_id = $2 WHERE id = $1`,
+          [asignacion.id, r.body.eslabon.id]
+        );
+        await client.query(`UPDATE proveedores SET ultimo_uso = now() WHERE id = $1`, [proveedor.id]);
+      }
+      return r;
+    });
+
+    if (resultado.status === 201) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'proveedor_firmar', entidad: 'lote_eslabon',
+        entidadId: resultado.body.eslabon.id,
+        detalle: { eslabon: resultado.body.eslabon.eslabon, asignacion_id: req.params.asignacionId }, ip: req.ip,
       });
     }
     res.status(resultado.status).json(resultado.body);

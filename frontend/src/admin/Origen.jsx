@@ -44,11 +44,12 @@ const ROLES_POR_TIPO = {
   producto: ['productor', 'proveedor', 'transporte', 'comercio', 'punto_aduana_verde', 'comprador'],
   documental: ['origen', 'transporte', 'deposito', 'frontera', 'puerto', 'destino'],
 };
-// Rol de "autoservicio" (credencial de firma/atestación) por tipo de
-// lote — hoy uno solo por tipo: el proveedor en lotes de producto, el
-// puerto en lotes documentales del Corredor. `transporte` ya tiene su
-// propio mecanismo (Tarjeta de Viaje, componente Tarjetas más abajo).
-const ROL_CREDENCIAL_POR_TIPO = { producto: 'proveedor', documental: 'puerto' };
+// Credencial de firma/atestación de un solo uso (serial+clave) — hoy solo
+// para el puerto en lotes documentales del Corredor. Los lotes de
+// producto dejaron de usar esta credencial: el proveedor ahora es una
+// entidad persistente que firma con su llave USB desde /panel-proveedor
+// (ver AsignarProveedor más abajo). `transporte` ya tiene su propio
+// mecanismo (Tarjeta de Viaje, componente Tarjetas más abajo).
 const ROL_CREDENCIAL_LABELS = {
   proveedor: { titulo: 'proveedor', empresa: 'Nombre de la empresa', placeholderEmpresa: 'Proveedor Demo SpA', rutLabel: 'RUT del proveedor' },
   puerto: { titulo: 'puerto', empresa: 'Autoridad portuaria', placeholderEmpresa: 'Puerto de Antofagasta', rutLabel: 'RUT de la autoridad portuaria' },
@@ -421,9 +422,8 @@ function DetalleLote({ data, flash, onVolver, onRefrescar }) {
       </div>
 
       <Tarjetas lote={lote} abierto={abierto} flash={flash} />
-      {ROL_CREDENCIAL_POR_TIPO[lote.tipo] && (
-        <CredencialesProveedor lote={lote} rol={ROL_CREDENCIAL_POR_TIPO[lote.tipo]} abierto={abierto} flash={flash} />
-      )}
+      {lote.tipo === 'producto' && <AsignarProveedor lote={lote} abierto={abierto} flash={flash} />}
+      {lote.tipo === 'documental' && <CredencialesProveedor lote={lote} rol="puerto" abierto={abierto} flash={flash} />}
       {lote.tipo === 'documental' && (
         <>
           <AgenciaAsignada lote={lote} abierto={abierto} flash={flash} onRefrescar={onRefrescar} />
@@ -822,10 +822,108 @@ function Documentos({ lote, abierto, documentos, semaforo, flash, onRefrescar })
   );
 }
 
+// Asignación de proveedor persistente (login FIDO2, /panel-proveedor) a un
+// lote de tipo 'producto' — reemplaza, para este tipo de lote, la
+// credencial de un solo uso de CredencialesProveedor. El proveedor entra
+// con su llave USB y firma la asignación; acá solo se decide quién puede
+// firmar cuál lote.
+function AsignarProveedor({ lote, abierto, flash }) {
+  const [proveedores, setProveedores] = useState(null);
+  const [asignaciones, setAsignaciones] = useState(null);
+  const [proveedorId, setProveedorId] = useState('');
+  const [asignando, setAsignando] = useState(false);
+
+  const cargarAsignaciones = () =>
+    api.origenProveedoresAsignados(lote.id).then((r) => setAsignaciones(r.asignaciones)).catch((e) => flash(e.message, true));
+
+  useEffect(() => {
+    api.accesosProveedores().then((r) => setProveedores(r.proveedores.filter((p) => p.activo))).catch((e) => flash(e.message, true));
+    cargarAsignaciones();
+  }, [lote.id]);
+
+  async function asignar() {
+    if (!proveedorId) return;
+    setAsignando(true);
+    try {
+      await api.origenAsignarProveedor(lote.id, proveedorId);
+      setProveedorId('');
+      cargarAsignaciones();
+      flash('Proveedor asignado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setAsignando(false); }
+  }
+
+  async function quitar(a) {
+    try {
+      await api.origenDesasignarProveedor(a.id);
+      cargarAsignaciones();
+      flash('Proveedor desasignado.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="card card-pad" style={{ marginBottom: 14 }}>
+      <h3 style={{ marginTop: 0 }}>Proveedores asignados</h3>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        El proveedor entra a <span className="mono">/panel-proveedor</span> con su llave USB (sin contraseña) y
+        firma este lote — mismo mecanismo que el resto de los paneles, con su identidad ya registrada de
+        antemano por sicr3p (ver pestaña Proveedores en Accesos).
+      </p>
+
+      {abierto && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+          <div className="field" style={{ margin: 0, flex: 1, minWidth: 220 }}>
+            <label>Proveedor</label>
+            <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} disabled={!proveedores}>
+              <option value="">— Selecciona —</option>
+              {(proveedores || []).map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre_empresa} ({p.rut})</option>
+              ))}
+            </select>
+          </div>
+          <button className="btn btn-primary" onClick={asignar} disabled={asignando || !proveedorId}>
+            {asignando ? <span className="spinner" /> : 'Asignar'}
+          </button>
+        </div>
+      )}
+
+      {!asignaciones ? <div className="skeleton" style={{ height: 40 }} /> : !asignaciones.length ? (
+        <p className="muted" style={{ fontSize: 13 }}>Sin proveedores asignados a este lote.</p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Empresa</th><th>RUT</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              {asignaciones.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.nombre_empresa}</td>
+                  <td>{a.rut}</td>
+                  <td>
+                    {a.firmado_at
+                      ? <span className="badge badge-green">Firmada — {fmtFecha(a.firmado_at)}</span>
+                      : <span className="badge badge-gray">Pendiente</span>}
+                  </td>
+                  <td>
+                    {!a.firmado_at && (
+                      <button className="btn btn-sm btn-outline" onClick={() => quitar(a)}>Quitar</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Credencial de Firma del Proveedor: atestación con credencial propia
 // (serial+clave) para el eslabón 'proveedor' — NO es firma electrónica con
 // validez legal (Ley N° 19.799). Identidad (RUT+empresa) fijada por el
-// admin al emitir; un solo uso.
+// admin al emitir; un solo uso. Hoy solo se usa desde lotes documentales
+// (rol='puerto') — el stock ya impreso con rol='proveedor' sigue
+// resolviendo por /f/:serial para siempre, sin cambios.
 function CredencialesProveedor({ lote, rol, abierto, flash }) {
   const labels = ROL_CREDENCIAL_LABELS[rol] || ROL_CREDENCIAL_LABELS.proveedor;
   const [items, setItems] = useState(null);

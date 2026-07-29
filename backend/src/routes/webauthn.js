@@ -131,6 +131,7 @@ router.post('/login/verificar', loginLimiter, async (req, res, next) => {
         puerto_id: user.puerto_id,
         mandante_id: user.mandante_id,
         agencia_id: user.agencia_id,
+        proveedor_id: user.proveedor_id,
         must_reset_password: user.must_reset_password,
       },
     });

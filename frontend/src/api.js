@@ -46,6 +46,7 @@ export const authPuerto = crearAlmacenSesion('puerto');
 export const authMandante = crearAlmacenSesion('mandante');
 export const authAgencia = crearAlmacenSesion('agencia');
 export const authTrazador = crearAlmacenSesion('trazador');
+export const authProveedor = crearAlmacenSesion('proveedor');
 
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
@@ -60,9 +61,9 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, authedTrazador = false, cliente = false } = {}) {
-  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : authedTrazador ? authTrazador : auth;
-  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia || authedTrazador;
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, authedTrazador = false, authedProveedor = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : authedTrazador ? authTrazador : authedProveedor ? authProveedor : auth;
+  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia || authedTrazador || authedProveedor;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
   if (anyAuthed && store.access) headers['Authorization'] = `Bearer ${store.access}`;
@@ -180,6 +181,13 @@ export const api = {
     request(`/admin/origen/credenciales-proveedor/${id}`, { method: 'PUT', body: b, authed: true }),
   abrirCredencialProveedor: (loteId, credencialId) =>
     abrirPdfAuth(`/api/admin/origen/lotes/${loteId}/credenciales-proveedor/${credencialId}/credencial.pdf`),
+  // Asignación de lotes 'producto' a un proveedor persistente (login FIDO2
+  // propio) — reemplaza, para ese tipo de lote, la credencial de un solo
+  // uso emitida arriba.
+  origenProveedoresAsignados: (loteId) => request(`/admin/origen/lotes/${loteId}/proveedores-asignados`, { authed: true }),
+  origenAsignarProveedor: (loteId, proveedorId) =>
+    request(`/admin/origen/lotes/${loteId}/proveedores-asignados`, { method: 'POST', body: { proveedor_id: proveedorId }, authed: true }),
+  origenDesasignarProveedor: (id) => request(`/admin/origen/proveedores-asignados/${id}`, { method: 'PUT', authed: true }),
   // Documentos del expediente — Carga Bioceánica (migración 043).
   origenDocumentos: (loteId) => request(`/admin/origen/lotes/${loteId}/documentos`, { authed: true }),
   origenSubirDocumento: (loteId, formData) =>
@@ -214,6 +222,7 @@ export const api = {
   meMandante: () => request('/auth/me', { authedMandante: true }),
   meAgencia: () => request('/auth/me', { authedAgencia: true }),
   meTrazador: () => request('/auth/me', { authedTrazador: true }),
+  meProveedor: () => request('/auth/me', { authedProveedor: true }),
   activar: (token, password) => request('/auth/activar', { method: 'POST', body: { token, password } }),
   solicitarReset: (email) => request('/auth/solicitar-reset', { method: 'POST', body: { email } }),
   // Candado de contraseña temporal (must_reset_password): mismo endpoint
@@ -223,6 +232,7 @@ export const api = {
   cambiarPasswordMandante: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedMandante: true }),
   cambiarPasswordAgencia: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedAgencia: true }),
   cambiarPasswordTrazador: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedTrazador: true }),
+  cambiarPasswordProveedor: (actual, nueva) => request('/auth/password', { method: 'PUT', body: { actual, nueva }, authedProveedor: true }),
 
   // Admin
   dashboard: () => request('/admin/dashboard', { authed: true }),
@@ -350,6 +360,13 @@ export const api = {
   accesosRutsTrazador: (id) => request(`/admin/accesos/trazadores/${id}/ruts`, { authed: true }),
   accesosAgregarRutTrazador: (id, rut) => request(`/admin/accesos/trazadores/${id}/ruts`, { method: 'POST', body: { rut }, authed: true }),
   accesosQuitarRutTrazador: (id, rutId) => request(`/admin/accesos/trazadores/${id}/ruts/${rutId}`, { method: 'DELETE', authed: true }),
+  // Proveedores como entidad persistente (panel /panel-proveedor, login
+  // FIDO2) — reemplaza para lotes tipo 'producto' la credencial de un solo
+  // uso (credenciales_proveedor), que sigue intacta para lotes 'documental'.
+  accesosProveedores: () => request('/admin/accesos/proveedores', { authed: true }),
+  accesosCrearProveedor: (b) => request('/admin/accesos/proveedores', { method: 'POST', body: b, authed: true }),
+  accesosEditarProveedor: (id, b) => request(`/admin/accesos/proveedores/${id}`, { method: 'PUT', body: b, authed: true }),
+  accesosProveedorCrearCuenta: (id, b) => request(`/admin/accesos/proveedores/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
 
   // Panel del mostrador presencial (authedAv: sesión propia, separada del panel núcleo)
   editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
@@ -424,6 +441,14 @@ export const api = {
   // lista: el backend responde 403 si se intenta.
   trazadorRutasPermitidas: () => request('/trazador/rutas-permitidas', { authedTrazador: true }),
   trazadorBuscar: (rut) => request(`/trazador/buscar?rut=${encodeURIComponent(rut)}`, { authedTrazador: true }),
+
+  // --- Panel exclusivo del proveedor (/panel-proveedor) — entidad
+  // persistente con login FIDO2 (sin contraseña), a diferencia de la
+  // credencial de un solo uso (serial+clave) que sigue vigente para el
+  // stock ya impreso. Firma las asignaciones (proveedor_lotes) que le hizo
+  // el admin desde Origen.jsx, nunca declara su propia identidad.
+  proveedorLotes: () => request('/panel-proveedor/lotes', { authedProveedor: true }),
+  proveedorFirmar: (asignacionId, body) => request(`/panel-proveedor/lotes/${asignacionId}/firmar`, { method: 'POST', body, authedProveedor: true }),
 };
 
 async function abrirPdfAuth(url, store = auth) {

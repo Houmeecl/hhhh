@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { startAuthentication } from '@simplewebauthn/browser';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
-import { api, auth, authAv, authPuerto, authMandante, authAgencia, authTrazador } from '../api.js';
+import { api, auth, authAv, authPuerto, authMandante, authAgencia, authTrazador, authProveedor } from '../api.js';
 
-// Login único para los seis paneles (sicrep, terreno, puerto, mandante,
-// agencia, trazador): a diferencia de PanelLogin.jsx, esta pantalla NO
-// manda `panel` en el body — el backend detecta el panel real de la
-// cuenta (POST /auth/login sin panel no exige coincidencia, ver
+// Login único para los siete paneles (sicrep, terreno, puerto, mandante,
+// agencia, trazador, proveedor): a diferencia de PanelLogin.jsx, esta
+// pantalla NO manda `panel` en el body — el backend detecta el panel real
+// de la cuenta (POST /auth/login sin panel no exige coincidencia, ver
 // routes/auth.js) y esta pantalla redirige sola a donde corresponda, en
-// vez de obligar a elegir de antemano una de las seis URLs de login.
+// vez de obligar a elegir de antemano una de las siete URLs de login.
 const DESTINO_POR_PANEL = {
   sicrep: { authStore: auth, redirect: '/admin' },
   aduana_verde: { authStore: authAv, redirect: '/panel-verde' },
@@ -18,6 +18,7 @@ const DESTINO_POR_PANEL = {
   mandante: { authStore: authMandante, redirect: '/panel-mandante' },
   agencia: { authStore: authAgencia, redirect: '/panel-agencia' },
   trazador: { authStore: authTrazador, redirect: '/panel-trazador' },
+  proveedor: { authStore: authProveedor, redirect: '/panel-proveedor' },
 };
 
 export default function IngresarPanel() {
@@ -37,7 +38,7 @@ export default function IngresarPanel() {
     const destino = DESTINO_POR_PANEL[user.panel];
     if (!destino) {
       // No debería pasar (el CHECK de la BD limita `usuarios.panel` a
-      // estos seis valores), pero si algún día se agrega un panel acá
+      // estos siete valores), pero si algún día se agrega un panel acá
       // sin actualizar este mapa, mejor un error claro que una pantalla
       // en blanco.
       setError('Tu cuenta pertenece a un panel que esta pantalla todavía no reconoce.');

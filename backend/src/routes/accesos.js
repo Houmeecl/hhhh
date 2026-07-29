@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
-import { sanearPuntoId } from '../services/pasaporteOrigen.js';
+import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
 import { generarPasswordTemporal } from '../services/cuentas.js';
 
 // ============================================================
@@ -19,9 +19,10 @@ router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin');
 const hashToken = hashApiKey; // misma función que verifica routes/mandante.js — no pueden desincronizarse
 
-// Crea el login web de un actor externo (puerto, mandante, agencia o
-// trazador): una fila de `usuarios` atada a SU entidad vía puerto_id/
-// mandante_id/agencia_id/trazador_id (migraciones 042/046/058).
+// Crea el login web de un actor externo (puerto, mandante, agencia,
+// trazador o proveedor): una fila de `usuarios` atada a SU entidad vía
+// puerto_id/mandante_id/agencia_id/trazador_id/proveedor_id
+// (migraciones 042/046/058/062).
 //
 // El correo no se envía: el mail saliente no es confiable, así que el
 // admin genera aquí mismo una contraseña temporal (generarPasswordTemporal)
@@ -359,6 +360,68 @@ router.delete('/trazadores/:id/ruts/:rutId', adminOnly, async (req, res, next) =
     );
     if (!rowCount) return res.status(404).json({ error: 'RUT no encontrado' });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- PROVEEDORES (panel /panel-proveedor — firma FIDO2 de lotes tipo 'producto') ----------
+// Entidad persistente (migración 062): a diferencia de credenciales_proveedor
+// (serial+clave de un solo uso, migración 038, que sigue viva sin cambios),
+// un proveedor acá tiene una identidad estable contra la cual registrar su
+// llave FIDO2 y firmar N lotes en el tiempo. La autorización de qué lote
+// puede firmar vive en proveedor_lotes (routes/origen.js), no acá.
+router.get('/proveedores', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.nombre_empresa, p.rut, p.activo, p.ultimo_uso, p.created_at,
+              (u.id IS NOT NULL) AS tiene_cuenta_web
+       FROM proveedores p LEFT JOIN usuarios u ON u.proveedor_id = p.id
+       ORDER BY p.created_at DESC`
+    );
+    res.json({ proveedores: rows });
+  } catch (err) { next(err); }
+});
+
+// Acceso web propio del proveedor (panel /panel-proveedor).
+router.post('/proveedores/:id/crear-cuenta', adminOnly, (req, res, next) =>
+  crearCuentaEntidad({ req, res, panel: 'proveedor', columnaFk: 'proveedor_id', entidadId: req.params.id }).catch(next)
+);
+
+router.post('/proveedores', adminOnly, async (req, res, next) => {
+  try {
+    // El formulario de esta pestaña usa el mismo nombre de campo que
+    // Mandantes/Agencias/Trazadores más arriba en este archivo (`rut`,
+    // no `rut_empresa`) — validarIdentidadProveedor se escribió para el
+    // flujo de credenciales_proveedor, que sí usa `rut_empresa`.
+    const val = validarIdentidadProveedor({ rut_empresa: req.body.rut, nombre_empresa: req.body.nombre_empresa });
+    if (!val.ok) return res.status(400).json({ error: val.errores.join(' ') });
+    const nombreEmpresa = String(req.body.nombre_empresa || '').trim();
+    let proveedor;
+    try {
+      const { rows } = await query(
+        `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2)
+         RETURNING id, nombre_empresa, rut, activo, created_at`,
+        [nombreEmpresa, val.rut_normalizado]
+      );
+      proveedor = rows[0];
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ error: 'Ya existe un proveedor con ese RUT.' });
+      throw e;
+    }
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_proveedor', entidad: 'proveedor', entidadId: proveedor.id, ip: req.ip });
+    res.status(201).json({ proveedor });
+  } catch (err) { next(err); }
+});
+
+router.put('/proveedores/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { activo } = req.body || {};
+    const { rows } = await query(
+      `UPDATE proveedores SET activo = COALESCE($2, activo) WHERE id = $1
+       RETURNING id, nombre_empresa, rut, activo`,
+      [req.params.id, typeof activo === 'boolean' ? activo : null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Proveedor no encontrado' });
+    res.json({ proveedor: rows[0] });
   } catch (err) { next(err); }
 });
 

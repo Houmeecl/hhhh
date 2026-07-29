@@ -19,7 +19,7 @@ import accesosRoutes from './routes/accesos.js';
 import motorRoutes from './routes/motor.js';
 import cadenaRoutes from './routes/cadena.js';
 import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
-import origenRoutes, { tarjetaRouter, torreRouter, firmaProveedorRouter } from './routes/origen.js';
+import origenRoutes, { tarjetaRouter, torreRouter, firmaProveedorRouter, proveedorPanelRouter } from './routes/origen.js';
 import capacitacionRoutes from './routes/capacitacion.js';
 import webauthnRoutes from './routes/webauthn.js';
 import puertoRoutes from './routes/puerto.js';
@@ -70,6 +70,7 @@ app.use('/api/admin/origen', origenRoutes);
 app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
 app.use('/api/torre', apiLimiter, torreRouter);
 app.use('/api/firma-proveedor', apiLimiter, firmaProveedorRouter);
+app.use('/api/panel-proveedor', apiLimiter, proveedorPanelRouter);
 app.use('/api/admin/capacitacion', capacitacionRoutes);
 // '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
 // hace match de app.use por prefijo en orden de registro, así que si fuera

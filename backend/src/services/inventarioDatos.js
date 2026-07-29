@@ -425,6 +425,16 @@ export const INVENTARIO = {
     base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
     retencion: 'Mientras dure el convenio del trazador.',
   },
+  proveedores: {
+    clasificacion: PERSONAL, columnas: ['nombre_empresa', 'rut'],
+    nota: 'Un proveedor suele ser una empresa, pero puede ser una persona natural (un pequeño '
+      + 'proveedor sin razón social) — mismo criterio que agencias_aduana/trazadores. Entidad '
+      + 'persistente para el login FIDO2 del panel /panel-proveedor (migración 062): NO reemplaza '
+      + 'a `credenciales_proveedor` (de un solo uso, migración 038), que sigue viva sin cambios.',
+    finalidad: 'Acceso web del proveedor para firmar los lotes tipo `producto` que un admin le asignó.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Se puede dar de baja cuando termina la relación con el proveedor.',
+  },
   credenciales_webauthn: {
     clasificacion: PERSONAL, columnas: ['nombre_dispositivo'],
     nota: '`public_key`/`credential_id`/`counter` son material criptográfico de la llave FIDO2, no '

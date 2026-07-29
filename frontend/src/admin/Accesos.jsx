@@ -19,8 +19,9 @@ export default function Accesos() {
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
             Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes,
-            API keys para puertos (tránsito del Corredor por su punto) y accesos para agencias de aduana
-            (Pasaporte Bioceánico — sicr3p es su infraestructura documental, nunca se presenta como agencia).
+            API keys para puertos (tránsito del Corredor por su punto), accesos para agencias de aduana
+            (Pasaporte Bioceánico — sicr3p es su infraestructura documental, nunca se presenta como agencia)
+            y cuentas de proveedor con login por llave USB para firmar lotes de producto en Pasaporte de Origen.
           </p>
         </div>
       </div>
@@ -31,6 +32,7 @@ export default function Accesos() {
         <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
         <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
         <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
+        <button className={`btn btn-sm ${tab === 'proveedores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('proveedores')}>Proveedores</button>
       </div>
 
       {tab === 'codigos' && <Codigos flash={flash} />}
@@ -38,6 +40,7 @@ export default function Accesos() {
       {tab === 'puertos' && <Puertos flash={flash} />}
       {tab === 'agencias' && <Agencias flash={flash} />}
       {tab === 'trazadores' && <Trazadores flash={flash} />}
+      {tab === 'proveedores' && <Proveedores flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -709,6 +712,90 @@ function GestionRutsTrazador({ trazador, flash, onClose }) {
           <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Proveedores como entidad persistente (panel /panel-proveedor, login
+// FIDO2 propio): el alta acá solo crea la empresa (nombre_empresa + RUT,
+// sin API key — no hay integración M2M en esta ronda). Qué lote puede
+// firmar cada proveedor se asigna en Pasaporte de Origen (Origen.jsx,
+// componente AsignarProveedor), sin tocar la credencial de un solo uso
+// (rol='puerto') que sigue vigente para lotes documentales.
+function Proveedores({ flash }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({ nombre_empresa: '', rut: '' });
+  const [creando, setCreando] = useState(false);
+  const [cuentaWeb, setCuentaWeb] = useState(null);
+
+  const cargar = () => api.accesosProveedores().then((r) => setItems(r.proveedores)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      await api.accesosCrearProveedor(form);
+      setForm({ nombre_empresa: '', rut: '' });
+      cargar(); flash('Proveedor creado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(p) {
+    try { await api.accesosEditarProveedor(p.id, { activo: !p.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div className="card card-pad">
+          <h3 style={{ marginTop: 0 }}>Nuevo proveedor</h3>
+          <div className="field"><label>Empresa</label><input value={form.nombre_empresa} placeholder="Proveedor Ejemplo Ltda." onChange={(e) => setForm({ ...form, nombre_empresa: e.target.value })} /></div>
+          <div className="field" style={{ marginBottom: 14 }}><label>RUT</label><input value={form.rut} placeholder="76.123.456-0" onChange={(e) => setForm({ ...form, rut: e.target.value })} /></div>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre_empresa || !form.rut}>
+            {creando ? <span className="spinner" /> : 'Crear proveedor'}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+            Con "Crear acceso web" le das a este proveedor una cuenta propia (email + contraseña temporal) para
+            entrar a <code>/panel-proveedor</code> y registrar su llave USB — con ella firma, sin contraseña,
+            los lotes de producto que le asignes en Pasaporte de Origen.
+          </p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id}>
+                <td><b>{p.nombre_empresa}</b></td>
+                <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.rut}</td>
+                <td className="muted" style={{ fontSize: 13 }}>{p.ultimo_uso ? fmtFecha(p.ultimo_uso) : 'Nunca'}</td>
+                <td><span className={`badge ${p.activo ? 'badge-green' : 'badge-gray'}`}>{p.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td>
+                  {p.tiene_cuenta_web
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(p)}>Crear acceso web</button>}
+                </td>
+                <td><button className="btn btn-outline btn-sm" onClick={() => toggle(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button></td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin proveedores registrados.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
+      {cuentaWeb && (
+        <CrearCuentaWeb
+          entidad={cuentaWeb} nombreEntidad={cuentaWeb.nombre_empresa}
+          crear={api.accesosProveedorCrearCuenta}
+          onCreada={cargar}
+          onClose={() => setCuentaWeb(null)}
+        />
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@ const router = express.Router();
 
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
-const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador'];
+const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador', 'proveedor'];
 
 // ---------- POST /api/auth/login ----------
 router.post('/login', loginLimiter, async (req, res, next) => {
@@ -62,6 +62,7 @@ router.post('/login', loginLimiter, async (req, res, next) => {
         puerto_id: user.puerto_id,
         mandante_id: user.mandante_id,
         agencia_id: user.agencia_id,
+        proveedor_id: user.proveedor_id,
         must_reset_password: user.must_reset_password,
       },
     });
@@ -88,7 +89,7 @@ router.post('/refresh', async (req, res) => {
 // ---------- GET /api/auth/me ----------
 router.get('/me', requireAuth, async (req, res) => {
   const { rows } = await query(
-    `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, agencia_id, must_reset_password FROM usuarios WHERE id = $1`,
+    `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, agencia_id, proveedor_id, must_reset_password FROM usuarios WHERE id = $1`,
     [req.user.sub]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
