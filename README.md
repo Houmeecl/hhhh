@@ -283,7 +283,7 @@ cuentas ambientales del Banco Central/MMA), citando además Natural Capital Prot
 - **Activos naturales**: derechos de agua, predios, bosques u otros stocks, con extensión,
   condición (0–100) y valorización CLP manual.
 - **Informe "Estado de Capital Natural"** (PDF, folio `N-AAAA-NNNN`): balance por cuenta con
-  libro de movimientos, activos y metodología citada.
+  libro de movimientos, activos y sello de integridad hash.
 
 ### Búsqueda con cruces
 

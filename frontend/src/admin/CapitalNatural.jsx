@@ -321,7 +321,7 @@ function Libro({ flash }) {
               {descargando ? <span className="spinner" /> : 'Estado de Capital Natural (PDF)'}
             </button>
             <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-              Balance por cuenta con movimientos del período, activos naturales y metodología citada (Plan Nacional de Cuentas Ambientales de Chile / SEEA).
+              Balance por cuenta con movimientos del período, activos naturales y sello de integridad para validar el documento.
             </p>
           </div>
         </div>
