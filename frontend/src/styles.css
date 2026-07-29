@@ -878,14 +878,22 @@ table.data tr:hover td { background: #f3f8f5; }
   padding: 6px 10px;
 }
 
-/* Bento de entregables */
-.av2-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+/* Bento de entregables: cada card ahora lleva una captura real de la
+   pantalla que describe (media) arriba y un acento de color propio (borde
+   superior + tinte del ícono) — mismo radio/sombra que el resto del sitio,
+   solo con más jerarquía visual. `align-items: start` a propósito: las
+   imágenes tienen alturas naturales distintas (algunas son capturas
+   panorámicas cortas, otras más altas) y forzar `stretch` dejaría huecos
+   raros bajo el texto de las cards más cortas. */
+.av2-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
 .av2-bento-3 { grid-template-columns: repeat(3, 1fr); }
 .av2-bento-card {
   background: #fff;
   border: 1px solid rgba(15, 31, 46, 0.08);
+  border-top: 4px solid var(--green-600);
   border-radius: 18px;
-  padding: 26px 26px 22px;
+  padding: 0;
+  overflow: hidden;
   box-shadow:
     0 1px 2px rgba(15, 31, 46, 0.04),
     0 6px 18px rgba(15, 31, 46, 0.05);
@@ -901,6 +909,7 @@ table.data tr:hover td { background: #f3f8f5; }
 }
 .av2-bento-card h3 { margin: 12px 0 6px; font-size: 17px; }
 .av2-bento-card p { margin: 0; color: var(--gray); font-size: 13.5px; line-height: 1.6; }
+.av2-bento-body { padding: 20px 26px 24px; }
 .av2-bento-ico {
   display: inline-flex;
   padding: 10px;
@@ -909,6 +918,46 @@ table.data tr:hover td { background: #f3f8f5; }
   background: var(--green-50);
   border: 1px solid var(--green-100);
 }
+
+/* Captura real de la pantalla que ilustra la card: ocupa el ancho completo,
+   sin recortar (el alto lo da la imagen misma) — así ninguna imagen se
+   deforma ni pierde el detalle que la hace "real" y no un mockup. El chip
+   de honestidad va DEBAJO de la imagen (nunca superpuesto): igual criterio
+   que .av2-pas-shot en el hero — superponerlo tapaba contenido real de la
+   captura (badges, botones) en las cards más ajustadas. */
+.av2-bento-media { line-height: 0; background: var(--bg); }
+.av2-bento-media img { display: block; width: 100%; height: auto; }
+.av2-bento-chip {
+  display: block;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--green-600);
+  background: var(--green-50);
+  border-bottom: 1px solid var(--green-100);
+  padding: 6px 10px;
+}
+
+/* Acentos de color por card: mismo borde superior (por ahora en la card,
+   no en el <img>) + tinte a juego en el ícono. Todos los tonos ya existen
+   en la paleta del sitio (variables de :root, o los mismos hex que usan
+   los badges/el panel de terreno) — no se agregó ningún color nuevo. */
+.av2-bento-acc-green { border-top-color: var(--green-600); }
+.av2-bento-acc-green .av2-bento-ico { color: var(--green-600); background: var(--green-50); border-color: var(--green-100); }
+
+.av2-bento-acc-navy { border-top-color: var(--navy-700); }
+.av2-bento-acc-navy .av2-bento-ico { color: var(--navy-700); background: #f2f9ff; border-color: #dce7f2; }
+
+.av2-bento-acc-amber { border-top-color: #d97706; }
+.av2-bento-acc-amber .av2-bento-ico { color: #92400e; background: #fff8e6; border-color: #f2d9a5; }
+
+/* Verde oscuro del panel de terreno (mismo tono que .theme-av .admin-side):
+   se reutiliza a propósito para la card de "Atención en terreno", que
+   ilustra justo ese panel. */
+.av2-bento-acc-deep { border-top-color: #0f2e1f; }
+.av2-bento-acc-deep .av2-bento-ico { color: #0f2e1f; background: var(--green-50); border-color: var(--green-100); }
+
 .av2-bento-a { background: linear-gradient(150deg, #ffffff 55%, var(--green-50)); }
 .av2-bento-b { background: linear-gradient(330deg, #ffffff 55%, #f2f9ff); }
 

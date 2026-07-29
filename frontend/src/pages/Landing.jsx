@@ -72,6 +72,27 @@ function PasaportePreview({ t, prioridad = false }) {
   );
 }
 
+// Card del bento de "Servicios"/"Pasos": misma estructura que
+// PasaportePreview aplica al hero — captura REAL de la pantalla que la
+// card describe (nunca un ícono solo), con el mismo chip de honestidad de
+// marca, más un acento de color propio (borde superior + tinte del ícono)
+// para que la grilla no se vea plana.
+function BentoCard({ accent, extraClass, img, alt, icon: Ico, title, desc, chip }) {
+  return (
+    <div className={`av2-bento-card av2-bento-acc-${accent} ${extraClass || ''} av2-reveal`}>
+      <div className="av2-bento-media">
+        <img src={img} alt={alt} loading="lazy" decoding="async" />
+      </div>
+      <span className="av2-bento-chip">✓ {chip}</span>
+      <div className="av2-bento-body">
+        <div className="av2-bento-ico"><Ico size={24} /></div>
+        <h3>{title}</h3>
+        <p>{desc}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { t } = useIdioma();
   const heroRef = useRef(null);
@@ -146,26 +167,38 @@ export default function Landing() {
           <h2 className="sec-head">{t('landing.servicios_titulo')}</h2>
           <p className="sec-head-sub">{t('landing.servicios_sub')}</p>
           <div className="av2-bento">
-            <div className="av2-bento-card av2-bento-a av2-reveal">
-              <div className="av2-bento-ico"><Icon.Chart size={24} /></div>
-              <h3>{t('landing.serv1_t')}</h3>
-              <p>{t('landing.serv1_d')}</p>
-            </div>
-            <div className="av2-bento-card av2-reveal">
-              <div className="av2-bento-ico"><Icon.Qr size={24} /></div>
-              <h3>{t('landing.serv2_t')}</h3>
-              <p>{t('landing.serv2_d')}</p>
-            </div>
-            <div className="av2-bento-card av2-reveal">
-              <div className="av2-bento-ico"><Icon.Leaf size={24} /></div>
-              <h3>{t('landing.serv3_t')}</h3>
-              <p>{t('landing.serv3_d')}</p>
-            </div>
-            <div className="av2-bento-card av2-bento-b av2-reveal">
-              <div className="av2-bento-ico"><Icon.Users size={24} /></div>
-              <h3>{t('landing.serv4_t')}</h3>
-              <p>{t('landing.serv4_d')}</p>
-            </div>
+            <BentoCard
+              accent="green" extraClass="av2-bento-a"
+              img="/img/plataforma/serv1-contabilidad-carbono.png"
+              alt={t('landing.serv1_alt')}
+              icon={Icon.Chart}
+              title={t('landing.serv1_t')} desc={t('landing.serv1_d')}
+              chip={t('landing.shot_chip')}
+            />
+            <BentoCard
+              accent="navy"
+              img="/img/plataforma/serv2-pasaporte-qr.png"
+              alt={t('landing.serv2_alt')}
+              icon={Icon.Qr}
+              title={t('landing.serv2_t')} desc={t('landing.serv2_d')}
+              chip={t('landing.shot_chip')}
+            />
+            <BentoCard
+              accent="amber"
+              img="/img/plataforma/serv3-declaracion-rep.png"
+              alt={t('landing.serv3_alt')}
+              icon={Icon.Leaf}
+              title={t('landing.serv3_t')} desc={t('landing.serv3_d')}
+              chip={t('landing.shot_chip')}
+            />
+            <BentoCard
+              accent="deep" extraClass="av2-bento-b"
+              img="/img/plataforma/serv4-atencion-terreno.png"
+              alt={t('landing.serv4_alt')}
+              icon={Icon.Users}
+              title={t('landing.serv4_t')} desc={t('landing.serv4_d')}
+              chip={t('landing.shot_chip')}
+            />
           </div>
         </div>
       </section>
@@ -198,21 +231,30 @@ export default function Landing() {
           <h2 className="sec-head">{t('landing.pasos_titulo')}</h2>
           <p className="sec-head-sub">{t('landing.pasos_sub')}</p>
           <div className="av2-bento av2-bento-3">
-            <div className="av2-bento-card av2-bento-a av2-reveal">
-              <div className="av2-bento-ico"><Icon.Cloud size={24} /></div>
-              <h3>{t('landing.paso1_t')}</h3>
-              <p>{t('landing.paso1_d')}</p>
-            </div>
-            <div className="av2-bento-card av2-reveal">
-              <div className="av2-bento-ico"><Icon.Chart size={24} /></div>
-              <h3>{t('landing.paso2_t')}</h3>
-              <p>{t('landing.paso2_d')}</p>
-            </div>
-            <div className="av2-bento-card av2-bento-b av2-reveal">
-              <div className="av2-bento-ico"><Icon.CheckCircle size={24} /></div>
-              <h3>{t('landing.paso3_t')}</h3>
-              <p>{t('landing.paso3_d')}</p>
-            </div>
+            <BentoCard
+              accent="green" extraClass="av2-bento-a"
+              img="/img/plataforma/paso1-subir-documentos.png"
+              alt={t('landing.paso1_alt')}
+              icon={Icon.Cloud}
+              title={t('landing.paso1_t')} desc={t('landing.paso1_d')}
+              chip={t('landing.shot_chip')}
+            />
+            <BentoCard
+              accent="amber"
+              img="/img/plataforma/paso2-generamos-informe.png"
+              alt={t('landing.paso2_alt')}
+              icon={Icon.Chart}
+              title={t('landing.paso2_t')} desc={t('landing.paso2_d')}
+              chip={t('landing.shot_chip')}
+            />
+            <BentoCard
+              accent="navy" extraClass="av2-bento-b"
+              img="/img/plataforma/paso3-etiqueta-qr.png"
+              alt={t('landing.paso3_alt')}
+              icon={Icon.CheckCircle}
+              title={t('landing.paso3_t')} desc={t('landing.paso3_d')}
+              chip={t('landing.shot_chip')}
+            />
           </div>
           <div style={{ textAlign: 'center', marginTop: 36 }}>
             <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
