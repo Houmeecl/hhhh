@@ -337,6 +337,7 @@ export const api = {
   accesosCrearTrazador: (nombre) => request('/admin/accesos/trazadores', { method: 'POST', body: { nombre }, authed: true }),
   accesosEditarTrazador: (id, b) => request(`/admin/accesos/trazadores/${id}`, { method: 'PUT', body: b, authed: true }),
   accesosCrearCuentaTrazador: (id, b) => request(`/admin/accesos/trazadores/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
+  accesosGenerarApiKeyTrazador: (id) => request(`/admin/accesos/trazadores/${id}/generar-api-key`, { method: 'POST', authed: true }),
   accesosRutsTrazador: (id) => request(`/admin/accesos/trazadores/${id}/ruts`, { authed: true }),
   accesosAgregarRutTrazador: (id, rut) => request(`/admin/accesos/trazadores/${id}/ruts`, { method: 'POST', body: { rut }, authed: true }),
   accesosQuitarRutTrazador: (id, rutId) => request(`/admin/accesos/trazadores/${id}/ruts/${rutId}`, { method: 'DELETE', authed: true }),

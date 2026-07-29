@@ -1,16 +1,26 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
+import { config } from '../config.js';
 import { query } from '../lib/db.js';
-import { requireAuth, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
-import { normalizarRut } from '../services/mandante.js';
+import { normalizarRut, hashApiKey } from '../services/mandante.js';
 
 // ============================================================
 // API para TRAZADORES — panel web (migración 058) para un tercero
-// externo (auditora, cliente final, organismo) que necesita buscar la
-// trazabilidad de un RUT, pero SOLO de los RUT que un admin le puso
-// explícitamente en su lista blanca (trazador_ruts). A diferencia de
-// puerto/mandante/agencia, no existe camino de X-Api-Key: es siempre
-// un humano entrando con su propia cuenta (email+contraseña).
+// externo (auditora, cliente final, organismo, socio como Kontax) que
+// necesita buscar la trazabilidad de un RUT, pero SOLO de los RUT que un
+// admin le puso explícitamente en su lista blanca (trazador_ruts).
+//
+// Dos caminos de acceso a los MISMOS datos (migración 060, mismo patrón
+// que puerto.js/agencia.js/mandante.js):
+//  1) X-Api-Key: el sistema del socio externo consulta el RUT
+//     programáticamente, sin operador humano de por medio.
+//  2) Sesión (Bearer JWT, panel='trazador'): el operador humano entra
+//     por /panel-trazador/login con su propia cuenta.
+// El X-Api-Key es OPCIONAL por trazador (a diferencia de puerto/agencia,
+// que siempre lo tienen desde su creación) — se genera aparte, solo
+// para los trazadores que de verdad integran un sistema propio.
 //
 // Los datos expuestos son EXACTAMENTE los mismos cruces por RUT que ya
 // arma routes/buscar.js (como_cliente / recibe_de / emite_a) sobre las
@@ -19,20 +29,39 @@ import { normalizarRut } from '../services/mandante.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('trazador'));
 
-// requireHomePanel solo valida el panel del JWT; la fila de `trazadores`
-// (nombre, activo) se carga aparte porque cada endpoint la necesita.
-async function cargarTrazador(req, res, next) {
+async function requireTrazador(req, res, next) {
   try {
-    const { rows } = await query(`SELECT * FROM trazadores WHERE id = $1`, [req.user.trazador_id]);
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ')) {
+      let payload;
+      try {
+        payload = jwt.verify(authHeader.slice(7), config.jwt.accessSecret);
+      } catch {
+        return res.status(401).json({ error: 'Sesión expirada o inválida.' });
+      }
+      if (payload.panel !== 'trazador' || !payload.trazador_id) {
+        return res.status(403).json({ error: 'Esta cuenta no tiene acceso al panel de trazador.' });
+      }
+      const { rows } = await query(`SELECT * FROM trazadores WHERE id = $1`, [payload.trazador_id]);
+      const t = rows[0];
+      if (!t || !t.activo) return res.status(401).json({ error: 'Trazador inactivo.' });
+      req.trazador = t;
+      req.usuarioId = payload.sub;
+      return next();
+    }
+    const key = req.headers['x-api-key'];
+    if (!key) return res.status(401).json({ error: 'Falta el header X-Api-Key o una sesión.' });
+    const { rows } = await query(`SELECT * FROM trazadores WHERE token_hash = $1`, [hashApiKey(key)]);
     const t = rows[0];
-    if (!t || !t.activo) return res.status(401).json({ error: 'Trazador inactivo.' });
+    if (!t || !t.activo) return res.status(401).json({ error: 'API key inválida o inactiva.' });
+    await query(`UPDATE trazadores SET ultimo_uso = now() WHERE id = $1`, [t.id]);
     req.trazador = t;
+    req.usuarioId = null;
     next();
   } catch (err) { next(err); }
 }
-router.use(cargarTrazador);
+router.use(requireTrazador);
 
 const rutNorm = normalizarRut;
 const NORM = (col) => `regexp_replace(COALESCE(${col},''), '[^0-9kK]', '', 'g')`;
@@ -111,7 +140,7 @@ router.get('/buscar', async (req, res, next) => {
       n_emite_a: cruces.emite_a.length,
     };
     logActividad({
-      usuarioId: req.user.sub, accion: 'consulta_cruce_rut_trazador',
+      usuarioId: req.usuarioId, accion: 'consulta_cruce_rut_trazador',
       entidad: 'trazador', entidadId: req.trazador.id, detalle, ip: req.ip,
     });
     bigquery.exportAcceso({ tipo: 'consulta_cruce_rut_trazador', actor: { tipo: 'trazador', id: req.trazador.id }, rut_consultado: rn, detalle });

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { hashApiKey } from '../src/services/mandante.js';
 import trazadorRouter from '../src/routes/trazador.js';
 
 // ============================================================
@@ -33,13 +34,14 @@ let trazadorId;
 let sesionId;
 let facturaId;
 let tokenTrazador;
+const API_KEY = `trz_test_${crypto.randomBytes(16).toString('hex')}`;
 
 before(async () => {
   await runMigrations(); // idempotente: valida además el punto 6 del encargo (correr no falla)
 
   const { rows: trazadores } = await query(
-    `INSERT INTO trazadores (nombre) VALUES ($1) RETURNING id`,
-    [`Test Trazador ${sufijo}`]
+    `INSERT INTO trazadores (nombre, token_hash) VALUES ($1, $2) RETURNING id`,
+    [`Test Trazador ${sufijo}`, hashApiKey(API_KEY)]
   );
   trazadorId = trazadores[0].id;
 
@@ -129,4 +131,39 @@ test('GET /api/trazador/buscar con un usuario de otro panel (sicrep) responde 40
     headers: { Authorization: `Bearer ${tokenOtroPanel}` },
   });
   assert.equal(res.status, 403);
+});
+
+// ---------- Camino X-Api-Key (migración 060) — integración de un socio
+// externo (ej. Kontax) que consulta el RUT programáticamente ----------
+
+test('GET /api/trazador/buscar con X-Api-Key inválida responde 401', async () => {
+  const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
+    headers: { 'X-Api-Key': 'trz_no_existe' },
+  });
+  assert.equal(res.status, 401);
+});
+
+test('GET /api/trazador/buscar con X-Api-Key válida y RUT dentro de la whitelist responde 200', async () => {
+  const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
+    headers: { 'X-Api-Key': API_KEY },
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.cruces.rut, RUT_PERMITIDO);
+});
+
+test('GET /api/trazador/buscar con X-Api-Key válida pero RUT fuera de la whitelist responde 403', async () => {
+  const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_FUERA}`, {
+    headers: { 'X-Api-Key': API_KEY },
+  });
+  assert.equal(res.status, 403);
+});
+
+test('GET /api/trazador/rutas-permitidas con X-Api-Key devuelve la whitelist', async () => {
+  const res = await fetch(`${baseUrl}/api/trazador/rutas-permitidas`, {
+    headers: { 'X-Api-Key': API_KEY },
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.deepEqual(body.ruts, [RUT_PERMITIDO]);
 });

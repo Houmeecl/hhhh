@@ -257,13 +257,17 @@ router.put('/agencias/:id', adminOnly, async (req, res, next) => {
 });
 
 // ---------- TRAZADORES (panel /panel-trazador — búsqueda de RUT en lista blanca) ----------
-// A diferencia de puerto/mandante/agencia, un trazador no tiene API key: es
-// siempre un login humano (migración 058), y su acceso a datos SIEMPRE
-// depende de trazador_ruts — sin filas ahí, no ve ningún RUT (nunca "todos").
+// Dos caminos de acceso, igual que puerto/mandante/agencia (migración 060):
+// login humano (cuenta web) o X-Api-Key para un socio cuyo propio sistema
+// integra (ej. Kontax). A diferencia de puerto/agencia, la key es OPCIONAL:
+// un trazador puede seguir existiendo solo como cuenta humana. Su acceso a
+// datos SIEMPRE depende de trazador_ruts — sin filas ahí, no ve ningún RUT
+// (nunca "todos").
 router.get('/trazadores', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT t.id, t.nombre, t.activo, t.ultimo_uso, t.created_at,
+              (t.token_hash IS NOT NULL) AS tiene_api_key,
               (u.id IS NOT NULL) AS tiene_cuenta_web
        FROM trazadores t LEFT JOIN usuarios u ON u.trazador_id = t.id
        ORDER BY t.created_at DESC`
@@ -272,11 +276,26 @@ router.get('/trazadores', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Acceso web propio del trazador (panel /panel-trazador) — único camino de
-// acceso de este actor, no hay X-Api-Key que reemplace.
+// Acceso web propio del trazador (panel /panel-trazador).
 router.post('/trazadores/:id/crear-cuenta', adminOnly, (req, res, next) =>
   crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id }).catch(next)
 );
+
+// Genera (o rota) la API key del trazador — se muestra UNA sola vez. Solo
+// se usa cuando el trazador integra un sistema propio (ej. Kontax); no es
+// obligatoria para el resto, que sigue entrando solo con su cuenta web.
+router.post('/trazadores/:id/generar-api-key', adminOnly, async (req, res, next) => {
+  try {
+    const token = `trz_${crypto.randomBytes(24).toString('base64url')}`;
+    const { rows } = await query(
+      `UPDATE trazadores SET token_hash = $1 WHERE id = $2 RETURNING id, nombre`,
+      [hashToken(token), req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Trazador no encontrado' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'generar_api_key_trazador', entidad: 'trazador', entidadId: rows[0].id, ip: req.ip });
+    res.json({ trazador: rows[0], token });
+  } catch (err) { next(err); }
+});
 
 router.post('/trazadores', adminOnly, async (req, res, next) => {
   try {

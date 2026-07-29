@@ -545,16 +545,19 @@ function Agencias({ flash }) {
   );
 }
 
-// Trazadores: un tercero externo con cuenta propia (email+contraseña) al
-// que se le da una lista blanca de RUT específicos. No tiene API key —
-// solo entra a su panel web (/panel-trazador) y ve los cruces (mismo dato
-// que el buscador interno) de los RUT que tiene autorizados, ni uno más.
+// Trazadores: un tercero externo al que se le da una lista blanca de RUT
+// específicos. Dos caminos de acceso a los mismos datos (migración 060):
+// cuenta web propia (/panel-trazador, email+contraseña) para un operador
+// humano, o API key para un socio cuyo propio sistema integra (ej.
+// Kontax) — la key es opcional, no todo trazador la necesita.
 function Trazadores({ flash }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({ nombre: '' });
   const [creando, setCreando] = useState(false);
   const [cuentaWeb, setCuentaWeb] = useState(null);
   const [gestion, setGestion] = useState(null);
+  const [tokenNuevo, setTokenNuevo] = useState(null);
+  const [generando, setGenerando] = useState('');
 
   const cargar = () => api.accesosTrazadores().then((r) => setItems(r.trazadores)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -574,6 +577,16 @@ function Trazadores({ flash }) {
     catch (e) { flash(e.message, true); }
   }
 
+  async function generarApiKey(t) {
+    setGenerando(t.id);
+    try {
+      const { token } = await api.accesosGenerarApiKeyTrazador(t.id);
+      setTokenNuevo({ nombre: t.nombre, token });
+      cargar();
+    } catch (e) { flash(e.message, true); }
+    finally { setGenerando(''); }
+  }
+
   return (
     <div className="form-content-grid">
       <div style={{ display: 'grid', gap: 16 }}>
@@ -584,16 +597,23 @@ function Trazadores({ flash }) {
             {creando ? <span className="spinner" /> : 'Crear'}
           </button>
           <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-            Un trazador solo entra por su panel web (<code>/panel-trazador</code>) — sin API key. Usa
-            "Crear acceso web" y luego "Gestionar RUT" para darle su lista blanca.
+            Usa "Crear acceso web" y "Gestionar RUT" para un operador humano, o "Generar API key"
+            si el trazador integra su propio sistema (ej. Kontax) — ambos caminos ven los mismos RUT autorizados.
           </p>
         </div>
+        {tokenNuevo && (
+          <div className="card card-pad" style={{ borderColor: 'var(--green)' }}>
+            <h3 style={{ marginTop: 0 }}>API key de {tokenNuevo.nombre}</h3>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>{tokenNuevo.token}</div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>Cópiala ahora: no volverá a mostrarse.</p>
+          </div>
+        )}
       </div>
 
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Estado</th><th>Acceso web</th><th>API key</th><th></th></tr></thead>
           <tbody>
             {items.map((t) => (
               <tr key={t.id}>
@@ -604,13 +624,20 @@ function Trazadores({ flash }) {
                     ? <span className="badge badge-green">Creada</span>
                     : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(t)}>Crear acceso web</button>}
                 </td>
+                <td>
+                  {t.tiene_api_key
+                    ? <span className="badge badge-green">Creada</span>
+                    : <button className="btn btn-outline btn-sm" onClick={() => generarApiKey(t)} disabled={generando === t.id}>
+                        {generando === t.id ? <span className="spinner" /> : 'Generar API key'}
+                      </button>}
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <button className="btn btn-outline btn-sm" onClick={() => setGestion(t)}>Gestionar RUT</button>{' '}
                   <button className="btn btn-outline btn-sm" onClick={() => toggle(t)}>{t.activo ? 'Desactivar' : 'Activar'}</button>
                 </td>
               </tr>
             ))}
-            {items.length === 0 && <tr><td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin trazadores registrados.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin trazadores registrados.</td></tr>}
           </tbody>
         </table>
         </div>
