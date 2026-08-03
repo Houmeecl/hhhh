@@ -27,8 +27,8 @@ import {
   generarCodigoLote,
   generarSerialTarjeta,
   hashAnclajeLote,
-  validarMensajeTorre,
   sanearPuntoId,
+  PUNTOS_CORREDOR_IDS,
   generarSerialCredencialProveedor,
   validarIdentidadProveedor,
   loteAdmiteRol,
@@ -254,6 +254,17 @@ async function anexarEslabonTx(client, lote, b) {
   // Vínculo opcional al DTE real: existe, y su RUT debiera coincidir.
   let facturaNumero = null;
   const advertencias = [...val.advertencias];
+
+  // El punto_id es dato declarativo del actor (torre/tarjeta lo usan para
+  // ubicar el paso en el mapa del Corredor): si no calza con el catálogo
+  // real, el eslabón igual se guarda (append-only, nunca se rechaza por
+  // esto) pero se avisa — mismo patrón no bloqueante que la advertencia
+  // de RUT que no calza con el DTE/documento vinculado, más abajo.
+  const puntoIdDeclarado = b.datos?.punto_id;
+  if (puntoIdDeclarado && !PUNTOS_CORREDOR_IDS.includes(puntoIdDeclarado)) {
+    advertencias.push(`El punto de control '${puntoIdDeclarado}' no está en el catálogo del corredor.`);
+  }
+
   if (b.factura_id) {
     const { rows: fRows } = await client.query(
       `SELECT id, numero_venta, rut_emisor, rut_receptor FROM facturas WHERE id = $1`, [b.factura_id]
@@ -1404,83 +1415,6 @@ proveedorPanelRouter.post('/lotes/:asignacionId/firmar', async (req, res, next) 
       });
     }
     res.status(resultado.status).json(resultado.body);
-  } catch (err) { next(err); }
-});
-
-// ============================================================
-// Router de la TORRE DE CONTROL — montado en /api/torre. La torre se
-// autentica con la credencial de un terminal (rol 'pos', el mismo login
-// de dispositivo del mostrador vía POST /api/pos/auth) y envía
-// instrucciones operativas al camión de un lote: dirigirse al puerto
-// seco o al puerto. Los mensajes son APPEND-ONLY y NO entran en la
-// cadena de hash del lote (son operación, no custodia — migración 024).
-// ============================================================
-export const torreRouter = express.Router();
-
-// POST /api/torre/mensaje — instrucción de la torre para un lote:
-// puerto_seco | puerto | estacionamiento (con zona obligatoria).
-torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, next) => {
-  try {
-    const b = req.body || {};
-    const val = validarMensajeTorre(b);
-    if (!val.ok) return res.status(400).json({ error: val.error });
-
-    const codigo = String(b.codigo_lote || '').trim().toUpperCase();
-    const { rows: lRows } = await query(
-      `SELECT id, codigo FROM lotes_minerales WHERE codigo = $1`, [codigo]
-    );
-    if (!lRows[0]) return res.status(404).json({ error: 'Lote no encontrado' });
-
-    const { rows: tRows } = await query(
-      `SELECT nombre FROM pos_terminales WHERE id = $1`, [req.user.sub]
-    );
-    const emisor = tRows[0]?.nombre || 'torre';
-
-    const { rows } = await query(
-      `INSERT INTO torre_mensajes (lote_id, destino, zona, nota, emisor)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id, destino, zona, nota, emisor, creado`,
-      [lRows[0].id, val.destino, val.zona, val.nota, emisor]
-    );
-    await logActividad({
-      accion: 'torre_mensaje', entidad: 'torre_mensaje', entidadId: rows[0].id,
-      detalle: { lote: lRows[0].codigo, destino: val.destino, zona: val.zona }, ip: req.ip,
-    });
-    res.status(201).json({ mensaje: rows[0] });
-  } catch (err) { next(err); }
-});
-
-// GET /api/torre/flota — TODOS los camiones activos en un solo mapa.
-// Solo para operadores autenticados (rol pos): la vista de flota lista
-// la operación completa, no es para el público (el pasaporte de cada
-// lote sigue siendo público por su propio código, como siempre).
-// Un lote "aparece en el mapa" recién cuando tiene un paso con punto
-// reconocible — un camión nuevo se ve al ACTIVARSE con su primer paso.
-torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next) => {
-  try {
-    const { rows } = await query(
-      `SELECT l.codigo, l.tipo, l.material, l.estado, l.n_eslabones, l.updated_at,
-              (SELECT json_build_object(
-                 'punto_id', e.datos->>'punto_id',
-                 'punto_control', e.datos->>'punto_control',
-                 'fecha', e.fecha, 'pais', e.pais)
-               FROM lote_eslabones e
-               WHERE e.lote_id = l.id
-                 AND (e.datos ? 'punto_id' OR e.datos ? 'punto_control')
-               ORDER BY e.eslabon DESC LIMIT 1) AS ultimo_paso,
-              (SELECT json_build_object(
-                 'destino', m.destino, 'zona', m.zona, 'nota', m.nota, 'creado', m.creado)
-               FROM torre_mensajes m
-               WHERE m.lote_id = l.id ORDER BY m.creado DESC LIMIT 1) AS instruccion,
-              (SELECT json_agg(json_build_object('serial', t.serial, 'portador', t.portador))
-               FROM tarjetas_viaje t
-               WHERE t.lote_id = l.id AND t.activo) AS tarjetas
-       FROM lotes_minerales l
-       WHERE l.estado = 'abierto'
-         AND EXISTS (SELECT 1 FROM tarjetas_viaje t WHERE t.lote_id = l.id AND t.activo)
-       ORDER BY l.updated_at DESC
-       LIMIT 100`
-    );
-    res.json({ flota: rows });
   } catch (err) { next(err); }
 });
 

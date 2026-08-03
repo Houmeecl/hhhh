@@ -449,6 +449,18 @@ export const DESTINOS_TORRE = ['puerto_seco', 'puerto', 'estacionamiento', 'fron
 // catálogo que PUNTOS_CORREDOR en frontend/src/lib/corredor.js).
 export const PUNTOS_FRONTERA = ['ponta-pora', 'pozo-hondo', 'paso-de-jama'];
 
+// Ids de los 14 puntos de control del Corredor (mismo catálogo completo
+// que PUNTOS_CORREDOR en frontend/src/lib/corredor.js — solo los ids, sin
+// coordenadas: el backend no dibuja el mapa, solo valida). Un test de
+// sincronía (backend/test/corredorSync.test.js) garantiza que este array
+// coincida exactamente con el del frontend.
+export const PUNTOS_CORREDOR_IDS = [
+  'campo-grande', 'ponta-pora', 'loma-plata', 'mariscal-estigarribia',
+  'pozo-hondo', 'tartagal', 'jujuy', 'susques', 'paso-de-jama',
+  'san-pedro-de-atacama', 'calama', 'puerto-seco', 'puerto-antofagasta',
+  'puerto-mejillones',
+];
+
 export function destinoTorreValido(d) {
   return DESTINOS_TORRE.includes(d);
 }

@@ -513,3 +513,19 @@ test('validarEslabon acepta rol puerto solo en tipo documental', () => {
   const rProducto = validarEslabon({ rol: 'puerto', pais: 'CL', rut_empresa: '76.123.456-0', fecha: '2026-01-01' }, { ...lote, tipo: 'producto' }, []);
   assert.equal(rProducto.ok, false);
 });
+
+// ---------- Guardia de sincronía: catálogo del Corredor (backend vs frontend) ----------
+// PUNTOS_CORREDOR_IDS (backend, solo ids) y PUNTOS_CORREDOR (frontend, con
+// lat/lng para el mapa) se mantienen a mano en dos archivos separados —
+// este test falla la suite si alguna vez se desincronizan, en vez de
+// depender de que quien edite uno se acuerde de editar el otro.
+test('PUNTOS_CORREDOR_IDS (backend) coincide exactamente con los ids de PUNTOS_CORREDOR (frontend)', async () => {
+  const { PUNTOS_CORREDOR_IDS, PUNTOS_FRONTERA } = await import('../src/services/pasaporteOrigen.js');
+  const { PUNTOS_CORREDOR, PUNTOS_FRONTERA: PUNTOS_FRONTERA_FRONTEND } =
+    await import('../../frontend/src/lib/corredor.js');
+  const idsFrontend = PUNTOS_CORREDOR.map((p) => p.id).sort();
+  assert.deepEqual([...PUNTOS_CORREDOR_IDS].sort(), idsFrontend);
+  assert.deepEqual([...PUNTOS_FRONTERA].sort(), [...PUNTOS_FRONTERA_FRONTEND].sort());
+  // Los 3 pasos fronterizos son un subconjunto del catálogo completo en ambos lados.
+  for (const id of PUNTOS_FRONTERA) assert.ok(PUNTOS_CORREDOR_IDS.includes(id));
+});
