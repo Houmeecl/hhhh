@@ -56,7 +56,7 @@ export default function AgenciaApp() {
   }
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell theme-agencia">
       <div className="admin-topbar">
         <button className="hamburger" aria-label="Abrir menú" onClick={() => setMenuOpen(true)}>
           <Icon.List size={22} />
@@ -69,7 +69,7 @@ export default function AgenciaApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo size={26} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Panel de Agencia</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>Panel de Agencia</div>
         </div>
         <nav>
           {NAV.map((n) => {

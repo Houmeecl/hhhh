@@ -38,6 +38,21 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
 .theme-av .admin-side { background: #0f2e1f; }
 .theme-av .admin-side nav a.active { background: var(--green); color: #fff; }
 
+/* Mismo patrón para los paneles externos con sidebar (puerto/mandante/
+   agencia/trazador): solo repintan el sidebar del shell compartido para
+   diferenciarse entre sí, sin tocar layout. Acentos tomados de la paleta
+   de gráficos ya existente (components/Charts.jsx PALETTE), no colores
+   nuevos. Proveedor no tiene sidebar (shell de una sola pantalla) — su
+   acento se aplica directo en ProveedorApp.jsx. */
+.theme-puerto .admin-side { background: #0c2233; }
+.theme-puerto .admin-side nav a.active { background: #0ea5e9; color: #fff; }
+.theme-mandante .admin-side { background: #1e1b3a; }
+.theme-mandante .admin-side nav a.active { background: #8b5cf6; color: #fff; }
+.theme-agencia .admin-side { background: #2e2410; }
+.theme-agencia .admin-side nav a.active { background: #f59e0b; color: #0f1f2e; }
+.theme-trazador .admin-side { background: #2e1414; }
+.theme-trazador .admin-side nav a.active { background: #ef4444; color: #fff; }
+
 /* Animaciones de entrada */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -653,9 +668,9 @@ table.data tr:hover td { background: #f3f8f5; }
 /* Marcador del camión: emoji sobre círculo de marca; el movimiento entre
    puntos se anima con transition sobre el transform que pone Leaflet. */
 .torre-camion {
-  font-size: 26px;
-  line-height: 38px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
   border: 2px solid #28a745;
   border-radius: 50%;
@@ -726,9 +741,9 @@ table.data tr:hover td { background: #f3f8f5; }
   flex: 0 0 auto;
   width: 38px;
   height: 38px;
-  line-height: 38px;
-  text-align: center;
-  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: #fff;
   border: 2px solid #28a745;
   border-radius: 50%;

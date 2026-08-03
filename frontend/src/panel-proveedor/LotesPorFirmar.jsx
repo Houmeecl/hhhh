@@ -43,6 +43,11 @@ export default function LotesPorFirmar() {
         con tu identidad ya registrada (no es una firma electrónica con validez legal).
       </p>
 
+      <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="stat"><div className="n green">{pendientes.length}</div><div className="l">Lotes pendientes de firmar</div></div>
+        <div className="stat"><div className="n">{firmadas.length}</div><div className="l">Lotes ya firmados</div></div>
+      </div>
+
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="table-scroll">
           <table className="data">

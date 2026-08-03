@@ -87,12 +87,14 @@ function Metodologias({ flash }) {
               <span className={`badge ${m.activo ? 'badge-green' : 'badge-gray'}`}>{m.activo ? '● Activo' : '○ Inactivo'}</span>
             </div>
             <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{m.referencia}</div>
-            <table className="data" style={{ marginTop: 12 }}>
-              <tbody>
-                <tr><td className="muted">Electricidad</td><td className="num">{fmt(m.factores?.electricidad_kgco2e_kwh, 4)} kgCO2e/kWh</td></tr>
-                <tr><td className="muted">Diésel</td><td className="num">{fmt(m.factores?.diesel_kgco2e_l, 3)} kgCO2e/L</td></tr>
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="data" style={{ marginTop: 12 }}>
+                <tbody>
+                  <tr><td className="muted">Electricidad</td><td className="num">{fmt(m.factores?.electricidad_kgco2e_kwh, 4)} kgCO2e/kWh</td></tr>
+                  <tr><td className="muted">Diésel</td><td className="num">{fmt(m.factores?.diesel_kgco2e_l, 3)} kgCO2e/L</td></tr>
+                </tbody>
+              </table>
+            </div>
             <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Fuente: {m.fuente} · {m.vigencia}</div>
             {m.notas && <div className="muted" style={{ fontSize: 12, marginTop: 4, fontStyle: 'italic' }}>{m.notas}</div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -202,25 +204,27 @@ function Documentos({ flash }) {
       </div>
 
       <div className="card">
-        <table className="data">
-          <thead><tr><th>Fecha</th><th>Tramo</th><th>Tipo</th><th>Metodología</th><th>Estado</th><th className="num">t CO2e</th></tr></thead>
-          <tbody>
-            {docs.map((d) => (
-              <tr key={d.id}>
-                <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
-                <td>{d.pais_origen} → {d.pais_destino}{d.tramo ? <div className="muted" style={{ fontSize: 12 }}>{d.tramo}</div> : null}</td>
-                <td>
-                  <span className="badge badge-gray">{(TIPOS.find((t) => t.value === d.tipo_documento) || {}).label || d.tipo_documento}</span>
-                  {d.numero_documento && <div className="muted" style={{ fontSize: 12 }}>N° {d.numero_documento}</div>}
-                </td>
-                <td>{d.metodologia_pais}</td>
-                <td><span className={`badge ${badge(d.estado)}`}>{d.estado}</span></td>
-                <td className="num">{d.estado === 'procesado' ? fmt(d.total_co2e, 3) : '—'}</td>
-              </tr>
-            ))}
-            {docs.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin documentos cargados.</td></tr>}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Fecha</th><th>Tramo</th><th>Tipo</th><th>Metodología</th><th>Estado</th><th className="num">t CO2e</th></tr></thead>
+            <tbody>
+              {docs.map((d) => (
+                <tr key={d.id}>
+                  <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
+                  <td>{d.pais_origen} → {d.pais_destino}{d.tramo ? <div className="muted" style={{ fontSize: 12 }}>{d.tramo}</div> : null}</td>
+                  <td>
+                    <span className="badge badge-gray">{(TIPOS.find((t) => t.value === d.tipo_documento) || {}).label || d.tipo_documento}</span>
+                    {d.numero_documento && <div className="muted" style={{ fontSize: 12 }}>N° {d.numero_documento}</div>}
+                  </td>
+                  <td>{d.metodologia_pais}</td>
+                  <td><span className={`badge ${badge(d.estado)}`}>{d.estado}</span></td>
+                  <td className="num">{d.estado === 'procesado' ? fmt(d.total_co2e, 3) : '—'}</td>
+                </tr>
+              ))}
+              {docs.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin documentos cargados.</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

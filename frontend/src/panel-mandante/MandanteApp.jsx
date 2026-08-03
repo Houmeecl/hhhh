@@ -51,7 +51,7 @@ export default function MandanteApp() {
   }
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell theme-mandante">
       <div className="admin-topbar">
         <button className="hamburger" aria-label="Abrir menú" onClick={() => setMenuOpen(true)}>
           <Icon.List size={22} />
@@ -64,7 +64,7 @@ export default function MandanteApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo size={26} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Panel de Mandante</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#8b5cf6', marginTop: 2 }}>Panel de Mandante</div>
         </div>
         <nav>
           {NAV.map((n) => {

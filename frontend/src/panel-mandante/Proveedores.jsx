@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
+import { Donut } from '../components/Charts.jsx';
 
 // Proveedores que le han emitido documentos a ESTE mandante (backend ya
 // filtra por su propio RUT receptor — nunca ve datos de otro mandante) +
@@ -72,6 +73,13 @@ export default function Proveedores() {
         </div>
         {errorExport && <div className="badge badge-red" style={{ display: 'block', marginTop: 10, padding: 10 }}>{errorExport}</div>}
       </div>
+
+      {data.proveedores.length > 0 && (
+        <div className="card card-pad" style={{ marginBottom: 16 }}>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>t CO2e por proveedor</h3>
+          <Donut data={data.proveedores.map((p) => ({ label: p.rut_proveedor, value: p.total_co2e }))} />
+        </div>
+      )}
 
       <div className="two-col-grid" style={{ gap: 16, alignItems: 'flex-start' }}>
         <div className="card card-pad">

@@ -116,6 +116,20 @@ export const Icon = {
     <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z" />
     <path d="M11 4v16M11 8h-4M11 12h-4" />
   </>),
+  Truck: ({ size = 22 }) => base(size, <>
+    <path d="M2 8h11v8H2Z" />
+    <path d="M13 11h4l3 3v2h-7Z" />
+    <circle cx="6.5" cy="17.3" r="1.8" /><circle cx="17" cy="17.3" r="1.8" />
+  </>),
+  Pause: ({ size = 22 }) => base(size, <path d="M8 5v14M16 5v14" />),
 };
 
 export default Icon;
+
+// Marcador de camión para mapas Leaflet (Torre de control): L.divIcon exige
+// un string de HTML crudo, no JSX, así que el trazo de Icon.Truck se repite
+// acá como SVG plano en vez de reusar el componente React.
+export const TRUCK_MARKER_SVG =
+  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#218838" stroke-width="1.8" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11v8H2Z"/><path d="M13 11h4l3 3v2h-7Z"/>' +
+  '<circle cx="6.5" cy="17.3" r="1.8"/><circle cx="17" cy="17.3" r="1.8"/></svg>';

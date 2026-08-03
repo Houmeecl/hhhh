@@ -6,6 +6,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 import { PUNTOS_CORREDOR, puntoDe, etiquetaInstruccion } from '../lib/corredor.js';
+import { Icon, TRUCK_MARKER_SVG } from '../components/icons.jsx';
 
 // ============================================================
 // Torre de Control — FLOTA (/torre, sin código)
@@ -75,7 +76,7 @@ export default function TorreFlota() {
       const p = c.ultimo_paso ? puntoDe({ datos: c.ultimo_paso }) : null;
       if (!p) continue; // sin posición: aparece cuando active su primer paso
       vivos.add(c.codigo);
-      const html = `<span class="torre-camion-emoji">🚚</span><span class="torre-camion-tag">${c.codigo.slice(-6)}</span>`;
+      const html = `<span class="torre-camion-emoji">${TRUCK_MARKER_SVG}</span><span class="torre-camion-tag">${c.codigo.slice(-6)}</span>`;
       let m = camionesRef.current.get(c.codigo);
       if (!m) {
         m = L.marker([p.lat, p.lng], {
@@ -134,7 +135,9 @@ export default function TorreFlota() {
                     const p = c.ultimo_paso ? puntoDe({ datos: c.ultimo_paso }) : null;
                     return (
                       <div key={c.codigo} className="torre-msg">
-                        <span style={{ fontSize: 20 }}>{p ? '🚚' : '⏸'}</span>
+                        <span style={{ color: p ? 'var(--green-600)' : 'var(--gray)' }}>
+                          {p ? <Icon.Truck size={20} /> : <Icon.Pause size={20} />}
+                        </span>
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>
                             <span className="mono">{c.codigo}</span>

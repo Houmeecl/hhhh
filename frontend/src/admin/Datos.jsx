@@ -51,7 +51,7 @@ function Solicitudes({ rol, flash }) {
     URL.revokeObjectURL(url);
   }
 
-  if (!datos) return <div className="card card-pad muted">Cargando…</div>;
+  if (!datos) return <div className="card card-pad muted"><span className="spinner dark" /> Cargando…</div>;
   const pendientes = datos.solicitudes.filter((s) => s.estado === 'pendiente');
 
   return (

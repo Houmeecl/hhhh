@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import PublicLayout from '../components/PublicLayout.jsx';
-import { Icon } from '../components/icons.jsx';
+import { Icon, TRUCK_MARKER_SVG } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 import { PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, puntoDestinoDe, etiquetaInstruccion } from '../lib/corredor.js';
@@ -82,7 +82,7 @@ export default function Torre() {
     // Polilínea de la ruta real (pasos sellados) y camión.
     rutaRef.current = L.polyline([], { color: '#28a745', weight: 4, opacity: 0.9 }).addTo(mapa);
     camionRef.current = L.marker(coords[0], {
-      icon: L.divIcon({ className: 'torre-camion', html: '🚚', iconSize: [38, 38], iconAnchor: [19, 19] }),
+      icon: L.divIcon({ className: 'torre-camion', html: TRUCK_MARKER_SVG, iconSize: [38, 38], iconAnchor: [19, 19] }),
       opacity: 0,
       zIndexOffset: 1000,
       keyboard: false,

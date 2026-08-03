@@ -54,7 +54,7 @@ export default function PuertoApp() {
   }
 
   return (
-    <div className="admin-shell">
+    <div className="admin-shell theme-puerto">
       <div className="admin-topbar">
         <button className="hamburger" aria-label="Abrir menú" onClick={() => setMenuOpen(true)}>
           <Icon.List size={22} />
@@ -67,7 +67,7 @@ export default function PuertoApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <Logo size={26} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Panel de Puerto</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0ea5e9', marginTop: 2 }}>Panel de Puerto</div>
         </div>
         <nav>
           {NAV.map((n) => {

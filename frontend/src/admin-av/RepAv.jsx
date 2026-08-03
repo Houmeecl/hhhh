@@ -14,10 +14,12 @@ export default function RepAv() {
     api.embalajeAv().then((r) => setItems(r.declaraciones)).catch((e) => setErr(e.message));
   }, []);
 
+  if (err) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{err}</div>;
+  if (!items) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;
+
   return (
     <div>
       <div className="admin-head"><h1>REP — declaraciones de embalaje</h1></div>
-      {err && <div className="badge badge-red" style={{ padding: '10px 14px', marginBottom: 14 }}>{err}</div>}
       <div className="card">
         <div className="table-scroll">
           <table className="data">
@@ -28,7 +30,7 @@ export default function RepAv() {
               </tr>
             </thead>
             <tbody>
-              {(items || []).map((d) => (
+              {items.map((d) => (
                 <tr key={d.id}>
                   <td>{d.nombre_cliente || d.rut_cliente || '—'}</td>
                   <td className="muted" style={{ fontSize: 13 }}>{d.fecha ? fmtFecha(d.fecha) : '—'}</td>
@@ -39,7 +41,7 @@ export default function RepAv() {
                   <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
                 </tr>
               ))}
-              {items && items.length === 0 && (
+              {items.length === 0 && (
                 <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin declaraciones de embalaje registradas todavía.</td></tr>
               )}
             </tbody>

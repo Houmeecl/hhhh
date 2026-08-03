@@ -232,7 +232,7 @@ export default function Resultado() {
               <h3 style={{ margin: '0 0 10px' }}>Detalle por ítem</h3>
               <span className="badge badge-green">{factura.categoria}</span>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="table-scroll">
               <table className="data">
                 <thead>
                   <tr><th>Descripción</th><th className="num">Cantidad</th><th className="num">t CO2e</th><th className="num">% del total</th></tr>

@@ -45,12 +45,21 @@ export default function Expedientes() {
   if (error) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{error}</div>;
   if (!data) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;
 
+  const nAbiertos = data.expedientes.filter((l) => l.estado === 'abierto').length;
+  const nCerrados = data.expedientes.length - nAbiertos;
+
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Expedientes de {data.agencia.nombre}</h1>
       <p className="muted" style={{ fontSize: 13, marginTop: -6 }}>
         Solo se muestran las cargas del Corredor Bioceánico asignadas a tu agencia.
       </p>
+
+      <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="stat"><div className="n">{data.expedientes.length}</div><div className="l">Expedientes totales</div></div>
+        <div className="stat"><div className="n green">{nAbiertos}</div><div className="l">Abiertos</div></div>
+        <div className="stat"><div className="n">{nCerrados}</div><div className="l">Cerrados</div></div>
+      </div>
 
       <div className="two-col-grid" style={{ gap: 16, alignItems: 'flex-start' }}>
         <div className="card card-pad">

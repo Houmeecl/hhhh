@@ -77,24 +77,24 @@ export default function Buscar() {
               <>
                 <h3 style={{ marginTop: 0, fontFamily: 'monospace' }}>{cruces.rut}</h3>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-                  <div className="card card-pad">
-                    <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase' }}>Como cliente sicr3p</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green-600)' }}>{fmtInt(cruces.como_cliente.n_sesiones)}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>
+                <div className="stat-grid" style={{ marginBottom: 16 }}>
+                  <div className="stat">
+                    <div className="n green">{fmtInt(cruces.como_cliente.n_sesiones)}</div>
+                    <div className="l">Como cliente sicr3p</div>
+                    <span className="muted" style={{ fontSize: 12.5 }}>
                       sesiones · {fmt(cruces.como_cliente.total_co2e, 2)} t CO2e
                       {cruces.como_cliente.ultima_sesion ? ` · última ${fmtFecha(cruces.como_cliente.ultima_sesion)}` : ''}
-                    </div>
+                    </span>
                   </div>
-                  <div className="card card-pad">
-                    <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase' }}>Le emiten (recibe de)</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green-600)' }}>{fmtInt(cruces.recibe_de.length)}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>{fmt(cruces.recibe_de.reduce((a, x) => a + (x.total_co2e || 0), 0), 2)} t CO2e</div>
+                  <div className="stat">
+                    <div className="n green">{fmtInt(cruces.recibe_de.length)}</div>
+                    <div className="l">Le emiten (recibe de)</div>
+                    <span className="muted" style={{ fontSize: 12.5 }}>{fmt(cruces.recibe_de.reduce((a, x) => a + (x.total_co2e || 0), 0), 2)} t CO2e</span>
                   </div>
-                  <div className="card card-pad">
-                    <div className="muted" style={{ fontSize: 11, textTransform: 'uppercase' }}>Emite a</div>
-                    <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green-600)' }}>{fmtInt(cruces.emite_a.length)}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>{fmt(cruces.emite_a.reduce((a, x) => a + (x.total_co2e || 0), 0), 2)} t CO2e</div>
+                  <div className="stat">
+                    <div className="n green">{fmtInt(cruces.emite_a.length)}</div>
+                    <div className="l">Emite a</div>
+                    <span className="muted" style={{ fontSize: 12.5 }}>{fmt(cruces.emite_a.reduce((a, x) => a + (x.total_co2e || 0), 0), 2)} t CO2e</span>
                   </div>
                 </div>
 

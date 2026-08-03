@@ -55,10 +55,11 @@ export default function ProveedorApp() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 24px', background: 'var(--navy)', color: '#fff', flexWrap: 'wrap', gap: 10,
+        borderBottom: '3px solid #14b8a6',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Logo size={22} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>Panel de Proveedor</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#14b8a6' }}>Panel de Proveedor</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>

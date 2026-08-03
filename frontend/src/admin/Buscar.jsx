@@ -75,27 +75,31 @@ export default function Buscar() {
             {data.cruces.recibe_de.length > 0 && (
               <div className="card">
                 <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Recibe documentos de (proveedores)</div>
-                <table className="data">
-                  <thead><tr><th>RUT emisor</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
-                  <tbody>
-                    {data.cruces.recibe_de.map((p) => (
-                      <tr key={p.rut_emisor}><td><b>{p.rut_emisor}</b></td><td className="num">{p.n_documentos}</td><td className="num">{fmt(p.total_co2e, 3)}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-scroll">
+                  <table className="data">
+                    <thead><tr><th>RUT emisor</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
+                    <tbody>
+                      {data.cruces.recibe_de.map((p) => (
+                        <tr key={p.rut_emisor}><td><b>{p.rut_emisor}</b></td><td className="num">{p.n_documentos}</td><td className="num">{fmt(p.total_co2e, 3)}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
             {data.cruces.emite_a.length > 0 && (
               <div className="card">
                 <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Emite documentos a (clientes)</div>
-                <table className="data">
-                  <thead><tr><th>RUT receptor</th><th>Empresa</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
-                  <tbody>
-                    {data.cruces.emite_a.map((p) => (
-                      <tr key={p.rut_receptor}><td><b>{p.rut_receptor}</b></td><td className="muted" style={{ fontSize: 13 }}>{p.empresa || '—'}</td><td className="num">{p.n_documentos}</td><td className="num">{fmt(p.total_co2e, 3)}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-scroll">
+                  <table className="data">
+                    <thead><tr><th>RUT receptor</th><th>Empresa</th><th className="num">Docs</th><th className="num">t CO2e</th></tr></thead>
+                    <tbody>
+                      {data.cruces.emite_a.map((p) => (
+                        <tr key={p.rut_receptor}><td><b>{p.rut_receptor}</b></td><td className="muted" style={{ fontSize: 13 }}>{p.empresa || '—'}</td><td className="num">{p.n_documentos}</td><td className="num">{fmt(p.total_co2e, 3)}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -108,73 +112,81 @@ export default function Buscar() {
           {data.clientes.length > 0 && (
             <div className="card">
               <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Clientes ({data.clientes.length})</div>
-              <table className="data">
-                <thead><tr><th>Empresa</th><th>RUT</th><th>Contrato</th><th>Plan</th></tr></thead>
-                <tbody>
-                  {data.clientes.map((c) => (
-                    <tr key={c.id}><td><b>{c.nombre_empresa}</b></td><td>{c.rut}</td>
-                      <td><span className={`badge ${c.estado_contrato === 'activo' ? 'badge-green' : c.estado_contrato === 'piloto' ? 'badge-amber' : 'badge-gray'}`}>{c.estado_contrato}</span></td>
-                      <td className="muted">{c.plan}</td></tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead><tr><th>Empresa</th><th>RUT</th><th>Contrato</th><th>Plan</th></tr></thead>
+                  <tbody>
+                    {data.clientes.map((c) => (
+                      <tr key={c.id}><td><b>{c.nombre_empresa}</b></td><td>{c.rut}</td>
+                        <td><span className={`badge ${c.estado_contrato === 'activo' ? 'badge-green' : c.estado_contrato === 'piloto' ? 'badge-amber' : 'badge-gray'}`}>{c.estado_contrato}</span></td>
+                        <td className="muted">{c.plan}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
           {data.facturas.length > 0 && (
             <div className="card">
               <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Documentos procesados ({data.facturas.length})</div>
-              <table className="data">
-                <thead><tr><th>Fecha</th><th>Documento</th><th>Emisor → Receptor</th><th>Cliente</th><th className="num">t CO2e</th></tr></thead>
-                <tbody>
-                  {data.facturas.map((f) => (
-                    <tr key={f.id}>
-                      <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(f.created_at)}</td>
-                      <td><b>{f.numero_venta || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{f.archivo_original}</div></td>
-                      <td className="muted" style={{ fontSize: 13 }}>{f.rut_emisor || '—'} → {f.rut_receptor || '—'}</td>
-                      <td className="muted" style={{ fontSize: 13 }}>{f.nombre_cliente || '—'}</td>
-                      <td className="num">{fmt(f.total_co2e, 3)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead><tr><th>Fecha</th><th>Documento</th><th>Emisor → Receptor</th><th>Cliente</th><th className="num">t CO2e</th></tr></thead>
+                  <tbody>
+                    {data.facturas.map((f) => (
+                      <tr key={f.id}>
+                        <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(f.created_at)}</td>
+                        <td><b>{f.numero_venta || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{f.archivo_original}</div></td>
+                        <td className="muted" style={{ fontSize: 13 }}>{f.rut_emisor || '—'} → {f.rut_receptor || '—'}</td>
+                        <td className="muted" style={{ fontSize: 13 }}>{f.nombre_cliente || '—'}</td>
+                        <td className="num">{fmt(f.total_co2e, 3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
           {data.documentos.length > 0 && (
             <div className="card">
               <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Corredor Bioceánico ({data.documentos.length})</div>
-              <table className="data">
-                <thead><tr><th>Fecha</th><th>Tramo</th><th>Tipo</th><th>N°</th><th>Estado</th><th className="num">t CO2e</th></tr></thead>
-                <tbody>
-                  {data.documentos.map((d) => (
-                    <tr key={d.id}>
-                      <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
-                      <td>{d.pais_origen} → {d.pais_destino}{d.tramo ? <div className="muted" style={{ fontSize: 12 }}>{d.tramo}</div> : null}</td>
-                      <td><span className="badge badge-gray">{d.tipo_documento}</span></td>
-                      <td className="muted" style={{ fontSize: 13 }}>{d.numero_documento || '—'}</td>
-                      <td><span className={`badge ${d.estado === 'procesado' ? 'badge-green' : 'badge-gray'}`}>{d.estado}</span></td>
-                      <td className="num">{d.estado === 'procesado' ? fmt(d.total_co2e, 3) : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead><tr><th>Fecha</th><th>Tramo</th><th>Tipo</th><th>N°</th><th>Estado</th><th className="num">t CO2e</th></tr></thead>
+                  <tbody>
+                    {data.documentos.map((d) => (
+                      <tr key={d.id}>
+                        <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(d.created_at)}</td>
+                        <td>{d.pais_origen} → {d.pais_destino}{d.tramo ? <div className="muted" style={{ fontSize: 12 }}>{d.tramo}</div> : null}</td>
+                        <td><span className="badge badge-gray">{d.tipo_documento}</span></td>
+                        <td className="muted" style={{ fontSize: 13 }}>{d.numero_documento || '—'}</td>
+                        <td><span className={`badge ${d.estado === 'procesado' ? 'badge-green' : 'badge-gray'}`}>{d.estado}</span></td>
+                        <td className="num">{d.estado === 'procesado' ? fmt(d.total_co2e, 3) : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
           {data.sesiones.length > 0 && (
             <div className="card">
               <div style={{ padding: '14px 16px 0', fontWeight: 700 }}>Sesiones ({data.sesiones.length})</div>
-              <table className="data">
-                <thead><tr><th>Fecha</th><th>Empresa</th><th>RUT</th><th>Email</th><th className="num">t CO2e</th></tr></thead>
-                <tbody>
-                  {data.sesiones.map((s) => (
-                    <tr key={s.id}>
-                      <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(s.created_at)}</td>
-                      <td><b>{s.nombre_cliente}</b></td><td>{s.rut_cliente}</td>
-                      <td className="muted" style={{ fontSize: 13 }}>{s.email_cliente}</td>
-                      <td className="num">{fmt(s.total_co2e, 3)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-scroll">
+                <table className="data">
+                  <thead><tr><th>Fecha</th><th>Empresa</th><th>RUT</th><th>Email</th><th className="num">t CO2e</th></tr></thead>
+                  <tbody>
+                    {data.sesiones.map((s) => (
+                      <tr key={s.id}>
+                        <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(s.created_at)}</td>
+                        <td><b>{s.nombre_cliente}</b></td><td>{s.rut_cliente}</td>
+                        <td className="muted" style={{ fontSize: 13 }}>{s.email_cliente}</td>
+                        <td className="num">{fmt(s.total_co2e, 3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

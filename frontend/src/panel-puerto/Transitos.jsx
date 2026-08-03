@@ -36,6 +36,9 @@ export default function Transitos() {
   if (error) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{error}</div>;
   if (!data) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;
 
+  const nAbiertos = data.transitos.filter((t) => t.estado === 'abierto').length;
+  const nCerrados = data.transitos.length - nAbiertos;
+
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Tránsitos por {data.puerto.nombre}</h1>
@@ -43,6 +46,12 @@ export default function Transitos() {
         Punto del Corredor: <code>{data.puerto.punto_id}</code> — solo se muestran los lotes que ya sellaron un
         eslabón en este punto.
       </p>
+
+      <div className="stat-grid" style={{ marginBottom: 16 }}>
+        <div className="stat"><div className="n">{data.transitos.length}</div><div className="l">Tránsitos totales</div></div>
+        <div className="stat"><div className="n green">{nAbiertos}</div><div className="l">Abiertos</div></div>
+        <div className="stat"><div className="n">{nCerrados}</div><div className="l">Cerrados</div></div>
+      </div>
 
       <div className="two-col-grid" style={{ gap: 16, alignItems: 'flex-start' }}>
         <div className="card card-pad">
