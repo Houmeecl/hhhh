@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { config } from './config.js';
 import { runMigrations } from './lib/migrate.js';
+import { verificarConfigProduccion } from './lib/verificarProduccion.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import publicRoutes from './routes/public.js';
 import authRoutes from './routes/auth.js';
@@ -92,6 +93,14 @@ app.use((err, req, res, next) => {
 
 async function start() {
   try {
+    // En producción, una configuración insegura (secretos de desarrollo,
+    // SEED_DEMO prendido) aborta el arranque; en desarrollo solo se avisa.
+    const { fatales, advertencias } = verificarConfigProduccion(config);
+    for (const a of advertencias) console.warn(`[config] aviso: ${a}`);
+    if (fatales.length) {
+      for (const f of fatales) console.error(`[config] ${config.env === 'production' ? 'FATAL' : 'aviso (fatal en producción)'}: ${f}`);
+      if (config.env === 'production') process.exit(1);
+    }
     // Aplica migraciones al arrancar (idempotente).
     await runMigrations();
     // Dólar observado automático: solo actúa si el admin activó el modo
