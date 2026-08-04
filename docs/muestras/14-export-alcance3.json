@@ -8,7 +8,7 @@
   "nota": "Emisiones de proveedores calculadas por sicr3p sobre documentos tributarios reales. No constituye una verificación de tercera parte acreditada.",
   "filas": [
     {
-      "rut_proveedor": "96.800.570-7",
+      "rut_proveedor": "78.345.120-4",
       "categoria_numero": 3,
       "categoria_nombre": "Actividades relacionadas con combustibles y energía",
       "descripcion_motor": "Energía eléctrica",
@@ -17,7 +17,7 @@
       "fuente_factor": "MMA Chile — HuellaChile (2023)"
     },
     {
-      "rut_proveedor": "81.201.000-K",
+      "rut_proveedor": "79.218.440-5",
       "categoria_numero": 3,
       "categoria_nombre": "Actividades relacionadas con combustibles y energía",
       "descripcion_motor": "Combustibles",

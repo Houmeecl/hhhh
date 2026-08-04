@@ -34,8 +34,8 @@ await query(`DELETE FROM sesiones WHERE rut_cliente = '76.432.109-8'`);
 const vId = (await versionVigente())?.id ?? null;
 
 const ITEMS = [
-  { n: 'F-8841', emisor: '96.800.570-7', glosa: 'Suministro eléctrico marzo', cat: 'Energía eléctrica', co2e: 3.8412, det: [['Consumo kWh 15.866', 15866, 3.8412, 'fisico']] },
-  { n: 'F-1220', emisor: '81.201.000-K', glosa: 'Petróleo diésel 1.200 L', cat: 'Combustibles', co2e: 3.2160, det: [['Diésel B5 (L)', 1200, 3.2160, 'fisico']] },
+  { n: 'F-8841', emisor: '78.345.120-4', glosa: 'Suministro eléctrico marzo', cat: 'Energía eléctrica', co2e: 3.8412, det: [['Consumo kWh 15.866', 15866, 3.8412, 'fisico']] },
+  { n: 'F-1220', emisor: '79.218.440-5', glosa: 'Petróleo diésel 1.200 L', cat: 'Combustibles', co2e: 3.2160, det: [['Diésel B5 (L)', 1200, 3.2160, 'fisico']] },
   { n: 'F-0455', emisor: '77.905.310-4', glosa: 'Flete Santiago–Antofagasta', cat: 'Transporte y logística', co2e: 1.7400, det: [['Flete camión 1.450 km', 1450, 1.7400, 'fisico']] },
   { n: 'F-3097', emisor: '76.115.220-9', glosa: 'Insumos de oficina y aseo', cat: 'Bienes y servicios', co2e: 0.4185, det: [['Compra varios', 1, 0.4185, 'gasto']] },
 ];
@@ -162,10 +162,10 @@ guardar('06-constancia-curso.pdf', await pdf.generateConstanciaCurso({
 // ---------- Carpeta del mandante ----------
 guardar('07-carpeta-mandante.pdf', await pdf.generateCarpetaMandante({
   sesion, facturas,
-  mandante: 'Minera Los Pelambres',
+  mandante: 'Minera Altiplano Norte SpA',
   contrapartes: [
-    { rut: '96.800.570-7', nombre: 'Enel Distribución', n_documentos: 1, total_co2e: 3.8412 },
-    { rut: '81.201.000-K', nombre: 'Copec', n_documentos: 1, total_co2e: 3.2160 },
+    { rut: '78.345.120-4', nombre: 'Eléctrica Valle Central SpA', n_documentos: 1, total_co2e: 3.8412 },
+    { rut: '79.218.440-5', nombre: 'Combustibles Litoral Ltda.', n_documentos: 1, total_co2e: 3.2160 },
   ],
 }));
 
@@ -231,8 +231,8 @@ guardar('12-sello.svg', Buffer.from(svg, 'utf8'));
 // ---------- Export Alcance 3 GHG para el mandante (CSV y JSON) ----------
 const { filasACsv } = await import(`${B}/services/csv.js`);
 const filasA3 = [
-  { rut_proveedor: '96.800.570-7', categoria_numero: 3, categoria_nombre: 'Actividades relacionadas con combustibles y energía', descripcion_motor: 'Energía eléctrica', n_documentos: 1, total_tco2e: 3.8412, fuente_factor: 'MMA Chile — HuellaChile (2023)' },
-  { rut_proveedor: '81.201.000-K', categoria_numero: 3, categoria_nombre: 'Actividades relacionadas con combustibles y energía', descripcion_motor: 'Combustibles', n_documentos: 1, total_tco2e: 3.2160, fuente_factor: 'IPCC — Guías 2006 (v2)' },
+  { rut_proveedor: '78.345.120-4', categoria_numero: 3, categoria_nombre: 'Actividades relacionadas con combustibles y energía', descripcion_motor: 'Energía eléctrica', n_documentos: 1, total_tco2e: 3.8412, fuente_factor: 'MMA Chile — HuellaChile (2023)' },
+  { rut_proveedor: '79.218.440-5', categoria_numero: 3, categoria_nombre: 'Actividades relacionadas con combustibles y energía', descripcion_motor: 'Combustibles', n_documentos: 1, total_tco2e: 3.2160, fuente_factor: 'IPCC — Guías 2006 (v2)' },
   { rut_proveedor: '77.905.310-4', categoria_numero: 4, categoria_nombre: 'Transporte y distribución aguas arriba', descripcion_motor: 'Transporte y logística', n_documentos: 1, total_tco2e: 1.7400, fuente_factor: 'Smart Freight Centre — GLEC Framework (v3)' },
   { rut_proveedor: '76.115.220-9', categoria_numero: 1, categoria_nombre: 'Bienes y servicios adquiridos', descripcion_motor: 'Bienes y servicios', n_documentos: 1, total_tco2e: 0.4185, fuente_factor: 'WRI/WBCSD — GHG Protocol Corporate Standard (2004)' },
 ];
