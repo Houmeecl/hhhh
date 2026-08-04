@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { validarInscripcion, prospectoDesdeInscripcion, INTERESES } from '../src/services/inscripcion.js';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 const BASE = {
   nombre_empresa: 'Fábrica de Prueba Ltda.',
@@ -64,11 +65,13 @@ test('prospectoDesdeInscripcion: arma el prospecto con contacto en notas', () =>
 // ============================================================
 
 after(async () => {
-  await query(`DELETE FROM solicitudes_inscripcion WHERE rut = '78.345.120-4'`);
-  await pool.end();
+  if (!EN_PRODUCCION) {
+    await query(`DELETE FROM solicitudes_inscripcion WHERE rut = '78.345.120-4'`);
+  }
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('migración 064: solo una inscripción pendiente por RUT; resuelta permite otra', async () => {
+test('migración 064: solo una inscripción pendiente por RUT; resuelta permite otra', { skip: SALTO_PROD }, async () => {
   await runMigrations();
   await query(`DELETE FROM solicitudes_inscripcion WHERE rut = '78.345.120-4'`);
 

@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import authRouter from '../src/routes/auth.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // POST /api/auth/login sin `panel` en el body: es lo que usa el login
@@ -25,6 +26,8 @@ let baseUrl;
 let usuarioId;
 
 before(async () => {
+  if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
+
   await runMigrations();
   const hash = await bcrypt.hash(PASSWORD, 4);
   // 'aduana_verde' no exige FK de entidad (a diferencia de puerto/mandante/
@@ -46,12 +49,14 @@ before(async () => {
 });
 
 after(async () => {
-  if (usuarioId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioId]);
+  if (!EN_PRODUCCION) {
+    if (usuarioId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioId]);
+  }
   if (server) await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('login SIN panel detecta el panel real de la cuenta y no exige coincidencia', async () => {
+test('login SIN panel detecta el panel real de la cuenta y no exige coincidencia', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -63,7 +68,7 @@ test('login SIN panel detecta el panel real de la cuenta y no exige coincidencia
   assert.ok(body.accessToken);
 });
 
-test('login CON el panel correcto sigue funcionando igual que antes', async () => {
+test('login CON el panel correcto sigue funcionando igual que antes', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -72,7 +77,7 @@ test('login CON el panel correcto sigue funcionando igual que antes', async () =
   assert.equal(res.status, 200);
 });
 
-test('login CON un panel distinto al de la cuenta sigue rechazando con 403', async () => {
+test('login CON un panel distinto al de la cuenta sigue rechazando con 403', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -81,7 +86,7 @@ test('login CON un panel distinto al de la cuenta sigue rechazando con 403', asy
   assert.equal(res.status, 403);
 });
 
-test('login con un panel inválido (ni siquiera en la lista) responde 400, no filtra por sicrep', async () => {
+test('login con un panel inválido (ni siquiera en la lista) responde 400, no filtra por sicrep', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -90,7 +95,7 @@ test('login con un panel inválido (ni siquiera en la lista) responde 400, no fi
   assert.equal(res.status, 400);
 });
 
-test('login sin panel con contraseña incorrecta sigue devolviendo 401 genérico', async () => {
+test('login sin panel con contraseña incorrecta sigue devolviendo 401 genérico', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

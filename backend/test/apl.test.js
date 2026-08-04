@@ -6,6 +6,7 @@ import {
 } from '../src/services/apl.js';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // RUT sintético válido (módulo 11), mismo criterio que inscripcion.test.js.
 const RUT_TEST = '78.345.120-4';
@@ -48,12 +49,14 @@ test('validarMeta: no lanza con cuerpo nulo', () => {
 let clienteId;
 
 after(async () => {
-  if (clienteId) await query('DELETE FROM clientes WHERE id = $1', [clienteId]); // CASCADE limpia acuerdos y metas
-  await query(`DELETE FROM sesiones WHERE rut_cliente = $1 AND nombre_cliente = 'APL Test SpA'`, [RUT_TEST]);
-  await pool.end();
+  if (!EN_PRODUCCION) {
+    if (clienteId) await query('DELETE FROM clientes WHERE id = $1', [clienteId]); // CASCADE limpia acuerdos y metas
+    await query(`DELETE FROM sesiones WHERE rut_cliente = $1 AND nombre_cliente = 'APL Test SpA'`, [RUT_TEST]);
+  }
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('migración 065: crea acuerdo + metas, CHECKs activos, resumen correcto', async () => {
+test('migración 065: crea acuerdo + metas, CHECKs activos, resumen correcto', { skip: SALTO_PROD }, async () => {
   await runMigrations();
   await runMigrations(); // idempotencia
 
@@ -108,7 +111,7 @@ test('migración 065: crea acuerdo + metas, CHECKs activos, resumen correcto', a
   assert.equal(huerfanas.length, 0, 'las metas caen con su acuerdo');
 });
 
-test('evidenciaDisponible: agrega documentos, CO2e y declaraciones del RUT', async () => {
+test('evidenciaDisponible: agrega documentos, CO2e y declaraciones del RUT', { skip: SALTO_PROD }, async () => {
   const vacia = await evidenciaDisponible('99.999.999-9');
   assert.equal(vacia.documentos, 0);
   assert.equal(vacia.co2e_total_kg, 0);

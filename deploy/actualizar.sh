@@ -114,10 +114,13 @@ construir() {
   fi
   ( cd "$REPO_DIR/backend" && npm ci --omit=dev ) >> "$LOG" 2>&1 || return 1
   # CI propio del VPS: los tests del backend corren ANTES de reiniciar.
-  # Son puros (node:test, sin BD ni red; los de OCR se saltan solos si
-  # faltan binarios), así que tardan segundos. Si fallan, el deploy no
-  # avanza y se hace rollback — el código malo jamás llega a producción,
-  # sin depender del CI de GitHub. SICR3P_SKIP_TESTS=1 lo omite.
+  # Con NODE_ENV=production (el .env del VPS) los tests de integración
+  # que tocan la BD SE SALTAN SOLOS (ver backend/test/util/soloDev.js):
+  # jamás escriben en la base de producción. Solo corren los puros
+  # (node:test sin BD; los de OCR también se saltan si faltan binarios),
+  # así que tardan segundos. Si fallan, el deploy no avanza y se hace
+  # rollback — el código malo jamás llega a producción, sin depender
+  # del CI de GitHub. SICR3P_SKIP_TESTS=1 lo omite.
   if [ "${SICR3P_SKIP_TESTS:-0}" != "1" ]; then
     if ( cd "$REPO_DIR/backend" && npm test ) >> "$LOG" 2>&1; then
       log "tests del backend: OK (CI propio del VPS)."

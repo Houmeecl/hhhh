@@ -8,6 +8,7 @@ import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
 import adminRouter from '../src/routes/admin.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // Test de integración contra Postgres real (mismo patrón que
@@ -27,6 +28,8 @@ let usuarioGeneralId;
 let tokenAdmin;
 
 before(async () => {
+  if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
+
   await runMigrations();
 
   const { rows: clientes } = await query(
@@ -46,14 +49,16 @@ before(async () => {
 });
 
 after(async () => {
-  if (usuarioGeneralId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioGeneralId]);
-  if (usuarioClienteId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioClienteId]);
-  if (clienteId) await query(`DELETE FROM clientes WHERE id = $1`, [clienteId]);
+  if (!EN_PRODUCCION) {
+    if (usuarioGeneralId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioGeneralId]);
+    if (usuarioClienteId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioClienteId]);
+    if (clienteId) await query(`DELETE FROM clientes WHERE id = $1`, [clienteId]);
+  }
   if (server) await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('POST /admin/clientes/:id/crear-cuenta devuelve password en vez de correo_enviado, con estado activo', async () => {
+test('POST /admin/clientes/:id/crear-cuenta devuelve password en vez de correo_enviado, con estado activo', { skip: SALTO_PROD }, async () => {
   const email = `cliente-${sufijo}@ejemplo.cl`;
   const res = await fetch(`${baseUrl}/api/admin/clientes/${clienteId}/crear-cuenta`, {
     method: 'POST',
@@ -76,7 +81,7 @@ test('POST /admin/clientes/:id/crear-cuenta devuelve password en vez de correo_e
   assert.equal(await bcrypt.compare(body.password, rows[0].password_hash), true);
 });
 
-test('POST /admin/clientes/:id/crear-cuenta responde 409 si el correo ya existe', async () => {
+test('POST /admin/clientes/:id/crear-cuenta responde 409 si el correo ya existe', { skip: SALTO_PROD }, async () => {
   const email = `cliente-${sufijo}@ejemplo.cl`; // mismo correo del test anterior
   const res = await fetch(`${baseUrl}/api/admin/clientes/${clienteId}/crear-cuenta`, {
     method: 'POST',
@@ -86,7 +91,7 @@ test('POST /admin/clientes/:id/crear-cuenta responde 409 si el correo ya existe'
   assert.equal(res.status, 409);
 });
 
-test('POST /admin/usuarios devuelve password en vez de correo_enviado, con estado activo', async () => {
+test('POST /admin/usuarios devuelve password en vez de correo_enviado, con estado activo', { skip: SALTO_PROD }, async () => {
   const email = `usuario-${sufijo}@ejemplo.cl`;
   const res = await fetch(`${baseUrl}/api/admin/usuarios`, {
     method: 'POST',
@@ -108,7 +113,7 @@ test('POST /admin/usuarios devuelve password en vez de correo_enviado, con estad
   assert.equal(await bcrypt.compare(body.password, rows[0].password_hash), true);
 });
 
-test('POST /admin/usuarios/:id/reenviar-activacion regenera la contraseña y funciona con bcrypt.compare', async () => {
+test('POST /admin/usuarios/:id/reenviar-activacion regenera la contraseña y funciona con bcrypt.compare', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioGeneralId}/reenviar-activacion`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenAdmin}` },
@@ -124,7 +129,7 @@ test('POST /admin/usuarios/:id/reenviar-activacion regenera la contraseña y fun
   assert.equal(await bcrypt.compare(body.password, rows[0].password_hash), true);
 });
 
-test('POST /admin/usuarios/:id/reenviar-activacion responde 404 para un usuario inexistente', async () => {
+test('POST /admin/usuarios/:id/reenviar-activacion responde 404 para un usuario inexistente', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${crypto.randomUUID()}/reenviar-activacion`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenAdmin}` },

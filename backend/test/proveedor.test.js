@@ -10,6 +10,7 @@ import { signAccess } from '../src/middleware/auth.js';
 import { verificarCadenaCompleta } from '../src/services/cadenaHash.js';
 import origenRoutes, { proveedorPanelRouter, firmaProveedorRouter } from '../src/routes/origen.js';
 import accesosRoutes from '../src/routes/accesos.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // Test de integración contra una base real (mismo patrón que
@@ -57,6 +58,8 @@ let asignacionBId;
 let proveedorCreadoPorAdminId;
 
 before(async () => {
+  if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
+
   await runMigrations(); // idempotente: valida además el punto de la migración 062
 
   adminToken = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
@@ -104,24 +107,26 @@ before(async () => {
 });
 
 after(async () => {
-  const loteIds = [loteProducto, loteProducto2, loteDocumental, loteParaCerrar, loteCompat]
-    .filter(Boolean).map((l) => l.id);
-  // Cascada: borrar los lotes se lleva lote_eslabones, proveedor_lotes y
-  // credenciales_proveedor de esos lotes (todas ON DELETE CASCADE).
-  if (loteIds.length) await query(`DELETE FROM lotes_minerales WHERE id = ANY($1::uuid[])`, [loteIds]);
-  if (proveedorCreadoPorAdminId) await query(`DELETE FROM proveedores WHERE id = $1`, [proveedorCreadoPorAdminId]);
-  const provIds = [proveedorA, proveedorB].filter(Boolean).map((p) => p.id);
-  // Cascada: borrar los proveedores se lleva sus usuarios (si quedara alguno).
-  if (provIds.length) await query(`DELETE FROM proveedores WHERE id = ANY($1::uuid[])`, [provIds]);
+  if (!EN_PRODUCCION) {
+    const loteIds = [loteProducto, loteProducto2, loteDocumental, loteParaCerrar, loteCompat]
+      .filter(Boolean).map((l) => l.id);
+    // Cascada: borrar los lotes se lleva lote_eslabones, proveedor_lotes y
+    // credenciales_proveedor de esos lotes (todas ON DELETE CASCADE).
+    if (loteIds.length) await query(`DELETE FROM lotes_minerales WHERE id = ANY($1::uuid[])`, [loteIds]);
+    if (proveedorCreadoPorAdminId) await query(`DELETE FROM proveedores WHERE id = $1`, [proveedorCreadoPorAdminId]);
+    const provIds = [proveedorA, proveedorB].filter(Boolean).map((p) => p.id);
+    // Cascada: borrar los proveedores se lleva sus usuarios (si quedara alguno).
+    if (provIds.length) await query(`DELETE FROM proveedores WHERE id = ANY($1::uuid[])`, [provIds]);
+  }
   if (server) await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('runMigrations es idempotente: correr dos veces seguidas no falla', async () => {
+test('runMigrations es idempotente: correr dos veces seguidas no falla', { skip: SALTO_PROD }, async () => {
   await assert.doesNotReject(runMigrations());
 });
 
-test('POST /api/admin/accesos/proveedores con el body real del formulario ({nombre_empresa, rut}) crea el proveedor', async () => {
+test('POST /api/admin/accesos/proveedores con el body real del formulario ({nombre_empresa, rut}) crea el proveedor', { skip: SALTO_PROD }, async () => {
   // Regresión: el formulario de Accesos.jsx manda `rut` (mismo campo que
   // usan Mandantes/Agencias/Trazadores en ese archivo), no `rut_empresa`
   // — validarIdentidadProveedor espera `rut_empresa` porque se escribió
@@ -140,19 +145,19 @@ test('POST /api/admin/accesos/proveedores con el body real del formulario ({nomb
   proveedorCreadoPorAdminId = body.proveedor.id;
 });
 
-test('GET /api/panel-proveedor/lotes sin sesión responde 401', async () => {
+test('GET /api/panel-proveedor/lotes sin sesión responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes`);
   assert.equal(res.status, 401);
 });
 
-test('GET /api/panel-proveedor/lotes con sesión de otro panel (sicrep) responde 403', async () => {
+test('GET /api/panel-proveedor/lotes con sesión de otro panel (sicrep) responde 403', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes`, {
     headers: { Authorization: `Bearer ${adminToken}` },
   });
   assert.equal(res.status, 403);
 });
 
-test('POST /api/admin/origen/lotes/:id/proveedores-asignados asigna un proveedor a un lote producto abierto', async () => {
+test('POST /api/admin/origen/lotes/:id/proveedores-asignados asigna un proveedor a un lote producto abierto', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/origen/lotes/${loteProducto.id}/proveedores-asignados`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -166,7 +171,7 @@ test('POST /api/admin/origen/lotes/:id/proveedores-asignados asigna un proveedor
   asignacionId = body.asignacion.id;
 });
 
-test('reintentar la misma asignación no la duplica (idempotente vía ON CONFLICT)', async () => {
+test('reintentar la misma asignación no la duplica (idempotente vía ON CONFLICT)', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/origen/lotes/${loteProducto.id}/proveedores-asignados`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -182,7 +187,7 @@ test('reintentar la misma asignación no la duplica (idempotente vía ON CONFLIC
   assert.equal(rows[0].n, 1);
 });
 
-test('asignar un proveedor a un lote documental responde 400 (rol no admitido en su cadena de custodia)', async () => {
+test('asignar un proveedor a un lote documental responde 400 (rol no admitido en su cadena de custodia)', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/origen/lotes/${loteDocumental.id}/proveedores-asignados`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -191,7 +196,7 @@ test('asignar un proveedor a un lote documental responde 400 (rol no admitido en
   assert.equal(res.status, 400);
 });
 
-test('admin asigna un segundo proveedor a un segundo lote', async () => {
+test('admin asigna un segundo proveedor a un segundo lote', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/origen/lotes/${loteProducto2.id}/proveedores-asignados`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -202,7 +207,7 @@ test('admin asigna un segundo proveedor a un segundo lote', async () => {
   asignacionBId = body.asignacion.id;
 });
 
-test('GET /api/panel-proveedor/lotes del proveedor A solo muestra SUS asignaciones (no las del proveedor B)', async () => {
+test('GET /api/panel-proveedor/lotes del proveedor A solo muestra SUS asignaciones (no las del proveedor B)', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes`, {
     headers: { Authorization: `Bearer ${proveedorATokenPayload}` },
   });
@@ -215,7 +220,7 @@ test('GET /api/panel-proveedor/lotes del proveedor A solo muestra SUS asignacion
   assert.equal(body.firmadas.length, 0);
 });
 
-test('un proveedor no puede firmar la asignación de otro proveedor (404: no se cruzan identidades)', async () => {
+test('un proveedor no puede firmar la asignación de otro proveedor (404: no se cruzan identidades)', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionBId}/firmar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${proveedorATokenPayload}`, 'Content-Type': 'application/json' },
@@ -224,7 +229,7 @@ test('un proveedor no puede firmar la asignación de otro proveedor (404: no se 
   assert.equal(res.status, 404);
 });
 
-test('POST /api/panel-proveedor/lotes/:id/firmar crea el eslabón con la identidad de `proveedores`, NUNCA la del body', async () => {
+test('POST /api/panel-proveedor/lotes/:id/firmar crea el eslabón con la identidad de `proveedores`, NUNCA la del body', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionId}/firmar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${proveedorATokenPayload}`, 'Content-Type': 'application/json' },
@@ -255,7 +260,7 @@ test('POST /api/panel-proveedor/lotes/:id/firmar crea el eslabón con la identid
   assert.equal(integridad.valido, true);
 });
 
-test('firmar la misma asignación una segunda vez responde 409', async () => {
+test('firmar la misma asignación una segunda vez responde 409', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionId}/firmar`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${proveedorATokenPayload}`, 'Content-Type': 'application/json' },
@@ -266,7 +271,7 @@ test('firmar la misma asignación una segunda vez responde 409', async () => {
   assert.match(body.error, /ya firmaste/i);
 });
 
-test('firmar con el lote cerrado responde 409', async () => {
+test('firmar con el lote cerrado responde 409', { skip: SALTO_PROD }, async () => {
   const resAsignar = await fetch(`${baseUrl}/api/admin/origen/lotes/${loteParaCerrar.id}/proveedores-asignados`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
@@ -286,14 +291,14 @@ test('firmar con el lote cerrado responde 409', async () => {
   assert.equal(res.status, 409);
 });
 
-test('UNIQUE (proveedor_id, lote_id) rechaza una fila duplicada insertada directo por SQL', async () => {
+test('UNIQUE (proveedor_id, lote_id) rechaza una fila duplicada insertada directo por SQL', { skip: SALTO_PROD }, async () => {
   await assert.rejects(
     query(`INSERT INTO proveedor_lotes (proveedor_id, lote_id) VALUES ($1,$2)`, [proveedorA.id, loteProducto.id]),
     (err) => err.code === '23505'
   );
 });
 
-test('ON DELETE CASCADE: borrar `usuarios` con proveedor_id no borra `proveedores`; borrar `proveedores` sí borra usuarios y proveedor_lotes', async () => {
+test('ON DELETE CASCADE: borrar `usuarios` con proveedor_id no borra `proveedores`; borrar `proveedores` sí borra usuarios y proveedor_lotes', { skip: SALTO_PROD }, async () => {
   const { rows: pRows } = await query(
     `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2) RETURNING id`,
     [`Proveedor Cascada ${sufijo}`, rutAleatorio()]
@@ -340,7 +345,7 @@ test('ON DELETE CASCADE: borrar `usuarios` con proveedor_id no borra `proveedore
 // insertada directo por SQL, como quedaría en un stock ya impreso) y
 // confirma que /api/firma-proveedor/auth + /firmar la resuelven exactamente
 // igual que siempre — la migración 062 no tocó esa tabla ni sus rutas.
-test('caso crítico: una credencial credenciales_proveedor (rol=proveedor) de ANTES de esta migración sigue firmando sin cambios', async () => {
+test('caso crítico: una credencial credenciales_proveedor (rol=proveedor) de ANTES de esta migración sigue firmando sin cambios', { skip: SALTO_PROD }, async () => {
   const serial = `FP-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
   const clave = 'clave-compat-retro-123';
   const claveHash = await bcrypt.hash(clave, 10);

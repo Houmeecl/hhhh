@@ -8,6 +8,7 @@ import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
 import { hashApiKey } from '../src/services/mandante.js';
 import trazadorRouter from '../src/routes/trazador.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // Test de integración contra una base real (mismo Postgres que usa el
@@ -37,6 +38,8 @@ let tokenTrazador;
 const API_KEY = `trz_test_${crypto.randomBytes(16).toString('hex')}`;
 
 before(async () => {
+  if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
+
   await runMigrations(); // idempotente: valida además el punto 6 del encargo (correr no falla)
 
   const { rows: trazadores } = await query(
@@ -75,24 +78,26 @@ before(async () => {
 });
 
 after(async () => {
-  if (facturaId) await query(`DELETE FROM facturas WHERE id = $1`, [facturaId]);
-  if (sesionId) await query(`DELETE FROM sesiones WHERE id = $1`, [sesionId]);
-  if (trazadorId) await query(`DELETE FROM trazador_ruts WHERE trazador_id = $1`, [trazadorId]);
-  if (trazadorId) await query(`DELETE FROM trazadores WHERE id = $1`, [trazadorId]);
+  if (!EN_PRODUCCION) {
+    if (facturaId) await query(`DELETE FROM facturas WHERE id = $1`, [facturaId]);
+    if (sesionId) await query(`DELETE FROM sesiones WHERE id = $1`, [sesionId]);
+    if (trazadorId) await query(`DELETE FROM trazador_ruts WHERE trazador_id = $1`, [trazadorId]);
+    if (trazadorId) await query(`DELETE FROM trazadores WHERE id = $1`, [trazadorId]);
+  }
   if (server) await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
-test('runMigrations es idempotente: correr dos veces seguidas no falla', async () => {
+test('runMigrations es idempotente: correr dos veces seguidas no falla', { skip: SALTO_PROD }, async () => {
   await assert.doesNotReject(runMigrations());
 });
 
-test('GET /api/trazador/buscar sin sesión responde 401', async () => {
+test('GET /api/trazador/buscar sin sesión responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`);
   assert.equal(res.status, 401);
 });
 
-test('GET /api/trazador/buscar con un RUT fuera de la whitelist responde 403', async () => {
+test('GET /api/trazador/buscar con un RUT fuera de la whitelist responde 403', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_FUERA}`, {
     headers: { Authorization: `Bearer ${tokenTrazador}` },
   });
@@ -101,7 +106,7 @@ test('GET /api/trazador/buscar con un RUT fuera de la whitelist responde 403', a
   assert.match(body.error, /No tienes acceso/);
 });
 
-test('GET /api/trazador/buscar con un RUT dentro de la whitelist responde 200 con los cruces reales', async () => {
+test('GET /api/trazador/buscar con un RUT dentro de la whitelist responde 200 con los cruces reales', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
     headers: { Authorization: `Bearer ${tokenTrazador}` },
   });
@@ -116,7 +121,7 @@ test('GET /api/trazador/buscar con un RUT dentro de la whitelist responde 200 co
   assert.equal(body.cruces.emite_a.length, 0); // el RUT no emite documentos en este fixture
 });
 
-test('GET /api/trazador/rutas-permitidas devuelve solo la whitelist de ESE trazador', async () => {
+test('GET /api/trazador/rutas-permitidas devuelve solo la whitelist de ESE trazador', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/rutas-permitidas`, {
     headers: { Authorization: `Bearer ${tokenTrazador}` },
   });
@@ -125,7 +130,7 @@ test('GET /api/trazador/rutas-permitidas devuelve solo la whitelist de ESE traza
   assert.deepEqual(body.ruts, [RUT_PERMITIDO]);
 });
 
-test('GET /api/trazador/buscar con un usuario de otro panel (sicrep) responde 403 por panel, no por whitelist', async () => {
+test('GET /api/trazador/buscar con un usuario de otro panel (sicrep) responde 403 por panel, no por whitelist', { skip: SALTO_PROD }, async () => {
   const tokenOtroPanel = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
     headers: { Authorization: `Bearer ${tokenOtroPanel}` },
@@ -136,14 +141,14 @@ test('GET /api/trazador/buscar con un usuario de otro panel (sicrep) responde 40
 // ---------- Camino X-Api-Key (migración 060) — integración de un socio
 // externo (ej. Kontax) que consulta el RUT programáticamente ----------
 
-test('GET /api/trazador/buscar con X-Api-Key inválida responde 401', async () => {
+test('GET /api/trazador/buscar con X-Api-Key inválida responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
     headers: { 'X-Api-Key': 'trz_no_existe' },
   });
   assert.equal(res.status, 401);
 });
 
-test('GET /api/trazador/buscar con X-Api-Key válida y RUT dentro de la whitelist responde 200', async () => {
+test('GET /api/trazador/buscar con X-Api-Key válida y RUT dentro de la whitelist responde 200', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_PERMITIDO}`, {
     headers: { 'X-Api-Key': API_KEY },
   });
@@ -152,14 +157,14 @@ test('GET /api/trazador/buscar con X-Api-Key válida y RUT dentro de la whitelis
   assert.equal(body.cruces.rut, RUT_PERMITIDO);
 });
 
-test('GET /api/trazador/buscar con X-Api-Key válida pero RUT fuera de la whitelist responde 403', async () => {
+test('GET /api/trazador/buscar con X-Api-Key válida pero RUT fuera de la whitelist responde 403', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/buscar?rut=${RUT_FUERA}`, {
     headers: { 'X-Api-Key': API_KEY },
   });
   assert.equal(res.status, 403);
 });
 
-test('GET /api/trazador/rutas-permitidas con X-Api-Key devuelve la whitelist', async () => {
+test('GET /api/trazador/rutas-permitidas con X-Api-Key devuelve la whitelist', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/trazador/rutas-permitidas`, {
     headers: { 'X-Api-Key': API_KEY },
   });

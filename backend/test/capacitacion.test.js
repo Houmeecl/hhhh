@@ -8,6 +8,7 @@ import {
 } from '../src/services/capacitacion.js';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
+import { SALTO_PROD } from './util/soloDev.js';
 
 const PREGUNTAS = [
   { id: 'p1', opciones: [{ id: 'p1a', correcta: true }, { id: 'p1b', correcta: false }] },
@@ -121,10 +122,10 @@ test('hashConstancia: sensible a cada campo', () => {
 // ============================================================
 
 after(async () => {
-  await pool.end();
+  await pool.end(); // SIEMPRE (también en producción): sin esto node:test se cuelga
 });
 
-test('migración 063: panel-mostrador queda interno, los demás publicables', async () => {
+test('migración 063: panel-mostrador queda interno, los demás publicables', { skip: SALTO_PROD }, async () => {
   await runMigrations();
   const { rows } = await query('SELECT slug, es_publico FROM cursos ORDER BY orden');
   const porSlug = Object.fromEntries(rows.map((r) => [r.slug, r.es_publico]));
@@ -135,7 +136,7 @@ test('migración 063: panel-mostrador queda interno, los demás publicables', as
   assert.equal(porSlug['apl-en-simple'], true, 'el curso APL (066) es público');
 });
 
-test('migraciones 063/066: contenido sembrado completo (5 lecciones + 5 preguntas × 4 opciones por curso nuevo)', async () => {
+test('migraciones 063/066: contenido sembrado completo (5 lecciones + 5 preguntas × 4 opciones por curso nuevo)', { skip: SALTO_PROD }, async () => {
   for (const slug of ['contabilidad-carbono', 'captura-documental-agencias', 'apl-en-simple']) {
     const { rows: cRows } = await query('SELECT id FROM cursos WHERE slug = $1', [slug]);
     assert.ok(cRows[0], `curso ${slug} debe existir`);
@@ -152,7 +153,7 @@ test('migraciones 063/066: contenido sembrado completo (5 lecciones + 5 pregunta
   }
 });
 
-test('runMigrations es idempotente: correrla otra vez no duplica cursos/lecciones/preguntas/opciones', async () => {
+test('runMigrations es idempotente: correrla otra vez no duplica cursos/lecciones/preguntas/opciones', { skip: SALTO_PROD }, async () => {
   const contar = async (tabla) => (await query(`SELECT count(*)::int AS n FROM ${tabla}`)).rows[0].n;
   const antes = {
     cursos: await contar('cursos'), lecciones: await contar('lecciones'),

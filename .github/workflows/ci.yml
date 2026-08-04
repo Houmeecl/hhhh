@@ -3,7 +3,16 @@ name: CI
 on:
   push:
     branches: ['**']
-  pull_request:
+  # Sin trigger pull_request: cada push a la rama del PR ya dispara el run
+  # de arriba con el mismo commit — el trigger doble solo duplicaba la cola
+  # (visto: 2 runs "queued" por commit con el runner self-hosted caído).
+
+# Un solo run vigente por rama: si llega un commit nuevo, el run anterior
+# (encolado o corriendo) se cancela. Evita que la cola se apile cuando el
+# runner self-hosted está desconectado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-test:

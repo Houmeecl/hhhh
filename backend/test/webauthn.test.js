@@ -8,6 +8,7 @@ import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
 import webauthnRouter from '../src/routes/webauthn.js';
 import adminRouter from '../src/routes/admin.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // Login sin contraseña con llave USB FIDO2 (migración 061). Esta suite
@@ -37,6 +38,8 @@ let tokenAdmin;
 let tokenNoAdmin;
 
 before(async () => {
+  if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
+
   await runMigrations();
   // Correrlas dos veces seguidas no debe fallar (idempotencia — mismo
   // criterio que el resto de las migraciones del proyecto).
@@ -62,19 +65,21 @@ before(async () => {
 });
 
 after(async () => {
-  if (usuarioId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioId]);
+  if (!EN_PRODUCCION) {
+    if (usuarioId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioId]);
+  }
   if (server) await new Promise((resolve) => server.close(resolve));
-  await pool.end();
+  await pool.end(); // SIEMPRE: sin esto node:test se cuelga con el pool abierto
 });
 
 // ---------- Guardas de autorización (registro, vive en admin.js) ----------
 
-test('POST /admin/usuarios/:id/webauthn/opciones sin sesión responde 401', async () => {
+test('POST /admin/usuarios/:id/webauthn/opciones sin sesión responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/opciones`, { method: 'POST' });
   assert.equal(res.status, 401);
 });
 
-test('POST /admin/usuarios/:id/webauthn/opciones con rol no-admin responde 403', async () => {
+test('POST /admin/usuarios/:id/webauthn/opciones con rol no-admin responde 403', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/opciones`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenNoAdmin}` },
@@ -82,7 +87,7 @@ test('POST /admin/usuarios/:id/webauthn/opciones con rol no-admin responde 403',
   assert.equal(res.status, 403);
 });
 
-test('POST /admin/usuarios/:id/webauthn/opciones con usuario inexistente responde 404', async () => {
+test('POST /admin/usuarios/:id/webauthn/opciones con usuario inexistente responde 404', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${crypto.randomUUID()}/webauthn/opciones`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenAdmin}` },
@@ -92,7 +97,7 @@ test('POST /admin/usuarios/:id/webauthn/opciones con usuario inexistente respond
 
 // ---------- Generar opciones de registro: guarda el challenge ----------
 
-test('POST /admin/usuarios/:id/webauthn/opciones (admin) genera opciones y guarda el challenge', async () => {
+test('POST /admin/usuarios/:id/webauthn/opciones (admin) genera opciones y guarda el challenge', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/opciones`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${tokenAdmin}` },
@@ -110,7 +115,7 @@ test('POST /admin/usuarios/:id/webauthn/opciones (admin) genera opciones y guard
   assert.equal(rows[0].challenge, body.challenge);
 });
 
-test('un segundo POST de opciones de registro reemplaza el challenge anterior (ON CONFLICT DO UPDATE)', async () => {
+test('un segundo POST de opciones de registro reemplaza el challenge anterior (ON CONFLICT DO UPDATE)', { skip: SALTO_PROD }, async () => {
   const primero = await (await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/opciones`, {
     method: 'POST', headers: { Authorization: `Bearer ${tokenAdmin}` },
   })).json();
@@ -129,7 +134,7 @@ test('un segundo POST de opciones de registro reemplaza el challenge anterior (O
 
 // ---------- Registro con respuesta malformada / challenge vencido ----------
 
-test('POST /admin/usuarios/:id/webauthn/verificar con respuesta malformada responde 400', async () => {
+test('POST /admin/usuarios/:id/webauthn/verificar con respuesta malformada responde 400', { skip: SALTO_PROD }, async () => {
   await query(
     `INSERT INTO webauthn_challenges (usuario_id, tipo, challenge, expires_at)
      VALUES ($1,'registro','challenge-de-prueba',$2)
@@ -144,7 +149,7 @@ test('POST /admin/usuarios/:id/webauthn/verificar con respuesta malformada respo
   assert.equal(res.status, 400);
 });
 
-test('POST /admin/usuarios/:id/webauthn/verificar sin challenge previo responde 400', async () => {
+test('POST /admin/usuarios/:id/webauthn/verificar sin challenge previo responde 400', { skip: SALTO_PROD }, async () => {
   await query(`DELETE FROM webauthn_challenges WHERE usuario_id = $1 AND tipo = 'registro'`, [usuarioId]);
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/verificar`, {
     method: 'POST',
@@ -154,7 +159,7 @@ test('POST /admin/usuarios/:id/webauthn/verificar sin challenge previo responde 
   assert.equal(res.status, 400);
 });
 
-test('POST /admin/usuarios/:id/webauthn/verificar con challenge vencido responde 400', async () => {
+test('POST /admin/usuarios/:id/webauthn/verificar con challenge vencido responde 400', { skip: SALTO_PROD }, async () => {
   await query(
     `INSERT INTO webauthn_challenges (usuario_id, tipo, challenge, expires_at)
      VALUES ($1,'registro','challenge-vencido',$2)
@@ -174,7 +179,7 @@ test('POST /admin/usuarios/:id/webauthn/verificar con challenge vencido responde
 let credencialId;
 const CREDENTIAL_ID = `cred-${crypto.randomBytes(8).toString('base64url')}`;
 
-test('insertar una credencial de prueba directo por SQL', async () => {
+test('insertar una credencial de prueba directo por SQL', { skip: SALTO_PROD }, async () => {
   const { rows } = await query(
     `INSERT INTO credenciales_webauthn (usuario_id, credential_id, public_key, counter, nombre_dispositivo)
      VALUES ($1,$2,'clave-publica-de-prueba',0,'Llave de prueba') RETURNING id`,
@@ -184,7 +189,7 @@ test('insertar una credencial de prueba directo por SQL', async () => {
   assert.ok(credencialId);
 });
 
-test('UNIQUE(credential_id): una segunda fila con el mismo credential_id falla', async () => {
+test('UNIQUE(credential_id): una segunda fila con el mismo credential_id falla', { skip: SALTO_PROD }, async () => {
   await assert.rejects(
     query(
       `INSERT INTO credenciales_webauthn (usuario_id, credential_id, public_key, counter)
@@ -195,7 +200,7 @@ test('UNIQUE(credential_id): una segunda fila con el mismo credential_id falla',
   );
 });
 
-test('GET /admin/usuarios/:id/webauthn lista las llaves registradas', async () => {
+test('GET /admin/usuarios/:id/webauthn lista las llaves registradas', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn`, {
     headers: { Authorization: `Bearer ${tokenAdmin}` },
   });
@@ -207,7 +212,7 @@ test('GET /admin/usuarios/:id/webauthn lista las llaves registradas', async () =
 
 // ---------- Login: opciones con credenciales existentes ----------
 
-test('POST /auth/webauthn/login/opciones con email inexistente responde 401 genérico', async () => {
+test('POST /auth/webauthn/login/opciones con email inexistente responde 401 genérico', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/webauthn/login/opciones`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -216,7 +221,7 @@ test('POST /auth/webauthn/login/opciones con email inexistente responde 401 gen�
   assert.equal(res.status, 401);
 });
 
-test('POST /auth/webauthn/login/opciones con cuenta que SÍ tiene llave devuelve allowCredentials', async () => {
+test('POST /auth/webauthn/login/opciones con cuenta que SÍ tiene llave devuelve allowCredentials', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/webauthn/login/opciones`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -234,7 +239,7 @@ test('POST /auth/webauthn/login/opciones con cuenta que SÍ tiene llave devuelve
   assert.equal(rows.length, 1);
 });
 
-test('POST /auth/webauthn/login/verificar con respuesta malformada responde 400 (no revienta el proceso)', async () => {
+test('POST /auth/webauthn/login/verificar con respuesta malformada responde 400 (no revienta el proceso)', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/webauthn/login/verificar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -243,7 +248,7 @@ test('POST /auth/webauthn/login/verificar con respuesta malformada responde 400 
   assert.equal(res.status, 400);
 });
 
-test('POST /auth/webauthn/login/verificar con un credential_id que no pertenece a la cuenta responde 401', async () => {
+test('POST /auth/webauthn/login/verificar con un credential_id que no pertenece a la cuenta responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/webauthn/login/verificar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -254,7 +259,7 @@ test('POST /auth/webauthn/login/verificar con un credential_id que no pertenece 
 
 // ---------- DELETE de la llave ----------
 
-test('DELETE /admin/usuarios/:id/webauthn/:credencialId de una llave inexistente responde 404', async () => {
+test('DELETE /admin/usuarios/:id/webauthn/:credencialId de una llave inexistente responde 404', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/${crypto.randomUUID()}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${tokenAdmin}` },
@@ -262,7 +267,7 @@ test('DELETE /admin/usuarios/:id/webauthn/:credencialId de una llave inexistente
   assert.equal(res.status, 404);
 });
 
-test('DELETE /admin/usuarios/:id/webauthn/:credencialId elimina la llave', async () => {
+test('DELETE /admin/usuarios/:id/webauthn/:credencialId elimina la llave', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioId}/webauthn/${credencialId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${tokenAdmin}` },
@@ -274,7 +279,7 @@ test('DELETE /admin/usuarios/:id/webauthn/:credencialId elimina la llave', async
 
 // ---------- ON DELETE CASCADE ----------
 
-test('ON DELETE CASCADE: borrar el usuario borra sus credenciales y challenges', async () => {
+test('ON DELETE CASCADE: borrar el usuario borra sus credenciales y challenges', { skip: SALTO_PROD }, async () => {
   const { rows: u } = await query(
     `INSERT INTO usuarios (email, nombre, rol, panel, estado, password_hash, must_reset_password)
      VALUES ($1,'Cascade Test','operador','sicrep','activo','x',false) RETURNING id`,
