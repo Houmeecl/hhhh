@@ -6,6 +6,12 @@ import { useIdioma } from '../lib/i18n.js';
 import { useScrollReveal } from '../lib/scrollReveal.js';
 import { api } from '../api.js';
 
+// Cursos cuyo contenido cita normativa de un país específico: se marca en
+// la tarjeta para no insinuar que aplica en otros mercados (p.ej. en modo
+// Perú, donde la Ley 20.920 chilena no rige). Mismo principio que cor.*
+// en i18n.js: no adaptar/ocultar, aclarar.
+const CURSO_PAIS = { 'fundamentos-rep': 'inst.badge_cl' };
+
 // Landing pública del Instituto sicr3p: la línea de formación de sicr3p,
 // construida sobre el módulo de capacitación interno (migración 037) que
 // ya emite constancias con serial y QR de verificación pública. Solo se
@@ -58,6 +64,9 @@ export default function InstitutoLanding() {
                   <div className="av2-bento-ico"><Icon.Book size={24} /></div>
                   <h3>{c.titulo}</h3>
                   <p>{c.descripcion}</p>
+                  {CURSO_PAIS[c.slug] && (
+                    <span className="badge badge-gray" style={{ marginTop: 8 }}>{t(CURSO_PAIS[c.slug])}</span>
+                  )}
                 </div>
               ))}
             </div>

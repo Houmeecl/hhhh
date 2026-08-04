@@ -243,6 +243,7 @@ const DICCIONARIOS = {
     'inst.cta1': 'Conversar un convenio',
     'inst.cta2': 'Consultar por mi equipo',
     'inst.disclaimer': 'El Instituto sicr3p no es una institución de educación superior ni una OTEC. Las constancias dejan registro verificable de que una persona completó un curso y aprobó su evaluación — no acreditan competencias laborales reguladas ni reemplazan una certificación de tercera parte.',
+    'inst.badge_cl': 'Normativa de Chile',
 
     // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
     'pos.sello_alt': 'Sello verificable de contabilidad de carbono trazable — sicr3p',
@@ -714,6 +715,7 @@ const DICCIONARIOS = {
     'inst.cta1': 'Discuss an agreement',
     'inst.cta2': 'Ask about my team',
     'inst.disclaimer': 'The sicr3p Institute is not a higher-education institution or a training-subsidy provider. The records leave a verifiable trace that a person completed a course and passed its evaluation \u2014 they do not accredit regulated professional competencies or replace an accredited third-party certification.',
+    'inst.badge_cl': 'Chilean regulation',
 
     'pos.sello_alt': 'Verifiable seal of traceable carbon accounting — sicr3p',
     'pos.copiado': '✓ Copied',
@@ -1180,6 +1182,7 @@ const DICCIONARIOS = {
     'inst.cta1': 'Conversar sobre um convênio',
     'inst.cta2': 'Perguntar sobre minha equipe',
     'inst.disclaimer': 'O Instituto sicr3p não é uma instituição de ensino superior nem uma entidade de formação subsidiada. Os registros deixam constância verificável de que uma pessoa completou um curso e foi aprovada em sua avaliação — não acreditam competências profissionais regulamentadas nem substituem uma certificação de terceira parte acreditada.',
+    'inst.badge_cl': 'Normativa do Chile',
 
     // Passaporte Digital de Produto (/pasaporte/:id)
     'pas.titulo': 'Passaporte Digital de Produto',
