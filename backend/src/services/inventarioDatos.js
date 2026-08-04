@@ -270,6 +270,18 @@ export const INVENTARIO = {
     finalidad: 'Capital Natural.', base: null, cadena: CADENA.NINGUNA, retencion: null,
     motivoSinPurga: 'No contiene datos personales.',
   },
+  apl_acuerdos: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: '`nombre` es el del Acuerdo de Producción Limpia sectorial (un convenio, no una persona); el cliente se referencia por FK.',
+    finalidad: 'Seguimiento del APL suscrito por cada cliente.', base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'No contiene datos personales.',
+  },
+  apl_metas: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Metas y acciones de un APL: descripciones de compromisos sectoriales, sin datos de personas.',
+    finalidad: 'Seguimiento del avance de metas del APL.', base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'No contiene datos personales.',
+  },
   cuentas_naturales: {
     clasificacion: NO_PERSONAL, columnas: [],
     nota: '`nombre` es el de una cuenta contable (Agua, Energía).',

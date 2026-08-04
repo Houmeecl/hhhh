@@ -23,6 +23,7 @@ import posRoutes, { adminRouter as posAdminRoutes } from './routes/pos.js';
 import origenRoutes, { tarjetaRouter, firmaProveedorRouter, proveedorPanelRouter } from './routes/origen.js';
 import { torreRouter } from './routes/torre.js';
 import capacitacionRoutes from './routes/capacitacion.js';
+import aplRoutes from './routes/apl.js';
 import webauthnRoutes from './routes/webauthn.js';
 import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
@@ -79,6 +80,7 @@ app.use('/api/torre', apiLimiter, torreRouter);
 app.use('/api/firma-proveedor', apiLimiter, firmaProveedorRouter);
 app.use('/api/panel-proveedor', apiLimiter, proveedorPanelRouter);
 app.use('/api/admin/capacitacion', capacitacionRoutes);
+app.use('/api/admin/apl', aplRoutes);
 // '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
 // hace match de app.use por prefijo en orden de registro, así que si fuera
 // primero, requireHomePanel('sicrep') de este router interceptaría TODAS

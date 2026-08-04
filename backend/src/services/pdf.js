@@ -1409,3 +1409,113 @@ export async function generateContrato({ contrato, clausulas, pendientes = [], t
 
   return bufferDoc(doc);
 }
+
+// ---------- ESTADO DE AVANCE APL ----------
+// Registro interno del avance de un Acuerdo de Producción Limpia.
+// El disclaimer del pie es parte del contrato de honestidad: la
+// certificación de cumplimiento la otorga la auditoría del sistema
+// APL, nunca este documento.
+const ESTADO_APL = {
+  adherido: 'Adherido', en_implementacion: 'En implementación',
+  en_auditoria: 'En auditoría', certificado: 'Certificado', cerrado: 'Cerrado',
+};
+const ESTADO_META_APL = {
+  pendiente: 'Pendiente', en_avance: 'En avance', cumplida: 'Cumplida', no_aplica: 'No aplica',
+};
+
+export async function generateInformeApl({ acuerdo, metas = [], resumen = {}, evidencia = {} }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+
+  // Encabezado
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text('Contabilidad de carbono trazable', 48, 74)
+    .text(`Emitido: ${fechaCorta(new Date())}`, 400, 46, { width: 147, align: 'right' });
+  doc.moveTo(48, 92).lineTo(547, 92).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY)
+    .text('Estado de avance — Acuerdo de Producción Limpia', 48, 106);
+  doc.font('Helvetica').fontSize(10).fillColor(GRAY)
+    .text('Registro interno de seguimiento', 48, 130);
+
+  // Datos del acuerdo
+  let y = 156;
+  doc.roundedRect(48, y, 499, 74, 8).fillAndStroke(LIGHT, BORDER);
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10);
+  doc.text('Empresa', 64, y + 12);
+  doc.text('RUT', 300, y + 12);
+  doc.text('Estado', 420, y + 12);
+  doc.font('Helvetica').fontSize(10.5).fillColor(NAVY);
+  doc.text(acuerdo.nombre_empresa || '—', 64, y + 26, { width: 220 });
+  doc.text(acuerdo.cliente_rut || '—', 300, y + 26, { width: 110 });
+  doc.text(ESTADO_APL[acuerdo.estado] || acuerdo.estado, 420, y + 26, { width: 115 });
+  doc.font('Helvetica-Bold').fontSize(10).text('Acuerdo', 64, y + 44);
+  doc.font('Helvetica').fontSize(10)
+    .text(`${acuerdo.nombre}${acuerdo.sector ? ` · ${acuerdo.sector}` : ''}${acuerdo.fecha_adhesion ? ` · adhesión ${fechaCorta(acuerdo.fecha_adhesion)}` : ''}`,
+      130, y + 44, { width: 400 });
+
+  // Resumen de metas
+  y += 90;
+  const total = resumen.total || 0;
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Metas y acciones', 48, y);
+  doc.font('Helvetica').fontSize(9.5).fillColor(GRAY)
+    .text(total
+      ? `${total} registradas · ${resumen.cumplida || 0} cumplidas · ${resumen.en_avance || 0} en avance · ${resumen.pendiente || 0} pendientes${resumen.no_aplica ? ` · ${resumen.no_aplica} no aplican` : ''}`
+      : 'Sin metas registradas todavía.', 48, y + 16);
+
+  // Tabla de metas
+  y += 38;
+  if (metas.length) {
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(GRAY);
+    doc.text('N°', 48, y, { width: 50 });
+    doc.text('META / ACCIÓN', 100, y, { width: 245 });
+    doc.text('ESTADO', 350, y, { width: 70 });
+    doc.text('EVIDENCIA', 424, y, { width: 123 });
+    y += 14;
+    doc.moveTo(48, y - 3).lineTo(547, y - 3).strokeColor(BORDER).stroke();
+    for (const m of metas) {
+      const hDesc = doc.font('Helvetica').fontSize(9).heightOfString(m.descripcion, { width: 245 });
+      const hEvi = doc.fontSize(8.5).heightOfString(m.evidencia || '—', { width: 123 });
+      const hFila = Math.max(hDesc, hEvi, 12) + 8;
+      if (y + hFila > doc.page.height - 120) { doc.addPage(); y = 60; }
+      doc.font('Helvetica').fontSize(9).fillColor(NAVY);
+      doc.text(m.numero || '—', 48, y, { width: 50 });
+      doc.text(m.descripcion, 100, y, { width: 245 });
+      doc.fillColor(m.estado === 'cumplida' ? GREEN : NAVY)
+        .text(ESTADO_META_APL[m.estado] || m.estado, 350, y, { width: 70 });
+      doc.fillColor(GRAY).fontSize(8.5)
+        .text(m.evidencia || '—', 424, y, { width: 123 });
+      y += hFila;
+    }
+  }
+
+  // Evidencia disponible en la plataforma
+  if (y > doc.page.height - 210) { doc.addPage(); y = 60; }
+  y += 14;
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('Evidencia disponible en sicr3p', 48, y);
+  doc.font('Helvetica').fontSize(9.5).fillColor(GRAY).text(
+    'Lo que la plataforma ya tiene registrado para este RUT y puede respaldar documentalmente:',
+    48, y + 16, { width: 499 }
+  );
+  y += 36;
+  doc.roundedRect(48, y, 499, 54, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(NAVY);
+  doc.text(String(evidencia.documentos ?? 0), 64, y + 10, { width: 110 });
+  doc.text(nf(evidencia.co2e_total_kg ?? 0, 2), 190, y + 10, { width: 140 });
+  doc.text(String(evidencia.declaraciones_rep ?? 0), 350, y + 10, { width: 110 });
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  doc.text('documentos procesados', 64, y + 32, { width: 110 });
+  doc.text('kg CO2e calculados (factor citado)', 190, y + 32, { width: 150 });
+  doc.text('declaraciones REP registradas', 350, y + 32, { width: 140 });
+
+  // Pie de honestidad
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+    'Este documento es un registro interno de seguimiento generado por sicr3p a partir de lo que el propio ' +
+    'equipo registró. NO acredita ni certifica el cumplimiento del Acuerdo de Producción Limpia: la evaluación ' +
+    'de conformidad y el certificado de cumplimiento los otorga el sistema APL a través de su proceso de ' +
+    'auditoría. Los datos de evidencia son agregados contables de la plataforma, verificables documento a documento.',
+    48, doc.page.height - 100, { width: 499 }
+  );
+
+  return bufferDoc(doc);
+}

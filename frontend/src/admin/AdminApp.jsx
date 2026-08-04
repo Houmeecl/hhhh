@@ -21,6 +21,7 @@ import Transporte from './Transporte.jsx';
 import Accesos from './Accesos.jsx';
 import MotorPropio from './MotorPropio.jsx';
 import Capacitacion from './Capacitacion.jsx';
+import Apl from './Apl.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -40,6 +41,7 @@ const NAV = [
   { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
   { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
   { to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
+  { to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
 ];
 
 // El panel admin es su propia "app" instalable, distinta del sitio público
@@ -181,6 +183,7 @@ export default function AdminApp() {
           <Route path="usuarios" element={<Usuarios />} />
           <Route path="actividad" element={<Actividad />} />
           <Route path="capacitacion/*" element={<Capacitacion />} />
+          <Route path="apl" element={<Apl />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>
