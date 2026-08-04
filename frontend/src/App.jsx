@@ -50,12 +50,18 @@ const CargandoModulo = () => (
   </div>
 );
 
+// El mismo bundle sirve también el subdominio del Instituto
+// (instituto.sicrep.cl / instituto.sicr3p.cl, ver deploy/INSTITUTO-SUBDOMINIO.md):
+// bajo ese host la raíz muestra la landing del Instituto en vez de la
+// portada general. Todas las demás rutas siguen operativas en ambos hosts.
+const ES_SUBDOMINIO_INSTITUTO = window.location.hostname.startsWith('instituto.');
+
 export default function App() {
   return (
     <Suspense fallback={<CargandoModulo />}>
     <Routes>
       {/* Flujo público (sin login) */}
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : <Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
