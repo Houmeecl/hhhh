@@ -57,6 +57,8 @@ export default function PublicLayout({ children }) {
         <span>SICR3P SpA · Antofagasta, Chile</span>
         <span>
           <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
+          {' · '}
+          <a href="/inscripcion" style={{ color: 'inherit' }}>{t('layout.inscribete')}</a>
           {' · '}{t('layout.tagline')} · www.sicr3p.cl
         </span>
       </footer>

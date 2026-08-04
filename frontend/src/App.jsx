@@ -15,6 +15,7 @@ import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
 import InstitutoLanding from './pages/InstitutoLanding.jsx';
+import Inscripcion from './pages/Inscripcion.jsx';
 import SolicitarAuspicio from './pages/SolicitarAuspicio.jsx';
 import MisDatos from './pages/MisDatos.jsx';
 import Cadena from './pages/Cadena.jsx';
@@ -77,6 +78,7 @@ export default function App() {
       <Route path="/aduana-verde" element={<Navigate to="/" replace />} />
       <Route path="/corredor" element={<CorredorLanding />} />
       <Route path="/instituto" element={<InstitutoLanding />} />
+      <Route path="/inscripcion" element={<Inscripcion />} />
       <Route path="/auspicio" element={<SolicitarAuspicio />} />
       {/* Ejercicio de derechos ARCOP sin cuenta: el titular se identifica
           por RUT o correo (Ley 21.719). */}

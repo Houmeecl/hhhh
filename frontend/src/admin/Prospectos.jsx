@@ -11,8 +11,23 @@ export default function Prospectos() {
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
-  const cargar = () => api.prospectos().then((r) => setItems(r.prospectos)).catch((e) => flash(e.message, true));
+  const [inscripciones, setInscripciones] = useState([]);
+
+  const cargar = () => {
+    api.prospectos().then((r) => setItems(r.prospectos)).catch((e) => flash(e.message, true));
+    api.solicitudesInscripcion('pendiente').then((r) => setInscripciones(r.solicitudes)).catch(() => {});
+  };
   useEffect(() => { cargar(); }, []);
+
+  async function convertir(id) {
+    try { await api.convertirInscripcion(id); cargar(); flash('Inscripción convertida en prospecto.'); }
+    catch (e) { flash(e.message, true); }
+  }
+  async function descartar(id) {
+    if (!confirm('¿Descartar esta inscripción?')) return;
+    try { await api.descartarInscripcion(id); cargar(); flash('Inscripción descartada.'); }
+    catch (e) { flash(e.message, true); }
+  }
 
   async function guardar() {
     try {
@@ -60,6 +75,41 @@ export default function Prospectos() {
         ))}
       </div>
       </div>
+
+      {/* Inscripciones recibidas desde el formulario público /inscripcion.
+          Convertir crea el prospecto en el pipeline de arriba; nada se
+          crea solo. */}
+      {inscripciones.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ padding: '14px 16px 0' }}>
+            <b>Inscripciones recibidas</b>
+            <span className="muted" style={{ fontSize: 13 }}> · formulario público /inscripcion · {inscripciones.length} pendiente{inscripciones.length === 1 ? '' : 's'}</span>
+          </div>
+          <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Empresa</th><th>Contacto</th><th>Interés</th><th>Mensaje</th><th>Recibida</th><th></th></tr></thead>
+            <tbody>
+              {inscripciones.map((s) => (
+                <tr key={s.id}>
+                  <td><b>{s.nombre_empresa}</b><div className="muted" style={{ fontSize: 12 }}>{s.rut}</div></td>
+                  <td>
+                    {s.contacto_nombre}{s.contacto_cargo ? ` · ${s.contacto_cargo}` : ''}
+                    <div className="muted" style={{ fontSize: 12 }}>{s.contacto_email}{s.contacto_telefono ? ` · ${s.contacto_telefono}` : ''}</div>
+                  </td>
+                  <td className="muted" style={{ fontSize: 13 }}>{(Array.isArray(s.intereses) ? s.intereses : []).join(', ')}</td>
+                  <td className="muted" style={{ fontSize: 13, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.mensaje || ''}>{s.mensaje || '—'}</td>
+                  <td>{fmtFecha(s.created_at)}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-primary btn-sm" onClick={() => convertir(s.id)}>Convertir en prospecto</button>{' '}
+                    <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => descartar(s.id)}>Descartar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="table-scroll">

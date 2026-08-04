@@ -260,6 +260,11 @@ export const api = {
   // Auspiciadores (Ruta sicr3p): convenio marco y, si aporta vehículo, comodato.
   solicitarAuspicio: (b) => request('/auspicio', { method: 'POST', body: b }),
   solicitudesAuspicio: (estado) => request(`/admin/solicitudes-auspicio${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  // Inscripciones de empresas (formulario público /inscripcion)
+  inscribirEmpresa: (body) => request('/inscripcion', { method: 'POST', body }),
+  solicitudesInscripcion: (estado) => request(`/admin/solicitudes-inscripcion${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  convertirInscripcion: (id) => request(`/admin/solicitudes-inscripcion/${id}/convertir`, { method: 'POST', authed: true }),
+  descartarInscripcion: (id) => request(`/admin/solicitudes-inscripcion/${id}/descartar`, { method: 'POST', authed: true }),
   aceptarAuspicio: (id, b) => request(`/admin/solicitudes-auspicio/${id}/aceptar`, { method: 'POST', body: b || {}, authed: true }),
   rechazarAuspicio: (id, motivo) => request(`/admin/solicitudes-auspicio/${id}/rechazar`, { method: 'POST', body: { motivo }, authed: true }),
   auspiciadores: () => request('/admin/auspiciadores', { authed: true }),

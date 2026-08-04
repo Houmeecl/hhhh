@@ -26,6 +26,7 @@ import { validarCompensacion, calcularMonto } from '../services/compensacion.js'
 import { generarSelloSvg } from '../services/sello.js';
 import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 import { validarSolicitud } from '../services/auspicio.js';
+import { validarInscripcion } from '../services/inscripcion.js';
 
 const router = express.Router();
 
@@ -682,6 +683,39 @@ router.post('/auspicio', async (req, res, next) => {
       ok: true,
       recibida: true,
       mensaje: 'Recibimos tu postulación. Te contactaremos al correo indicado.',
+      id: rows[0]?.id || null,
+    });
+  } catch (err) { next(err); }
+});
+
+// ---------- POST /api/inscripcion — inscripción de una empresa ----------
+// Formulario público. NO crea prospecto ni cliente: deja la solicitud
+// registrada para que alguien la revise en el panel (routes/admin.js).
+// Mismo patrón que POST /auspicio.
+router.post('/inscripcion', async (req, res, next) => {
+  try {
+    const { ok, error, datos } = validarInscripcion(req.body);
+    if (!ok) return res.status(400).json({ error });
+
+    const { rows } = await query(
+      `INSERT INTO solicitudes_inscripcion
+         (rut, nombre_empresa, contacto_nombre, contacto_cargo, contacto_email,
+          contacto_telefono, intereses, mensaje, ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)
+       ON CONFLICT (rut) WHERE estado = 'pendiente' DO NOTHING
+       RETURNING id, created_at`,
+      [datos.rut, datos.nombre_empresa, datos.contacto_nombre, datos.contacto_cargo,
+       datos.contacto_email, datos.contacto_telefono, JSON.stringify(datos.intereses),
+       datos.mensaje, req.ip || null]
+    );
+
+    // Sin fila devuelta = ya había una pendiente con ese RUT. Se responde
+    // igual que si fuera nueva (mismo criterio que /auspicio): reenviar el
+    // formulario no debe verse como error ni filtrar estado interno.
+    res.status(201).json({
+      ok: true,
+      recibida: true,
+      mensaje: 'Recibimos tu inscripción. Te contactaremos al correo indicado.',
       id: rows[0]?.id || null,
     });
   } catch (err) { next(err); }

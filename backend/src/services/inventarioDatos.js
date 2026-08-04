@@ -113,6 +113,14 @@ export const INVENTARIO = {
     cadena: CADENA.NINGUNA,
     retencion: 'Se anonimiza el contacto de las rechazadas pasado el plazo; se conserva el hecho y su resolución.',
   },
+  solicitudes_inscripcion: {
+    clasificacion: PERSONAL,
+    columnas: ['rut', 'nombre_empresa', 'contacto_nombre', 'contacto_cargo', 'contacto_email', 'contacto_telefono', 'ip'],
+    finalidad: 'Recibir y resolver la inscripción de una empresa interesada (formulario público /inscripcion).',
+    base: BASE.CONSENTIMIENTO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Se anonimiza el contacto de las descartadas pasado el plazo; se conserva el hecho y su resolución.',
+  },
 
   // ---------- Operación: lo que se calcula ----------
   sesiones: {

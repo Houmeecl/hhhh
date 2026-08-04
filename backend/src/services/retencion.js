@@ -123,6 +123,20 @@ const TAREAS = [
              AND (contacto_nombre IS NOT NULL OR contacto_email <> '' OR ip IS NOT NULL)`,
   },
   {
+    nombre: 'solicitudes_inscripcion.contacto',
+    accion: 'anonimizar',
+    plazo: () => PLAZOS.auspicio_rechazado,
+    // Mismo criterio que solicitudes_auspicio: se conserva la empresa y
+    // la resolución; se suelta a la persona. El mensaje es texto libre.
+    sql: `UPDATE solicitudes_inscripcion
+             SET contacto_nombre = '', contacto_cargo = NULL, contacto_email = '',
+                 contacto_telefono = NULL, mensaje = NULL, ip = NULL
+           WHERE estado = 'descartada'
+             AND resuelta_at IS NOT NULL
+             AND resuelta_at < now() - ($1 || ' days')::interval
+             AND (contacto_nombre <> '' OR contacto_email <> '' OR ip IS NOT NULL)`,
+  },
+  {
     nombre: 'solicitudes_arcop.ip',
     accion: 'anonimizar',
     plazo: () => PLAZOS.actividad_ip,

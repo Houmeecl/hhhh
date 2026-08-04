@@ -13,6 +13,7 @@ import {
 import { generateContrato } from '../services/pdf.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
+import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
 import {
   MOTOR_CLAY, SII_EXCLUIDOS, datosDeDte, admiteDte, itemsDeDte,
   agruparLineas, resumirImportacion,
@@ -545,6 +546,76 @@ router.post('/solicitudes-auspicio/:id/rechazar', adminOnly, async (req, res, ne
     );
     if (!rows[0]) return res.status(409).json({ error: 'La postulación no existe o ya fue resuelta' });
     await logActividad({ usuarioId: req.user.sub, accion: 'rechazar_auspicio', entidad: 'solicitud_auspicio', entidadId: req.params.id, ip: req.ip });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Inscripciones de empresas (formulario público /inscripcion) ----------
+router.get('/solicitudes-inscripcion', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'convertida', 'descartada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_inscripcion s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        ORDER BY s.created_at DESC LIMIT 200`,
+      [estado]
+    );
+    res.json({ solicitudes: rows });
+  } catch (err) { next(err); }
+});
+
+// Convertir crea el prospecto en el pipeline comercial y marca la
+// solicitud, en la misma transacción: si algo falla, la inscripción
+// sigue pendiente en vez de quedar convertida sin prospecto detrás.
+router.post('/solicitudes-inscripcion/:id/convertir', async (req, res, next) => {
+  try {
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_inscripcion WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Inscripción no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta inscripción ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+
+      const base = prospectoDesdeInscripcion(sol);
+      const { rows: pRows } = await client.query(
+        `INSERT INTO prospectos (nombre_empresa, rut, contacto, etapa, origen, notas)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [base.nombre_empresa, base.rut, base.contacto, base.etapa, base.origen, base.notas]
+      );
+      const prospecto = pRows[0];
+
+      await client.query(
+        `UPDATE solicitudes_inscripcion
+            SET estado = 'convertida', prospecto_id = $2, resuelta_por = $3, resuelta_at = now()
+          WHERE id = $1`,
+        [sol.id, prospecto.id, req.user.sub]
+      );
+      return { prospecto };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'convertir_inscripcion', entidad: 'prospecto', entidadId: salida.prospecto.id, detalle: { solicitud: req.params.id }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.post('/solicitudes-inscripcion/:id/descartar', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE solicitudes_inscripcion
+          SET estado = 'descartada', resuelta_por = $2, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La inscripción no existe o ya fue resuelta' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'descartar_inscripcion', entidad: 'solicitud_inscripcion', entidadId: req.params.id, ip: req.ip });
     res.json({ solicitud: rows[0] });
   } catch (err) { next(err); }
 });
