@@ -1,0 +1,187 @@
+/* ============================================================
+   El Libro sicr3p — estilo de libro navegable (pantalla) e
+   imprimible (PDF A4). Paleta de marca: navy #0f1f2e ·
+   verde #28a745/#218838 · menta #eaf6ef. Autocontenido.
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --navy: #0f1f2e;
+  --verde: #28a745;
+  --verde-oscuro: #218838;
+  --menta: #eaf6ef;
+  --gris: #64748b;
+  --borde: #e6e9ed;
+  --tinta: #1f2937;
+  --fondo: #f7f9fa;
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--tinta);
+  background: var(--fondo);
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ---------- Layout: menú fijo + contenido ---------- */
+.libro { display: flex; min-height: 100vh; }
+
+nav.menu {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 264px;
+  background: var(--navy);
+  color: #cbd5e1;
+  overflow-y: auto;
+  padding: 22px 0 30px;
+  z-index: 10;
+}
+nav.menu .marca {
+  font-size: 20px; font-weight: 800; color: #fff;
+  padding: 0 22px 4px;
+}
+nav.menu .marca .punto { color: var(--verde); }
+nav.menu .tagline { font-size: 11px; color: #94a3b8; padding: 0 22px 18px; }
+nav.menu ol { list-style: none; }
+nav.menu a {
+  display: block;
+  padding: 7px 22px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 13px;
+  border-left: 3px solid transparent;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+nav.menu a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+nav.menu a.activo { border-left-color: var(--verde); color: #fff; background: rgba(40,167,69,0.12); }
+nav.menu a .n { color: var(--verde); font-weight: 700; margin-right: 8px; font-variant-numeric: tabular-nums; }
+nav.menu .pdf-btn {
+  display: block; margin: 18px 22px 0; padding: 9px 14px;
+  background: var(--verde); color: #fff; border-radius: 10px;
+  text-align: center; font-weight: 600; font-size: 13px; text-decoration: none;
+}
+nav.menu .pdf-btn:hover { background: var(--verde-oscuro); }
+
+/* Botón menú móvil (checkbox hack, sin JS) */
+.menu-toggle { display: none; }
+label.hamburguesa {
+  display: none;
+  position: fixed; top: 14px; left: 14px; z-index: 20;
+  background: var(--navy); color: #fff;
+  width: 42px; height: 42px; border-radius: 10px;
+  font-size: 20px; line-height: 42px; text-align: center; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15,31,46,0.35);
+}
+@media (max-width: 920px) {
+  label.hamburguesa { display: block; }
+  nav.menu { transform: translateX(-100%); transition: transform 200ms ease; }
+  .menu-toggle:checked ~ nav.menu { transform: translateX(0); }
+  main.paginas { margin-left: 0 !important; padding: 24px 18px !important; }
+}
+
+main.paginas {
+  margin-left: 264px;
+  flex: 1;
+  padding: 40px 48px 80px;
+  max-width: 860px;
+}
+
+/* ---------- Portada ---------- */
+.portada {
+  background: linear-gradient(160deg, var(--navy) 0%, #16324a 55%, var(--verde-oscuro) 140%);
+  color: #fff;
+  border-radius: 18px;
+  padding: 72px 56px;
+  margin-bottom: 48px;
+}
+.portada .tipo {
+  display: inline-block;
+  background: rgba(40,167,69,0.18);
+  border: 1px solid rgba(40,167,69,0.55);
+  color: #b9e8c6;
+  font-size: 12px; font-weight: 600; letter-spacing: 2px;
+  padding: 5px 16px; border-radius: 999px; margin-bottom: 26px;
+}
+.portada h1 { font-size: 44px; line-height: 1.12; font-weight: 800; margin-bottom: 16px; }
+.portada .bajada { font-size: 17px; color: #cbd5e1; max-width: 560px; }
+.portada .edicion { margin-top: 40px; font-size: 13px; color: #94a3b8; }
+
+/* ---------- Capítulos ---------- */
+section.cap { margin-bottom: 56px; scroll-margin-top: 24px; }
+.cap-head { display: flex; align-items: baseline; gap: 18px; border-bottom: 3px solid var(--verde); padding-bottom: 10px; margin-bottom: 6px; }
+.cap-head .num {
+  font-size: 52px; font-weight: 800; color: var(--verde);
+  line-height: 1; font-variant-numeric: tabular-nums;
+}
+.cap-head h2 { font-size: 27px; color: var(--navy); line-height: 1.2; }
+.cap-resumen { color: var(--gris); font-size: 14px; margin: 8px 0 22px; font-style: italic; }
+
+section.cap h3 { color: var(--navy); font-size: 18px; margin: 26px 0 8px; }
+section.cap h4 { color: var(--navy); font-size: 15px; margin: 18px 0 6px; }
+section.cap p { margin-bottom: 12px; }
+section.cap ul, section.cap ol { margin: 0 0 12px 22px; }
+section.cap li { margin-bottom: 5px; }
+section.cap strong { color: var(--navy); }
+
+.caja {
+  background: var(--menta);
+  border-left: 4px solid var(--verde);
+  border-radius: 0 12px 12px 0;
+  padding: 14px 18px;
+  margin: 16px 0;
+  font-size: 14.5px;
+}
+.caja.alerta { background: #fff7ed; border-left-color: #b45309; }
+
+table { width: 100%; border-collapse: collapse; margin: 14px 0 18px; font-size: 14px; background: #fff; border-radius: 10px; overflow: hidden; }
+th { background: var(--navy); color: #fff; text-align: left; padding: 9px 12px; font-size: 12.5px; letter-spacing: 0.04em; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--borde); vertical-align: top; }
+tr:nth-child(even) td { background: #fafcfb; }
+
+code, .mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.9em; background: #eef2f5; padding: 1px 6px; border-radius: 6px; }
+
+.firma { margin-top: 26px; padding-top: 14px; border-top: 1px solid var(--borde); color: var(--gris); font-size: 13.5px; font-style: italic; }
+
+/* ---------- Impresión: libro A4, sin menú ---------- */
+@media print {
+  @page { size: A4; margin: 18mm 16mm; }
+  body { background: #fff; font-size: 10.5pt; }
+  nav.menu, label.hamburguesa, .no-print { display: none !important; }
+  main.paginas { margin-left: 0; padding: 0; max-width: none; }
+  .portada { border-radius: 0; padding: 60mm 10mm 30mm; min-height: 240mm; page-break-after: always; }
+  section.cap { break-before: page; margin-bottom: 0; }
+  section.cap:first-of-type { break-before: auto; }
+  table, .caja { break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* ---------- Figuras del Libro de Servicios (pantallas e informes) ---------- */
+.figura { margin: 18px 0 22px; }
+.figura img {
+  width: 100%; display: block;
+  border: 1px solid var(--borde); border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(15,31,46,0.08);
+}
+.figura.doc img { max-width: 480px; margin: 0 auto; }
+.figura .pie { font-size: 12.5px; color: var(--gris); margin-top: 8px; text-align: center; font-style: italic; }
+.dos-figuras { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 720px) { .dos-figuras { grid-template-columns: 1fr; } }
+
+/* Catálogo de documentos: miniatura + descripción */
+.doc-item { display: grid; grid-template-columns: 190px 1fr; gap: 18px; align-items: start; margin: 18px 0; }
+.doc-item img { width: 100%; border: 1px solid var(--borde); border-radius: 8px; box-shadow: 0 3px 12px rgba(15,31,46,0.10); }
+.doc-item h4 { margin: 0 0 4px !important; }
+.doc-item .ruta { font-size: 12px; color: var(--gris); }
+@media (max-width: 640px) { .doc-item { grid-template-columns: 1fr; } }
+
+/* Ficha de rol (capítulo paneles) */
+.rol-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+.rol-meta span { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--menta); color: var(--verde-oscuro); }
+.rol-meta span.no { background: #fee2e2; color: #b91c1c; }
+
+@media print {
+  .figura, .doc-item { break-inside: avoid; }
+  .dos-figuras { grid-template-columns: 1fr 1fr; }
+}

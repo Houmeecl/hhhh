@@ -72,16 +72,30 @@ NGINX
   CAMBIO=1
 fi
 
+# Libro de Servicios — manual completo del sistema con ejemplos de informes.
+if ! grep -q 'location /docs/libro-servicios/' "$CONF"; then
+  insertar_bloques <<NGINX
+
+    # Libro de Servicios sicr3p — todos los servicios, con ejemplos.
+    location /docs/libro-servicios/ {
+        alias $DIR/docs/libro-servicios/;
+        index index.html;
+    }
+NGINX
+  CAMBIO=1
+fi
+
 if [ "$CAMBIO" -eq 1 ]; then
   nginx -t && systemctl reload nginx
   echo "==> nginx actualizado y recargado."
 else
-  echo "==> Ya estaba todo servido (comercial, metodologia y libro en $CONF). Nada que hacer."
+  echo "==> Ya estaba todo servido (comercial, metodologia, libro y libro-servicios en $CONF). Nada que hacer."
 fi
 
 echo
 echo "PDFs accesibles en (reemplaza por tu dominio o IP real):"
-for f in "$DIR"/docs/comercial/*.pdf "$DIR"/docs/metodologia/*.pdf "$DIR"/docs/libro/*.pdf; do
+for f in "$DIR"/docs/comercial/*.pdf "$DIR"/docs/metodologia/*.pdf "$DIR"/docs/libro/*.pdf "$DIR"/docs/libro-servicios/*.pdf; do
   [ -f "$f" ] && echo "  http://<tu-dominio-o-IP>/docs/${f#"$DIR"/docs/}"
 done
 echo "  http://<tu-dominio-o-IP>/docs/libro/   ← El Libro del proyecto (web con menú)"
+echo "  http://<tu-dominio-o-IP>/docs/libro-servicios/   ← Libro de Servicios (manual completo)"
