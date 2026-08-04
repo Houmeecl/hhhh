@@ -3,7 +3,7 @@ import { citaFuente } from './pdf.js';
 // ============================================================
 // Parseo de motor_categorias.alcance_ghg ("Alcance N · Cat. M — desc")
 // hacia forma estructurada, SOLO al leer — NO se persiste: el campo es
-// texto libre editable desde el panel (PUT /admin/motor/categorias/:codigo)
+// texto libre editable desde el panel (PUT /admin/motor-propio/categorias/:codigo)
 // sin validar el patrón, así que una columna derivada persistida podría
 // desincronizarse sin que nada la vuelva a derivar. Tolerante: texto que
 // no calza con el patrón no revienta el export, solo queda sin clasificar.

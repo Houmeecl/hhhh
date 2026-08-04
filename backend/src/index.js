@@ -61,9 +61,14 @@ app.use('/api/mandante', apiLimiter, mandanteRoutes);
 app.use('/api/puerto', apiLimiter, puertoRoutes);
 app.use('/api/agencia', apiLimiter, agenciaRoutes);
 app.use('/api/trazador', apiLimiter, trazadorRoutes);
+// Prefijo canónico del motor de cálculo: es el único que usa el frontend
+// actual (ver frontend/src/api.js, funciones motor*). No confundir con la
+// ruta React /admin/motor del panel ("Motor externo"), que es navegación
+// de UI, no API.
 app.use('/api/admin/motor-propio', motorRoutes);
-// Alias del mismo router: el registro de fuentes metodológicas se consume
-// como /api/admin/motor/fuentes; /api/admin/motor-propio sigue vivo (compat).
+// Alias de compatibilidad del mismo router: versiones anteriores del
+// panel consumían /api/admin/motor/*. Ningún código de este repo lo usa
+// hoy; se mantiene solo por si quedan consumidores externos desplegados.
 app.use('/api/admin/motor', motorRoutes);
 app.use('/api/admin/cadena', cadenaRoutes);
 app.use('/api/pos', apiLimiter, posRoutes);
