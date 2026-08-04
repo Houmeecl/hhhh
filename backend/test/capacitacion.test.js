@@ -132,10 +132,11 @@ test('migración 063: panel-mostrador queda interno, los demás publicables', as
   assert.equal(porSlug['fundamentos-rep'], true);
   assert.equal(porSlug['contabilidad-carbono'], true);
   assert.equal(porSlug['captura-documental-agencias'], true);
+  assert.equal(porSlug['apl-en-simple'], true, 'el curso APL (066) es público');
 });
 
-test('migración 063: contenido sembrado completo (5 lecciones + 5 preguntas × 4 opciones por curso nuevo)', async () => {
-  for (const slug of ['contabilidad-carbono', 'captura-documental-agencias']) {
+test('migraciones 063/066: contenido sembrado completo (5 lecciones + 5 preguntas × 4 opciones por curso nuevo)', async () => {
+  for (const slug of ['contabilidad-carbono', 'captura-documental-agencias', 'apl-en-simple']) {
     const { rows: cRows } = await query('SELECT id FROM cursos WHERE slug = $1', [slug]);
     assert.ok(cRows[0], `curso ${slug} debe existir`);
     const cursoId = cRows[0].id;

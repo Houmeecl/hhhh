@@ -10,7 +10,7 @@ import { api } from '../api.js';
 // la tarjeta para no insinuar que aplica en otros mercados (p.ej. en modo
 // Perú, donde la Ley 20.920 chilena no rige). Mismo principio que cor.*
 // en i18n.js: no adaptar/ocultar, aclarar.
-const CURSO_PAIS = { 'fundamentos-rep': 'inst.badge_cl' };
+const CURSO_PAIS = { 'fundamentos-rep': 'inst.badge_cl', 'apl-en-simple': 'inst.badge_cl' };
 
 // Landing pública del Instituto sicr3p: la línea de formación de sicr3p,
 // construida sobre el módulo de capacitación interno (migración 037) que
