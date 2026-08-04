@@ -2,8 +2,10 @@
 -- 037: Capacitación interna (cursos + evaluación + constancia).
 --
 -- Contexto: capacitación para el PERSONAL que ya opera la plataforma
--- (cuentas admin/operador de /admin o /panel-verde) — no es un servicio
--- que se ofrezca a clientes ni se anuncia en la landing pública. Un
+-- (cuentas admin/operador de /admin o /panel-verde). Todos los cursos
+-- viven aquí, pero solo algunos son publicables hacia terceros — ver
+-- columna cursos.es_publico agregada en la migración 063, que también
+-- explica el catálogo público de "Instituto sicr3p" en /instituto. Un
 -- curso tiene lecciones ordenadas y un banco de preguntas de opción
 -- múltiple; al completar todas las lecciones y aprobar el quiz
 -- (≥70%, ver NOTA_APROBACION en services/capacitacion.js) se emite una

@@ -410,6 +410,9 @@ export const api = {
   constanciaUrl: (serial) => `/api/capacitacion/constancias/${serial}.pdf`,
   constanciaQrUrl: (serial) => `/api/capacitacion/constancias/${serial}/qr.png`,
   constanciaPublica: (serial) => request(`/capacitacion/constancias/${serial}`),
+  // Catálogo público del Instituto sicr3p (/instituto) — sin login, solo
+  // cursos marcados es_publico=true (ver migración 063).
+  catalogoInstituto: () => request('/capacitacion/cursos'),
 
   // --- Panel exclusivo del puerto (/panel-puerto) — misma API que la
   // integración X-Api-Key, autenticada con la sesión propia authedPuerto.

@@ -226,6 +226,29 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Instituto sicr3p: la línea de formación, con landing propia */}
+      <section className="sec-pad">
+        <div className="container">
+          <div className="land-corr av2-reveal">
+            <div>
+              <span className="land-corr-kicker"><Icon.Book size={16} /> {t('landing.inst_kicker')}</span>
+              <h3 className="land-corr-titulo">{t('landing.inst_titulo')}<span style={{ color: 'var(--green)' }}>.</span></h3>
+              <p className="land-corr-sub">{t('landing.inst_sub')}</p>
+            </div>
+            <div className="land-corr-lado">
+              <div className="land-corr-chips">
+                <span>{t('landing.inst_chip1')}</span>
+                <span>{t('landing.inst_chip2')}</span>
+                <span>{t('landing.inst_chip3')}</span>
+              </div>
+              <Link to="/instituto" className="btn btn-primary">
+                {t('landing.inst_cta')} <Icon.ArrowRight size={16} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="sec-pad">
         <div className="container">
           <h2 className="sec-head">{t('landing.pasos_titulo')}</h2>

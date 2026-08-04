@@ -1285,6 +1285,12 @@ export async function generateConstanciaCurso({ constancia, curso, usuario }) {
   drawLogo(doc, 60, 66, 22);
   doc.font('Helvetica').fontSize(9).fillColor(GRAY)
     .text(constancia.serial, W - 220, 68, { width: 160, align: 'right' });
+  // Sello "Instituto sicr3p": lockup de marca bajo el logo, la línea de
+  // formación de sicr3p (ver docs/instituto/PLAN-INSTITUTO-SICR3P.md).
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(GREEN)
+    .text('INSTITUTO SICR3P', 60, 94, { width: 220, characterSpacing: 1 });
+  doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+    .text('La línea de formación de sicr3p', 60, 103, { width: 220 });
 
   doc.font('Helvetica-Bold').fontSize(11).fillColor(GREEN)
     .text('CONSTANCIA DE PARTICIPACIÓN', 0, 130, { width: W, align: 'center', characterSpacing: 1.5 });
@@ -1305,8 +1311,8 @@ export async function generateConstanciaCurso({ constancia, curso, usuario }) {
     .text('Escanee para verificar', W - 190, H - 84, { width: 100, align: 'center' });
 
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
-    'Constancia de participación interna emitida por sicr3p. Verificable con el QR o en ' +
-    'sicr3p.cl/constancia/' + constancia.serial + '.',
+    'Constancia de participación interna emitida por el Instituto sicr3p — la línea de formación ' +
+    'de sicr3p. Verificable con el QR o en sicr3p.cl/constancia/' + constancia.serial + '.',
     60, H - 76, { width: W - 260 }
   );
 

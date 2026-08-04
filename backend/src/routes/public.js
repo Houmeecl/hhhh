@@ -1250,6 +1250,20 @@ router.get('/f/:serial/qr.png', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ---------- GET /api/capacitacion/cursos — catálogo público (Instituto sicr3p) ----------
+// Solo cursos con es_publico=true (ver migración 063): nunca expone
+// lecciones ni banco de preguntas, que siguen exclusivos de los paneles
+// internos autenticados (ver routes/capacitacion.js).
+router.get('/capacitacion/cursos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT slug, titulo, descripcion FROM cursos
+       WHERE activo = true AND es_publico = true ORDER BY orden`
+    );
+    res.json({ cursos: rows });
+  } catch (err) { next(err); }
+});
+
 // ---------- GET /api/capacitacion/constancias/:serial — verificación pública ----------
 // El serial ES la credencial (mismo principio que /v/:serial): cualquiera
 // que lo tenga puede verificar la constancia, sin login. Nunca se llama

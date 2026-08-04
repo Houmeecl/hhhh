@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   NOTA_APROBACION,
@@ -6,6 +6,8 @@ import {
   generarSerialConstancia,
   hashConstancia,
 } from '../src/services/capacitacion.js';
+import { query, pool } from '../src/lib/db.js';
+import { runMigrations } from '../src/lib/migrate.js';
 
 const PREGUNTAS = [
   { id: 'p1', opciones: [{ id: 'p1a', correcta: true }, { id: 'p1b', correcta: false }] },
@@ -109,4 +111,56 @@ test('hashConstancia: sensible a cada campo', () => {
   assert.notEqual(hashConstancia(base), hashConstancia({ ...base, puntaje_pct: 90 }));
   assert.notEqual(hashConstancia(base), hashConstancia({ ...base, usuario_nombre: 'Otro' }));
   assert.notEqual(hashConstancia(base), hashConstancia({ ...base, serial: 'CAP-ZZZ999' }));
+});
+
+// ============================================================
+// Integración contra BD real (migración 063 — Instituto sicr3p): confirma
+// que el catálogo público queda bien segmentado (es_publico) y que correr
+// la migración dos veces no duplica filas. Mismo patrón que
+// proveedor.test.js/trazador.test.js.
+// ============================================================
+
+after(async () => {
+  await pool.end();
+});
+
+test('migración 063: panel-mostrador queda interno, los demás publicables', async () => {
+  await runMigrations();
+  const { rows } = await query('SELECT slug, es_publico FROM cursos ORDER BY orden');
+  const porSlug = Object.fromEntries(rows.map((r) => [r.slug, r.es_publico]));
+  assert.equal(porSlug['panel-mostrador'], false);
+  assert.equal(porSlug['fundamentos-rep'], true);
+  assert.equal(porSlug['contabilidad-carbono'], true);
+  assert.equal(porSlug['captura-documental-agencias'], true);
+});
+
+test('migración 063: contenido sembrado completo (5 lecciones + 5 preguntas × 4 opciones por curso nuevo)', async () => {
+  for (const slug of ['contabilidad-carbono', 'captura-documental-agencias']) {
+    const { rows: cRows } = await query('SELECT id FROM cursos WHERE slug = $1', [slug]);
+    assert.ok(cRows[0], `curso ${slug} debe existir`);
+    const cursoId = cRows[0].id;
+    const { rows: lRows } = await query('SELECT count(*)::int AS n FROM lecciones WHERE curso_id = $1', [cursoId]);
+    assert.equal(lRows[0].n, 5, `${slug} debe tener 5 lecciones`);
+    const { rows: pRows } = await query('SELECT count(*)::int AS n FROM preguntas WHERE curso_id = $1', [cursoId]);
+    assert.equal(pRows[0].n, 5, `${slug} debe tener 5 preguntas`);
+    const { rows: oRows } = await query(
+      `SELECT count(*)::int AS n FROM opciones o JOIN preguntas p ON p.id = o.pregunta_id WHERE p.curso_id = $1`,
+      [cursoId]
+    );
+    assert.equal(oRows[0].n, 20, `${slug} debe tener 20 opciones (5 preguntas × 4)`);
+  }
+});
+
+test('runMigrations es idempotente: correrla otra vez no duplica cursos/lecciones/preguntas/opciones', async () => {
+  const contar = async (tabla) => (await query(`SELECT count(*)::int AS n FROM ${tabla}`)).rows[0].n;
+  const antes = {
+    cursos: await contar('cursos'), lecciones: await contar('lecciones'),
+    preguntas: await contar('preguntas'), opciones: await contar('opciones'),
+  };
+  await assert.doesNotReject(runMigrations());
+  const despues = {
+    cursos: await contar('cursos'), lecciones: await contar('lecciones'),
+    preguntas: await contar('preguntas'), opciones: await contar('opciones'),
+  };
+  assert.deepEqual(despues, antes);
 });
