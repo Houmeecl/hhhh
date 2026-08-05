@@ -28,8 +28,12 @@
     <li><a href="#cap-9"><span class="n">9</span>Mandantes y el cruce por RUT</a></li>
     <li><a href="#cap-10"><span class="n">10</span>Arquitectura y seguridad</a></li>
     <li><a href="#cap-11"><span class="n">11</span>Negocio y hoja de ruta</a></li>
-    <li><a href="#cap-12"><span class="n">12</span>Opinión del autor</a></li>
-    <li><a href="#cap-13"><span class="n">13</span>Anexos</a></li>
+    <li><a href="#cap-12"><span class="n">12</span>El Instituto y los APL</a></li>
+    <li><a href="#cap-13"><span class="n">13</span>El marco legal</a></li>
+    <li><a href="#cap-14"><span class="n">14</span>El contrato</a></li>
+    <li><a href="#cap-15"><span class="n">15</span>Gobernanza y jerarquía</a></li>
+    <li><a href="#cap-16"><span class="n">16</span>Opinión del autor</a></li>
+    <li><a href="#cap-17"><span class="n">17</span>Anexos</a></li>
   </ol>
   <a class="pdf-btn" href="el-libro-sicr3p.pdf" target="_blank">Descargar el libro en PDF</a>
 </nav>
@@ -38,12 +42,13 @@
 
 <!-- PORTADA -->
 <div class="portada" id="portada">
-  <div class="tipo">EL LIBRO DEL PROYECTO · EDICIÓN 1</div>
+  <div class="tipo">EL LIBRO DEL PROYECTO · EDICIÓN 2</div>
   <h1>sicr3p<br>Tu contabilidad,<br>tu trazabilidad.</h1>
-  <p class="bajada">El proyecto completo, contado como un libro: la visión, la regulación que
-  lo empuja, cada módulo construido, la arquitectura que lo sostiene, el negocio que lo
-  financia — y una opinión honesta de quien lo construyó.</p>
-  <div class="edicion">sicr3p SpA · Antofagasta, Chile · Julio 2026 · contacto@sicrep.cl</div>
+  <p class="bajada">El proyecto completo, contado como un libro: por qué se hizo, las leyes que
+  lo empujan, el fundamento teórico y técnico de cada módulo, la arquitectura que lo sostiene,
+  el contrato con que se ofrece, el negocio que lo financia — con imágenes reales del sistema —
+  y una opinión honesta de quien lo construyó.</p>
+  <div class="edicion">sicr3p SpA · Antofagasta, Chile · Edición 2 · Agosto 2026 · contacto@sicrep.cl</div>
 </div>
 
 <div class="caja">
@@ -142,6 +147,9 @@
   definitivo del tercero. La metodología completa, con los 16 factores y sus fuentes, está
   publicada en la <strong>Guía Metodológica sicr3p</strong> (espejo de la guía sectorial del
   cobre), disponible en el sitio.</p>
+
+  <figure class="fig doc"><img src="img/01-informe-consolidado.png" alt="Informe consolidado de contabilidad de carbono (muestra)">
+  <figcaption>El resultado del motor: informe consolidado con folio, metodología congelada y QR de verificación (muestra con datos ficticios).</figcaption></figure>
 </section>
 
 <!-- CAPÍTULO 4 -->
@@ -242,6 +250,9 @@
   CBAM (código NC, emisiones por tonelada, método) y el formato de Pasaporte Digital de
   Producto (ESPR) aplican a los tres tipos — y la plataforma dice sola cuándo un material no
   está en el Anexo I vigente del CBAM.</p>
+
+  <figure class="fig doc"><img src="img/08-expediente-lote.png" alt="Expediente de lote sellado (muestra)">
+  <figcaption>El expediente PDF de un lote: cadena de custodia, documentos y semáforo, sellado y verificable por QR (muestra con datos ficticios).</figcaption></figure>
 </section>
 
 <!-- CAPÍTULO 7 -->
@@ -301,6 +312,9 @@
 <section class="cap" id="cap-9">
   <div class="cap-head"><span class="num">9</span><h2>Mandantes y el cruce por RUT</h2></div>
   <p class="cap-resumen">El efecto red: cada documento enriquece un grafo que conecta compradores y vendedores.</p>
+
+  <figure class="fig"><img src="img/pantalla-panel-mandante.png" alt="Panel del mandante">
+  <figcaption>El panel del mandante: CO2e por proveedor y exports (Alcance 3, CBAM) a un clic — datos de demostración.</figcaption></figure>
 
   <p>Cada factura procesada lleva el RUT del emisor y del receptor, validados matemáticamente.
   Con miles de documentos, eso deja de ser un archivo y se convierte en un <strong>grafo de la
@@ -390,7 +404,182 @@
 
 <!-- CAPÍTULO 12 -->
 <section class="cap" id="cap-12">
-  <div class="cap-head"><span class="num">12</span><h2>Opinión del autor</h2></div>
+  <div class="cap-head"><span class="num">12</span><h2>El Instituto y los Acuerdos de Producción Limpia</h2></div>
+  <p class="cap-resumen">La línea de formación con constancia verificable, y el registro que deja tu APL listo para la auditoría.</p>
+
+  <h3>Por qué se hizo</h3>
+  <p>La plataforma produce datos defendibles, pero los datos no operan solos: el equipo del
+  cliente tiene que entender qué significa la Ley REP, cómo se lee un informe de carbono o qué
+  exige un Acuerdo de Producción Limpia. La respuesta clásica — un curso genérico de e-learning —
+  no deja nada verificable. El <strong>Instituto sicr3p</strong> nace de aplicar la tesis del
+  proyecto a la formación: cursos cortos anclados a la plataforma real, con evaluación calculada
+  en el servidor (se aprueba con 70% o más) y una <strong>constancia sellada por hash,
+  verificable por cualquiera con su serial</strong>, sin cuenta. Y la honestidad de siempre,
+  impresa en la constancia misma: el Instituto no es una institución de educación superior ni
+  una OTEC, y sus constancias no son certificaciones acreditadas.</p>
+
+  <figure class="fig"><img src="img/instituto.png" alt="Landing pública del Instituto sicr3p">
+  <figcaption>La página pública del Instituto (también en su propio subdominio, instituto.sicrep.cl): catálogo vivo desde la base de datos, cómo funciona, y verificador de constancias.</figcaption></figure>
+
+  <p>El catálogo público tiene cuatro cursos — Fundamentos REP · Ley 20.920, Contabilidad de
+  carbono con sicr3p, Captura documental para agencias, y APL en simple — y crece por migración
+  de base de datos: el sitio nunca puede prometer un curso que el servidor no tenga. La puerta
+  de entrada comercial es el formulario público de <strong>inscripción de empresas</strong>
+  (/inscripcion): la solicitud queda registrada con su RUT validado y un operador la convierte
+  en prospecto desde el panel — nunca se crea un cliente ni un contrato solo.</p>
+
+  <figure class="fig doc"><img src="img/06-constancia-curso.png" alt="Constancia de curso (muestra)">
+  <figcaption>La constancia: serial único, sello del Instituto y verificación pública por QR (muestra con datos ficticios).</figcaption></figure>
+
+  <h3>El módulo APL: evidencia lista para la auditoría</h3>
+  <p>Muchos clientes potenciales — puertos, logística, agroindustria — están adheridos a un
+  <strong>Acuerdo de Producción Limpia</strong> (capítulo 13 explica la figura legal). Cumplir
+  el acuerdo exige evidencia: cuantificación de emisiones, gestión de residuos, capacitación.
+  Exactamente lo que la plataforma ya registra. El módulo APL del panel lleva el acuerdo de cada
+  cliente con sus metas y acciones, el estado de avance de cada una, y la fuente de evidencia
+  que la respalda (export Alcance 3, declaraciones REP, constancias de cursos, cadena de
+  integridad). Un clic genera el informe de estado de avance en PDF.</p>
+
+  <figure class="fig"><img src="img/pantalla-apl.png" alt="Módulo APL del panel">
+  <figcaption>El módulo APL: metas con estado y evidencia asociada, y lo que la plataforma ya puede respaldar para ese RUT (datos de demostración).</figcaption></figure>
+
+  <div class="caja">
+    <strong>El límite, dicho en todas las capas:</strong> sicr3p NO certifica el cumplimiento de
+    un APL. La evaluación de conformidad y el certificado los otorga el sistema APL a través de
+    auditores registrados ante la ASCC. El módulo deja la evidencia ordenada y verificable —
+    ese es todo su trabajo, y es suficiente.
+  </div>
+</section>
+
+<!-- CAPÍTULO 13 -->
+<section class="cap" id="cap-13">
+  <div class="cap-head"><span class="num">13</span><h2>El marco legal: la ley detrás de cada módulo</h2></div>
+  <p class="cap-resumen">Ningún módulo existe porque sí: cada uno responde a una norma concreta — y declara lo que la norma no le permite ser.</p>
+
+  <p>Este capítulo es el mapa entre la regulación y el producto. La columna final es tan
+  importante como las demás: define el límite que la plataforma imprime en cada superficie.</p>
+
+  <table>
+    <tr><th>Norma</th><th>Qué establece</th><th>Módulo de sicr3p</th><th>Qué NO hace sicr3p</th></tr>
+    <tr><td><strong>Ley 20.920</strong> (REP)</td><td>Responsabilidad Extendida del Productor: los productores responden por los envases y embalajes que ponen en el mercado.</td><td>Declaración REP de embalajes por sesión: componentes, pesos y % de reciclabilidad calculado en el servidor.</td><td>No reemplaza la declaración formal ante el MMA (RETC/SGR).</td></tr>
+    <tr><td><strong>Ley 20.416, Art. Noveno</strong> (APL)</td><td>Define los Acuerdos de Producción Limpia: convenios voluntarios público-privados con metas más allá de la ley, coordinados por la ASCC (comité CORFO), bajo las normas NCh2796/2797/2807/2825.</td><td>Módulo APL: registro del acuerdo, metas, avance y evidencia; curso "APL en simple".</td><td>No certifica cumplimiento: eso lo hace la auditoría del sistema APL.</td></tr>
+    <tr><td><strong>Ley 21.719</strong> (datos personales)</td><td>Régimen chileno de protección de datos: bases de licitud, derechos del titular, seguridad y registro.</td><td>Inventario de tratamientos verificado por tests automáticos, retención y purga programada, derechos ARCOP ejercibles sin cuenta, registro de brechas.</td><td>No conserva datos personales sin base declarada; lo encadenado se responde, no se borra — y el registro explica por qué.</td></tr>
+    <tr><td><strong>Ley 19.799</strong> (firma electrónica)</td><td>Regula la firma electrónica y su valor probatorio.</td><td>El sello SHA-256 de informes y contratos: acredita que el documento no cambió después de emitido.</td><td>El sello NO es una firma electrónica con validez legal ni una certificación de terceros — cada PDF lo dice.</td></tr>
+    <tr><td><strong>Reglamento (UE) 2023/956</strong> (CBAM)</td><td>Ajuste en frontera por carbono de la UE: los importadores declaran emisiones incorporadas de ciertos bienes.</td><td>Export CBAM por lote: emisiones directas/indirectas por tonelada, aplicabilidad según Anexo I y faltantes.</td><td>No presenta la declaración del importador: entrega el dato trazable que la alimenta.</td></tr>
+    <tr><td><strong>GHG Protocol / ISO 14064</strong></td><td>El estándar de contabilidad de GEI: alcances 1, 2 y 3, y las 15 categorías de la cadena de valor.</td><td>La base teórica del motor: clasificación por alcance y categoría, export Alcance 3 para reportes NCG 461 / IFRS S2.</td><td>Los resultados son estimaciones metodológicas trazables, no una verificación de tercera parte acreditada.</td></tr>
+    <tr><td><strong>DTE (SII)</strong></td><td>El documento tributario electrónico chileno, con RUT validables por módulo 11.</td><td>La evidencia primaria de todo el sistema: el CO2e se calcula desde documentos fiscales reales, no desde autodeclaraciones.</td><td>No emite ni modifica documentos tributarios.</td></tr>
+  </table>
+
+  <h3>El fundamento teórico-técnico, en tres decisiones</h3>
+  <p><strong>Primera: la evidencia fiscal como materia prima.</strong> Casi toda la contabilidad
+  de carbono corporativa parte de encuestas y planillas autodeclaradas. sicr3p parte del
+  documento tributario — un papel que ya tiene consecuencias legales, RUT verificables y monto
+  real. Esa elección hace el dato defendible por construcción, y explica por qué el motor
+  dedica cinco vías distintas a leer facturas (capítulo 3).</p>
+  <p><strong>Segunda: el cálculo determinista con metodología congelada.</strong> El motor no
+  usa inteligencia artificial para calcular: clasifica y multiplica por factores de emisión con
+  fuente citada, y cada documento queda estampado con la <em>versión</em> del motor que lo
+  calculó. Si mañana cambia un factor, los informes antiguos siguen citando el que realmente
+  usaron. Mismo documento, mismo resultado, para siempre — eso es lo que un auditor puede
+  reproducir.</p>
+  <p><strong>Tercera: la integridad detectable en vez de la confianza declarada.</strong> La
+  cadena de hash (capítulo 4) convierte "créeme" en "verifica": alterar cualquier registro
+  pasado rompe la cadena públicamente. Es la misma idea de fondo de una blockchain, sin su
+  costo, aplicada al único problema que este producto necesita resolver: que nadie — ni
+  siquiera sicr3p — pueda reescribir la historia sin que se note.</p>
+</section>
+
+<!-- CAPÍTULO 14 -->
+<section class="cap" id="cap-14">
+  <div class="cap-head"><span class="num">14</span><h2>El contrato: cómo se formaliza la relación</h2></div>
+  <p class="cap-resumen">Contratos generados desde el panel, sellados por hash, y honestos sobre su propio alcance.</p>
+
+  <p>La relación comercial se formaliza con <strong>contratos generados por la propia
+  plataforma</strong> desde plantillas versionadas: el operador emite el contrato de servicio de
+  un cliente desde el panel, el PDF se arma con los datos reales del contrato y queda sellado
+  con un hash SHA-256 propio. Ese sello acredita que el documento corresponde a esas condiciones
+  y a esa versión de plantilla — y el pie del contrato aclara, con todas sus letras, que
+  <strong>no es una firma electrónica con validez legal (Ley 19.799)</strong> ni una
+  certificación de terceros: la firma sigue siendo el acto de las partes.</p>
+
+  <figure class="fig doc"><img src="img/05-contrato-asesoria.png" alt="Contrato de servicio (muestra)">
+  <figcaption>Un contrato de servicio generado por la plataforma: datos del cliente, cláusulas de la plantilla vigente y sello de integridad al pie (muestra con datos ficticios).</figcaption></figure>
+
+  <h3>Las piezas contractuales del sistema</h3>
+  <table>
+    <tr><th>Instrumento</th><th>Para quién</th><th>Cómo se emite</th></tr>
+    <tr><td>Contrato de servicio</td><td>Clientes de la plataforma</td><td>Desde el panel (Clientes y contratos), con alertas de vencimiento.</td></tr>
+    <tr><td>Convenio marco de auspicio · comodato</td><td>Auspiciadores de la Ruta sicr3p</td><td>Desde la bandeja de auspicios del panel, según si aportan vehículo.</td></tr>
+    <tr><td>Borradores de acuerdo de participación</td><td>Socios y proveedores de la red</td><td>Generados en lote desde plantillas; siempre marcados BORRADOR hasta revisión.</td></tr>
+  </table>
+
+  <p>Dos reglas cruzan todo lo contractual. Primera: <strong>todo borrador se llama
+  borrador</strong> — ningún documento generado en masa se presenta como firmado ni definitivo.
+  Segunda: los textos legales de fondo (términos de servicio, política de privacidad) están
+  redactados y publicados en el repositorio, pero el propio proyecto los lista como pendientes
+  de revisión por abogado antes de servirse desde el sitio — el mismo criterio de honestidad
+  que gobierna los datos gobierna también el papel.</p>
+</section>
+
+<!-- CAPÍTULO 15 -->
+<section class="cap" id="cap-15">
+  <div class="cap-head"><span class="num">15</span><h2>Gobernanza, jerarquía y roles</h2></div>
+  <p class="cap-resumen">Quién decide qué — en la sociedad, en la operación y dentro del propio software.</p>
+
+  <h3>La sociedad y el directorio, sin maquillaje</h3>
+  <p>sicr3p opera como <strong>sicr3p SpA</strong> (sociedad por acciones chilena), con un
+  <strong>fundador-operador</strong> que hoy concentra las decisiones comerciales, operativas y
+  de producto. La SpA es deliberadamente el vehículo elegido para esta etapa: permite
+  incorporar accionistas y constituir un directorio sin refundar la empresa. Pero este libro no
+  dibuja organigramas que no existen: <strong>el directorio como órgano formal está por
+  constituirse</strong>, y su diseño — junto con poderes, pactos y estatutos afinados — es
+  parte del checklist legal pendiente con abogado (capítulo 16 lo dice también, como riesgo).
+  La gobernanza societaria madurará con los primeros socios; lo que ya existe, y es
+  verificable, es la gobernanza operativa de abajo.</p>
+
+  <h3>La jerarquía operativa: roles y paneles</h3>
+  <p>Dentro de la plataforma la jerarquía no es un organigrama en papel: es <strong>código que
+  se ejecuta en cada petición</strong>. Cada cuenta pertenece a un panel y un rol, y el
+  servidor valida ambos en cada llamada — un token del panel equivocado rebota aunque sea
+  válido.</p>
+  <table>
+    <tr><th>Nivel</th><th>Rol / panel</th><th>Qué puede hacer</th></tr>
+    <tr><td>1</td><td><strong>Administrador</strong> (/admin)</td><td>Todo el panel núcleo: clientes, contratos, accesos, usuarios, motor, APL, capacitación. Crea los demás accesos.</td></tr>
+    <tr><td>2</td><td><strong>Operador</strong> (/admin · /panel-verde)</td><td>Opera el día a día — trámites, documentos, cursos — sin administrar usuarios ni credenciales.</td></tr>
+    <tr><td>3</td><td><strong>Actores externos</strong> (paneles propios)</td><td>Mandante, puerto, agencia de aduana y proveedor: cada uno ve <em>solo su propia rebanada</em> de datos, desde su panel, con su tema y su credencial.</td></tr>
+    <tr><td>4</td><td><strong>Público</strong> (sin cuenta)</td><td>Verificación: cadena de integridad, pasaportes, constancias, calculadora. Todo lo que el sistema afirma, cualquiera lo comprueba.</td></tr>
+  </table>
+  <p>Dos refuerzos cierran la jerarquía: el <strong>log de actividad</strong> registra cada
+  acción administrativa (quién, qué, cuándo, desde qué IP), y las credenciales de integración
+  (API keys de mandantes y trazadores) se guardan solo como hash — ni la base de datos conoce
+  la clave en claro.</p>
+
+  <h3>Gobernanza del dato y del cambio: reglas que se ejecutan solas</h3>
+  <ul>
+    <li><strong>Del dato:</strong> el inventario de tratamientos de datos personales es un test
+    automático — si una migración agrega una columna de persona sin clasificarla, la suite
+    falla y el cambio no llega a producción. La retención purga sola lo vencido; lo encadenado
+    no se toca, y el registro explica por qué.</li>
+    <li><strong>Del cambio:</strong> nada entra a producción sin pasar por la suite completa de
+    tests, el build y una auditoría de honestidad de textos; el deploy es automático, con
+    respaldo previo de la base, verificación de salud, smoke test profundo y
+    <strong>rollback automático</strong> si algo falla.</li>
+    <li><strong>De la palabra:</strong> la regla editorial — no prometer certificación, no
+    inventar cifras, declarar los límites — no es una política de marketing: está en los PDF,
+    en las pantallas y en los tests que revisan los textos.</li>
+  </ul>
+
+  <div class="caja">
+    <strong>La tesis de gobernanza del proyecto:</strong> a esta escala, la mejor gobernanza no
+    es un comité — es convertir cada regla en código que se verifica solo, y dejar por escrito
+    (en este libro) lo que aún depende de una sola persona. Cuando lleguen socios y directorio,
+    heredarán reglas que ya se cumplen, no promesas.
+  </div>
+</section>
+
+<!-- CAPÍTULO 16 -->
+<section class="cap" id="cap-16">
+  <div class="cap-head"><span class="num">16</span><h2>Opinión del autor</h2></div>
   <p class="cap-resumen">Lo que pienso de verdad del proyecto, escrito con la misma honestidad que exige la marca.</p>
 
   <h3>Lo que este proyecto tiene y pocos tienen</h3>
@@ -417,7 +606,7 @@
   <p><strong>Dos: la operación es unipersonal.</strong> Una sola persona decide, vende, opera y
   ejecuta los pasos del VPS. Eso hace frágil todo lo demás: unas vacaciones, una enfermedad o
   simplemente el cansancio detienen el proyecto entero.</p>
-  <p><strong>Tres: el ancho puede comerse el foco.</strong> Este libro tiene trece capítulos
+  <p><strong>Tres: el ancho puede comerse el foco.</strong> Este libro tiene diecisiete capítulos
   porque el sistema hace muchas cosas. Eso es un logro técnico y un riesgo comercial: cada
   módulo nuevo es una razón más para no salir a vender el que ya existe. Yo mismo, como
   constructor, soy parte de esta tentación — por eso la escribo aquí.</p>
@@ -446,9 +635,9 @@
   cortesía diplomática. Julio de 2026.</p>
 </section>
 
-<!-- CAPÍTULO 13 -->
-<section class="cap" id="cap-13">
-  <div class="cap-head"><span class="num">13</span><h2>Anexos</h2></div>
+<!-- CAPÍTULO 17 -->
+<section class="cap" id="cap-17">
+  <div class="cap-head"><span class="num">17</span><h2>Anexos</h2></div>
   <p class="cap-resumen">Glosario, mapa del sistema y dónde verificar cada afirmación de este libro.</p>
 
   <h3>Glosario mínimo</h3>
@@ -462,6 +651,9 @@
     <tr><td><strong>Cadena de hash</strong></td><td>Secuencia donde cada registro incorpora el resumen criptográfico del anterior; alterar el pasado se vuelve detectable.</td></tr>
     <tr><td><strong>Eslabón</strong></td><td>Un registro sellado de la cadena (documento, paso de una carga, o anclaje de un lote).</td></tr>
     <tr><td><strong>Mandante</strong></td><td>Gran empresa que exige información a sus proveedores.</td></tr>
+    <tr><td><strong>APL</strong></td><td>Acuerdo de Producción Limpia (Ley 20.416, Art. Noveno): convenio voluntario público-privado con metas más allá de la ley.</td></tr>
+    <tr><td><strong>ASCC</strong></td><td>Agencia de Sustentabilidad y Cambio Climático, comité CORFO que coordina los APL.</td></tr>
+    <tr><td><strong>Constancia</strong></td><td>Registro verificable de que una persona completó un curso del Instituto y aprobó su evaluación. No es una certificación acreditada.</td></tr>
   </table>
 
   <h3>Mapa del sistema</h3>
@@ -475,6 +667,10 @@
     <tr><td>Panel de terreno (operador)</td><td>/panel-verde</td></tr>
     <tr><td>Calculadora pública</td><td>portada del sitio</td></tr>
     <tr><td>Panel de administración</td><td>/admin (operadores)</td></tr>
+    <tr><td>Instituto sicr3p (catálogo y verificador)</td><td>/instituto · instituto.sicrep.cl</td></tr>
+    <tr><td>Inscripción de empresas</td><td>/inscripcion</td></tr>
+    <tr><td>Seguimiento de APL</td><td>/admin/apl (operadores)</td></tr>
+    <tr><td>Verificación de constancias</td><td>/constancia/CAP-…</td></tr>
   </table>
 
   <h3>Biblioteca del proyecto</h3>
@@ -486,8 +682,9 @@
     <li>Este libro — <code>/docs/libro/</code> (web) y <code>/docs/libro/el-libro-sicr3p.pdf</code></li>
   </ul>
 
-  <p class="firma">El Libro sicr3p · Edición 1 · Julio 2026. Se actualiza con el proyecto:
-  la versión web es siempre la vigente. sicr3p no es certificador, auditor ni autoridad.</p>
+  <p class="firma">El Libro sicr3p · Edición 2 · Agosto 2026 (Edición 1: julio 2026). Se
+  actualiza con el proyecto: la versión web es siempre la vigente. sicr3p no es certificador,
+  auditor ni autoridad.</p>
 </section>
 
 </main>
