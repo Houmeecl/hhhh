@@ -138,8 +138,8 @@ export default function Landing() {
               <p className="av2-t2"><span className="av2-grad">{t('landing.hero2_t2')}</span></p>
               <p className="av2-sub">{t('landing.hero2_sub')}</p>
               <div className="hero-actions">
-                <Link to="/cargar" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
-                  {t('landing.cta_comenzar')}
+                <Link to="/inscripcion" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
+                  {t('landing.cta_inscribir')}
                 </Link>
                 <Link to="/cadena" className="btn av2-btn-ghost">{t('landing.verif_cta')}</Link>
               </div>
@@ -280,7 +280,7 @@ export default function Landing() {
             />
           </div>
           <div style={{ textAlign: 'center', marginTop: 36 }}>
-            <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
+            <Link to="/inscripcion" className="btn btn-primary">{t('landing.cta_inscribir')}</Link>
           </div>
         </div>
       </section>
@@ -409,7 +409,7 @@ export default function Landing() {
               {t('landing.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <Link to="/cargar" className="btn btn-primary">{t('landing.cta_comenzar')}</Link>
+              <Link to="/inscripcion" className="btn btn-primary">{t('landing.cta_inscribir')}</Link>
               <a href="mailto:contacto@sicrep.cl?subject=Cliente%20fundador%20sicr3p" className="btn btn-outline">{t('landing.pre_cta1')}</a>
             </div>
 
@@ -429,7 +429,7 @@ export default function Landing() {
       {/* CTA flotante móvil (≤640px): visible solo pasado el hero y lejos del footer */}
       <div className={mostrarCta ? 'mobile-cta show' : 'mobile-cta'} aria-hidden={!mostrarCta}>
         <Link
-          to="/cargar"
+          to="/inscripcion"
           className="btn btn-primary"
           tabIndex={mostrarCta ? 0 : -1}
           aria-label={t('landing.mobile_cta')}

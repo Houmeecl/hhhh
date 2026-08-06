@@ -3,8 +3,8 @@ import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Logo from './Logo.jsx';
 import { api } from '../api.js';
 
-// Página de activación/reset de contraseña compartida por los 4 paneles
-// (sicrep, mostrador presencial, puerto, mandante) — el token identifica
+// Página de activación/reset de contraseña compartida por los siete paneles
+// (sicrep, terreno, puerto, mandante, agencia, trazador, proveedor) — el token identifica
 // la fila de `usuarios` y ya trae su panel correcto (services/cuentas.js
 // arma el link con la ruta de este componente); lo único que cambia por
 // panel es a qué login se vuelve tras definir la contraseña.

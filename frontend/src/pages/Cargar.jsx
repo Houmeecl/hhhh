@@ -4,7 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import Dropzone from '../components/Dropzone.jsx';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
-import { api } from '../api.js';
+import { api, clienteAuth } from '../api.js';
 
 const MAX = 5;
 const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
@@ -24,6 +24,11 @@ export default function Cargar() {
 
   useEffect(() => {
     const c = sessionStorage.getItem('sicr3p_codigo');
+    // Uso real: la carga exige credencial — un código de acceso o la
+    // sesión de un cliente con historial (magic link). Sin ninguna de
+    // las dos, la puerta es /prueba (donde se ingresa el código). El
+    // backend impone la misma regla (403), esto solo evita el callejón.
+    if (!c && !clienteAuth.token) { nav('/prueba'); return; }
     if (!c) return;
     api.codigoEstado(c)
       .then(setCodigoInfo)

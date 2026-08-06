@@ -19,13 +19,12 @@ const DICCIONARIOS = {
   // ---------- Español (Chile): fuente de verdad ----------
   es: {
     // Layout público (header/footer)
-    'layout.comienza': 'Comienza ahora',
     'layout.ingresar': 'Ingresar',
     'layout.cadena': 'Cadena de integridad',
     'layout.tagline': 'Contabilidad de carbono trazable',
     'layout.idioma': 'Cambiar idioma',
 
-    'landing.cta_comenzar': 'Comienza ahora',
+    'landing.cta_inscribir': 'Inscribe tu empresa',
     'landing.hero_eyebrow': 'Plataforma operativa · Antofagasta, Chile',
     'landing.hero2_t1': 'Tu contabilidad de carbono y tu trazabilidad,',
     'landing.hero2_t2': 'selladas y verificables.',
@@ -83,7 +82,7 @@ const DICCIONARIOS = {
     'landing.faq_a3': 'Es el documento público que ves al escanear el QR de una etiqueta: muestra el resultado calculado y su cadena de integridad (hash), sin necesidad de instalar nada.',
     'landing.faq_q4': '¿Reemplaza una verificación de tercera parte?',
     'landing.faq_a4': 'No. sicr3p entrega evidencia trazable y verificable de tus datos; contratar una verificación o certificación acreditada sigue siendo una decisión y gestión aparte.',
-    'landing.mobile_cta': 'Genera tu informe',
+    'landing.mobile_cta': 'Inscribe tu empresa',
     'landing.cadena_docs': 'documentos encadenados por hash',
     'landing.cadena_verificada': 'Cadena verificada e intacta',
     'landing.cadena_ultimo': 'último eslabón',
@@ -138,7 +137,7 @@ const DICCIONARIOS = {
     'calc.ajusta': 'Ajusta tu consumo mensual aproximado y mira el número en vivo.',
     'calc.clp_mes': 'de compensación al mes',
     'calc.nota': 'Estimación referencial con los factores reales del motor sicr3p y la tarifa vigente — tu número exacto sale de tus documentos.',
-    'calc.cta': 'Calcula el tuyo con tus facturas',
+    'calc.cta': 'Inscríbete y calcula con tus facturas reales',
 
     // Verificación pública (/verificar/:id)
     'ver.error_titulo': 'Documento no encontrado',
@@ -282,6 +281,8 @@ const DICCIONARIOS = {
     'ins.recibida_nota': 'Recibirla no crea una cuenta ni un contrato: la revisamos y te contactamos al correo indicado.',
     'ins.volver': 'Volver al inicio',
     'layout.inscribete': 'Inscribe tu empresa',
+    'layout.mis_datos': 'Mis datos personales',
+    'layout.auspicio': 'Auspicia la Ruta sicr3p',
 
     // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
     'pos.sello_alt': 'Sello verificable de contabilidad de carbono trazable — sicr3p',
@@ -532,13 +533,12 @@ const DICCIONARIOS = {
   // "sicr3p" se mantiene como marca; el subtítulo dice "green
   // document processing" y el disclaimer aclara que no es aduana estatal.
   en: {
-    'layout.comienza': 'Start now',
     'layout.ingresar': 'Sign in',
     'layout.cadena': 'Integrity chain',
     'layout.tagline': 'Traceable carbon accounting',
     'layout.idioma': 'Change language',
 
-    'landing.cta_comenzar': 'Start now',
+    'landing.cta_inscribir': 'Register your company',
     'landing.hero_eyebrow': 'Platform in operation · Antofagasta, Chile',
     'landing.hero2_t1': 'Your carbon accounting and your traceability,',
     'landing.hero2_t2': 'sealed and verifiable.',
@@ -596,7 +596,7 @@ const DICCIONARIOS = {
     'landing.faq_a3': 'It is the public document you see when scanning a label QR code: it shows the calculated result and its integrity (hash) chain, with nothing to install.',
     'landing.faq_q4': 'Does it replace a third-party verification?',
     'landing.faq_a4': 'No. sicr3p provides traceable, verifiable evidence of your data; hiring an accredited verification or certification remains a separate decision and process.',
-    'landing.mobile_cta': 'Generate your report',
+    'landing.mobile_cta': 'Register your company',
     'landing.cadena_docs': 'documents chained by hash',
     'landing.cadena_verificada': 'Chain verified and intact',
     'landing.cadena_ultimo': 'latest link',
@@ -649,7 +649,7 @@ const DICCIONARIOS = {
     'calc.ajusta': 'Adjust your approximate monthly usage and watch the number update live.',
     'calc.clp_mes': 'of monthly offsetting',
     'calc.nota': 'Reference estimate using the real factors of the sicr3p engine and the current rate — your exact number comes from your documents.',
-    'calc.cta': 'Calculate yours with your invoices',
+    'calc.cta': 'Register and calculate with your real invoices',
 
     'ver.error_titulo': 'Document not found',
     'ver.error_texto': 'We could not verify the traceability of this document.',
@@ -792,6 +792,8 @@ const DICCIONARIOS = {
     'ins.recibida_nota': 'Receiving it does not create an account or a contract: we review it and contact you at the email provided.',
     'ins.volver': 'Back to home',
     'layout.inscribete': 'Register your company',
+    'layout.mis_datos': 'My personal data',
+    'layout.auspicio': 'Sponsor the sicr3p Route',
 
     'pos.sello_alt': 'Verifiable seal of traceable carbon accounting — sicr3p',
     'pos.copiado': '✓ Copied',
@@ -1039,13 +1041,12 @@ const DICCIONARIOS = {
 
   // ---------- Portugués ----------
   pt: {
-    'layout.comienza': 'Comece agora',
     'layout.ingresar': 'Entrar',
     'layout.cadena': 'Cadeia de integridade',
     'layout.tagline': 'Contabilidade de carbono rastreável',
     'layout.idioma': 'Mudar idioma',
 
-    'landing.cta_comenzar': 'Comece agora',
+    'landing.cta_inscribir': 'Inscreva sua empresa',
     'landing.hero_eyebrow': 'Plataforma em operação · Antofagasta, Chile',
     'landing.hero2_t1': 'Sua contabilidade de carbono e sua rastreabilidade,',
     'landing.hero2_t2': 'seladas e verificáveis.',
@@ -1103,7 +1104,7 @@ const DICCIONARIOS = {
     'landing.faq_a3': 'É o documento público que você vê ao escanear o QR de uma etiqueta: mostra o resultado calculado e sua cadeia de integridade (hash), sem precisar instalar nada.',
     'landing.faq_q4': 'Substitui uma verificação de terceira parte?',
     'landing.faq_a4': 'Não. A sicr3p entrega evidência rastreável e verificável dos seus dados; contratar uma verificação ou certificação credenciada continua sendo uma decisão e gestão à parte.',
-    'landing.mobile_cta': 'Gere seu relatório',
+    'landing.mobile_cta': 'Inscreva sua empresa',
     'landing.cadena_docs': 'documentos encadeados por hash',
     'landing.cadena_verificada': 'Cadeia verificada e intacta',
     'landing.cadena_ultimo': 'último elo',
@@ -1154,7 +1155,7 @@ const DICCIONARIOS = {
     'calc.ajusta': 'Ajuste seu consumo mensal aproximado e veja o número ao vivo.',
     'calc.clp_mes': 'de compensação por mês',
     'calc.nota': 'Estimativa referencial com os fatores reais do motor sicr3p e a tarifa vigente — seu número exato sai dos seus documentos.',
-    'calc.cta': 'Calcule o seu com suas faturas',
+    'calc.cta': 'Inscreva-se e calcule com suas faturas reais',
 
     'ver.error_titulo': 'Documento não encontrado',
     'ver.error_texto': 'Não foi possível verificar a rastreabilidade deste documento.',
@@ -1297,6 +1298,8 @@ const DICCIONARIOS = {
     'ins.recibida_nota': 'Recebê-la não cria uma conta nem um contrato: nós a revisamos e entramos em contato pelo e-mail indicado.',
     'ins.volver': 'Voltar ao início',
     'layout.inscribete': 'Inscreva sua empresa',
+    'layout.mis_datos': 'Meus dados pessoais',
+    'layout.auspicio': 'Patrocine a Rota sicr3p',
 
     // Passaporte Digital de Produto (/pasaporte/:id)
     'pas.titulo': 'Passaporte Digital de Produto',

@@ -157,7 +157,7 @@ export default function CalculadoraCompensacion() {
             </div>
           </div>
           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
-            <Link to="/cargar" className="btn btn-primary">{t('calc.cta')}</Link>
+            <Link to="/inscripcion" className="btn btn-primary">{t('calc.cta')}</Link>
           </div>
         </div>
       </div>

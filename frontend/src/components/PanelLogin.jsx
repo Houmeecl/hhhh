@@ -61,7 +61,7 @@ export default function PanelLogin({
 
   // Login sin contraseña con una llave USB FIDO2 con sensor de huella
   // (YubiKey Bio, Kensington VeriMark, Feitian BioPass — se registra antes
-  // desde el panel admin). Misma lógica que pages/IngresarPanel.jsx: la
+  // desde el panel admin). Misma lógica que pages/AccesoUnico.jsx: la
   // huella se valida DENTRO de la llave, este sitio nunca la recibe, solo
   // una firma que confirma "esta llave, que ya conocemos, verificó a su
   // dueño". A diferencia de esa pantalla (que detecta el panel solo desde
@@ -75,7 +75,7 @@ export default function PanelLogin({
     try {
       const opciones = await api.webauthnLoginOpciones(email);
       const respuesta = await startAuthentication({ optionsJSON: opciones });
-      const { accessToken, refreshToken, user } = await api.webauthnLoginVerificar(email, respuesta);
+      const { accessToken, refreshToken, user } = await api.webauthnLoginVerificar(email, respuesta, panel);
       if (user.panel !== panel) {
         setError('Esa llave no corresponde a una cuenta de este panel.');
         return;
@@ -184,11 +184,11 @@ export default function PanelLogin({
 
         {/* Solo un atajo para quien no recuerda en qué panel entra: el
             backend detecta el panel real de la cuenta y esta redirige
-            sola (ver pages/IngresarPanel.jsx). No reemplaza esta pantalla
+            sola (ver pages/AccesoUnico.jsx). No reemplaza esta pantalla
             —cada panel sigue teniendo su propia URL directa—, solo evita
             que alguien se quede trabado por no saber cuál usar. */}
         <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>
-          ¿No sabes en qué panel entrar? <a href="/panel/ingresar">Usa el acceso general</a>
+          ¿No sabes en qué panel entrar? <a href="/ingresar">Usa el acceso general</a>
         </p>
 
         <div className="login-badges">

@@ -219,7 +219,7 @@ export default function Cadena() {
             </div>
 
             <p style={{ textAlign: 'center', marginTop: 24 }}>
-              <Link to="/cargar" className="btn btn-outline btn-sm">Procesa tus documentos y súmate a la cadena</Link>
+              <Link to="/inscripcion" className="btn btn-outline btn-sm">Inscribe tu empresa y súmate a la cadena</Link>
             </p>
           </>
         )}

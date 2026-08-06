@@ -20,10 +20,10 @@ router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email y contraseña son obligatorios' });
-    // Los seis logins propios de cada panel SIEMPRE mandan su panel
+    // Los siete logins propios de cada panel SIEMPRE mandan su panel
     // esperado y siguen exigiendo coincidencia exacta (comportamiento de
     // siempre: evita que alguien entre "por accidente" a la pantalla de
-    // otro panel). El login general (pages/IngresarPanel.jsx) no manda
+    // otro panel). El login general (pages/AccesoUnico.jsx) no manda
     // panel: no exige coincidencia, detecta el panel real de la cuenta
     // (ya viaja en `user.panel` de la respuesta) y el frontend redirige
     // solo con ese dato.

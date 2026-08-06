@@ -104,7 +104,13 @@ async function request(path, { method = 'GET', body, formData, authed = false, a
 
 export const api = {
   // Público
-  crearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true }),
+  // La carga adjunta la credencial que exista: sesión del operador de
+  // terreno (authedAv, quien carga desde /panel-verde) o sesión de
+  // cliente del magic link — el backend acepta cualquiera de las dos, o
+  // un código de acceso en el propio formulario. En request(), el header
+  // del cliente pisa al de authedAv si ambos existen; sin ninguno, la
+  // petición sale anónima y el backend responde 403.
+  crearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true, authedAv: true, cliente: true }),
   getSesion: (id) => request(`/sesiones/${id}`),
   verificar: (id) => request(`/verificar/${id}`),
   pasaporte: (id) => request(`/pasaporte/${id}`),
@@ -213,9 +219,11 @@ export const api = {
 
   // Auth
   login: (email, password, panel) => request('/auth/login', { method: 'POST', body: { email, password, panel } }),
-  // Login sin contraseña con llave USB FIDO2 (huella) — ver pages/IngresarPanel.jsx.
+  // Login sin contraseña con llave USB FIDO2 (huella) — ver pages/AccesoUnico.jsx.
   webauthnLoginOpciones: (email) => request('/auth/webauthn/login/opciones', { method: 'POST', body: { email } }),
-  webauthnLoginVerificar: (email, respuesta) => request('/auth/webauthn/login/verificar', { method: 'POST', body: { email, respuesta } }),
+  // `panel` opcional: los logins por panel lo mandan (el servidor rechaza
+  // cuentas de otro panel); el acceso único /ingresar no lo manda.
+  webauthnLoginVerificar: (email, respuesta, panel) => request('/auth/webauthn/login/verificar', { method: 'POST', body: { email, respuesta, panel } }),
   me: () => request('/auth/me', { authed: true }),
   meAv: () => request('/auth/me', { authedAv: true }),
   mePuerto: () => request('/auth/me', { authedPuerto: true }),

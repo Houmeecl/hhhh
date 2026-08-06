@@ -149,6 +149,12 @@ async function accionLanding(page, idle, pasos = 6) {
 }
 
 async function accionCargar(page, idle, delayTexto) {
+  // /cargar exige un código de acceso (uso real): la grabación lo deja en
+  // sessionStorage vía SICR3P_STORY_CODIGO antes de navegar; sin él, la
+  // página redirige a /prueba y esta escena saldría vacía.
+  if (process.env.SICR3P_STORY_CODIGO) {
+    await page.addInitScript((c) => sessionStorage.setItem('sicr3p_codigo', c), process.env.SICR3P_STORY_CODIGO);
+  }
   await page.goto(`${FRONT}/cargar`, { waitUntil: 'load' });
   await page.waitForSelector('input[placeholder="76.123.456-7"]');
   await idle(900);

@@ -18,7 +18,7 @@ import { loginLimiter } from '../middleware/rateLimit.js';
 // recibe, solo una firma criptográfica que confirma "esta llave, que ya
 // conocemos, verificó a su dueño". Por eso la respuesta final tiene
 // EXACTAMENTE el mismo shape que POST /api/auth/login: el frontend
-// (pages/IngresarPanel.jsx) reutiliza sin cambios su lógica de detectar
+// (pages/AccesoUnico.jsx) reutiliza sin cambios su lógica de detectar
 // el panel real y redirigir.
 // ============================================================
 
@@ -70,6 +70,15 @@ router.post('/login/verificar', loginLimiter, async (req, res, next) => {
     const { rows: usuarios } = await query(`SELECT * FROM usuarios WHERE email = $1`, [email]);
     const user = usuarios[0];
     if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
+
+    // Igual que en POST /auth/login: si el login de un panel específico
+    // manda `panel`, la cuenta debe pertenecer a ese panel. El acceso
+    // único (/ingresar) no lo manda y el chequeo se omite — antes esta
+    // restricción vivía solo en el cliente.
+    const panelPedido = req.body.panel;
+    if (panelPedido && user.panel !== panelPedido) {
+      return res.status(403).json({ error: 'Esta cuenta no pertenece a este panel.' });
+    }
 
     const { rows: desafios } = await query(
       `SELECT * FROM webauthn_challenges WHERE usuario_id = $1 AND tipo = 'login'`,

@@ -114,6 +114,10 @@ if (ESCRITURA) {
     fd.append('empresa', 'SMOKE TEST — sicr3p');
     fd.append('email', 'smoke@sicrep.cl');
     fd.append('archivos', new Blob([fixture], { type: 'application/pdf' }), 'smoke-factura.pdf');
+    // La carga pública exige credencial (uso real): pasa un código de
+    // acceso con créditos vía SICR3P_SMOKE_CODIGO (se emite en el panel,
+    // Accesos → Códigos). Sin él, este nivel fallará con 403.
+    if (process.env.SICR3P_SMOKE_CODIGO) fd.append('codigo', process.env.SICR3P_SMOKE_CODIGO);
     const r = await pedir(`${API}/sesiones`, { method: 'POST', body: fd });
     const j = await r.json().catch(() => ({}));
     const f = j.facturas?.[0];

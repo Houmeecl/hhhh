@@ -11,7 +11,7 @@ import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // POST /api/auth/login sin `panel` en el body: es lo que usa el login
-// general (frontend/src/pages/IngresarPanel.jsx) para no obligar a elegir
+// general (frontend/src/pages/AccesoUnico.jsx) para no obligar a elegir
 // de antemano una de las seis URLs de login por panel. El backend debe
 // devolver el panel real de la cuenta sin exigir coincidencia; los seis
 // logins propios de cada panel (que SIEMPRE mandan `panel`) deben seguir

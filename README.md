@@ -132,7 +132,7 @@ Ver `.env.example`. Las principales:
   (YubiKey Bio, Kensington VeriMark, Feitian BioPass — hardware estándar, sin fabricar nada
   propio). El verificador biométrico se valida dentro de la llave; el servidor solo recibe una
   firma criptográfica, nunca el dato biométrico. Un admin registra la llave desde Usuarios.jsx;
-  el login vive en `/panel/ingresar` junto al login por contraseña.
+  el login vive en `/ingresar` (acceso único; /panel/ingresar redirige ahí) junto al login por contraseña.
 - **Rate limiting** en el login (`express-rate-limit`).
 - **helmet** y **CORS restringido**.
 - Tokens de activación/reset **hasheados** (SHA-256) con expiración.

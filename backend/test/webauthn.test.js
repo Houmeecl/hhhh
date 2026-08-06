@@ -248,6 +248,17 @@ test('POST /auth/webauthn/login/verificar con respuesta malformada responde 400 
   assert.equal(res.status, 400);
 });
 
+test('POST /auth/webauthn/login/verificar con panel que no coincide responde 403 (espejo de /auth/login)', { skip: SALTO_PROD }, async () => {
+  // El fixture es panel 'sicrep': pedir 'puerto' debe rebotar en el
+  // servidor, sin depender del check del cliente.
+  const res = await fetch(`${baseUrl}/api/auth/webauthn/login/verificar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `webauthn-${sufijo}@ejemplo.cl`, panel: 'puerto', respuesta: { id: CREDENTIAL_ID } }),
+  });
+  assert.equal(res.status, 403);
+});
+
 test('POST /auth/webauthn/login/verificar con un credential_id que no pertenece a la cuenta responde 401', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/webauthn/login/verificar`, {
     method: 'POST',

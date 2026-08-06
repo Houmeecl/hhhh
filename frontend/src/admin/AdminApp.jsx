@@ -22,6 +22,8 @@ import Accesos from './Accesos.jsx';
 import MotorPropio from './MotorPropio.jsx';
 import Capacitacion from './Capacitacion.jsx';
 import Apl from './Apl.jsx';
+import Auspiciadores from './Auspiciadores.jsx';
+import Datos from './Datos.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -42,6 +44,8 @@ const NAV = [
   { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
   { to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
   { to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
+  { to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
+  { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
 ];
 
 // El panel admin es su propia "app" instalable, distinta del sitio público
@@ -74,7 +78,13 @@ export default function AdminApp() {
     if (!auth.access) { nav('/admin/login'); return; }
     let vigente = true;
     const verificar = (reintento = false) => api.me()
-      .then((d) => { if (vigente) { setUser(d.user); setChecking(false); } })
+      .then((d) => {
+        if (!vigente) return;
+        // Defensa en profundidad (mismo criterio que los otros paneles):
+        // un token válido de OTRO panel no entra al admin.
+        if (d.user?.panel && d.user.panel !== 'sicrep') { auth.clear(); nav('/admin/login'); return; }
+        setUser(d.user); setChecking(false);
+      })
       .catch((e) => {
         if (!vigente) return;
         // Un error de red (TypeError) no invalida la sesión: se reintenta una vez.
@@ -184,6 +194,8 @@ export default function AdminApp() {
           <Route path="actividad" element={<Actividad />} />
           <Route path="capacitacion/*" element={<Capacitacion />} />
           <Route path="apl" element={<Apl />} />
+          <Route path="auspiciadores" element={<Auspiciadores rol={user?.rol} />} />
+          <Route path="datos" element={<Datos rol={user?.rol} />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>

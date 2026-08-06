@@ -8,8 +8,7 @@ import Pasaporte from './pages/Pasaporte.jsx';
 import PasaporteLote from './pages/PasaporteLote.jsx';
 import TarjetaViaje from './pages/TarjetaViaje.jsx';
 import FirmaProveedor from './pages/FirmaProveedor.jsx';
-import Ingresar from './pages/Ingresar.jsx';
-import IngresarPanel from './pages/IngresarPanel.jsx';
+import AccesoUnico from './pages/AccesoUnico.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
@@ -71,8 +70,11 @@ export default function App() {
       <Route path="/f/:serial" element={<FirmaProveedor />} />
       <Route path="/torre" element={<TorreFlota />} />
       <Route path="/torre/:codigo" element={<Torre />} />
-      <Route path="/ingresar" element={<Ingresar />} />
-      <Route path="/panel/ingresar" element={<IngresarPanel />} />
+      {/* Acceso único del sitio: paneles (detección automática) + clientes
+          (magic link). /panel/ingresar queda como redirect: está enlazado
+          desde builds ya desplegados y posibles marcadores. */}
+      <Route path="/ingresar" element={<AccesoUnico />} />
+      <Route path="/panel/ingresar" element={<Navigate to="/ingresar" replace />} />
       <Route path="/prueba" element={<Prueba />} />
       <Route path="/acceso" element={<Acceso />} />
       <Route path="/mis-sesiones" element={<MisSesiones />} />

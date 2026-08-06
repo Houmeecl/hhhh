@@ -43,8 +43,8 @@ export default function PublicLayout({ children }) {
         </Link>
         <nav>
           <SelectorIdioma />
-          <Link to="/cargar" className="muted" style={{ color: 'var(--navy)', fontWeight: 600 }}>
-            {t('layout.comienza')}
+          <Link to="/inscripcion" className="muted" style={{ color: 'var(--navy)', fontWeight: 600 }}>
+            {t('layout.inscribete')}
           </Link>
           <Link to="/ingresar" className="btn btn-outline btn-sm">{t('layout.ingresar')}</Link>
         </nav>
@@ -59,6 +59,12 @@ export default function PublicLayout({ children }) {
           <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
           {' · '}
           <a href="/inscripcion" style={{ color: 'inherit' }}>{t('layout.inscribete')}</a>
+          {' · '}
+          {/* Descubribilidad del ejercicio de derechos (Ley 21.719): el
+              titular tiene que poder encontrar /mis-datos sin conocer la URL. */}
+          <a href="/mis-datos" style={{ color: 'inherit' }}>{t('layout.mis_datos')}</a>
+          {' · '}
+          <a href="/auspicio" style={{ color: 'inherit' }}>{t('layout.auspicio')}</a>
           {' · '}{t('layout.tagline')} · www.sicr3p.cl
         </span>
       </footer>

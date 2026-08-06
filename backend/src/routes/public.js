@@ -239,6 +239,17 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
       });
     }
 
+    // Uso real: la carga exige una credencial — un código de acceso con
+    // créditos (se valida y consume más abajo, dentro de la transacción)
+    // o la sesión de un cliente con historial (magic link). El chequeo va
+    // ANTES de la pre-lectura para no gastar OCR en envíos anónimos.
+    if (!codigo && !clienteOpcional(req)) {
+      return res.status(403).json({
+        error: 'La carga de documentos requiere un código de acceso o una sesión de cliente. '
+          + 'Inscribe tu empresa en /inscripcion para obtener acceso.',
+      });
+    }
+
     // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
     // segundos por archivo y antes corría con la fila de cadena_estado
     // bloqueada, serializando todos los envíos concurrentes. Ahora el lock
@@ -642,6 +653,24 @@ router.post('/sesiones/:id/embalaje', async (req, res, next) => {
 // del terminal; si no, null. El parse es OPCIONAL: el flujo de compensación
 // es público y jamás se rechaza por un token ausente, vencido o ajeno —
 // solo se aprovecha para atribuir el cobro al terminal que lo originó.
+// Si la petición trae un Bearer con JWT válido de una identidad conocida
+// — un cliente del magic link (rol 'cliente') o un usuario de panel (el
+// token lleva su claim `panel`, p. ej. el operador de terreno que carga
+// desde /panel-verde) — devuelve su payload; si no, null. Parse opcional,
+// mismo criterio que terminalIdOpcional: nunca rechaza por token malo —
+// solo se usa como una de las credenciales que habilitan la carga.
+function clienteOpcional(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, config.jwt.accessSecret);
+    return (payload.rol === 'cliente' || payload.panel) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
 function terminalIdOpcional(req) {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
