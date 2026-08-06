@@ -252,6 +252,11 @@ export const api = {
   eliminarCliente: (id) => request(`/admin/clientes/${id}`, { method: 'DELETE', authed: true }),
   crearCuenta: (id, b) => request(`/admin/clientes/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
   consultarRut: (rut) => request(`/admin/clientes/consultar-rut/${encodeURIComponent(rut)}`, { authed: true }),
+  // Situación tributaria pública del SII (vía BaseAPI, solo backend): la
+  // variante admin trae la ficha completa; la pública solo razón social y
+  // actividades, para autocompletar el formulario de /inscripcion.
+  consultarRutSii: (rut) => request(`/admin/clientes/sii/${encodeURIComponent(rut)}`, { authed: true }),
+  consultarRutSiiPublico: (rut) => request(`/inscripcion/sii/${encodeURIComponent(rut)}`),
   // Protección de datos personales (Ley 21.719): derechos del titular y
   // política de retención.
   solicitarArcop: (b) => request('/arcop', { method: 'POST', body: b }),

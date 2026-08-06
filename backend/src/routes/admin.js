@@ -4,6 +4,7 @@ import { generateRegistrationOptions, verifyRegistrationResponse } from '@simple
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { siiLimiter } from '../middleware/rateLimit.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generarPasswordTemporal } from '../services/cuentas.js';
 import {
@@ -23,6 +24,7 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
 import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
 import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
+import { consultarRut } from '../services/baseapi.js';
 
 const router = express.Router();
 
@@ -131,6 +133,25 @@ router.get('/clientes', async (req, res, next) => {
     const { rows } = await query(`SELECT * FROM clientes ORDER BY created_at DESC`);
     res.json({ clientes: rows });
   } catch (err) { next(err); }
+});
+
+// Situación tributaria pública del SII por RUT (vía BaseAPI), para
+// autocompletar el alta de clientes. Va ANTES de las rutas /clientes/:id
+// en orden de lectura, pero Express igual la distingue por el prefijo
+// fijo /clientes/sii/. Apagado limpio (503) si no hay BASEAPI_API_KEY.
+router.get('/clientes/sii/:rut', adminOnly, siiLimiter, async (req, res, next) => {
+  try {
+    if (!config.baseapi.enabled) {
+      return res.status(503).json({ error: 'Consulta SII no configurada (BASEAPI_API_KEY).' });
+    }
+    const situacion = await consultarRut(req.params.rut);
+    await logActividad({ usuarioId: req.user.sub, accion: 'sii_consulta', entidad: 'cliente', entidadId: null, detalle: { rut: req.params.rut }, ip: req.ip });
+    res.json({ situacion });
+  } catch (err) {
+    if (err.sinRegistro) return res.status(404).json({ error: 'RUT sin registro en el SII.' });
+    if (err.message === 'RUT inválido') return res.status(400).json({ error: 'RUT inválido.' });
+    next(err);
+  }
 });
 
 // Dar de alta una empresa emite además SU CONTRATO, en la misma

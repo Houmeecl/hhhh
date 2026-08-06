@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
+import { validarRut } from '../lib/rut.js';
 
 const VACIO = { rut: '', nombre_empresa: '', contacto_email: '', estado_contrato: 'piloto', fecha_inicio: '', fecha_fin: '', plan: 'piloto' };
 
@@ -8,6 +9,9 @@ export default function Clientes({ rol }) {
   const [modal, setModal] = useState(null); // {mode:'crear'|'editar', data}
   const [cuenta, setCuenta] = useState(null); // cliente para crear cuenta
   const [toast, setToast] = useState(null);
+  // Ficha SII del RUT recién escrito en el alta (vía backend/BaseAPI).
+  // Solo ayuda a prellenar: si el módulo está apagado o falla, silencio.
+  const [sii, setSii] = useState(null); // null | 'consultando' | {razonSocial, giro}
   const esAdmin = rol === 'admin';
 
   const cargar = () => api.clientes().then((r) => setClientes(r.clientes)).catch((e) => flash(e.message, true));
@@ -36,13 +40,24 @@ export default function Clientes({ rol }) {
     } catch (e) { flash(e.message, true); }
   }
 
+  async function consultarSii(rut) {
+    if (!validarRut(rut)) { setSii(null); return; }
+    setSii('consultando');
+    try {
+      const { situacion } = await api.consultarRutSii(rut);
+      setSii({ razonSocial: situacion.razonSocial, giro: situacion.actividades?.[0]?.descripcion || null });
+      setModal((m) => (!m || m.mode !== 'crear' || m.data.nombre_empresa.trim())
+        ? m : { ...m, data: { ...m.data, nombre_empresa: situacion.razonSocial } });
+    } catch { setSii(null); }
+  }
+
   const badge = (e) => e === 'activo' ? 'badge-green' : e === 'piloto' ? 'badge-amber' : 'badge-red';
 
   return (
     <div>
       <div className="admin-head">
         <h1>Clientes y contratos</h1>
-        {esAdmin && <button className="btn btn-primary" onClick={() => setModal({ mode: 'crear', data: { ...VACIO } })}>+ Nuevo cliente</button>}
+        {esAdmin && <button className="btn btn-primary" onClick={() => { setSii(null); setModal({ mode: 'crear', data: { ...VACIO } }); }}>+ Nuevo cliente</button>}
       </div>
 
       <div className="card">
@@ -81,7 +96,13 @@ export default function Clientes({ rol }) {
           <div className="modal">
             <h2 style={{ marginTop: 0 }}>{modal.mode === 'crear' ? 'Nuevo cliente' : 'Editar cliente'}</h2>
             <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-              <div className="field"><label>RUT</label><input value={modal.data.rut} disabled={modal.mode === 'editar'} onChange={(e) => setModal({ ...modal, data: { ...modal.data, rut: e.target.value } })} /></div>
+              <div className="field"><label>RUT</label>
+                <input value={modal.data.rut} disabled={modal.mode === 'editar'} onChange={(e) => setModal({ ...modal, data: { ...modal.data, rut: e.target.value } })} onBlur={(e) => modal.mode === 'crear' && consultarSii(e.target.value)} />
+                {modal.mode === 'crear' && sii === 'consultando' && <span className="muted" style={{ fontSize: 12 }}>Consultando el SII…</span>}
+                {modal.mode === 'crear' && sii && sii !== 'consultando' && (
+                  <span className="muted" style={{ fontSize: 12 }}>Según SII: <b>{sii.razonSocial}</b>{sii.giro ? ` · ${sii.giro}` : ''}</span>
+                )}
+              </div>
               <div className="field"><label>Empresa</label><input value={modal.data.nombre_empresa} onChange={(e) => setModal({ ...modal, data: { ...modal.data, nombre_empresa: e.target.value } })} /></div>
               <div className="field"><label>Email de contacto</label><input value={modal.data.contacto_email || ''} onChange={(e) => setModal({ ...modal, data: { ...modal.data, contacto_email: e.target.value } })} /></div>
               <div className="field"><label>Plan</label><input value={modal.data.plan || ''} onChange={(e) => setModal({ ...modal, data: { ...modal.data, plan: e.target.value } })} /></div>

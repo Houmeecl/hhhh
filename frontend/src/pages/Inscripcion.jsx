@@ -5,6 +5,7 @@ import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { api } from '../api.js';
+import { validarRut } from '../lib/rut.js';
 
 // Página especial de inscripción de empresas, con la marca al centro:
 // hero navy con el logo grande, argumentos a la izquierda y el
@@ -35,6 +36,23 @@ export default function Inscripcion() {
   const [enviando, setEnviando] = useState(false);
   const [listo, setListo] = useState(null);
   const [error, setError] = useState(null);
+  // Autocompletado por RUT con datos públicos del SII (el backend consulta
+  // BaseAPI; acá nunca hay API key). Cualquier falla —módulo apagado, RUT
+  // sin registro, rate limit— se ignora en silencio: el formulario manual
+  // es el camino principal y esto es solo una ayuda.
+  const [sii, setSii] = useState(null); // null | 'consultando' | {razonSocial, giro}
+
+  async function consultarSii() {
+    // validarRut evita gastar una consulta (cuota pagada de BaseAPI) en un
+    // RUT con dígito verificador malo; el servidor valida de nuevo igual.
+    if (!validarRut(f.rut)) { setSii(null); return; }
+    setSii('consultando');
+    try {
+      const { situacion } = await api.consultarRutSiiPublico(f.rut);
+      setSii({ razonSocial: situacion.razonSocial, giro: situacion.actividades?.[0]?.descripcion || null });
+      setF((x) => (x.nombre_empresa.trim() ? x : { ...x, nombre_empresa: situacion.razonSocial }));
+    } catch { setSii(null); }
+  }
 
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const toggleInteres = (k) => setF((x) => ({
@@ -106,7 +124,14 @@ export default function Inscripcion() {
                 <div className="field"><label>{t('ins.empresa')} *</label>
                   <input required value={f.nombre_empresa} onChange={(e) => set('nombre_empresa', e.target.value)} /></div>
                 <div className="field"><label>RUT *</label>
-                  <input required placeholder="76.123.456-7" value={f.rut} onChange={(e) => set('rut', e.target.value)} /></div>
+                  <input required placeholder="76.123.456-7" value={f.rut} onChange={(e) => set('rut', e.target.value)} onBlur={consultarSii} />
+                  {sii === 'consultando' && <span className="muted" style={{ fontSize: 12 }}>{t('sii.consultando')}</span>}
+                  {sii && sii !== 'consultando' && (
+                    <span className="muted" style={{ fontSize: 12 }}>
+                      {t('sii.segun_sii')} <b>{sii.razonSocial}</b>{sii.giro ? ` · ${sii.giro}` : ''}
+                    </span>
+                  )}
+                </div>
                 <div className="field"><label>{t('ins.nombre')} *</label>
                   <input required value={f.contacto_nombre} onChange={(e) => set('contacto_nombre', e.target.value)} /></div>
                 <div className="field"><label>{t('ins.cargo')}</label>

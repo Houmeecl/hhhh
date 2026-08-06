@@ -11,6 +11,7 @@ const base = () => ({
   seedDemo: false,
   resend: { apiKey: 're_algo' },
   simple: { mock: false },
+  baseapi: { enabled: true },
 });
 
 test('config sana no arroja fatales ni advertencias', () => {
@@ -58,6 +59,15 @@ test('sin RESEND_API_KEY y con MOCK_SIMPLE solo advierte, no es fatal', () => {
   const { fatales, advertencias } = verificarConfigProduccion(cfg);
   assert.deepEqual(fatales, []);
   assert.equal(advertencias.length, 2);
+});
+
+test('sin BASEAPI_API_KEY solo advierte que el autocompletado SII queda apagado', () => {
+  const cfg = base();
+  cfg.baseapi = { enabled: false };
+  const { fatales, advertencias } = verificarConfigProduccion(cfg);
+  assert.deepEqual(fatales, []);
+  assert.equal(advertencias.length, 1);
+  assert.match(advertencias[0], /BASEAPI_API_KEY/);
 });
 
 test('los defaults de desarrollo acumulan varios fatales a la vez', () => {

@@ -122,6 +122,20 @@ export const INVENTARIO = {
     retencion: 'Se anonimiza el contacto de las descartadas pasado el plazo; se conserva el hecho y su resolución.',
   },
 
+  sii_consultas: {
+    clasificacion: PERSONAL,
+    columnas: ['rut_norm'],
+    nota: 'Caché de la situación tributaria PÚBLICA del SII por RUT (vía BaseAPI), para el '
+      + 'autocompletado de formularios. El RUT se incluye por el mismo criterio que en `clientes`: '
+      + 'puede ser el de una persona natural. El JSONB `respuesta` solo guarda lo que el SII publica '
+      + 'de cualquier contribuyente (razón social, actividades); jamás claves ni datos privados.',
+    columnasRut: ['rut_norm'],
+    finalidad: 'No pagar dos veces la misma consulta a BaseAPI y autocompletar formularios.',
+    base: BASE.LEGITIMO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Es una caché: se puede vaciar entera en cualquier momento sin perder nada — la consulta se rehace.',
+  },
+
   // ---------- Operación: lo que se calcula ----------
   sesiones: {
     clasificacion: PERSONAL,

@@ -27,6 +27,8 @@ import { generarSelloSvg } from '../services/sello.js';
 import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 import { validarSolicitud } from '../services/auspicio.js';
 import { validarInscripcion } from '../services/inscripcion.js';
+import { consultarRut } from '../services/baseapi.js';
+import { siiLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -748,6 +750,26 @@ router.post('/inscripcion', async (req, res, next) => {
       id: rows[0]?.id || null,
     });
   } catch (err) { next(err); }
+});
+
+// ---------- GET /api/inscripcion/sii/:rut — autocompletado del formulario ----------
+// Situación tributaria PÚBLICA del SII (vía BaseAPI) reducida al mínimo
+// para autocompletar: razón social + actividades. Rate limit estricto
+// propio (siiLimiter): cada consulta consume cuota pagada y esto no
+// puede ser un proxy SII abierto. Sin BASEAPI_API_KEY responde 503 y el
+// frontend simplemente no ofrece el autocompletado.
+router.get('/inscripcion/sii/:rut', siiLimiter, async (req, res, next) => {
+  try {
+    if (!config.baseapi.enabled) {
+      return res.status(503).json({ error: 'Consulta no disponible.' });
+    }
+    const s = await consultarRut(req.params.rut);
+    res.json({ situacion: { razonSocial: s.razonSocial, actividades: s.actividades } });
+  } catch (err) {
+    if (err.sinRegistro) return res.status(404).json({ error: 'RUT sin registro en el SII.' });
+    if (err.message === 'RUT inválido') return res.status(400).json({ error: 'RUT inválido.' });
+    next(err);
+  }
 });
 
 // ---------- POST /api/sesiones/:id/compensacion — cobro del POS de mostrador ----------

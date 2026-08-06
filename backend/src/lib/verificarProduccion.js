@@ -34,6 +34,9 @@ export function verificarConfigProduccion(cfg) {
   if (!cfg.resend.apiKey) {
     advertencias.push('RESEND_API_KEY vacía — los correos NO se envían, solo se escriben en el log');
   }
+  if (!cfg.baseapi?.enabled) {
+    advertencias.push('BASEAPI_API_KEY vacía — el autocompletado SII por RUT queda deshabilitado');
+  }
   if (cfg.simple.mock) {
     advertencias.push('MOCK_SIMPLE=true — los documentos sin XML ni texto extraíble se analizan con datos simulados');
   }

@@ -60,6 +60,18 @@ export const config = {
     challengeTtlMs: 2 * 60 * 1000,
   },
 
+  // Consultas al SII vía BaseAPI (api.baseapi.cl) — SOLO el endpoint de
+  // situación tributaria por RUT, que es dato público y no requiere la
+  // clave tributaria de nadie. La key vive únicamente en backend/.env;
+  // sin key el módulo queda apagado y el autocompletado simplemente no
+  // aparece. El frontend jamás habla con BaseAPI directo.
+  baseapi: {
+    enabled: Boolean(process.env.BASEAPI_API_KEY),
+    key: process.env.BASEAPI_API_KEY || '',
+    base: process.env.BASEAPI_BASE || 'https://api.baseapi.cl/api/v1',
+    timeoutMs: parseInt(process.env.BASEAPI_TIMEOUT_MS || '15000', 10),
+  },
+
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
     from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>',
