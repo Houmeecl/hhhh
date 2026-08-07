@@ -97,6 +97,11 @@ export const config = {
     port: parseInt(process.env.SMTP_PORT || '465', 10),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
+    // El backend habla con su PROPIO servidor de correo en el mismo VPS. Si
+    // ese servidor (Poste.io) presenta un certificado autofirmado, poner
+    // SMTP_TLS_INSECURE=true acepta esa conexión local — es seguro porque no
+    // sale a internet. Por defecto queda estricto (rechaza autofirmados).
+    tlsInsecure: bool(process.env.SMTP_TLS_INSECURE, false),
   },
 
   admin: {

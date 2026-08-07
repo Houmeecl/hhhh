@@ -11,6 +11,10 @@ const smtpTransport = (config.smtp.host && config.smtp.user && config.smtp.pass)
       port: config.smtp.port,
       secure: config.smtp.port === 465,
       auth: { user: config.smtp.user, pass: config.smtp.pass },
+      // Con SMTP_TLS_INSECURE=true se acepta el certificado autofirmado del
+      // servidor de correo propio en el mismo host (conexión local, no sale
+      // a internet). Por defecto rejectUnauthorized queda en true.
+      ...(config.smtp.tlsInsecure ? { tls: { rejectUnauthorized: false } } : {}),
     })
   : null;
 
