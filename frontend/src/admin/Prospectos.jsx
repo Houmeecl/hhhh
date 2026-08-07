@@ -28,6 +28,15 @@ export default function Prospectos() {
     try { await api.descartarInscripcion(id); cargar(); flash('Inscripción descartada.'); }
     catch (e) { flash(e.message, true); }
   }
+  async function enrolar(id) {
+    try {
+      const r = await api.enrolarInscripcion(id);
+      cargar();
+      if (r.tenia_cuenta) flash(`Empresa enrolada — ya tenía acceso web, no se reenvió invitación.`);
+      else if (r.correo_enviado === false) flash('Empresa enrolada; el correo no pudo enviarse — comparte el enlace de respaldo desde Enrolar empresa.', true);
+      else flash('Empresa enrolada e invitación enviada por correo.');
+    } catch (e) { flash(e.message, true); }
+  }
 
   async function guardar() {
     try {
@@ -100,7 +109,8 @@ export default function Prospectos() {
                   <td className="muted" style={{ fontSize: 13, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={s.mensaje || ''}>{s.mensaje || '—'}</td>
                   <td>{fmtFecha(s.created_at)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    <button className="btn btn-primary btn-sm" onClick={() => convertir(s.id)}>Convertir en prospecto</button>{' '}
+                    <button className="btn btn-primary btn-sm" onClick={() => enrolar(s.id)}>Enrolar y enviar invitación</button>{' '}
+                    <button className="btn btn-outline btn-sm" onClick={() => convertir(s.id)}>Solo convertir en prospecto</button>{' '}
                     <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => descartar(s.id)}>Descartar</button>
                   </td>
                 </tr>

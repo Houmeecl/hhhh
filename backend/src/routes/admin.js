@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generarPasswordTemporal, crearCuentaEntidad, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
+import { generarPasswordTemporal, crearCuentaEntidad, enviarActivacion, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
 import {
   PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
   generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
@@ -627,6 +627,89 @@ router.post('/solicitudes-inscripcion/:id/convertir', async (req, res, next) => 
 
     await logActividad({ usuarioId: req.user.sub, accion: 'convertir_inscripcion', entidad: 'prospecto', entidadId: salida.prospecto.id, detalle: { solicitud: req.params.id }, ip: req.ip });
     res.status(201).json(salida);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+// Enrolar la empresa de la solicitud y enviarle la invitación por correo,
+// en un solo clic: crea (o reutiliza por RUT) la empresa en `proveedores`,
+// le crea el acceso web y dispara el correo de activación — mismo camino
+// que admin/Enrolar.jsx, pero partiendo de un lead ya calificado en vez de
+// que el admin retipee los datos. Todo en una transacción: si algo falla,
+// la solicitud sigue pendiente.
+router.post('/solicitudes-inscripcion/:id/enrolar', adminOnly, async (req, res, next) => {
+  try {
+    const rutForzado = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_inscripcion WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Inscripción no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta inscripción ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+      const rut = rutForzado || sol.rut.replace(/[^0-9kK]/g, '').toUpperCase();
+      const conGuion = rut.length >= 7 ? `${rut.slice(0, -1)}-${rut.slice(-1)}` : '';
+      if (!rutValido(conGuion)) { const e = new Error('El RUT de la solicitud no es válido.'); e.status = 400; throw e; }
+
+      let { rows: eRows } = await client.query(`SELECT * FROM proveedores WHERE rut = $1`, [rut]);
+      const yaExistia = Boolean(eRows[0]);
+      if (!eRows[0]) {
+        ({ rows: eRows } = await client.query(
+          `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2) RETURNING *`,
+          [sol.nombre_empresa, rut]
+        ));
+      }
+      const empresa = eRows[0];
+
+      // Acceso web de la empresa (mismo patrón que crearCuentaEntidad, sin
+      // el atajo de recibir req/res: acá el correo viene de la solicitud,
+      // no del body). Si la empresa ya tenía cuenta, no se crea otra ni se
+      // reenvía invitación — se informa para que el admin no se confunda.
+      let acceso = null;
+      const { rows: uExistente } = await client.query(`SELECT id FROM usuarios WHERE proveedor_id = $1`, [empresa.id]);
+      if (!uExistente[0]) {
+        const email = String(sol.contacto_email || '').toLowerCase().trim();
+        const password = generarPasswordTemporal();
+        const hash = await bcrypt.hash(password, config.bcryptRounds);
+        const { rows: uRows } = await client.query(
+          `INSERT INTO usuarios (email, nombre, rol, panel, proveedor_id, nivel_acceso, estado, password_hash, must_reset_password)
+           VALUES ($1,$2,'operador','proveedor',$3,'operador','activo',$4,true)
+           ON CONFLICT (email) DO NOTHING RETURNING id`,
+          [email, sol.contacto_nombre || empresa.nombre_empresa, empresa.id, hash]
+        );
+        if (uRows[0]) {
+          acceso = { usuarioId: uRows[0].id, email, nombre: sol.contacto_nombre || empresa.nombre_empresa };
+        }
+      }
+
+      await client.query(
+        `UPDATE solicitudes_inscripcion SET estado = 'convertida', resuelta_por = $2, resuelta_at = now() WHERE id = $1`,
+        [sol.id, req.user.sub]
+      );
+      return { empresa, yaExistia, acceso, tieneCuentaPrevia: Boolean(uExistente[0]) };
+    });
+
+    // El correo se envía FUERA de la transacción (sendMail hace red; no
+    // debe bloquear el commit ni deshacerlo si la red falla).
+    let correo = null;
+    if (salida.acceso) {
+      correo = await enviarActivacion({
+        usuarioId: salida.acceso.usuarioId, email: salida.acceso.email, nombre: salida.acceso.nombre, panel: 'proveedor',
+      });
+    }
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'enrolar_desde_inscripcion', entidad: 'proveedor',
+      entidadId: salida.empresa.id, detalle: { solicitud: req.params.id, ya_existia: salida.yaExistia }, ip: req.ip,
+    });
+    res.status(201).json({
+      empresa: salida.empresa, ya_existia: salida.yaExistia, tenia_cuenta: salida.tieneCuentaPrevia,
+      correo_enviado: correo?.correoEnviado, dev_activation_link: correo?.dev_activation_link,
+    });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     next(err);

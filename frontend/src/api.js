@@ -282,6 +282,7 @@ export const api = {
   solicitudesInscripcion: (estado) => request(`/admin/solicitudes-inscripcion${estado ? `?estado=${estado}` : ''}`, { authed: true }),
   convertirInscripcion: (id) => request(`/admin/solicitudes-inscripcion/${id}/convertir`, { method: 'POST', authed: true }),
   descartarInscripcion: (id) => request(`/admin/solicitudes-inscripcion/${id}/descartar`, { method: 'POST', authed: true }),
+  enrolarInscripcion: (id) => request(`/admin/solicitudes-inscripcion/${id}/enrolar`, { method: 'POST', authed: true }),
   // APL — Acuerdos de Producción Limpia (seguimiento por cliente)
   aplAcuerdos: () => request('/admin/apl', { authed: true }),
   aplAcuerdo: (id) => request(`/admin/apl/${id}`, { authed: true }),
