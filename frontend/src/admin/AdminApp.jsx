@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api, auth } from '../api.js';
@@ -26,6 +26,7 @@ import Auspiciadores from './Auspiciadores.jsx';
 import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
+import SelectorPanel from './SelectorPanel.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -52,87 +53,6 @@ const NAV = [
   { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
 ];
 
-// Bloque "Entrar a otro panel" — visible solo para cuentas es_superadmin.
-// Canjea la sesión sicrep por un token de VISTA (5 min, sin refresh) del
-// panel elegido y abre una pestaña nueva al puente /impersonar/:panel.
-const PANELES_VISTA = [
-  { valor: 'aduana_verde', etiqueta: 'Terreno', entidades: null },
-  { valor: 'puerto', etiqueta: 'Puerto', entidades: (d) => d.puertos, cargar: () => api.puertos(), nombre: (e) => e.nombre },
-  { valor: 'mandante', etiqueta: 'Mandante', entidades: (d) => d.mandantes, cargar: () => api.mandantes(), nombre: (e) => e.nombre_empresa },
-  { valor: 'agencia', etiqueta: 'Agencia', entidades: (d) => d.agencias, cargar: () => api.agencias(), nombre: (e) => e.nombre },
-  { valor: 'trazador', etiqueta: 'Trazador', entidades: (d) => d.trazadores, cargar: () => api.accesosTrazadores(), nombre: (e) => e.nombre },
-  { valor: 'proveedor', etiqueta: 'Proveedor', entidades: (d) => d.proveedores, cargar: () => api.accesosProveedores(), nombre: (e) => e.nombre_empresa },
-];
-
-function EntrarAOtroPanel() {
-  const [panel, setPanel] = useState('');
-  const [entidades, setEntidades] = useState(null); // null = panel sin entidad
-  const [entidadId, setEntidadId] = useState('');
-  const [msg, setMsg] = useState('');
-  const [cargando, setCargando] = useState(false);
-
-  const cfg = PANELES_VISTA.find((p) => p.valor === panel);
-
-  useEffect(() => {
-    setEntidades(null); setEntidadId(''); setMsg('');
-    if (!cfg || !cfg.cargar) return;
-    let vigente = true;
-    cfg.cargar()
-      .then((d) => { if (vigente) setEntidades((cfg.entidades(d) || []).filter((e) => e.activo !== false)); })
-      .catch((e) => { if (vigente) setMsg(e.message); });
-    return () => { vigente = false; };
-  }, [panel]);
-
-  async function entrar() {
-    setMsg(''); setCargando(true);
-    // La pestaña se abre ACÁ, todavía dentro del gesto del clic. Si se
-    // abriera después del await, el navegador la trata como popup no
-    // solicitado y la bloquea en silencio: el botón parecía no hacer nada.
-    // Va sin 'noopener' porque con esa opción window.open devuelve null y
-    // se pierde la referencia para redirigirla; el vínculo se corta a mano
-    // con opener = null (el destino es del mismo origen, no un tercero).
-    const pestana = window.open('', '_blank');
-    if (pestana) pestana.opener = null;
-    try {
-      const { accessToken } = await api.entrarAPanel(panel, entidadId || undefined);
-      // En el fragmento (#), no en el query: así el token no llega al
-      // servidor ni queda en el access.log — ver EntrarComoSuperadmin.jsx.
-      const destino = `/impersonar/${panel}#t=${encodeURIComponent(accessToken)}`;
-      // Si aun así la bloqueó (algunos navegadores con el bloqueo estricto),
-      // se usa la pestaña actual en vez de dejar al usuario sin nada.
-      if (pestana) pestana.location.replace(destino);
-      else window.location.assign(destino);
-    } catch (e) {
-      if (pestana) pestana.close();
-      setMsg(e.message);
-    }
-    setCargando(false);
-  }
-
-  const necesitaEntidad = Boolean(cfg?.cargar);
-  const listo = panel && (!necesitaEntidad || entidadId);
-
-  return (
-    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.12)' }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6 }}>Entrar a otro panel</div>
-      <select value={panel} onChange={(e) => setPanel(e.target.value)} style={{ width: '100%', marginBottom: 6 }}>
-        <option value="">Panel…</option>
-        {PANELES_VISTA.map((p) => <option key={p.valor} value={p.valor}>{p.etiqueta}</option>)}
-      </select>
-      {necesitaEntidad && (
-        <select value={entidadId} onChange={(e) => setEntidadId(e.target.value)} style={{ width: '100%', marginBottom: 6 }}>
-          <option value="">{entidades ? (entidades.length ? 'Entidad…' : 'Sin entidades activas') : 'Cargando…'}</option>
-          {(entidades || []).map((e) => <option key={e.id} value={e.id}>{cfg.nombre(e)}</option>)}
-        </select>
-      )}
-      {msg && <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 6 }}>{msg}</div>}
-      <button className="btn btn-outline btn-sm" style={{ width: '100%' }} disabled={!listo || cargando} onClick={entrar}>
-        {cargando ? 'Abriendo…' : 'Abrir vista (5 min)'}
-      </button>
-    </div>
-  );
-}
-
 // El panel admin es su propia "app" instalable, distinta del sitio público
 // (que usa /manifest.webmanifest, start_url "/"): mientras se está en
 // /admin, el navegador ofrece instalar "sicr3p Admin" con su propio
@@ -150,6 +70,7 @@ function useManifestAdmin() {
 
 export default function AdminApp() {
   const nav = useNavigate();
+  const { pathname } = useLocation();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -194,6 +115,14 @@ export default function AdminApp() {
     );
   }
 
+  // La elección de panel ocupa la pantalla completa: es lo primero tras
+  // iniciar sesión y todavía no se sabe a qué panel va la persona, así que
+  // mostrarle el menú lateral de sicrep alrededor sería contradecir la
+  // pregunta. Va DESPUÉS del cambio de contraseña obligatorio: con una clave
+  // temporal todavía sin cambiar no corresponde ofrecer ningún panel.
+  // SelectorPanel rebota solo a /admin si la cuenta no es superadmin.
+  if (pathname === '/admin/paneles') return <SelectorPanel user={user} />;
+
   return (
     <div className="admin-shell">
       {/* Barra superior solo en móvil */}
@@ -222,7 +151,12 @@ export default function AdminApp() {
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>
           <div className="muted" style={{ fontSize: 12, color: '#94a3b8' }}>{user?.email} · {user?.rol}{user?.es_superadmin ? ' · superadmin' : ''}</div>
-          {user?.es_superadmin && <EntrarAOtroPanel />}
+          {user?.es_superadmin && (
+            <button className="btn btn-outline btn-sm" style={{ marginTop: 10, width: '100%' }}
+              onClick={() => { setMenuOpen(false); nav('/admin/paneles'); }}>
+              Entrar a otro panel
+            </button>
+          )}
           <button className="btn btn-outline btn-sm" style={{ marginTop: 10, width: '100%' }}
             onClick={() => { setMenuOpen(false); setPwd({ actual: '', nueva: '', confirmar: '' }); }}>
             Cambiar contraseña
