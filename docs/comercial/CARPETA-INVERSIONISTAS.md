@@ -1,8 +1,16 @@
 # Qué documento enviar según a quién
 
 Índice rápido de la carpeta comercial (`docs/comercial/*.pdf`) para no mandar
-los 12 PDFs sueltos sin criterio. No es contenido nuevo — solo el orden en
+los PDFs sueltos sin criterio. No es contenido nuevo — solo el orden en
 que ya existen.
+
+## Si no sabes cuál mandar
+
+**21 · Dossier corporativo.** Es la presentación institucional completa: quiénes
+somos, qué hacemos, sobre qué metodología nos sostenemos, cómo protegemos los
+datos y en qué estado real está la plataforma. Sirve como primer documento para
+cualquier contraparte — cliente, mandante, autoridad o inversionista — y remite
+al final a los documentos específicos según el interés que aparezca.
 
 ## Para venture capital / inversionistas
 
@@ -42,3 +50,12 @@ las que trae por defecto son ilustrativas.
 | 10 | Manual de beneficios | Clientes, recorrido end-to-end |
 | 11 | Valorización del proyecto (TIR) | Inversionistas — complemento numérico del 06 |
 | 12 | Portafolio de informes, proceso y apoyo | Clientes y pilotos — qué documentos entrega la plataforma |
+| 13 | Servicio · Alcance 3 | Empresas mandantes que reportan cadena de valor |
+| 14 | Servicio · CBAM | Exportadores a la Unión Europea |
+| 15 | Servicio · Capital Natural | Empresas con activos naturales que reportar |
+| 16 | Servicio · Torre logística | Transportistas y operadores del Corredor |
+| 17 | Servicio · Capacitación | Empresas que necesitan formar a su equipo |
+| 18 | Servicio · Red de actores | Gremios, asociaciones, articuladores |
+| 19 | Propuesta aduanas | Servicio Nacional de Aduanas, agencias |
+| 20 | Servicio · APL | Empresas adheridas a un Acuerdo de Producción Limpia |
+| 21 | **Dossier corporativo** | **Todas — presentación institucional de sicr3p** |
