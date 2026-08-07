@@ -55,7 +55,15 @@ export default function AnalisisSiiVista({ a }) {
                     <td>{d.tipo === 'compra' ? 'Compra' : 'Venta'}</td>
                     <td style={{ fontFamily: 'monospace' }}>{d.folio}</td>
                     <td>{d.fecha ? fmtFecha(d.fecha) : '—'}</td>
-                    <td>{d.razon_social || d.rut_contraparte || '—'}</td>
+                    <td>
+                      {d.razon_social || d.rut_contraparte || '—'}
+                      {d.conciliado && d.monto_coincide && (
+                        <span title="Confirmado: también aparece en el RCV que esta empresa descargó de su propio SII" style={{ marginLeft: 6, color: '#16a34a' }}>✓</span>
+                      )}
+                      {d.conciliado && !d.monto_coincide && (
+                        <span title="El folio coincide con el RCV de esta empresa, pero el monto declarado difiere — revisar" style={{ marginLeft: 6, color: '#d97706' }}>⚠</span>
+                      )}
+                    </td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.neto)}</td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.total)}</td>
                     <td style={{ textAlign: 'right' }}>{d.co2e != null ? d.co2e : '—'}</td>
@@ -106,7 +114,10 @@ function PorTipoTabla({ titulo, filas }) {
 }
 
 // Tabla de concentración por contraparte, marcando las que ya están en
-// sicr3p (cruce por RUT). Solo un indicador — no expone datos de terceros.
+// sicr3p (cruce por RUT) y, cuando la contraparte también conectó su
+// propio SII, cuántos de los documentos quedaron confirmados: coinciden
+// en el RCV que ELLA misma descargó (dos fuentes SII independientes de
+// acuerdo). Nunca expone datos de esos terceros más allá de eso.
 function ContraparteTabla({ titulo, filas }) {
   if (!filas || filas.length === 0) return null;
   return (
@@ -123,7 +134,15 @@ function ContraparteTabla({ titulo, filas }) {
                 <td style={{ textAlign: 'right' }}>{fmtInt(f.n)}</td>
                 <td style={{ textAlign: 'right' }}>{CLP(f.total)}</td>
                 <td style={{ textAlign: 'right' }}>{f.participacion}%</td>
-                <td>{f.en_sicr3p && <span className="badge badge-green" title="Esta contraparte ya está en sicr3p">en sicr3p</span>}</td>
+                <td>
+                  {f.conciliados > 0 ? (
+                    <span className="badge badge-green" title="Estos documentos también aparecen en el RCV que esta empresa descargó de su propio SII">
+                      Confirmado ({fmtInt(f.conciliados)}/{fmtInt(f.n)})
+                    </span>
+                  ) : f.en_sicr3p ? (
+                    <span className="badge badge-amber" title="El RUT coincide con una empresa de sicr3p, pero aún no se confirma contra su propio RCV">en sicr3p</span>
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>

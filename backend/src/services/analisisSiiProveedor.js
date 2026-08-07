@@ -3,12 +3,17 @@
 // ya descargado en dte_proveedor. NO habla con el SII ni con BaseAPI: solo
 // lee la BD, así que no necesita la clave y no cuesta cuota.
 //
-// Combina tres piezas que ya existen en sicr3p, sin inventar:
+// Combina cuatro piezas que ya existen en sicr3p, sin inventar:
 //  1. Resumen y concentración por contraparte (agregación simple).
 //  2. Cruce de contrapartes por RUT: ¿esta contraparte ya está en sicr3p?
-//     (clientes / proveedores). Es el valor diferencial. Solo devuelve un
-//     booleano por RUT — nunca expone datos de esos terceros.
-//  3. Estimación REFERENCIAL de emisiones con el motor propio (método por
+//     (clientes / proveedores). Solo devuelve un booleano por RUT — nunca
+//     expone datos de esos terceros.
+//  3. Conciliación real: cuando la contraparte es OTRO proveedor de
+//     sicr3p que también conectó su SII, se compara el documento (folio +
+//     tipo_dte) contra el RCV que esa empresa descargó del suyo — dos
+//     fuentes SII independientes confirmándose entre sí. Nunca expone el
+//     monto de la otra empresa, solo si coincide.
+//  4. Estimación REFERENCIAL de emisiones con el motor propio (método por
 //     gasto), estampada con la versión del motor. Nunca es una cifra
 //     definitiva ni una "certificación".
 // ============================================================
@@ -74,9 +79,10 @@ function concentracion(filas, marcados) {
   for (const f of filas) {
     const rut = f.rut_contraparte || 'sin-rut';
     totalGlobal += Number(f.total || 0);
-    const prev = porRut.get(rut) || { rut: f.rut_contraparte, razon_social: f.razon_social, n: 0, total: 0 };
+    const prev = porRut.get(rut) || { rut: f.rut_contraparte, razon_social: f.razon_social, n: 0, total: 0, conciliados: 0 };
     prev.n += 1;
     prev.total += Number(f.total || 0);
+    if (f.conciliado) prev.conciliados += 1;
     if (!prev.razon_social && f.razon_social) prev.razon_social = f.razon_social;
     porRut.set(rut, prev);
   }
@@ -104,6 +110,56 @@ async function contrapartesEnSicr3p(query, ruts) {
     [lista]
   );
   return new Set(rows.map((r) => r.rn));
+}
+
+// Conciliación real (no solo "existe el RUT"): ¿el documento de este
+// proveedor tiene su espejo en el RCV que OTRO proveedor de sicr3p ya
+// descargó de su propio SII? Si A compró a B y ambos conectaron su SII,
+// la compra de A (folio+tipo_dte, rut_contraparte = RUT de B) debe
+// aparecer como venta de B (mismo folio+tipo_dte, rut_contraparte = RUT
+// de A) — dos fuentes independientes (el SII de cada uno) confirmándose
+// entre sí. No se filtra por período del otro lado: una compra de fin de
+// mes puede caer en el período siguiente del SII de la contraparte.
+// Nunca devuelve el monto de la otra empresa — solo si coincide o no; el
+// nombre de la contraparte ya lo trae la propia fila (razon_social), no
+// es información nueva.
+async function conciliarConOtrosProveedores(query, proveedorId, rows) {
+  if (rows.length === 0) return new Map();
+  const { rows: propio } = await query(`SELECT rut FROM proveedores WHERE id = $1`, [proveedorId]);
+  const miRut = propio[0]?.rut;
+  if (!miRut) return new Map();
+
+  const { rows: espejos } = await query(
+    `SELECT d.tipo, d.tipo_dte, d.folio, d.rut_contraparte, d.total AS mi_total, o.total AS otro_total, p.nombre_empresa
+       FROM dte_proveedor d
+       JOIN dte_proveedor o
+         ON o.proveedor_id <> d.proveedor_id
+        AND o.rut_contraparte = $2
+        AND o.tipo = CASE WHEN d.tipo = 'compra' THEN 'venta' ELSE 'compra' END
+        AND o.tipo_dte = d.tipo_dte
+        AND o.folio = d.folio
+       JOIN proveedores p ON p.id = o.proveedor_id AND p.rut = d.rut_contraparte
+      WHERE d.proveedor_id = $1`,
+    [proveedorId, miRut]
+  );
+
+  const mapa = new Map();
+  for (const e of espejos) {
+    const clave = `${e.tipo}|${e.tipo_dte}|${e.folio}|${e.rut_contraparte}`;
+    // El folio NO es global — es correlativo por RUT emisor (migración 071),
+    // así que dos empresas SIN relación entre sí pueden compartir folio +
+    // tipo_dte por coincidencia. El `p.rut = d.rut_contraparte` de arriba es
+    // lo que evita conciliar contra un tercero ajeno: exige que la empresa
+    // del documento espejo sea EXACTAMENTE la contraparte que este documento
+    // declaró, no cualquier otro proveedor con folio igual.
+    if (mapa.has(clave)) continue;
+    mapa.set(clave, {
+      conciliado: true,
+      espejo_empresa: e.nombre_empresa,
+      monto_coincide: Math.abs(Number(e.mi_total || 0) - Number(e.otro_total || 0)) <= 1,
+    });
+  }
+  return mapa;
 }
 
 // Estimación referencial de emisiones de las COMPRAS: suma el co2e que se
@@ -138,6 +194,13 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
       ORDER BY tipo, fecha NULLS LAST, folio`,
     [proveedorId, periodo]
   );
+  const conciliaciones = await conciliarConOtrosProveedores(query, proveedorId, rows);
+  for (const r of rows) {
+    const clave = `${r.tipo}|${r.tipo_dte}|${r.folio}|${r.rut_contraparte}`;
+    const c = conciliaciones.get(clave);
+    if (c) Object.assign(r, c);
+  }
+
   const compras = rows.filter((r) => r.tipo === 'compra');
   const ventas = rows.filter((r) => r.tipo === 'venta');
 
