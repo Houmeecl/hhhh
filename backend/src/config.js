@@ -87,6 +87,18 @@ export const config = {
     from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>',
   },
 
+  // Envío por SMTP propio (servidor Poste.io en el VPS). Si está configurado,
+  // el mailer lo usa ANTES que Resend: el correo sale firmado con el DKIM de
+  // sicr3p.cl y pasa SPF (la IP del VPS está autorizada), mejor entregabilidad
+  // para el dominio propio. `secure` = true en 465 (TLS implícito), false en
+  // 587 (STARTTLS). Sin SMTP_HOST/USER/PASS queda apagado y cae a Resend.
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '465', 10),
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+
   admin: {
     email: process.env.ADMIN_EMAIL || 'admin@sicrep.cl',
     password: process.env.ADMIN_PASSWORD || '',

@@ -397,6 +397,48 @@ function Brechas({ rol, flash }) {
   );
 }
 
+// Prueba del sistema de correo: manda un correo con un enlace a la dirección
+// indicada y reporta por qué transporte salió (SMTP propio / Resend / dev).
+function ProbarCorreo({ flash }) {
+  const [to, setTo] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  async function enviar() {
+    setEnviando(true);
+    setResultado(null);
+    try {
+      const r = await api.probarCorreo(to);
+      setResultado(r);
+      flash(`Correo enviado por ${r.transporte}.`);
+    } catch (e) {
+      flash(e.message, true);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 24 }}>
+      <h2 style={{ marginTop: 0, fontSize: 16 }}>Probar el sistema de correo</h2>
+      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+        Envía un correo de prueba con un enlace y muestra por qué transporte salió
+        (servidor propio SMTP o Resend). Útil para verificar que los correos llegan.
+      </p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="email" value={to} onChange={(e) => setTo(e.target.value)}
+          placeholder="destino@ejemplo.cl" style={{ minWidth: 240 }} />
+        <button className="btn btn-primary btn-sm" onClick={enviar} disabled={enviando || !to}>
+          {enviando ? <span className="spinner" /> : 'Enviar prueba'}
+        </button>
+        {resultado && (
+          <span className="badge badge-green">Enviado · transporte: {resultado.transporte}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Datos({ rol }) {
   const [toast, setToast] = useState(null);
   function flash(msg, err = false) { setToast({ msg, err }); setTimeout(() => setToast(null), 4000); }
@@ -404,6 +446,7 @@ export default function Datos({ rol }) {
   return (
     <div>
       <div className="admin-head"><h1>Protección de datos</h1></div>
+      {rol === 'admin' && <ProbarCorreo flash={flash} />}
       <Solicitudes rol={rol} flash={flash} />
       <Retencion rol={rol} flash={flash} />
       <Brechas rol={rol} flash={flash} />

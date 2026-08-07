@@ -11,6 +11,7 @@ import {
   generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
 } from '../services/contrato.js';
 import { generateContrato } from '../services/pdf.js';
+import { sendMail } from '../services/mailer.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
 import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
@@ -1484,6 +1485,33 @@ router.get('/retencion/registro', async (req, res, next) => {
       tratamientos: Object.entries(INVENTARIO).map(([tabla, e]) => ({ tabla, ...e })),
     });
   } catch (err) { next(err); }
+});
+
+// POST /api/admin/correo/prueba { to } — envía un correo de prueba con un
+// enlace, para verificar el sistema de correo (SMTP propio o Resend) y ver
+// por qué transporte salió. Devuelve el transporte usado ('smtp'|'resend'|dev).
+router.post('/correo/prueba', adminOnly, async (req, res, next) => {
+  try {
+    const to = String(req.body?.to || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return res.status(400).json({ error: 'Correo de destino inválido.' });
+    const link = `${config.publicAppUrl}/verificar`;
+    const r = await sendMail({
+      to,
+      subject: 'Prueba de correo · sicr3p',
+      html: `
+        <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+          <h2 style="color:#0f1f2e">Prueba de envío — <b>sicr3p</b></h2>
+          <p>Si ves este correo, el sistema de correo de sicr3p está funcionando.</p>
+          <p>Este es un enlace de prueba (debe ser clickeable):</p>
+          <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Abrir sicr3p</a></p>
+          <p style="color:#64748b;font-size:13px">Correo de prueba enviado desde el panel de administración.</p>
+        </div>`,
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'correo_prueba', entidad: 'sistema', detalle: { to, transporte: r?.transport || (r?.dev ? 'dev' : 'desconocido') }, ip: req.ip });
+    res.json({ ok: true, transporte: r?.transport || (r?.dev ? 'dev' : 'desconocido'), id: r?.id || null });
+  } catch (err) {
+    res.status(502).json({ error: `No se pudo enviar: ${err.message}` });
+  }
 });
 
 export default router;

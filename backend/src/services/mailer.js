@@ -1,32 +1,72 @@
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { config } from '../config.js';
 
 const resend = config.resend.apiKey ? new Resend(config.resend.apiKey) : null;
 
-// Envía un correo. Si no hay RESEND_API_KEY, lo registra en consola (modo dev).
+// Transporte SMTP propio (Poste.io) si está configurado. secure=true en 465.
+const smtpTransport = (config.smtp.host && config.smtp.user && config.smtp.pass)
+  ? nodemailer.createTransport({
+      host: config.smtp.host,
+      port: config.smtp.port,
+      secure: config.smtp.port === 465,
+      auth: { user: config.smtp.user, pass: config.smtp.pass },
+    })
+  : null;
+
+// De dónde salen los correos (MAIL_FROM). En producción con SMTP propio debe
+// ser una casilla del dominio del servidor (ej. no-responder@sicr3p.cl) para
+// que el DKIM firme y el SPF pase.
+const FROM = config.resend.from;
+
+// Qué transporte se usaría según la config: SMTP propio tiene prioridad, luego
+// Resend, y si no hay ninguno, modo dev (log). Función pura para poder testear
+// la prioridad sin tocar red ni entorno.
+export function elegirTransporte(cfg = config) {
+  if (cfg.smtp?.host && cfg.smtp?.user && cfg.smtp?.pass) return 'smtp';
+  if (cfg.resend?.apiKey) return 'resend';
+  return 'dev';
+}
+
+// Envía un correo. Prioridad: SMTP propio → Resend → modo dev (log en consola).
 // `attachments`: [{ filename, content: Buffer }] (opcional).
 export async function sendMail({ to, subject, html, attachments }) {
-  if (!resend) {
-    console.log('\n===== CORREO (modo dev, sin Resend) =====');
-    console.log('Para:', to);
-    console.log('Asunto:', subject);
-    console.log(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-    // Los enlaces viven en atributos href (se pierden al quitar las etiquetas): se listan aparte.
-    const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
-    if (links.length) console.log('Enlaces:', links.join(' '));
-    if (attachments?.length) console.log('Adjuntos:', attachments.map((a) => a.filename).join(', '));
-    console.log('=========================================\n');
-    return { dev: true };
+  // 1) SMTP propio (servidor de correo del VPS).
+  if (smtpTransport) {
+    const info = await smtpTransport.sendMail({
+      from: FROM,
+      to,
+      subject,
+      html,
+      attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
+    });
+    return { id: info.messageId, transport: 'smtp' };
   }
-  const { data, error } = await resend.emails.send({
-    from: config.resend.from,
-    to,
-    subject,
-    html,
-    attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
-  });
-  if (error) throw new Error(`Resend: ${error.message || 'error'}`);
-  return data;
+
+  // 2) Resend (transaccional externo).
+  if (resend) {
+    const { data, error } = await resend.emails.send({
+      from: FROM,
+      to,
+      subject,
+      html,
+      attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
+    });
+    if (error) throw new Error(`Resend: ${error.message || 'error'}`);
+    return { ...data, transport: 'resend' };
+  }
+
+  // 3) Modo dev: sin SMTP ni Resend, se registra en consola.
+  console.log('\n===== CORREO (modo dev, sin SMTP ni Resend) =====');
+  console.log('Para:', to);
+  console.log('Asunto:', subject);
+  console.log(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+  // Los enlaces viven en atributos href (se pierden al quitar las etiquetas): se listan aparte.
+  const links = [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+  if (links.length) console.log('Enlaces:', links.join(' '));
+  if (attachments?.length) console.log('Adjuntos:', attachments.map((a) => a.filename).join(', '));
+  console.log('=================================================\n');
+  return { dev: true };
 }
 
 export function activationEmail({ nombre, link }) {

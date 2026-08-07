@@ -311,6 +311,7 @@ export const api = {
   simpleApi: () => request('/admin/simple-api', { authed: true }),
   usuarios: () => request('/admin/usuarios', { authed: true }),
   cambiarPassword: (actual, nueva) => request('/admin/perfil/password', { method: 'PUT', body: { actual, nueva }, authed: true }),
+  probarCorreo: (to) => request('/admin/correo/prueba', { method: 'POST', body: { to }, authed: true }),
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   reenviarActivacion: (id) => request(`/admin/usuarios/${id}/reenviar-activacion`, { method: 'POST', authed: true }),

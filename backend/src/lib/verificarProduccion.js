@@ -40,8 +40,9 @@ export function verificarConfigProduccion(cfg) {
     fatales.push(`SII_CRED_KEY tiene menos de ${LARGO_MINIMO_SECRETO} caracteres — demasiado corta para cifrar credenciales`);
   }
 
-  if (!cfg.resend.apiKey) {
-    advertencias.push('RESEND_API_KEY vacía — los correos NO se envían, solo se escriben en el log');
+  const smtpOk = cfg.smtp?.host && cfg.smtp?.user && cfg.smtp?.pass;
+  if (!smtpOk && !cfg.resend.apiKey) {
+    advertencias.push('Sin SMTP propio ni RESEND_API_KEY — los correos NO se envían, solo se escriben en el log');
   }
   if (!cfg.baseapi?.enabled) {
     advertencias.push('BASEAPI_API_KEY vacía — el autocompletado SII por RUT queda deshabilitado');
