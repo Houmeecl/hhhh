@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { hashApiKey } from '../src/services/mandante.js';
 import adminRouter from '../src/routes/admin.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
@@ -25,7 +26,10 @@ let baseUrl;
 let clienteId;
 let usuarioClienteId;
 let usuarioGeneralId;
+let usuarioPuertoId;
+let puertoId;
 let tokenAdmin;
+let tokenSuperadmin;
 
 before(async () => {
   if (EN_PRODUCCION) return; // los tests de BD quedan skipped: no montar nada
@@ -38,7 +42,17 @@ before(async () => {
   );
   clienteId = clientes[0].id;
 
+  const { rows: puertos } = await query(
+    `INSERT INTO puertos (nombre, punto_id, token_hash, activo) VALUES ($1,$2,$3,true) RETURNING id`,
+    [`Puerto Cuentas ${sufijo}`, `pt-cuentas-${sufijo}`, hashApiKey(`pto_cuentas_${sufijo}`)]
+  );
+  puertoId = puertos[0].id;
+
   tokenAdmin = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
+  tokenSuperadmin = signAccess({
+    id: crypto.randomUUID(), rol: 'admin', email: `super-${sufijo}@ejemplo.cl`,
+    panel: 'sicrep', es_superadmin: true,
+  });
 
   const app = express();
   app.use(express.json());
@@ -50,8 +64,10 @@ before(async () => {
 
 after(async () => {
   if (!EN_PRODUCCION) {
+    if (usuarioPuertoId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioPuertoId]);
     if (usuarioGeneralId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioGeneralId]);
     if (usuarioClienteId) await query(`DELETE FROM usuarios WHERE id = $1`, [usuarioClienteId]);
+    if (puertoId) await query(`DELETE FROM puertos WHERE id = $1`, [puertoId]);
     if (clienteId) await query(`DELETE FROM clientes WHERE id = $1`, [clienteId]);
   }
   if (server) await new Promise((resolve) => server.close(resolve));
@@ -135,4 +151,86 @@ test('POST /admin/usuarios/:id/reenviar-activacion responde 404 para un usuario 
     headers: { Authorization: `Bearer ${tokenAdmin}` },
   });
   assert.equal(res.status, 404);
+});
+
+// ============================================================
+// Pantalla única de cuentas (Usuarios.jsx): POST /admin/usuarios ahora
+// también da de alta cuentas de los 5 paneles externos (delegando en
+// crearCuentaEntidad, compartida con routes/accesos.js), y GET/PUT
+// exponen es_superadmin/nivel_acceso (migraciones 069/070).
+// ============================================================
+
+test('GET /admin/usuarios incluye es_superadmin y nivel_acceso', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/usuarios`, {
+    headers: { Authorization: `Bearer ${tokenAdmin}` },
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  const fila = body.usuarios.find((u) => u.id === usuarioGeneralId);
+  assert.equal(fila.es_superadmin, false);
+  assert.equal(fila.nivel_acceso, 'operador');
+});
+
+test('POST /admin/usuarios con panel externo sin entidad_id responde 400', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/usuarios`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `sin-entidad-${sufijo}@ejemplo.cl`, nombre: 'Sin Entidad', panel: 'puerto' }),
+  });
+  assert.equal(res.status, 400);
+});
+
+test('POST /admin/usuarios con panel="puerto" delega en crearCuentaEntidad y respeta nivel_acceso', { skip: SALTO_PROD }, async () => {
+  const email = `puerto-${sufijo}@ejemplo.cl`;
+  const res = await fetch(`${baseUrl}/api/admin/usuarios`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, nombre: 'Operador Puerto', panel: 'puerto', entidad_id: puertoId, nivel_acceso: 'lectura' }),
+  });
+  const body = await res.json();
+  assert.equal(res.status, 201);
+  assert.equal(body.email, email);
+  assert.equal(typeof body.password, 'string');
+  usuarioPuertoId = body.usuario_id;
+
+  const { rows } = await query(`SELECT panel, puerto_id, nivel_acceso, rol FROM usuarios WHERE id = $1`, [usuarioPuertoId]);
+  assert.equal(rows[0].panel, 'puerto');
+  assert.equal(rows[0].puerto_id, puertoId);
+  assert.equal(rows[0].nivel_acceso, 'lectura');
+  assert.equal(rows[0].rol, 'operador');
+});
+
+test('PUT /admin/usuarios/:id acepta nivel_acceso pero ignora es_superadmin si el llamador no es superadmin', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioGeneralId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nivel_acceso: 'lectura', es_superadmin: true }),
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.usuario.nivel_acceso, 'lectura');
+  assert.equal(body.usuario.es_superadmin, false); // sin efecto: tokenAdmin no es superadmin
+
+  const { rows } = await query(`SELECT es_superadmin FROM usuarios WHERE id = $1`, [usuarioGeneralId]);
+  assert.equal(rows[0].es_superadmin, false);
+});
+
+test('PUT /admin/usuarios/:id honra es_superadmin cuando el llamador SÍ es superadmin', { skip: SALTO_PROD }, async () => {
+  // El CHECK usuarios_superadmin_requiere_sicrep_admin exige panel='sicrep'
+  // Y rol='admin' — usuarioGeneralId nació con rol='operador' (test de
+  // arriba), así que este PUT sube ambos campos en la MISMA sentencia:
+  // Postgres evalúa el CHECK sobre el estado final de la fila, no sobre
+  // pasos intermedios.
+  const res = await fetch(`${baseUrl}/api/admin/usuarios/${usuarioGeneralId}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rol: 'admin', es_superadmin: true }),
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.usuario.es_superadmin, true);
+
+  // Revertir a como estaba (rol operador, sin superadmin) para no dejar
+  // una fixture de superadmin de sobra en la BD de test.
+  await query(`UPDATE usuarios SET es_superadmin = false, rol = 'operador' WHERE id = $1`, [usuarioGeneralId]);
 });

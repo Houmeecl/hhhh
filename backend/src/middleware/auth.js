@@ -6,7 +6,8 @@ export function signAccess(user) {
   return jwt.sign(
     { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null,
       panel: user.panel || 'sicrep', puerto_id: user.puerto_id || null, mandante_id: user.mandante_id || null,
-      agencia_id: user.agencia_id || null, trazador_id: user.trazador_id || null, proveedor_id: user.proveedor_id || null },
+      agencia_id: user.agencia_id || null, trazador_id: user.trazador_id || null, proveedor_id: user.proveedor_id || null,
+      es_superadmin: user.es_superadmin === true, nivel_acceso: user.nivel_acceso || 'operador' },
     config.jwt.accessSecret,
     { expiresIn: config.jwt.accessTtl }
   );
@@ -51,6 +52,27 @@ export function requireHomePanel(panel) {
     }
     next();
   };
+}
+
+// Exige que la cuenta esté marcada como superadmin (migración 069) — un
+// nivel por encima de requireRole('admin'), independiente de él: un admin
+// de sicrep sin esta marca NO puede canjear un token de vista de otro
+// panel (ver POST /api/admin/entrar-a-panel).
+export function requireSuperadmin(req, res, next) {
+  if (!req.user || req.user.es_superadmin !== true) {
+    return res.status(403).json({ error: 'Solo un superadmin puede hacer esto' });
+  }
+  next();
+}
+
+// Exige nivel_acceso='operador' — usado en las 2 mutaciones que hoy
+// existen en los paneles externos (ver migración 070). 'lectura' nunca
+// puede mutar.
+export function requireNivelOperador(req, res, next) {
+  if (req.user?.nivel_acceso === 'lectura') {
+    return res.status(403).json({ error: 'Tu cuenta es de solo lectura.' });
+  }
+  next();
 }
 
 // Registra una acción en actividad_log.

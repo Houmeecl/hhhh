@@ -1,7 +1,20 @@
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
 import { sendMail, activationEmail } from './mailer.js';
+import { logActividad } from '../middleware/auth.js';
+
+// Qué columna FK de `usuarios` corresponde a cada panel externo, y en qué
+// tabla vive la entidad — usado tanto por accesos.js (una ruta por
+// entidad) como por admin.js POST /usuarios (una ruta unificada).
+export const ENTIDAD_POR_PANEL = {
+  puerto: { columnaFk: 'puerto_id', tabla: 'puertos' },
+  mandante: { columnaFk: 'mandante_id', tabla: 'mandantes' },
+  agencia: { columnaFk: 'agencia_id', tabla: 'agencias_aduana' },
+  trazador: { columnaFk: 'trazador_id', tabla: 'trazadores' },
+  proveedor: { columnaFk: 'proveedor_id', tabla: 'proveedores' },
+};
 
 // ============================================================
 // Activación de cuenta compartida por los 7 paneles (sicrep, terreno,
@@ -69,4 +82,43 @@ export function generarPasswordTemporal(largo = 12) {
   let out = '';
   for (let i = 0; i < largo; i++) out += ALFABETO_PASSWORD[bytes[i] % ALFABETO_PASSWORD.length];
   return out;
+}
+
+// Crea el login web de un actor externo (puerto, mandante, agencia,
+// trazador o proveedor): una fila de `usuarios` atada a SU entidad vía
+// puerto_id/mandante_id/agencia_id/trazador_id/proveedor_id (migraciones
+// 042/046/058/062). Compartida por routes/accesos.js (una ruta por
+// entidad) y routes/admin.js POST /usuarios (alta unificada).
+//
+// El correo no se envía: el admin genera aquí una contraseña temporal que
+// se muestra UNA sola vez en el response — la cuenta queda activa de
+// inmediato con must_reset_password=true. Un solo login por entidad
+// (UNIQUE parcial en la migración de cada panel).
+export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId, nivelAcceso = 'operador' }) {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  const nombre = String(req.body.nombre || '').trim();
+  if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios.' });
+
+  const password = generarPasswordTemporal();
+  const hash = await bcrypt.hash(password, config.bcryptRounds);
+  let rows;
+  try {
+    ({ rows } = await query(
+      `INSERT INTO usuarios (email, nombre, rol, panel, ${columnaFk}, nivel_acceso, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,'operador',$3,$4,$5,'activo',$6,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id`,
+      [email, nombre, panel, entidadId, nivelAcceso, hash]
+    ));
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'Esta entidad ya tiene un acceso web creado.' });
+    throw e;
+  }
+  if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo.' });
+
+  // La contraseña NUNCA se guarda en el log de actividad, solo su hash en `usuarios`.
+  await logActividad({
+    usuarioId: req.user.sub, accion: `crear_cuenta_${panel}`, entidad: 'usuario',
+    entidadId: rows[0].id, detalle: { email }, ip: req.ip,
+  });
+  res.status(201).json({ ok: true, usuario_id: rows[0].id, email, password });
 }

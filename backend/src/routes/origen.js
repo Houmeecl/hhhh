@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad, signAccess } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireNivelOperador, logActividad, signAccess } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
@@ -1362,7 +1362,7 @@ proveedorPanelRouter.get('/lotes', async (req, res, next) => {
 // POST /api/panel-proveedor/lotes/:asignacionId/firmar — la identidad
 // SIEMPRE sale de la fila `proveedores` (rut/nombre_empresa), nunca del
 // body: el firmante no puede declarar quién es, igual que el camino viejo.
-proveedorPanelRouter.post('/lotes/:asignacionId/firmar', async (req, res, next) => {
+proveedorPanelRouter.post('/lotes/:asignacionId/firmar', requireNivelOperador, async (req, res, next) => {
   try {
     const b = req.body || {};
     const resultado = await withTx(async (client) => {

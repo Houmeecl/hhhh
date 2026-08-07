@@ -15,6 +15,17 @@ import { calcularPuntaje, generarSerialConstancia, hashConstancia } from '../ser
 
 const router = express.Router();
 router.use(requireAuth, requireRole('admin', 'operador'));
+// Sesión de vista de superadmin (POST /api/admin/entrar-a-panel): su `sub`
+// sintético no corresponde a ninguna fila real de `usuarios` y su
+// `rol:'operador'` pasaría el requireRole de arriba sin querer, ya que
+// este router es la única excepción documentada que NO usa
+// requireHomePanel (ver comentario superior) — sin este guard, un token
+// de vista de CUALQUIER panel externo colaría en el módulo de
+// capacitación, que asume que `req.user.sub` siempre es un usuario real.
+router.use((req, res, next) => {
+  if (req.user.imp) return res.status(403).json({ error: 'No disponible en una sesión de vista de superadmin.' });
+  next();
+});
 
 async function cursoActivoPorSlug(slug) {
   const { rows } = await query(`SELECT * FROM cursos WHERE slug = $1 AND activo = true`, [slug]);

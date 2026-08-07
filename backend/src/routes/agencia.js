@@ -46,6 +46,7 @@ async function requireAgencia(req, res, next) {
       if (!a || !a.activo) return res.status(401).json({ error: 'Agencia inactiva.' });
       req.agencia = a;
       req.usuarioId = payload.sub;
+      req.nivelAcceso = payload.nivel_acceso || 'operador';
       return next();
     }
     const key = req.headers['x-api-key'];
@@ -56,10 +57,21 @@ async function requireAgencia(req, res, next) {
     await query(`UPDATE agencias_aduana SET ultimo_uso = now() WHERE id = $1`, [a.id]);
     req.agencia = a;
     req.usuarioId = null;
+    req.nivelAcceso = 'operador'; // integración por API key: siempre acceso completo
     next();
   } catch (err) { next(err); }
 }
 router.use(requireAgencia);
+
+// Exige nivel_acceso='operador' — mismo criterio que requireNivelOperador
+// (middleware/auth.js), aplicado sobre req.nivelAcceso porque este router
+// no usa requireAuth (jwt.verify manual, ver requireAgencia arriba).
+function requireNivelOperadorAgencia(req, res, next) {
+  if (req.nivelAcceso === 'lectura') {
+    return res.status(403).json({ error: 'Tu cuenta es de solo lectura.' });
+  }
+  next();
+}
 
 // ---------- GET /api/agencia/expedientes — lotes documentales de MI agencia ----------
 router.get('/expedientes', async (req, res, next) => {
@@ -153,7 +165,7 @@ router.get('/expedientes/:codigo/expediente.pdf', async (req, res, next) => {
 // carta de porte, MIC/DTA, etc. del expediente que le corresponde. Reusa
 // EXACTAMENTE la misma lógica de lectura/hash que el admin (routes/origen.js)
 // — nunca una copia paralela.
-router.post('/expedientes/:codigo/documentos', uploadDocumentoLote.single('archivo'), async (req, res, next) => {
+router.post('/expedientes/:codigo/documentos', requireNivelOperadorAgencia, uploadDocumentoLote.single('archivo'), async (req, res, next) => {
   try {
     const lote = await miExpediente(req);
     if (!lote) return res.status(404).json({ error: 'Expediente no encontrado.' });

@@ -88,8 +88,35 @@ router.post('/refresh', async (req, res) => {
 
 // ---------- GET /api/auth/me ----------
 router.get('/me', requireAuth, async (req, res) => {
+  // Sesión de superadmin "entrando a otro panel" (ver POST
+  // /api/admin/entrar-a-panel): el token es sintético, su `sub` NO es un
+  // UUID de `usuarios` (es `imp:<superadminId>:<panel>`), así que esta
+  // ruta responde directo desde el payload del JWT sin tocar la BD. Sin
+  // esta rama, las apps de cada panel (que comparan el `panel` de /me
+  // contra el suyo) verían el panel REAL del superadmin (sicrep) y
+  // cerrarían la sesión de inmediato.
+  if (req.user.imp) {
+    return res.json({
+      user: {
+        id: req.user.sub,
+        email: req.user.email,
+        nombre: `Superadmin (vista de ${req.user.panel})`,
+        rol: req.user.rol,
+        panel: req.user.panel,
+        cliente_id: null,
+        puerto_id: req.user.puerto_id,
+        mandante_id: req.user.mandante_id,
+        agencia_id: req.user.agencia_id,
+        trazador_id: req.user.trazador_id,
+        proveedor_id: req.user.proveedor_id,
+        must_reset_password: false,
+      },
+    });
+  }
   const { rows } = await query(
-    `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, agencia_id, proveedor_id, must_reset_password FROM usuarios WHERE id = $1`,
+    `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, agencia_id, trazador_id, proveedor_id,
+            must_reset_password, es_superadmin
+     FROM usuarios WHERE id = $1`,
     [req.user.sub]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -104,6 +131,11 @@ router.get('/me', requireAuth, async (req, res) => {
 // routes/accesos.js para el panel trazador, que nunca recibe correo.
 router.put('/password', requireAuth, async (req, res, next) => {
   try {
+    // Sesión de superadmin viendo otro panel (`sub` sintético, no un UUID
+    // de `usuarios`): no hay contraseña que cambiar acá.
+    if (req.user.imp) {
+      return res.status(403).json({ error: 'No se puede cambiar la contraseña desde una sesión de superadmin.' });
+    }
     const { actual, nueva } = req.body;
     if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son obligatorias.' });
     if (String(nueva).length < 10) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 10 caracteres.' });

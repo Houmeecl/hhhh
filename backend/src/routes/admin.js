@@ -3,9 +3,9 @@ import bcrypt from 'bcryptjs';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generarPasswordTemporal } from '../services/cuentas.js';
+import { generarPasswordTemporal, crearCuentaEntidad, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
 import {
   PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
   generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
@@ -26,6 +26,7 @@ import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiterAdmin } from '../middleware/rateLimit.js';
 import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
@@ -877,7 +878,7 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
-              u.created_at, c.nombre_empresa AS cliente,
+              u.created_at, c.nombre_empresa AS cliente, u.es_superadmin, u.nivel_acceso,
               (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb,
               (SELECT count(*) FROM credenciales_archivo ca WHERE ca.usuario_id = u.id AND ca.activo) AS num_llaves_archivo
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
@@ -887,28 +888,38 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Alta general de usuario interno para cualquier panel. El correo no se
-// envía: se genera aquí una contraseña temporal que se muestra UNA sola vez
-// en este response; la cuenta queda activa de inmediato con
-// must_reset_password=true (mismo criterio que crearCuentaEntidad de
-// routes/accesos.js). Para 'puerto'/'mandante'/'agencia'/'trazador' este
-// endpoint no resuelve la entidad (puerto_id/mandante_id/agencia_id/
-// trazador_id): esos paneles se dan de alta por routes/accesos.js, que ya
-// trae la entidad resuelta — si igual se intenta aquí sin ese id, el CHECK
-// usuarios_panel_entidad_check de la migración correspondiente rechaza el
-// INSERT tal cual lo hacía antes.
+// Alta general de usuario para cualquier panel — pantalla única en
+// Usuarios.jsx. Para los 5 paneles externos (puerto/mandante/agencia/
+// trazador/proveedor) delega en crearCuentaEntidad (services/cuentas.js,
+// compartida con las rutas específicas de routes/accesos.js): exige
+// entidad_id y resuelve la FK correspondiente. Para sicrep/aduana_verde
+// sigue el alta directa de siempre. El correo no se envía: se genera aquí
+// una contraseña temporal que se muestra UNA sola vez en este response;
+// la cuenta queda activa de inmediato con must_reset_password=true.
 router.post('/usuarios', adminOnly, async (req, res, next) => {
   try {
-    const { email, nombre, rol, cliente_id, panel } = req.body;
+    const { email, nombre, rol, cliente_id, panel, entidad_id, nivel_acceso } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
+
+    const entidadCfg = ENTIDAD_CUENTA_POR_PANEL[panel];
+    if (entidadCfg) {
+      if (!entidad_id) return res.status(400).json({ error: 'Falta entidad_id' });
+      const { rows: entidadRows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidad_id]);
+      if (!entidadRows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
+      return crearCuentaEntidad({
+        req, res, panel, columnaFk: entidadCfg.columnaFk, entidadId: entidad_id,
+        nivelAcceso: nivel_acceso === 'lectura' ? 'lectura' : 'operador',
+      });
+    }
+
     const emailNorm = String(email).toLowerCase();
     const password = generarPasswordTemporal();
     const hash = await bcrypt.hash(password, config.bcryptRounds);
     const { rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, estado, password_hash, must_reset_password)
-       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),'activo',$6,true)
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, nivel_acceso, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),$6,'activo',$7,true)
        ON CONFLICT (email) DO NOTHING RETURNING id, email, nombre, rol`,
-      [emailNorm, nombre, rol, cliente_id || null, panel, hash]
+      [emailNorm, nombre, rol, cliente_id || null, panel, nivel_acceso === 'lectura' ? 'lectura' : 'operador', hash]
     );
     if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
 
@@ -939,12 +950,21 @@ router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, nex
 
 router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
   try {
-    const { rol, estado, nombre, panel } = req.body;
+    const { rol, estado, nombre, panel, nivel_acceso } = req.body;
+    // es_superadmin: solo un superadmin puede otorgar/quitar la marca a
+    // otra cuenta — nunca auto-promoción vía un admin normal de sicrep.
+    // El CHECK usuarios_superadmin_requiere_sicrep_admin (migración 069)
+    // igual rechaza intentarlo fuera de panel=sicrep/rol=admin.
+    const esSuperadmin = req.user.es_superadmin === true && typeof req.body.es_superadmin === 'boolean'
+      ? req.body.es_superadmin
+      : null;
+    const nivelAcceso = nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : null;
     const { rows } = await query(
       `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
-              panel = COALESCE($5,panel)
-       WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado`,
-      [req.params.id, rol, estado, nombre, panel]
+              panel = COALESCE($5,panel), es_superadmin = COALESCE($6,es_superadmin),
+              nivel_acceso = COALESCE($7,nivel_acceso)
+       WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso`,
+      [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     await logActividad({ usuarioId: req.user.sub, accion: 'editar_usuario', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
@@ -1142,6 +1162,55 @@ router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, async (re
     if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada o ya revocada' });
     await logActividad({ usuarioId: req.user.sub, accion: 'revocar_llave_archivo', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Entrar a otro panel (superadmin) — ver migración 069 ----------
+// Canjea la sesión de un superadmin por un token de VISTA de otro panel,
+// sin crear ninguna fila nueva en `usuarios` ni aflojar requireHomePanel
+// ni los checks manuales de puerto/mandante/agencia/trazador: el token
+// que se emite ya los cumple tal cual están hoy. `sub` es una cadena
+// sintética (no un UUID de `usuarios`, mismo patrón que el `cliente:`+
+// email del magic link) para que cualquier código que la use para volver
+// a golpear la tabla `usuarios` falle explícito en vez de devolver datos
+// ajenos por error. TTL corto y SIN refresh a propósito: es una vista
+// rápida, no un turno de trabajo — si expira, se vuelve a canjear.
+// aduana_verde no tiene FK propia (sin entrada en ENTIDAD_CUENTA_POR_PANEL,
+// import de services/cuentas.js — el mismo mapa que usa crearCuentaEntidad).
+const PANELES_ENTRAR_A_PANEL = ['aduana_verde', ...Object.keys(ENTIDAD_CUENTA_POR_PANEL)];
+
+router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
+  try {
+    const panel = String(req.body?.panel || '');
+    if (!PANELES_ENTRAR_A_PANEL.includes(panel)) return res.status(400).json({ error: 'Panel inválido' });
+    const entidadCfg = ENTIDAD_CUENTA_POR_PANEL[panel];
+
+    const fks = { puerto_id: null, mandante_id: null, agencia_id: null, trazador_id: null, proveedor_id: null };
+    if (entidadCfg) {
+      const entidadId = req.body?.entidad_id;
+      if (!entidadId) return res.status(400).json({ error: 'Falta entidad_id' });
+      const { rows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidadId]);
+      if (!rows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
+      fks[entidadCfg.columnaFk] = entidadId;
+    }
+
+    const accessToken = jwt.sign(
+      {
+        sub: `imp:${req.user.sub}:${panel}`,
+        imp: true,
+        imp_by: req.user.sub,
+        rol: 'operador', // nunca 'admin': los paneles externos no tienen ese concepto
+        email: req.user.email,
+        panel,
+        nivel_acceso: 'operador',
+        ...fks,
+      },
+      config.jwt.accessSecret,
+      { expiresIn: '5m' }
+    );
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'entrar_a_panel', entidad: 'usuario', entidadId: req.user.sub, detalle: { panel, entidad_id: req.body?.entidad_id || null }, ip: req.ip });
+    res.json({ accessToken });
   } catch (err) { next(err); }
 });
 

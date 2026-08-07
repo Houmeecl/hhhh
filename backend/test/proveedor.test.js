@@ -229,6 +229,19 @@ test('un proveedor no puede firmar la asignación de otro proveedor (404: no se 
   assert.equal(res.status, 404);
 });
 
+test('una cuenta con nivel_acceso="lectura" recibe 403 antes de llegar a la lógica de negocio (migración 070)', { skip: SALTO_PROD }, async () => {
+  const tokenSoloLectura = signAccess({
+    id: crypto.randomUUID(), rol: 'operador', email: `prov-b-lectura-${sufijo}@ejemplo.cl`,
+    panel: 'proveedor', proveedor_id: proveedorB.id, nivel_acceso: 'lectura',
+  });
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionBId}/firmar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenSoloLectura}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(res.status, 403);
+});
+
 test('POST /api/panel-proveedor/lotes/:id/firmar crea el eslabón con la identidad de `proveedores`, NUNCA la del body', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionId}/firmar`, {
     method: 'POST',
