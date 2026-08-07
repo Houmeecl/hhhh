@@ -24,6 +24,7 @@ import Capacitacion from './Capacitacion.jsx';
 import Apl from './Apl.jsx';
 import Auspiciadores from './Auspiciadores.jsx';
 import Datos from './Datos.jsx';
+import Sii from './Sii.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
@@ -33,6 +34,7 @@ const NAV = [
   { to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
   { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
   { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
+  { to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
   { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
   { to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
   { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
@@ -278,6 +280,7 @@ export default function AdminApp() {
           <Route path="apl" element={<Apl />} />
           <Route path="auspiciadores" element={<Auspiciadores rol={user?.rol} />} />
           <Route path="datos" element={<Datos rol={user?.rol} />} />
+          <Route path="sii" element={<Sii />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>

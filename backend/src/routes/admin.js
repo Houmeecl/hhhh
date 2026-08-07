@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generarPasswordTemporal, crearCuentaEntidad, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../services/contrato.js';
 import { generateContrato } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
+import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
 import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
@@ -1484,6 +1485,112 @@ router.get('/retencion/registro', async (req, res, next) => {
       responsable: 'sicr3p',
       tratamientos: Object.entries(INVENTARIO).map(([tabla, e]) => ({ tabla, ...e })),
     });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// SII central (sección admin "SII"): empresas (proveedores) + Generar.
+// El admin elige una empresa, ingresa las credenciales SII EN EL MOMENTO
+// (por-request: acá NUNCA se guardan — guardar la clave es decisión que
+// solo toma el propio proveedor desde su panel) y genera: descarga los DTE
+// del período, calcula emisiones por documento y devuelve el análisis.
+// ============================================================
+
+// GET /api/admin/sii/empresas — proveedores con su estado SII: si tienen
+// credenciales guardadas (solo el hecho, jamás la clave) y qué períodos ya
+// descargaron.
+router.get('/sii/empresas', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.nombre_empresa, p.rut, p.activo,
+              (c.proveedor_id IS NOT NULL) AS tiene_credenciales,
+              COALESCE(d.n_periodos, 0)::int AS n_periodos,
+              d.ultimo_periodo
+       FROM proveedores p
+       LEFT JOIN credenciales_sii_proveedor c ON c.proveedor_id = p.id
+       LEFT JOIN (
+         SELECT proveedor_id, COUNT(DISTINCT periodo) AS n_periodos, MAX(periodo) AS ultimo_periodo
+         FROM dte_proveedor GROUP BY proveedor_id
+       ) d ON d.proveedor_id = p.id
+       ORDER BY p.created_at DESC`
+    );
+    res.json({ empresas: rows });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/sii/empresas — alta rápida de una empresa (proveedor)
+// desde la misma pantalla, para agregar y generar sin pasar por Accesos.
+router.post('/sii/empresas', adminOnly, async (req, res, next) => {
+  try {
+    const nombre = String(req.body?.nombre_empresa || '').trim();
+    const rut = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+    if (!nombre || rut.length < 7) return res.status(400).json({ error: 'Nombre y RUT válido son obligatorios.' });
+    const { rows } = await query(
+      `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2)
+       ON CONFLICT (rut) DO UPDATE SET nombre_empresa = EXCLUDED.nombre_empresa
+       RETURNING id, nombre_empresa, rut, activo`,
+      [nombre, rut]
+    );
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'sii_crear_empresa', entidad: 'proveedor',
+      entidadId: rows[0].id, detalle: { rut }, ip: req.ip,
+    });
+    res.status(201).json({ empresa: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/sii/:proveedorId/descargar — { rut, password, periodo }.
+// rut/password = credenciales SII que el admin ingresa (por-request, NO se
+// guardan). El RUT de la empresa consultada SALE de la fila `proveedores`,
+// nunca del body.
+router.post('/sii/:proveedorId/descargar', requireNivelOperador, async (req, res, next) => {
+  const b = req.body || {};
+  try {
+    const { rows } = await query(`SELECT id, rut, activo FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const proveedor = rows[0];
+    if (!proveedor) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    if (!proveedor.activo) return res.status(409).json({ error: 'Empresa inactiva.' });
+    if (!b.password) return res.status(400).json({ error: 'Falta la clave tributaria.' });
+
+    let resultado;
+    try {
+      resultado = await descargarYCalcular({
+        query, withTx,
+        proveedorId: proveedor.id,
+        rutEmpresa: proveedor.rut, // de la fila proveedores, nunca del body
+        rutSii: b.rut,
+        password: b.password,
+        periodo: b.periodo,
+      });
+    } catch (e) {
+      const status = e.credenciales || /inválid|Período|clave|RUT/i.test(e.message) ? 400 : 502;
+      return res.status(status).json({ error: e.message });
+    }
+
+    // Período y nº de documentos: NUNCA la clave.
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'admin_descarga_sii', entidad: 'dte_proveedor',
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: resultado.documentos }, ip: req.ip,
+    });
+    res.json({ periodo: b.periodo, documentos: resultado.documentos, analisis: resultado.analisis });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/analisis/:periodo — análisis de lo ya
+// descargado (sin costo, sin clave) + períodos disponibles.
+router.get('/sii/:proveedorId/analisis/:periodo', async (req, res, next) => {
+  try {
+    res.json({
+      analisis: await analizarPeriodo(query, req.params.proveedorId, req.params.periodo),
+      periodos: await periodosDescargados(query, req.params.proveedorId),
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/periodos — solo el selector de períodos.
+router.get('/sii/:proveedorId/periodos', async (req, res, next) => {
+  try {
+    res.json({ periodos: await periodosDescargados(query, req.params.proveedorId) });
   } catch (err) { next(err); }
 });
 

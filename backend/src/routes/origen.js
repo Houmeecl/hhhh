@@ -9,10 +9,8 @@ import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadena
 import { generarClave, generarSerial } from '../services/posTerminal.js';
 import { generateCredencialTarjeta, generateCredencialProveedor } from '../services/pdf.js';
 import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
-import { descargarComprasVentas } from '../services/baseapiSii.js';
-import { analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
+import { analizarPeriodo, periodosDescargados, descargarYCalcular } from '../services/analisisSiiProveedor.js';
 import { cifrar, descifrar, cifradoDisponible } from '../services/cripto.js';
-import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { normalizarRut as normalizarRutLocal } from '../services/mandante.js';
 import {
   ROLES,
@@ -1534,12 +1532,14 @@ proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, re
       guardarAhora = false; // ya estaba guardada
     }
 
-    let descarga;
+    let resultado;
     try {
-      descarga = await descargarComprasVentas({
-        rut: rutSii,
-        password,
+      resultado = await descargarYCalcular({
+        query, withTx,
+        proveedorId: proveedor.id,
         rutEmpresa: proveedor.rut, // identidad de PROVEEDORES, nunca del body
+        rutSii,
+        password,
         periodo: b.periodo,
       });
     } catch (e) {
@@ -1547,71 +1547,23 @@ proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, re
       return res.status(status).json({ error: e.message });
     }
 
-    // Cálculo de emisiones POR DOCUMENTO de compra: se extrae el detalle de
-    // ítems (del XML) y se corre el motor propio. Referencial; si el motor no
-    // está configurado, co2e queda null y el resto del análisis igual sirve.
-    let categorias = null;
-    try { categorias = await cargarCategorias(query); } catch { categorias = null; }
-    const co2ePorCompra = descarga.compra.map((f) => {
-      if (!categorias) return { co2e: null, metodo: null };
-      try {
-        const calc = calcularFactura(f.items, categorias, { origen: f.origen_calculo });
-        const metodo = calc.items.some((it) => it.metodo === 'fisico') ? 'fisico' : 'gasto';
-        return { co2e: calc.total_co2e, metodo };
-      } catch { return { co2e: null, metodo: null }; }
-    });
-
-    // UPSERT idempotente: re-descargar un período no duplica.
-    let guardados = 0;
-    await withTx(async (client) => {
-      for (let i = 0; i < descarga.compra.length; i++) {
-        const f = descarga.compra[i];
-        const { co2e, metodo } = co2ePorCompra[i];
-        await client.query(
-          `INSERT INTO dte_proveedor
-             (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo)
-           VALUES ($1,$2,'compra',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-           ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
-           DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
-                         total = EXCLUDED.total, fecha = EXCLUDED.fecha, co2e = EXCLUDED.co2e,
-                         metodo = EXCLUDED.metodo, descargado_at = now()`,
-          [proveedor.id, b.periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
-           f.neto, f.iva, f.total, f.fecha, co2e, metodo]
-        );
-        guardados += 1;
-      }
-      for (const f of descarga.venta) {
-        await client.query(
-          `INSERT INTO dte_proveedor
-             (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha)
-           VALUES ($1,$2,'venta',$3,$4,$5,$6,$7,$8,$9,$10)
-           ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
-           DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
-                         total = EXCLUDED.total, fecha = EXCLUDED.fecha, descargado_at = now()`,
-          [proveedor.id, b.periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
-           f.neto, f.iva, f.total, f.fecha]
-        );
-        guardados += 1;
-      }
-
-      // Guardar la clave (cifrada) si vino en el body y el proveedor no pidió lo contrario.
-      if (guardarAhora && cifradoDisponible()) {
-        await client.query(
-          `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
-           VALUES ($1,$2,$3, now())
-           ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
-          [proveedor.id, normalizarRutLocal(rutSii), cifrar(password)]
-        );
-      }
-    });
+    // Guardar la clave (cifrada) si vino en el body y el proveedor no pidió lo contrario.
+    if (guardarAhora && cifradoDisponible()) {
+      await query(
+        `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
+         VALUES ($1,$2,$3, now())
+         ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
+        [proveedor.id, normalizarRutLocal(rutSii), cifrar(password)]
+      );
+    }
 
     // El detalle (accion + período), NUNCA la clave.
     await logActividad({
       usuarioId: req.user.sub, accion: 'proveedor_descarga_sii', entidad: 'dte_proveedor',
-      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: guardados, credenciales_guardadas: guardarAhora }, ip: req.ip,
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: resultado.documentos, credenciales_guardadas: guardarAhora }, ip: req.ip,
     });
 
-    res.json({ periodo: b.periodo, documentos: guardados, analisis: await analizarPeriodo(query, proveedor.id, b.periodo) });
+    res.json({ periodo: b.periodo, documentos: resultado.documentos, analisis: resultado.analisis });
   } catch (err) { next(err); }
 });
 

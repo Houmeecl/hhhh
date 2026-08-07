@@ -13,6 +13,8 @@
 //     definitiva ni una "certificación".
 // ============================================================
 import { versionVigente } from './motorVersiones.js';
+import { descargarComprasVentas } from './baseapiSii.js';
+import { cargarCategorias, calcularFactura } from './motorPropio.js';
 
 const TOP_CONTRAPARTES = 10;
 
@@ -120,6 +122,66 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
     emisiones: await estimacionEmisiones(query, compras),
     documentos: rows,
   };
+}
+
+// Descarga compras/ventas del SII para un proveedor, calcula el CO2e por
+// documento de compra (motor propio) y hace el UPSERT idempotente en
+// dte_proveedor. Devuelve { documentos, analisis }. NO guarda la clave: eso
+// es decisión del llamador (el panel proveedor sí la guarda; el admin no).
+// Lo usan el panel del proveedor y la sección admin "SII", para no duplicar.
+//   rutSii/password: credenciales que autentican en el SII (por-request).
+//   rutEmpresa: RUT de la empresa a consultar (sale de la fila proveedores).
+export async function descargarYCalcular({ query, withTx, proveedorId, rutEmpresa, rutSii, password, periodo }, opts = {}) {
+  // `opts` ({ fetcher, cfg }) llega a baseapiSii: inyectable para tests sin red.
+  const descarga = await descargarComprasVentas({ rut: rutSii, password, rutEmpresa, periodo }, opts);
+
+  // CO2e por documento de compra: detalle de ítems (XML) → motor propio.
+  // Si el motor no está configurado, co2e queda null y el análisis igual sirve.
+  let categorias = null;
+  try { categorias = await cargarCategorias(query); } catch { categorias = null; }
+  const co2ePorCompra = descarga.compra.map((f) => {
+    if (!categorias) return { co2e: null, metodo: null };
+    try {
+      const calc = calcularFactura(f.items, categorias, { origen: f.origen_calculo });
+      const metodo = calc.items.some((it) => it.metodo === 'fisico') ? 'fisico' : 'gasto';
+      return { co2e: calc.total_co2e, metodo };
+    } catch { return { co2e: null, metodo: null }; }
+  });
+
+  let guardados = 0;
+  await withTx(async (client) => {
+    for (let i = 0; i < descarga.compra.length; i++) {
+      const f = descarga.compra[i];
+      const { co2e, metodo } = co2ePorCompra[i];
+      await client.query(
+        `INSERT INTO dte_proveedor
+           (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo)
+         VALUES ($1,$2,'compra',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
+         DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
+                       total = EXCLUDED.total, fecha = EXCLUDED.fecha, co2e = EXCLUDED.co2e,
+                       metodo = EXCLUDED.metodo, descargado_at = now()`,
+        [proveedorId, periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
+         f.neto, f.iva, f.total, f.fecha, co2e, metodo]
+      );
+      guardados += 1;
+    }
+    for (const f of descarga.venta) {
+      await client.query(
+        `INSERT INTO dte_proveedor
+           (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha)
+         VALUES ($1,$2,'venta',$3,$4,$5,$6,$7,$8,$9,$10)
+         ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
+         DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
+                       total = EXCLUDED.total, fecha = EXCLUDED.fecha, descargado_at = now()`,
+        [proveedorId, periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
+         f.neto, f.iva, f.total, f.fecha]
+      );
+      guardados += 1;
+    }
+  });
+
+  return { documentos: guardados, analisis: await analizarPeriodo(query, proveedorId, periodo) };
 }
 
 // Lista de períodos ya descargados por un proveedor (para el selector).

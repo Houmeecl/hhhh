@@ -312,6 +312,13 @@ export const api = {
   usuarios: () => request('/admin/usuarios', { authed: true }),
   cambiarPassword: (actual, nueva) => request('/admin/perfil/password', { method: 'PUT', body: { actual, nueva }, authed: true }),
   probarCorreo: (to) => request('/admin/correo/prueba', { method: 'POST', body: { to }, authed: true }),
+  // Sección admin "SII": empresas + generar (la clave viaja solo en el body
+  // de la descarga; el backend no la guarda desde este camino).
+  adminSiiEmpresas: () => request('/admin/sii/empresas', { authed: true }),
+  adminSiiCrearEmpresa: (b) => request('/admin/sii/empresas', { method: 'POST', body: b, authed: true }),
+  adminSiiDescargar: (proveedorId, b) => request(`/admin/sii/${proveedorId}/descargar`, { method: 'POST', body: b, authed: true }),
+  adminSiiAnalisis: (proveedorId, periodo) => request(`/admin/sii/${proveedorId}/analisis/${periodo}`, { authed: true }),
+  adminSiiPeriodos: (proveedorId) => request(`/admin/sii/${proveedorId}/periodos`, { authed: true }),
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   reenviarActivacion: (id) => request(`/admin/usuarios/${id}/reenviar-activacion`, { method: 'POST', authed: true }),
