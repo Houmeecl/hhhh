@@ -125,10 +125,18 @@ async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cf
   }
 
   if (!res.ok) {
+    // 401/403 = credenciales SII inválidas en RCV/DTE. OJO: /sii/auth/validar
+    // responde 400 para "credenciales inválidas" (así lo documenta BaseAPI);
+    // ese caso lo interpreta validarCredencialesSii() con e.status.
     if (res.status === 401 || res.status === 403) {
-      throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true });
+      throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true, status: res.status });
     }
-    throw new Error(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`);
+    if (res.status === 400) {
+      // En RCV/DTE un 400 es período/empresa inválidos. Mensaje accionable,
+      // sin cuerpo crudo de la respuesta remota.
+      throw Object.assign(new Error('El SII rechazó la consulta: revisa el período (AAAA-MM) y que el RUT de la empresa exista en el SII.'), { status: 400 });
+    }
+    throw Object.assign(new Error(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`), { status: res.status });
   }
   const json = await res.json().catch(() => null);
   if (!json || json.success === false) throw new Error('El SII no entregó una respuesta válida.');
@@ -143,7 +151,9 @@ export async function validarCredencialesSii({ rut, password }, opts = {}) {
     await llamar('/sii/auth/validar', { rut, password }, opts);
     return true;
   } catch (e) {
-    if (e.credenciales) return false;
+    // En ESTE endpoint, BaseAPI documenta 400 = "Credenciales inválidas"
+    // (además de los 401/403 genéricos): todos significan clave mala.
+    if (e.credenciales || e.status === 400) return false;
     throw e;
   }
 }

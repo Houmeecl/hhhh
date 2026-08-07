@@ -97,6 +97,20 @@ test('credenciales malas (401/403) se marcan como error de credenciales', async 
   );
 });
 
+test('validar: BaseAPI responde 400 para credenciales inválidas → false (no explota)', async () => {
+  // /sii/auth/validar documenta 400 = "Credenciales inválidas" (no 401).
+  const fetcher = fakeFetch({}, { status: 400 });
+  assert.equal(await validarCredencialesSii({ rut: RUT, password: 'mala' }, { fetcher, cfg: CFG }), false);
+});
+
+test('RCV con 400 da un mensaje accionable de período/empresa', async () => {
+  const fetcher = fakeFetch({}, { status: 400 });
+  await assert.rejects(
+    () => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG }),
+    /revisa el período/
+  );
+});
+
 // DTE recibido tal como lo entrega BaseAPI (sin XML: cae a un ítem por el total).
 const DTE_RECIBIDO = {
   tipo_dte: 33, folio: 100, fecha: '2025-01-15', rut_emisor: '77.000.000-0',
