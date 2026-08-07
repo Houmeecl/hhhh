@@ -12,7 +12,6 @@
 //     gasto), estampada con la versión del motor. Nunca es una cifra
 //     definitiva ni una "certificación".
 // ============================================================
-import { cargarCategorias, calcularFactura } from './motorPropio.js';
 import { versionVigente } from './motorVersiones.js';
 
 const TOP_CONTRAPARTES = 10;
@@ -71,36 +70,23 @@ async function contrapartesEnSicr3p(query, ruts) {
   return new Set(rows.map((r) => r.rn));
 }
 
-// Estimación referencial de emisiones de las COMPRAS, por método de gasto:
-// cada documento es un "ítem" cuyo texto (razón social) el motor clasifica
-// y cuyo monto neto alimenta el factor por gasto. Devuelve null si el motor
-// no está configurado — nunca rompe el análisis por eso.
+// Estimación referencial de emisiones de las COMPRAS: suma el co2e que se
+// calculó POR DOCUMENTO al descargar (extrayendo el detalle de ítems del
+// XML y corriendo el motor propio — método físico donde había unidades,
+// gasto si no). Devuelve null si ningún documento tiene cálculo (motor sin
+// configurar): el resto del análisis igual sirve.
 async function estimacionEmisiones(query, compras) {
-  if (compras.length === 0) return null;
-  let categorias;
-  try {
-    categorias = await cargarCategorias(query);
-  } catch {
-    return null; // motor sin configurar: el resto del análisis igual sirve
-  }
-  const items = compras.map((f) => ({
-    nombre: f.razon_social || 'Documento',
-    descripcion: '',
-    monto: Number(f.neto || 0),
-    cantidad: 0,
-    unidad: null,
-  }));
-  let calc;
-  try {
-    calc = calcularFactura(items, categorias, { origen: 'texto' }); // 'texto' => siempre por gasto
-  } catch {
-    return null;
-  }
+  const conCalculo = compras.filter((f) => f.co2e != null);
+  if (conCalculo.length === 0) return null;
+  const total = conCalculo.reduce((a, f) => a + Number(f.co2e || 0), 0);
+  const nFisico = conCalculo.filter((f) => f.metodo === 'fisico').length;
   const version = await versionVigente(query);
   return {
-    total_co2e_tref: calc.total_co2e, // tCO2e referencial
-    categoria_dominante: calc.categoria,
-    metodo: 'gasto',
+    total_co2e_tref: Math.round(total * 10000) / 10000, // tCO2e referencial
+    documentos_calculados: conCalculo.length,
+    documentos_totales: compras.length,
+    metodo_fisico: nFisico, // cuántos documentos se pudieron calcular por unidades reales
+    metodo_gasto: conCalculo.length - nFisico,
     referencial: true, // la UI lo rotula "referencial — validar"
     motor_version_id: version?.id ?? null,
   };
@@ -110,7 +96,7 @@ async function estimacionEmisiones(query, compras) {
 // proveedor a partir de dte_proveedor.
 export async function analizarPeriodo(query, proveedorId, periodo) {
   const { rows } = await query(
-    `SELECT tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha
+    `SELECT tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo
        FROM dte_proveedor
       WHERE proveedor_id = $1 AND periodo = $2
       ORDER BY tipo, fecha NULLS LAST, folio`,

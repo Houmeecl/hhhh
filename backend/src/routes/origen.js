@@ -11,6 +11,9 @@ import { generateCredencialTarjeta, generateCredencialProveedor } from '../servi
 import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
 import { descargarComprasVentas } from '../services/baseapiSii.js';
 import { analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
+import { cifrar, descifrar, cifradoDisponible } from '../services/cripto.js';
+import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { normalizarRut as normalizarRutLocal } from '../services/mandante.js';
 import {
   ROLES,
   TIPOS,
@@ -1424,14 +1427,18 @@ proveedorPanelRouter.post('/lotes/:asignacionId/firmar', requireNivelOperador, a
 // Compras y ventas del SII (RCV) del propio proveedor.
 //
 // El proveedor escribe su clave tributaria y descarga su Registro de
-// Compras y Ventas de un período. La clave viaja por request a BaseAPI y
-// se descarta al terminar el handler: NUNCA se guarda en BD ni se registra
-// en logActividad. Lo que sí guardamos es el DETALLE de los documentos
-// (dte_proveedor) para poder analizarlo sin volver a pedir la clave.
+// Compras y Ventas de un período. El proveedor puede AUTORIZAR guardar su
+// clave (migración 072) para no reescribirla: en ese caso se persiste
+// CIFRADA (AES-256-GCM, services/cripto.js) en credenciales_sii_proveedor
+// — la llave de cifrado vive solo en env, nunca en la BD. La clave EN
+// CLARO nunca se guarda ni se registra en logActividad: solo viaja por
+// request a BaseAPI y se cifra para almacenarla. Además guardamos el
+// DETALLE de los documentos (dte_proveedor) con su cálculo de emisiones.
 // ============================================================
 
 // GET /api/panel-proveedor/sii/estado — identidad del proveedor (para
-// prellenar el RUT) + períodos ya descargados. Sin costo, sin clave.
+// prellenar el RUT), si tiene credenciales SII guardadas, y los períodos ya
+// descargados. NUNCA devuelve la clave, solo si existe y con qué RUT.
 proveedorPanelRouter.get('/sii/estado', async (req, res, next) => {
   try {
     const { rows } = await query(
@@ -1439,15 +1446,72 @@ proveedorPanelRouter.get('/sii/estado', async (req, res, next) => {
     );
     const proveedor = rows[0];
     if (!proveedor) return res.status(403).json({ error: 'Cuenta de proveedor no encontrada.' });
-    res.json({ proveedor, periodos: await periodosDescargados(query, req.user.proveedor_id) });
+    const cred = await query(
+      `SELECT rut_sii, actualizada_at FROM credenciales_sii_proveedor WHERE proveedor_id = $1`,
+      [req.user.proveedor_id]
+    );
+    res.json({
+      proveedor,
+      credenciales: cred.rows[0]
+        ? { guardadas: true, rut_sii: cred.rows[0].rut_sii, actualizada_at: cred.rows[0].actualizada_at }
+        : { guardadas: false },
+      periodos: await periodosDescargados(query, req.user.proveedor_id),
+    });
   } catch (err) { next(err); }
 });
 
-// POST /api/panel-proveedor/sii/descargar — { periodo, rut, password }.
-// `rut`+`password` autentican en el SII (persona que se autentica, puede
-// ser el representante). El RUT de la empresa contra el que se guardan los
-// DTE SALE de la fila `proveedores` del usuario logueado, NUNCA del body:
-// nadie puede descargar los datos de otra empresa.
+// POST /api/panel-proveedor/sii/credenciales — { rut, password }. Valida
+// contra el SII y GUARDA la clave CIFRADA (AES-256-GCM). El proveedor lo
+// autoriza explícitamente para no reescribirla en cada descarga.
+proveedorPanelRouter.post('/sii/credenciales', requireNivelOperador, async (req, res, next) => {
+  const b = req.body || {};
+  try {
+    if (!cifradoDisponible()) return res.status(503).json({ error: 'El guardado de credenciales no está disponible (falta configurar el cifrado).' });
+    const { rows } = await query(`SELECT rut FROM proveedores WHERE id = $1 AND activo = true`, [req.user.proveedor_id]);
+    if (!rows[0]) return res.status(403).json({ error: 'Cuenta de proveedor inactiva.' });
+    if (!b.password) return res.status(400).json({ error: 'Falta la clave tributaria.' });
+
+    // Validar contra el SII antes de guardar: no guardamos una clave mala.
+    const { validarCredencialesSii } = await import('../services/baseapiSii.js');
+    let ok;
+    try {
+      ok = await validarCredencialesSii({ rut: b.rut, password: b.password });
+    } catch (e) {
+      return res.status(502).json({ error: e.message });
+    }
+    if (!ok) return res.status(400).json({ error: 'Clave tributaria incorrecta o bloqueada en el SII.' });
+
+    await query(
+      `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
+       VALUES ($1,$2,$3, now())
+       ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
+      [req.user.proveedor_id, normalizarRutLocal(b.rut), cifrar(b.password)]
+    );
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'proveedor_guardar_credenciales_sii', entidad: 'credenciales_sii_proveedor',
+      entidadId: req.user.proveedor_id, detalle: { rut_sii: normalizarRutLocal(b.rut) }, ip: req.ip, // NUNCA la clave
+    });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/panel-proveedor/sii/credenciales — el proveedor borra su clave guardada.
+proveedorPanelRouter.delete('/sii/credenciales', requireNivelOperador, async (req, res, next) => {
+  try {
+    await query(`DELETE FROM credenciales_sii_proveedor WHERE proveedor_id = $1`, [req.user.proveedor_id]);
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'proveedor_borrar_credenciales_sii', entidad: 'credenciales_sii_proveedor',
+      entidadId: req.user.proveedor_id, ip: req.ip,
+    });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/panel-proveedor/sii/descargar — { periodo, rut?, password?,
+// guardar? }. Si el body no trae clave, se usa la GUARDADA (cifrada). Si la
+// trae y `guardar` != false, se guarda para las próximas veces. El RUT de la
+// empresa contra el que se guardan los DTE SALE de la fila `proveedores`,
+// NUNCA del body: nadie puede descargar datos de otra empresa.
 proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, res, next) => {
   const b = req.body || {};
   try {
@@ -1457,45 +1521,94 @@ proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, re
     const proveedor = rows[0];
     if (!proveedor || !proveedor.activo) return res.status(403).json({ error: 'Cuenta de proveedor inactiva.' });
 
+    // Resolver credenciales: las del body, o las guardadas (descifradas).
+    let rutSii = b.rut;
+    let password = b.password;
+    let guardarAhora = b.guardar !== false && Boolean(b.password);
+    if (!password) {
+      const cred = await query(`SELECT rut_sii, clave_cifrada FROM credenciales_sii_proveedor WHERE proveedor_id = $1`, [proveedor.id]);
+      if (!cred.rows[0]) return res.status(400).json({ error: 'No hay credenciales guardadas: ingresa tu RUT y clave del SII.' });
+      rutSii = cred.rows[0].rut_sii;
+      try { password = descifrar(cred.rows[0].clave_cifrada); }
+      catch { return res.status(500).json({ error: 'No se pudo leer la clave guardada. Vuelve a ingresarla.' }); }
+      guardarAhora = false; // ya estaba guardada
+    }
+
     let descarga;
     try {
       descarga = await descargarComprasVentas({
-        rut: b.rut,
-        password: b.password,
+        rut: rutSii,
+        password,
         rutEmpresa: proveedor.rut, // identidad de PROVEEDORES, nunca del body
         periodo: b.periodo,
       });
     } catch (e) {
-      // 400 para errores de entrada/credenciales; 502 si la fuente falló.
       const status = e.credenciales || /inválid|Período|clave|RUT/i.test(e.message) ? 400 : 502;
       return res.status(status).json({ error: e.message });
     }
 
+    // Cálculo de emisiones POR DOCUMENTO de compra: se extrae el detalle de
+    // ítems (del XML) y se corre el motor propio. Referencial; si el motor no
+    // está configurado, co2e queda null y el resto del análisis igual sirve.
+    let categorias = null;
+    try { categorias = await cargarCategorias(query); } catch { categorias = null; }
+    const co2ePorCompra = descarga.compra.map((f) => {
+      if (!categorias) return { co2e: null, metodo: null };
+      try {
+        const calc = calcularFactura(f.items, categorias, { origen: f.origen_calculo });
+        const metodo = calc.items.some((it) => it.metodo === 'fisico') ? 'fisico' : 'gasto';
+        return { co2e: calc.total_co2e, metodo };
+      } catch { return { co2e: null, metodo: null }; }
+    });
+
     // UPSERT idempotente: re-descargar un período no duplica.
     let guardados = 0;
     await withTx(async (client) => {
-      for (const [tipo, filas] of [['compra', descarga.compra], ['venta', descarga.venta]]) {
-        for (const f of filas) {
-          await client.query(
-            `INSERT INTO dte_proveedor
-               (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-             ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
-             DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto,
-                           iva = EXCLUDED.iva, total = EXCLUDED.total, fecha = EXCLUDED.fecha,
-                           descargado_at = now()`,
-            [proveedor.id, b.periodo, tipo, f.tipo_dte, f.folio, f.rut_contraparte,
-             f.razon_social, f.neto, f.iva, f.total, f.fecha]
-          );
-          guardados += 1;
-        }
+      for (let i = 0; i < descarga.compra.length; i++) {
+        const f = descarga.compra[i];
+        const { co2e, metodo } = co2ePorCompra[i];
+        await client.query(
+          `INSERT INTO dte_proveedor
+             (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo)
+           VALUES ($1,$2,'compra',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
+           DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
+                         total = EXCLUDED.total, fecha = EXCLUDED.fecha, co2e = EXCLUDED.co2e,
+                         metodo = EXCLUDED.metodo, descargado_at = now()`,
+          [proveedor.id, b.periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
+           f.neto, f.iva, f.total, f.fecha, co2e, metodo]
+        );
+        guardados += 1;
+      }
+      for (const f of descarga.venta) {
+        await client.query(
+          `INSERT INTO dte_proveedor
+             (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha)
+           VALUES ($1,$2,'venta',$3,$4,$5,$6,$7,$8,$9,$10)
+           ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
+           DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
+                         total = EXCLUDED.total, fecha = EXCLUDED.fecha, descargado_at = now()`,
+          [proveedor.id, b.periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
+           f.neto, f.iva, f.total, f.fecha]
+        );
+        guardados += 1;
+      }
+
+      // Guardar la clave (cifrada) si vino en el body y el proveedor no pidió lo contrario.
+      if (guardarAhora && cifradoDisponible()) {
+        await client.query(
+          `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
+           VALUES ($1,$2,$3, now())
+           ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
+          [proveedor.id, normalizarRutLocal(rutSii), cifrar(password)]
+        );
       }
     });
 
     // El detalle (accion + período), NUNCA la clave.
     await logActividad({
       usuarioId: req.user.sub, accion: 'proveedor_descarga_sii', entidad: 'dte_proveedor',
-      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: guardados }, ip: req.ip,
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: guardados, credenciales_guardadas: guardarAhora }, ip: req.ip,
     });
 
     res.json({ periodo: b.periodo, documentos: guardados, analisis: await analizarPeriodo(query, proveedor.id, b.periodo) });

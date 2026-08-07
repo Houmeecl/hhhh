@@ -12,6 +12,7 @@ const base = () => ({
   resend: { apiKey: 're_algo' },
   simple: { mock: false },
   baseapi: { enabled: true },
+  cripto: { siiKey: 'c'.repeat(64) },
 });
 
 test('config sana no arroja fatales ni advertencias', () => {
@@ -68,6 +69,22 @@ test('sin BASEAPI_API_KEY solo advierte que el autocompletado SII queda apagado'
   assert.deepEqual(fatales, []);
   assert.equal(advertencias.length, 1);
   assert.match(advertencias[0], /BASEAPI_API_KEY/);
+});
+
+test('sin SII_CRED_KEY es fatal (se cifraría con la llave de desarrollo)', () => {
+  const cfg = base();
+  cfg.cripto = { siiKey: '' };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /SII_CRED_KEY/);
+});
+
+test('SII_CRED_KEY demasiado corta es fatal', () => {
+  const cfg = base();
+  cfg.cripto = { siiKey: 'corta' };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /SII_CRED_KEY/);
 });
 
 test('los defaults de desarrollo acumulan varios fatales a la vez', () => {

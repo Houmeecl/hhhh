@@ -22,7 +22,7 @@
 // ============================================================
 import { config } from '../config.js';
 import { normalizarRut } from './mandante.js';
-import { rutValido } from './dte.js';
+import { rutValido, parseDte } from './dte.js';
 
 // 'YYYY-MM' — el mismo formato que exige BaseAPI para el período.
 export const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -156,14 +156,64 @@ export async function descargarRcv({ rut, password, rutEmpresa, periodo, tipo },
   return filasDe(json).map(normalizarFilaRcv).filter(Boolean);
 }
 
+// Normaliza un DTE recibido (compra) trayendo el DETALLE de ítems desde el
+// XML firmado (xml_base64), para poder calcular emisiones por ítem con el
+// motor propio. Si el XML falta o no parsea, cae a un solo ítem por el
+// monto total (método por gasto), sin perder el documento.
+export function normalizarDteRecibido(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+  const folio = doc.folio ?? doc.Folio;
+  if (folio == null) return null;
+
+  let dte = null;
+  if (typeof doc.xml_base64 === 'string' && doc.xml_base64) {
+    try { dte = parseDte(Buffer.from(doc.xml_base64, 'base64').toString('utf8')); } catch { dte = null; }
+  }
+
+  const total = Number(doc.monto_total ?? dte?.monto_total ?? 0) || 0;
+  const neto = Number(dte?.monto_neto ?? 0) || 0;
+  const iva = Number(dte?.iva ?? 0) || 0;
+  const rut = doc.rut_emisor ?? dte?.rut_emisor;
+  // Ítems del XML; si no hay, un ítem sintético por el monto (razón social
+  // como texto para que el motor pueda clasificar por palabras clave).
+  const items = dte?.items?.length
+    ? dte.items
+    : [{ nombre: doc.razon_social_emisor || dte?.razon_social_emisor || 'Documento', descripcion: '', cantidad: 0, unidad: null, monto: neto || total }];
+
+  return {
+    tipo_dte: String(doc.tipo_dte ?? dte?.tipo_dte ?? ''),
+    folio: String(folio),
+    rut_contraparte: rut ? normalizarRut(rut) : null,
+    razon_social: doc.razon_social_emisor || dte?.razon_social_emisor || null,
+    neto: neto || total,
+    iva,
+    total,
+    fecha: fechaISO(doc.fecha ?? dte?.fecha_emision),
+    items, // detalle para el cálculo; no se persiste tal cual
+    origen_calculo: dte?.items?.length ? 'xml' : 'texto', // xml habilita método físico
+  };
+}
+
+// Descarga los DTE recibidos (compras) CON su XML, para extraer el detalle.
+export async function descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts = {}) {
+  if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
+  const json = await llamar(`/sii/dte/recibidos/${periodo}`, { rut, password, rutEmpresa }, opts);
+  const docs = Array.isArray(json?.data?.documentos) ? json.data.documentos : [];
+  return docs.map(normalizarDteRecibido).filter(Boolean);
+}
+
 // Descarga compras Y ventas de un período en una sola operación. Valida
 // primero las credenciales con el endpoint barato: si están malas, no
-// gasta las dos llamadas caras.
+// gasta las llamadas caras.
+//  - COMPRAS: por DTE recibidos (con XML) para extraer todo el detalle y
+//    poder calcular emisiones por ítem.
+//  - VENTAS: por RCV (totales); las ventas no alimentan la estimación de
+//    emisiones de compras, basta el resumen.
 export async function descargarComprasVentas({ rut, password, rutEmpresa, periodo }, opts = {}) {
   if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
   const ok = await validarCredencialesSii({ rut, password }, opts);
   if (!ok) throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true });
-  const compra = await descargarRcv({ rut, password, rutEmpresa, periodo, tipo: 'compra' }, opts);
+  const compra = await descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts);
   const venta = await descargarRcv({ rut, password, rutEmpresa, periodo, tipo: 'venta' }, opts);
   return { compra, venta };
 }

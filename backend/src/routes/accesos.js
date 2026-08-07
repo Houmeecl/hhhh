@@ -343,9 +343,11 @@ router.get('/proveedores', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Acceso web propio del proveedor (panel /panel-proveedor).
+// Acceso web propio del proveedor (panel /panel-proveedor). enviarCorreo:
+// al proveedor le llega un mail con enlace para ingresar y definir su clave
+// (además del password temporal que ve el admin como respaldo).
 router.post('/proveedores/:id/crear-cuenta', adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'proveedor', columnaFk: 'proveedor_id', entidadId: req.params.id }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'proveedor', columnaFk: 'proveedor_id', entidadId: req.params.id, enviarCorreo: true }).catch(next)
 );
 
 router.post('/proveedores', adminOnly, async (req, res, next) => {

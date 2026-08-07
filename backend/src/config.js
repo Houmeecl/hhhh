@@ -49,6 +49,16 @@ export const config = {
   },
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
 
+  // Cifrado simétrico en reposo de secretos que SÍ hay que poder recuperar
+  // en claro (no un hash) — hoy: la clave tributaria del SII que el
+  // proveedor autoriza guardar. La llave vive SOLO acá (env), nunca en la
+  // BD: si se filtra la base, las claves quedan cifradas e inútiles. En
+  // producción verificarProduccion.js exige SII_CRED_KEY; en desarrollo cae
+  // a una llave fija para no bloquear el flujo local.
+  cripto: {
+    siiKey: process.env.SII_CRED_KEY || '',
+  },
+
   // Login con llave USB FIDO2 (WebAuthn) — ver migración 061 y
   // routes/webauthn.js. OJO: el rpID queda atado al dominio para
   // siempre — si en producción cambia el dominio del panel, todas las

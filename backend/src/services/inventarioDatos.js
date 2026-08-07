@@ -482,6 +482,16 @@ export const INVENTARIO = {
     base: BASE.CONSENTIMIENTO, cadena: CADENA.NINGUNA,
     retencion: 'El proveedor puede re-descargar un período en cualquier momento (UPSERT); se borra al dar de baja la cuenta (ON DELETE CASCADE).',
   },
+  credenciales_sii_proveedor: {
+    clasificacion: PERSONAL, columnas: ['rut_sii'],
+    nota: 'La clave tributaria del SII que el proveedor autoriza guardar (migración 072). Se guarda '
+      + 'CIFRADA con AES-256-GCM (services/cripto.js); la llave vive solo en env (SII_CRED_KEY), nunca '
+      + 'en la BD, así que un vaciado de la base no la expone en claro. `rut_sii` es el RUT con que se '
+      + 'autentica en el SII. El proveedor puede borrarla desde su panel cuando quiera.',
+    finalidad: 'Permitir que el proveedor descargue su RCV del SII sin reescribir su clave cada vez.',
+    base: BASE.CONSENTIMIENTO, cadena: CADENA.NINGUNA,
+    retencion: 'El proveedor la borra desde su panel; se elimina sola al dar de baja la cuenta (ON DELETE CASCADE).',
+  },
   credenciales_webauthn: {
     clasificacion: PERSONAL, columnas: ['nombre_dispositivo'],
     nota: '`public_key`/`credential_id`/`counter` son material criptográfico de la llave FIDO2, no '

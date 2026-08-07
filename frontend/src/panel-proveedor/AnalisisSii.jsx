@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, fmtInt, fmtFecha } from '../api.js';
 import { validarRut } from '../lib/rut.js';
 
-// Compras y ventas del proveedor traídas del SII (RCV) y analizadas.
-// El proveedor escribe su clave tributaria SOLO para descargar; el backend
-// la reenvía por request a BaseAPI y no la guarda. Acá tampoco se retiene:
-// el campo se limpia apenas termina la descarga.
+// Compras y ventas del proveedor traídas del SII (RCV/DTE) y analizadas.
+// El proveedor puede GUARDAR su clave tributaria (cifrada en el servidor)
+// para que el botón "descargar" funcione sin reescribirla; o borrarla.
 const CLP = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`;
 
 // Período por defecto: el mes pasado en formato AAAA-MM.
@@ -22,33 +21,52 @@ export default function AnalisisSii() {
   const [periodo, setPeriodo] = useState(periodoAnterior());
   const [rut, setRut] = useState('');
   const [clave, setClave] = useState('');
+  const [guardar, setGuardar] = useState(true); // el titular pidió que la clave quede guardada
   const [descargando, setDescargando] = useState(false);
   const [analisis, setAnalisis] = useState(null);
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 4000); };
 
-  useEffect(() => {
-    api.proveedorSiiEstado()
-      .then((d) => { setEstado(d); if (d.proveedor?.rut) setRut(d.proveedor.rut); })
-      .catch((e) => setError(e.message));
-  }, []);
+  const cargarEstado = () => api.proveedorSiiEstado().then((d) => {
+    setEstado(d);
+    if (!rut) setRut(d.credenciales?.rut_sii || d.proveedor?.rut || '');
+  });
+
+  useEffect(() => { cargarEstado().catch((e) => setError(e.message)); }, []);
+
+  const guardadas = estado?.credenciales?.guardadas;
 
   async function descargar(e) {
     e.preventDefault();
-    if (!clave) { flash('Escribe tu clave tributaria para descargar.', true); return; }
-    if (!validarRut(rut)) { flash('El RUT no es válido — revísalo antes de descargar.', true); return; }
+    // Si NO hay credenciales guardadas, exigimos clave + RUT válido acá.
+    if (!guardadas) {
+      if (!clave) { flash('Escribe tu clave tributaria para descargar.', true); return; }
+      if (!validarRut(rut)) { flash('El RUT no es válido — revísalo antes de descargar.', true); return; }
+    }
     setDescargando(true);
     try {
-      const d = await api.proveedorSiiDescargar({ periodo, rut, password: clave });
-      setClave(''); // la clave no se retiene ni un segundo de más
+      const body = guardadas && !clave
+        ? { periodo }                                   // usa la clave guardada
+        : { periodo, rut, password: clave, guardar };   // clave nueva (y se guarda si corresponde)
+      const d = await api.proveedorSiiDescargar(body);
+      setClave('');
       setAnalisis(d.analisis);
       flash(`Listo: ${fmtInt(d.documentos)} documentos del período ${d.periodo}.`);
-      api.proveedorSiiEstado().then(setEstado).catch(() => {});
+      cargarEstado().catch(() => {});
     } catch (err) {
       flash(err.message, true);
     } finally {
       setDescargando(false);
     }
+  }
+
+  async function borrarCredenciales() {
+    if (!window.confirm('¿Borrar tu clave guardada? Tendrás que escribirla de nuevo la próxima vez.')) return;
+    try {
+      await api.proveedorSiiBorrarCredenciales();
+      flash('Clave borrada.');
+      cargarEstado().catch(() => {});
+    } catch (err) { flash(err.message, true); }
   }
 
   async function verPeriodo(p) {
@@ -65,8 +83,8 @@ export default function AnalisisSii() {
       <h1 style={{ marginTop: 0 }}>Compras y ventas (SII)</h1>
       <p className="muted" style={{ fontSize: 14, maxWidth: 720 }}>
         Descarga tu Registro de Compras y Ventas del SII y sicr3p lo analiza: resumen del período,
-        con quién compras y vendes, y una estimación referencial de emisiones. Tu clave tributaria
-        se usa una sola vez para descargar y <strong>no se guarda</strong>.
+        con quién compras y vendes, y una estimación referencial de emisiones a partir del detalle
+        de tus compras.
       </p>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -75,20 +93,40 @@ export default function AnalisisSii() {
             <label>Período</label>
             <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} required />
           </div>
-          <div className="field" style={{ margin: 0 }}>
-            <label>RUT que ingresa al SII</label>
-            <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76000000-0" required />
-          </div>
-          <div className="field" style={{ margin: 0 }}>
-            <label>Clave tributaria (no se guarda)</label>
-            <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" placeholder="••••••••" />
-          </div>
+          {guardadas ? (
+            <div className="field" style={{ margin: 0 }}>
+              <label>Credenciales SII</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38 }}>
+                <span className="badge badge-green">Guardadas ✓</span>
+                <span className="muted" style={{ fontSize: 13, fontFamily: 'monospace' }}>{estado.credenciales.rut_sii}</span>
+                <button type="button" className="btn btn-outline btn-sm" onClick={borrarCredenciales}>Borrar</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="field" style={{ margin: 0 }}>
+                <label>RUT que ingresa al SII</label>
+                <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76000000-0" required />
+              </div>
+              <div className="field" style={{ margin: 0 }}>
+                <label>Clave tributaria</label>
+                <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" placeholder="••••••••" />
+              </div>
+            </>
+          )}
           <button className="btn btn-primary" type="submit" disabled={descargando}>
             {descargando ? <><span className="spinner" /> Descargando…</> : 'Descargar del SII'}
           </button>
         </form>
-        <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 12 }}>
-          🔒 La clave viaja cifrada, se usa una única vez para consultar el SII y se descarta. sicr3p no la almacena.
+
+        {!guardadas && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginTop: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} />
+            Guardar mi clave para no escribirla la próxima vez (se guarda cifrada en el servidor).
+          </label>
+        )}
+        <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
+          🔒 Tu clave se guarda cifrada y solo se usa para consultar el SII a tu nombre. Puedes borrarla cuando quieras.
         </p>
       </div>
 
@@ -112,6 +150,7 @@ export default function AnalisisSii() {
 
 function Analisis({ a }) {
   const c = a.resumen.compra, v = a.resumen.venta;
+  const em = a.emisiones;
   return (
     <div>
       <div className="stat-grid" style={{ marginBottom: 16 }}>
@@ -121,18 +160,21 @@ function Analisis({ a }) {
         <div className="stat"><div className="n green">{CLP(v.total)}</div><div className="l">Total vendido</div></div>
       </div>
 
-      {a.emisiones && (
+      {em && (
         <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid #f59e0b' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{a.emisiones.total_co2e_tref} tCO₂e</div>
-              <div className="muted" style={{ fontSize: 13 }}>Estimación referencial de tus compras — categoría dominante: {a.emisiones.categoria_dominante}</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{em.total_co2e_tref} tCO₂e</div>
+              <div className="muted" style={{ fontSize: 13 }}>
+                Estimación referencial de tus compras — {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos calculados
+                {em.metodo_fisico > 0 && ` · ${fmtInt(em.metodo_fisico)} por unidades reales, ${fmtInt(em.metodo_gasto)} por gasto`}
+              </div>
             </div>
             <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>referencial — validar</span>
           </div>
           <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-            Calculada por método de gasto sobre el monto neto de cada compra. Es un orden de magnitud para orientar,
-            no una cifra definitiva ni una certificación.
+            Calculada extrayendo el detalle de cada compra y corriendo el motor propio (unidades físicas donde el
+            documento las trae, gasto si no). Es un orden de magnitud para orientar, no una cifra definitiva ni una certificación.
           </p>
         </div>
       )}
@@ -145,7 +187,7 @@ function Analisis({ a }) {
         <div className="card" style={{ marginTop: 10 }}>
           <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>Tipo</th><th>Folio</th><th>Fecha</th><th>Contraparte</th><th style={{ textAlign: 'right' }}>Neto</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+              <thead><tr><th>Tipo</th><th>Folio</th><th>Fecha</th><th>Contraparte</th><th style={{ textAlign: 'right' }}>Neto</th><th style={{ textAlign: 'right' }}>Total</th><th style={{ textAlign: 'right' }}>tCO₂e</th></tr></thead>
               <tbody>
                 {a.documentos.map((d, i) => (
                   <tr key={i}>
@@ -155,10 +197,11 @@ function Analisis({ a }) {
                     <td>{d.razon_social || d.rut_contraparte || '—'}</td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.neto)}</td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.total)}</td>
+                    <td style={{ textAlign: 'right' }}>{d.co2e != null ? d.co2e : '—'}</td>
                   </tr>
                 ))}
                 {a.documentos.length === 0 && (
-                  <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 24 }}>Sin documentos en este período.</td></tr>
+                  <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>Sin documentos en este período.</td></tr>
                 )}
               </tbody>
             </table>

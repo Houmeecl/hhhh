@@ -251,20 +251,23 @@ function CrearCuentaWeb({ entidad, nombreEntidad, crear, onClose, onCreada }) {
       <div className="modal" style={{ maxWidth: 440 }}>
         <h2 style={{ marginTop: 0 }}>Acceso web de {nombreEntidad}</h2>
         {resultado ? (
-          resultado.password ? (
-            <PasswordUnaVez password={resultado.password} />
-          ) : (
-            <>
-              <div className="badge badge-green" style={{ display: 'block', padding: 12, marginBottom: 10 }}>
-                Cuenta creada. {resultado.correo_enviado ? 'Se envió un correo de activación.' : 'No se pudo enviar el correo — comparte este enlace a mano:'}
-              </div>
-              {resultado.dev_activation_link && (
-                <div style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
-                  {resultado.dev_activation_link}
+          <>
+            {resultado.password && <PasswordUnaVez password={resultado.password} />}
+            {/* Cuando la creación también manda correo (proveedor): avisar del
+                mail de ingreso además del password temporal de respaldo. */}
+            {resultado.correo_enviado !== undefined && (
+              <>
+                <div className="badge badge-green" style={{ display: 'block', padding: 12, margin: '10px 0' }}>
+                  {resultado.correo_enviado ? 'Se envió un correo para que ingrese y defina su clave.' : 'No se pudo enviar el correo — comparte este enlace a mano:'}
                 </div>
-              )}
-            </>
-          )
+                {resultado.dev_activation_link && (
+                  <div style={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
+                    {resultado.dev_activation_link}
+                  </div>
+                )}
+              </>
+            )}
+          </>
         ) : (
           <>
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>

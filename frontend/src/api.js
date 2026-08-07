@@ -499,6 +499,8 @@ export const api = {
   proveedorSiiEstado: () => request('/panel-proveedor/sii/estado', { authedProveedor: true }),
   proveedorSiiDescargar: (body) => request('/panel-proveedor/sii/descargar', { method: 'POST', body, authedProveedor: true }),
   proveedorSiiAnalisis: (periodo) => request(`/panel-proveedor/sii/analisis/${periodo}`, { authedProveedor: true }),
+  proveedorSiiGuardarCredenciales: (body) => request('/panel-proveedor/sii/credenciales', { method: 'POST', body, authedProveedor: true }),
+  proveedorSiiBorrarCredenciales: () => request('/panel-proveedor/sii/credenciales', { method: 'DELETE', authedProveedor: true }),
 };
 
 async function abrirPdfAuth(url, store = auth) {

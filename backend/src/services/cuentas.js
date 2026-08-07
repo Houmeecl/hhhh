@@ -94,7 +94,7 @@ export function generarPasswordTemporal(largo = 12) {
 // se muestra UNA sola vez en el response — la cuenta queda activa de
 // inmediato con must_reset_password=true. Un solo login por entidad
 // (UNIQUE parcial en la migración de cada panel).
-export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId, nivelAcceso = 'operador' }) {
+export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId, nivelAcceso = 'operador', enviarCorreo = false }) {
   const email = String(req.body.email || '').toLowerCase().trim();
   const nombre = String(req.body.nombre || '').trim();
   if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios.' });
@@ -120,5 +120,16 @@ export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId
     usuarioId: req.user.sub, accion: `crear_cuenta_${panel}`, entidad: 'usuario',
     entidadId: rows[0].id, detalle: { email }, ip: req.ip,
   });
-  res.status(201).json({ ok: true, usuario_id: rows[0].id, email, password });
+
+  // Con enviarCorreo=true (panel proveedor): además del password temporal se
+  // envía un correo con enlace de activación, para que el proveedor pueda
+  // entrar solo, sin que el admin tenga que transcribirle la clave.
+  let correo;
+  if (enviarCorreo) {
+    correo = await enviarActivacion({ usuarioId: rows[0].id, email, nombre, panel });
+  }
+  res.status(201).json({
+    ok: true, usuario_id: rows[0].id, email, password,
+    ...(correo ? { correo_enviado: correo.correoEnviado, dev_activation_link: correo.dev_activation_link } : {}),
+  });
 }

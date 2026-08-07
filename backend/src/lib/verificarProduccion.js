@@ -31,6 +31,15 @@ export function verificarConfigProduccion(cfg) {
     fatales.push('SEED_DEMO=true — sembraría clientes ficticios y contraseñas de portal fijas ("demo123")');
   }
 
+  // Sin esta llave, el cifrado de credenciales SII caería a la llave fija de
+  // desarrollo: las claves tributarias guardadas quedarían "cifradas" con un
+  // secreto público. Es fatal en producción.
+  if (!cfg.cripto?.siiKey) {
+    fatales.push('SII_CRED_KEY vacía — se guardarían claves tributarias con la llave de cifrado de desarrollo; genera una con: openssl rand -hex 32');
+  } else if (String(cfg.cripto.siiKey).length < LARGO_MINIMO_SECRETO) {
+    fatales.push(`SII_CRED_KEY tiene menos de ${LARGO_MINIMO_SECRETO} caracteres — demasiado corta para cifrar credenciales`);
+  }
+
   if (!cfg.resend.apiKey) {
     advertencias.push('RESEND_API_KEY vacía — los correos NO se envían, solo se escriben en el log');
   }
