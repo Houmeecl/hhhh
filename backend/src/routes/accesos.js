@@ -375,11 +375,22 @@ router.post('/proveedores/:id/crear-cuenta', adminOnly, async (req, res, next) =
 router.post('/proveedores/:id/reenviar-invitacion', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT id, email, nombre FROM usuarios WHERE proveedor_id = $1 AND panel = 'proveedor' AND estado = 'activo'`,
+      `SELECT id, email, nombre, estado FROM usuarios WHERE proveedor_id = $1 AND panel = 'proveedor'`,
       [req.params.id]
     );
     const usuario = rows[0];
     if (!usuario) return res.status(404).json({ error: 'Esta empresa todavía no tiene un acceso web creado.' });
+    // Una cuenta suspendida NO se reactiva por esta vía: activar define
+    // contraseña y deja `estado='activo'` (routes/auth.js), así que reenviar
+    // sería deshacer la suspensión de rebote. Se rechaza diciendo lo que
+    // realmente pasa — antes el filtro por estado vivía en el WHERE y esto
+    // caía en el 404 de arriba, que le mentía al admin.
+    if (usuario.estado !== 'activo') {
+      return res.status(409).json({
+        codigo: 'cuenta_no_activa',
+        error: `El acceso de esta empresa está en estado "${usuario.estado}". Reactívalo antes de reenviarle la invitación.`,
+      });
+    }
 
     const correo = await enviarActivacion({
       usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre, panel: 'proveedor',

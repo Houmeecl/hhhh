@@ -73,4 +73,8 @@ test('formatearRut no inventa puntuación sobre un valor que no es un RUT', () =
   assert.equal(formatearRut(''), '');
   assert.equal(formatearRut(null), '');
   assert.equal(formatearRut('K'), 'K');
+  // Identificadores extranjeros: la forma se valida sobre el valor crudo, así
+  // que las letras no se borran en silencio para fabricar un RUT chileno.
+  assert.equal(formatearRut('ABC123'), 'ABC123');
+  assert.equal(formatearRut('DE811907980'), 'DE811907980');
 });

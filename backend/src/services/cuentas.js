@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { config } from '../config.js';
 import { query } from '../lib/db.js';
-import { sendMail, activationEmail } from './mailer.js';
+import { sendMail, activationEmail, elegirTransporte } from './mailer.js';
 import { logActividad } from '../middleware/auth.js';
 
 // Qué columna FK de `usuarios` corresponde a cada panel externo, y en qué
@@ -42,6 +42,16 @@ const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 export async function enviarActivacion({ usuarioId, email, nombre, panel }) {
   const raw = crypto.randomBytes(32).toString('hex');
   const expira = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
+  // La invitación nueva reemplaza a la anterior, no se suma a ella. Reenviar
+  // se pide justamente cuando el enlace viejo se perdió o llegó a manos que
+  // ya no corresponden (la persona que lo recibió se fue de la empresa);
+  // dejarlo vivo 48h más, y acumulando uno por reenvío, sería lo contrario de
+  // lo que el admin cree que está haciendo.
+  await query(
+    `UPDATE tokens_password SET usado = true
+     WHERE usuario_id = $1 AND tipo = 'activacion' AND usado = false`,
+    [usuarioId]
+  );
   await query(
     `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
     [usuarioId, hashToken(raw), expira]
@@ -55,9 +65,14 @@ export async function enviarActivacion({ usuarioId, email, nombre, panel }) {
     correoEnviado = false;
     console.error('[activacion] no se pudo enviar el correo:', err.message);
   }
-  // Sin Resend (dev) o si el envío real falló: devolvemos el link para que
-  // el admin lo pueda compartir a mano en vez de perderlo.
-  const mostrarLink = !config.resend.apiKey || !correoEnviado;
+  // Sin ningún transporte de correo (dev) o si el envío real falló:
+  // devolvemos el link para que el admin lo pueda compartir a mano en vez de
+  // perderlo. Se pregunta por el transporte EFECTIVO y no por la llave de
+  // Resend: en un VPS con SMTP propio y sin Resend, mirar `resend.apiKey`
+  // daba siempre "no hay correo" y el token de activación volvía en el
+  // response —y a la pantalla del admin— aunque el correo se hubiera
+  // entregado bien.
+  const mostrarLink = elegirTransporte() === 'dev' || !correoEnviado;
   return { link, correoEnviado, dev_activation_link: mostrarLink ? link : undefined };
 }
 

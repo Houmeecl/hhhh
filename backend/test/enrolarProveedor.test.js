@@ -142,3 +142,41 @@ test('los dos 409 de crear-cuenta se distinguen por `codigo`', { skip: SALTO_PRO
   assert.equal(correoTomado.status, 409);
   assert.equal((await correoTomado.json()).codigo, 'email_en_uso');
 });
+
+test('reenviar invalida la invitación anterior en vez de sumar otra viva', { skip: SALTO_PROD }, async () => {
+  await pedir(`/api/admin/accesos/proveedores/${proveedorId}/reenviar-invitacion`);
+  const { rows } = await query(
+    `SELECT count(*)::int AS n FROM tokens_password
+     WHERE usuario_id IN (SELECT id FROM usuarios WHERE proveedor_id = $1)
+       AND tipo = 'activacion' AND usado = false`,
+    [proveedorId]
+  );
+  assert.equal(rows[0].n, 1, 'solo el último enlace queda vigente');
+});
+
+test('reenviar sobre una cuenta suspendida lo dice, no finge que no existe', { skip: SALTO_PROD }, async () => {
+  await query(`UPDATE usuarios SET estado = 'suspendido' WHERE proveedor_id = $1`, [proveedorId]);
+  try {
+    const res = await pedir(`/api/admin/accesos/proveedores/${proveedorId}/reenviar-invitacion`);
+    assert.equal(res.status, 409);
+    const data = await res.json();
+    assert.equal(data.codigo, 'cuenta_no_activa');
+    // Reactivar por esta vía desharía la suspensión: activar deja estado='activo'.
+    assert.match(data.error, /suspendido/);
+  } finally {
+    await query(`UPDATE usuarios SET estado = 'activo' WHERE proveedor_id = $1`, [proveedorId]);
+  }
+});
+
+test('reenviar-invitacion exige sesión de admin del panel sicrep', { skip: SALTO_PROD }, async () => {
+  const sinSesion = await fetch(`${baseUrl}/api/admin/accesos/proveedores/${proveedorId}/reenviar-invitacion`, { method: 'POST' });
+  assert.equal(sinSesion.status, 401);
+
+  const tokenOperador = signAccess({
+    id: crypto.randomUUID(), rol: 'operador', email: `op-${sufijo}@ejemplo.cl`, panel: 'sicrep',
+  });
+  const conOperador = await fetch(`${baseUrl}/api/admin/accesos/proveedores/${proveedorId}/reenviar-invitacion`, {
+    method: 'POST', headers: { Authorization: `Bearer ${tokenOperador}` },
+  });
+  assert.equal(conOperador.status, 403);
+});

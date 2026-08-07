@@ -21,11 +21,16 @@ export function normalizarRut(rut) {
 // escriben en Chile. Si el valor no tiene la forma de un RUT se devuelve tal
 // cual, para no inventar puntuación sobre un dato que no se entiende.
 export function formatearRut(rut) {
-  const limpio = normalizarRut(rut);
-  if (limpio.length < 2) return String(rut || '');
+  const crudo = String(rut || '');
+  // La forma se valida sobre el valor CRUDO, no sobre el normalizado:
+  // normalizarRut borra las letras distintas de K antes de mirar, así que un
+  // identificador extranjero como 'ABC123' se habría convertido en '12-3'.
+  // Se aceptan las dos escrituras que existen en la BD: normalizada
+  // (76222089K) y con puntuación chilena (76.222.089-K).
+  if (!/^\d{1,3}(\.?\d{3})*-?[\dkK]$/.test(crudo.trim())) return crudo;
+  const limpio = normalizarRut(crudo);
   const cuerpo = limpio.slice(0, -1);
   const dv = limpio.slice(-1);
-  if (!/^\d+$/.test(cuerpo)) return String(rut || '');
   return `${cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${dv}`;
 }
 
