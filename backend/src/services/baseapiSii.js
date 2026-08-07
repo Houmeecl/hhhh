@@ -200,8 +200,8 @@ export async function validarCredencialesSii({ rut, password }, opts = {}) {
 // más una fila-resumen por cada tipo agregado (boletas 39/41, comprobantes
 // 48) que el RCV no detalla documento a documento.
 export async function descargarRcv({ rut, password, rutEmpresa, periodo, tipo }, opts = {}) {
-  if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
-  if (tipo !== 'compra' && tipo !== 'venta') throw new Error('Tipo inválido (compra|venta).');
+  if (!PERIODO_RE.test(String(periodo || ''))) throw errEntrada('Período inválido: usa AAAA-MM (ej: 2026-06).');
+  if (tipo !== 'compra' && tipo !== 'venta') throw errEntrada('Tipo inválido (compra|venta).');
   const json = await llamar(`/sii/rcv/${periodo}/${tipo}`, { rut, password, rutEmpresa }, opts);
   const filas = filasDe(json).map(normalizarFilaRcv).filter(Boolean);
   const resumen = Array.isArray(json?.data?.resumenPorTipo)
@@ -250,7 +250,7 @@ export function normalizarDteRecibido(doc) {
 
 // Descarga los DTE recibidos (compras) CON su XML, para extraer el detalle.
 export async function descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts = {}) {
-  if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
+  if (!PERIODO_RE.test(String(periodo || ''))) throw errEntrada('Período inválido: usa AAAA-MM (ej: 2026-06).');
   const json = await llamar(`/sii/dte/recibidos/${periodo}`, { rut, password, rutEmpresa }, opts);
   const docs = Array.isArray(json?.data?.documentos) ? json.data.documentos : [];
   return docs.map(normalizarDteRecibido).filter(Boolean);
@@ -264,7 +264,7 @@ export async function descargarDteRecibidos({ rut, password, rutEmpresa, periodo
 //  - VENTAS: por RCV (totales); las ventas no alimentan la estimación de
 //    emisiones de compras, basta el resumen.
 export async function descargarComprasVentas({ rut, password, rutEmpresa, periodo }, opts = {}) {
-  if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
+  if (!PERIODO_RE.test(String(periodo || ''))) throw errEntrada('Período inválido: usa AAAA-MM (ej: 2026-06).');
   const ok = await validarCredencialesSii({ rut, password }, opts);
   if (!ok) throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true });
   const compra = await descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts);

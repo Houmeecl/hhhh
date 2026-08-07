@@ -73,8 +73,9 @@ test('descargarRcv envía la clave en el cuerpo hacia BaseAPI y normaliza la res
 test('descargarRcv rechaza período y tipo inválidos antes de tocar la red', async () => {
   const capturas = [];
   const fetcher = fakeFetch({}, { capturas });
-  await assert.rejects(() => descargarRcv({ rut: RUT, password: CLAVE, periodo: 'mal', tipo: 'compra' }, { fetcher, cfg: CFG }), /Período/);
-  await assert.rejects(() => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'otro' }, { fetcher, cfg: CFG }), /Tipo/);
+  // Con bandera entrada:true → la ruta responde 400 con el mensaje, no 500.
+  await assert.rejects(() => descargarRcv({ rut: RUT, password: CLAVE, periodo: 'mal', tipo: 'compra' }, { fetcher, cfg: CFG }), (e) => e.entrada === true && /Período/.test(e.message));
+  await assert.rejects(() => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'otro' }, { fetcher, cfg: CFG }), (e) => e.entrada === true && /Tipo/.test(e.message));
   assert.equal(capturas.length, 0);
 });
 

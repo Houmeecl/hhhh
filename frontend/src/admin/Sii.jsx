@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtInt } from '../api.js';
 import { validarRut } from '../lib/rut.js';
+import { normalizarPeriodo, periodoValido } from '../lib/periodo.js';
 import AnalisisSiiVista from '../components/AnalisisSiiVista.jsx';
 
 // Sección admin "SII" en DOS pasos:
@@ -177,9 +178,12 @@ function GenerarEmpresa({ empresa, sesion, flash, onDescargado }) {
 
   async function generar(e) {
     e.preventDefault();
+    const p = normalizarPeriodo(periodo);
+    if (!periodoValido(p)) { flash('Período inválido: usa AAAA-MM (ej: 2026-06).', true); return; }
+    if (p !== periodo) setPeriodo(p);
     setGenerando(true);
     try {
-      const d = await api.adminSiiDescargar(empresa.id, { rut: sesion.rut, password: sesion.password, periodo });
+      const d = await api.adminSiiDescargar(empresa.id, { rut: sesion.rut, password: sesion.password, periodo: p });
       setAnalisis(d.analisis);
       flash(`Listo: ${fmtInt(d.documentos)} documentos del período ${d.periodo}.`);
       api.adminSiiPeriodos(empresa.id).then((r) => setPeriodos(r.periodos)).catch(() => {});

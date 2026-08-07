@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtInt } from '../api.js';
 import { validarRut } from '../lib/rut.js';
+import { normalizarPeriodo, periodoValido } from '../lib/periodo.js';
 import AnalisisSiiVista from '../components/AnalisisSiiVista.jsx';
 
 // Compras y ventas del proveedor traídas del SII (RCV/DTE) y analizadas.
@@ -45,11 +46,14 @@ export default function AnalisisSii() {
       if (!clave) { flash('Escribe tu clave tributaria para descargar.', true); return; }
       if (!validarRut(rut)) { flash('El RUT no es válido — revísalo antes de descargar.', true); return; }
     }
+    const p = normalizarPeriodo(periodo);
+    if (!periodoValido(p)) { flash('Período inválido: usa AAAA-MM (ej: 2026-06).', true); return; }
+    if (p !== periodo) setPeriodo(p);
     setDescargando(true);
     try {
       const body = guardadas && !clave
-        ? { periodo }                                   // usa la clave guardada
-        : { periodo, rut, password: clave, guardar };   // clave nueva (y se guarda si corresponde)
+        ? { periodo: p }                                   // usa la clave guardada
+        : { periodo: p, rut, password: clave, guardar };   // clave nueva (y se guarda si corresponde)
       const d = await api.proveedorSiiDescargar(body);
       setClave('');
       setAnalisis(d.analisis);
