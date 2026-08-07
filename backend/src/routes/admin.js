@@ -195,8 +195,8 @@ async function emitirContrato(client, entidad, tipoPedido, sujeto = 'cliente') {
   const tipo = tipoValido(tipoPedido) && permitidos.includes(tipoPedido)
     ? tipoPedido
     : (sujeto === 'auspiciador' ? 'auspicio' : TIPO_POR_DEFECTO);
-  const datos = snapshotDe(entidad, tipo);
-  const columna = sujeto === 'auspiciador' ? 'auspiciador_id' : 'cliente_id';
+  const datos = snapshotDe(entidad, tipo, sujeto);
+  const columna = sujeto === 'auspiciador' ? 'auspiciador_id' : sujeto === 'proveedor' ? 'proveedor_id' : 'cliente_id';
   for (let intento = 0; intento < 5; intento += 1) {
     const numero = generarNumeroContrato();
     const created_at = new Date().toISOString();
@@ -1654,6 +1654,56 @@ router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, 
 router.get('/sii/:proveedorId/periodos', async (req, res, next) => {
   try {
     res.json({ periodos: await periodosDescargados(query, req.params.proveedorId) });
+  } catch (err) { next(err); }
+});
+
+// ---------- Contrato de la empresa (proveedor) ----------
+// Mismo documento comercial que ya existe para clientes/auspiciadores
+// (services/contrato.js), ahora también sobre la empresa enrolada en esta
+// sección. GET nunca 404: null cuando aún no tiene contrato, para que el
+// frontend muestre "Emitir" sin depender de un catch.
+router.get('/sii/:proveedorId/contrato', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.proveedorId]
+    );
+    res.json({ contrato: rows[0] || null });
+  } catch (err) { next(err); }
+});
+
+router.post('/sii/:proveedorId/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows } = await client.query(`SELECT * FROM proveedores WHERE id = $1 FOR UPDATE`, [req.params.proveedorId]);
+      const empresa = rows[0];
+      if (!empresa) return null;
+      const { rows: vigente } = await client.query(
+        `SELECT id FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' LIMIT 1`, [empresa.id]
+      );
+      if (vigente[0]) return { error: 409 };
+      return emitirContrato(client, empresa, req.body?.tipo, 'proveedor');
+    });
+    if (!contrato) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    if (contrato.error === 409) return res.status(409).json({ error: 'Esta empresa ya tiene un contrato vigente.' });
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'emitir_contrato_proveedor', entidad: 'contrato',
+      entidadId: contrato.id, detalle: { proveedor_id: req.params.proveedorId, tipo: contrato.tipo }, ip: req.ip,
+    });
+    res.status(201).json({ contrato });
+  } catch (err) { next(err); }
+});
+
+router.get('/sii/:proveedorId/contrato.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.proveedorId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Esta empresa todavía no tiene contrato.' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${rows[0].numero}.pdf"`);
+    res.send(await pdfDeContrato(rows[0]));
   } catch (err) { next(err); }
 });
 

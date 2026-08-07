@@ -52,7 +52,11 @@ export const TIPOS = {
 };
 export const TIPO_POR_DEFECTO = 'asesoria';
 
-export const TIPOS_DE = (sujeto) => Object.entries(TIPOS).filter(([, t]) => t.sujeto === sujeto).map(([k]) => k);
+// 'proveedor' (empresa enrolada vía la sección SII) reusa los tipos de
+// contrato de 'cliente': para el paquete es el mismo tipo de relación
+// (servicio pagado por la contraparte), solo cambia la tabla de origen.
+export const TIPOS_DE = (sujeto) =>
+  Object.entries(TIPOS).filter(([, t]) => t.sujeto === (sujeto === 'proveedor' ? 'cliente' : sujeto)).map(([k]) => k);
 
 // Datos del prestador, tomados del certificado de Inscripción al Rol Único
 // Tributario del SII (folio 16548963, 06-07-2026).
@@ -146,9 +150,31 @@ export function snapshotAuspiciador(a = {}) {
   };
 }
 
-// Snapshot correcto según el sujeto del tipo de contrato.
-export function snapshotDe(entidad, tipo) {
-  return TIPOS[tipo]?.sujeto === 'auspiciador' ? snapshotAuspiciador(entidad) : snapshotCliente(entidad);
+// Foto de la empresa (proveedor) al emitir. Misma forma que snapshotCliente
+// para que clausulas()/hashContrato() no distingan el origen: `proveedores`
+// no tiene plan/estado_contrato/fecha_inicio/fecha_fin (no es un contrato
+// comercial con esos términos hoy), así que quedan con un valor neutro.
+export function snapshotProveedor(p = {}) {
+  return {
+    razon_social: p.nombre_empresa || '',
+    rut: p.rut || '',
+    contacto_email: p.contacto_email || '',
+    plan: 'estandar',
+    estado_contrato: p.activo === false ? 'vencido' : 'activo',
+    fecha_inicio: fecha(p.created_at),
+    fecha_fin: null,
+  };
+}
+
+// Snapshot correcto según la contraparte. `sujeto` explícito (recomendado)
+// distingue proveedor de cliente aunque compartan tipo de contrato; sin él
+// se infiere del tipo (comportamiento previo, sigue sirviendo para
+// cliente/auspiciador).
+export function snapshotDe(entidad, tipo, sujeto) {
+  const s = sujeto || TIPOS[tipo]?.sujeto;
+  if (s === 'auspiciador') return snapshotAuspiciador(entidad);
+  if (s === 'proveedor') return snapshotProveedor(entidad);
+  return snapshotCliente(entidad);
 }
 
 // ---------- cláusulas comunes ----------

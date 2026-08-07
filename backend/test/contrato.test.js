@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PLANTILLA_VERSION, PUNTOS_PENDIENTES, ESTADOS, TIPOS, TIPO_POR_DEFECTO, PRESTADOR,
-  generarNumeroContrato, snapshotCliente, clausulas, clausulasPendientes,
+  generarNumeroContrato, snapshotCliente, snapshotProveedor, clausulas, clausulasPendientes,
   puedeEmitirse, hashContrato, tipoValido, TIPOS_DE, snapshotDe, PENDIENTE,
 } from '../src/services/contrato.js';
 
@@ -259,4 +259,39 @@ test('el sello distingue dos auspiciadores con distinto vehículo', () => {
   const uno = hashContrato({ ...base, datos: snapshotDe(AUSPICIADOR, 'comodato') });
   const otro = hashContrato({ ...base, datos: snapshotDe({ ...AUSPICIADOR, vehiculo: { ...AUSPICIADOR.vehiculo, patente: 'WXYZ99' } }, 'comodato') });
   assert.notEqual(uno, otro);
+});
+
+// ---------- contrato de la empresa (proveedor, sección SII) ----------
+
+const PROVEEDOR = {
+  id: 'p1', rut: '76520943-9', nombre_empresa: 'Minería del Norte SpA',
+  contacto_email: 'contacto@mineria.cl', activo: true, created_at: '2026-08-01T10:00:00Z',
+};
+
+test('snapshotProveedor tiene la misma forma que snapshotCliente (mismo tipo de contrato)', () => {
+  const d = snapshotProveedor(PROVEEDOR);
+  assert.deepEqual(Object.keys(d).sort(), Object.keys(snapshotCliente(PROVEEDOR)).sort());
+  assert.equal(d.razon_social, 'Minería del Norte SpA');
+  assert.equal(d.estado_contrato, 'activo');
+});
+
+test('un proveedor inactivo se refleja en el snapshot', () => {
+  assert.equal(snapshotProveedor({ ...PROVEEDOR, activo: false }).estado_contrato, 'vencido');
+});
+
+test('TIPOS_DE("proveedor") reusa los tipos de cliente (asesoria/mandante)', () => {
+  assert.deepEqual(TIPOS_DE('proveedor').sort(), TIPOS_DE('cliente').sort());
+});
+
+test('snapshotDe con sujeto explícito "proveedor" usa snapshotProveedor', () => {
+  const d = snapshotDe(PROVEEDOR, 'asesoria', 'proveedor');
+  assert.equal(d.razon_social, 'Minería del Norte SpA');
+  assert.equal(d.rut, '76520943-9');
+});
+
+test('el contrato de una empresa (proveedor) nombra su razón social igual que el de un cliente', () => {
+  const texto = clausulas(snapshotDe(PROVEEDOR, 'asesoria', 'proveedor'), 'asesoria')
+    .flatMap((c) => c.parrafos).join(' ');
+  assert.ok(texto.includes('Minería del Norte SpA'));
+  assert.ok(texto.includes('76520943-9'));
 });

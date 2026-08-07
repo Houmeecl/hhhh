@@ -256,6 +256,54 @@ function GenerarEmpresa({ empresa, sesion, flash, onDescargado }) {
           <AnalisisSiiVista a={analisis} />
         </div>
       )}
+
+      <ContratoEmpresa empresa={empresa} flash={flash} />
+    </div>
+  );
+}
+
+// Contrato de servicio de la empresa: verlo, emitirlo si no existe,
+// descargarlo. Mismo documento comercial que ya existe para clientes y
+// auspiciadores (services/contrato.js); acá cuelga de la empresa (proveedor).
+function ContratoEmpresa({ empresa, flash }) {
+  const [contrato, setContrato] = useState(null); // undefined mientras carga, null sin contrato
+  const [emitiendo, setEmitiendo] = useState(false);
+
+  useEffect(() => {
+    setContrato(undefined);
+    api.adminSiiContrato(empresa.id).then((d) => setContrato(d.contrato)).catch((e) => flash(e.message, true));
+  }, [empresa.id]);
+
+  async function emitir() {
+    setEmitiendo(true);
+    try {
+      const d = await api.adminSiiEmitirContrato(empresa.id);
+      setContrato(d.contrato);
+      flash('Contrato emitido en borrador.');
+    } catch (e) { flash(e.message, true); } finally { setEmitiendo(false); }
+  }
+
+  if (contrato === undefined) return null;
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>Contrato</h3>
+      {contrato ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span className={`badge ${contrato.estado === 'aceptado' ? 'badge-green' : 'badge-amber'}`}>{contrato.estado}</span>
+          <span className="muted" style={{ fontSize: 13 }}>{contrato.numero}</span>
+          <button className="btn btn-outline btn-sm" onClick={() => api.abrirSiiContratoPdf(empresa.id).catch((e) => flash(e.message, true))}>
+            Descargar PDF
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <span className="muted" style={{ fontSize: 13 }}>Esta empresa todavía no tiene contrato.</span>
+          <button className="btn btn-primary btn-sm" onClick={emitir} disabled={emitiendo}>
+            {emitiendo ? <><span className="spinner" /> Emitiendo…</> : 'Emitir contrato'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
