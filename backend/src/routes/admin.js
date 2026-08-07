@@ -903,7 +903,7 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
 
     const entidadCfg = ENTIDAD_CUENTA_POR_PANEL[panel];
     if (entidadCfg) {
-      if (!entidad_id) return res.status(400).json({ error: 'Falta entidad_id' });
+      if (!entidad_id) return res.status(400).json({ error: 'Falta elegir la entidad' });
       const { rows: entidadRows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidad_id]);
       if (!entidadRows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
       return crearCuentaEntidad({
@@ -959,18 +959,46 @@ router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
       ? req.body.es_superadmin
       : null;
     const nivelAcceso = nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : null;
-    const { rows } = await query(
-      `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
-              panel = COALESCE($5,panel), es_superadmin = COALESCE($6,es_superadmin),
-              nivel_acceso = COALESCE($7,nivel_acceso)
-       WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso`,
-      [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso]
-    );
+    let rows;
+    try {
+      ({ rows } = await query(
+        `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
+                panel = COALESCE($5,panel), es_superadmin = COALESCE($6,es_superadmin),
+                nivel_acceso = COALESCE($7,nivel_acceso)
+         WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso`,
+        [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso]
+      ));
+    } catch (e) {
+      // 23514 = CHECK. El caso real es bajarle el rol o cambiarle el panel
+      // a un superadmin: la migración 069 exige que siga siendo admin de
+      // sicrep. Sin esto sale un 500 genérico que no explica nada.
+      if (e.code === '23514' && /superadmin/.test(e.constraint || '')) {
+        return res.status(409).json({ error: 'Un superadmin debe seguir siendo admin del panel sicrep. Quítale primero la marca de superadmin.' });
+      }
+      throw e;
+    }
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     await logActividad({ usuarioId: req.user.sub, accion: 'editar_usuario', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
     res.json({ usuario: rows[0] });
   } catch (err) { next(err); }
 });
+
+// Provisionar una credencial (llave FIDO2 o llave de archivo) sobre una
+// cuenta ajena es equivalente a poder entrar como ella: el admin enrola su
+// propia llave física, o se lleva el token+PIN en claro del response, y
+// después inicia sesión con los privilegios del dueño. Mientras 'admin'
+// era el techo eso daba lo mismo; con la marca es_superadmin (migración
+// 069) por encima, deja de darlo — un admin normal escalaría a superadmin
+// en dos llamadas. Solo un superadmin puede tocar las credenciales de otro.
+async function protegerCredencialesDeSuperadmin(req, res, next) {
+  try {
+    const { rows } = await query(`SELECT es_superadmin FROM usuarios WHERE id = $1`, [req.params.id]);
+    if (rows[0]?.es_superadmin && req.user.es_superadmin !== true) {
+      return res.status(403).json({ error: 'Solo un superadmin puede gestionar las credenciales de otro superadmin' });
+    }
+    next();
+  } catch (err) { next(err); }
+}
 
 // ---------- Llaves USB de huella (WebAuthn/FIDO2) — ver migración 061 ----------
 // El registro lo hace un admin, no el propio usuario (autoservicio queda
@@ -987,7 +1015,7 @@ router.get('/usuarios/:id/webauthn', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/webauthn/opciones', adminOnly, async (req, res, next) => {
+router.post('/usuarios/:id/webauthn/opciones', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1019,7 +1047,7 @@ router.post('/usuarios/:id/webauthn/opciones', adminOnly, async (req, res, next)
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/webauthn/verificar', adminOnly, async (req, res, next) => {
+router.post('/usuarios/:id/webauthn/verificar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1076,7 +1104,7 @@ router.post('/usuarios/:id/webauthn/verificar', adminOnly, async (req, res, next
   } catch (err) { next(err); }
 });
 
-router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, async (req, res, next) => {
+router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `DELETE FROM credenciales_webauthn WHERE id = $1 AND usuario_id = $2`,
@@ -1106,7 +1134,7 @@ router.get('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => {
+router.post('/usuarios/:id/llaves-archivo', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1153,7 +1181,7 @@ router.post('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) =>
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, async (req, res, next) => {
+router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `UPDATE credenciales_archivo SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo`,
@@ -1188,7 +1216,7 @@ router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
     const fks = { puerto_id: null, mandante_id: null, agencia_id: null, trazador_id: null, proveedor_id: null };
     if (entidadCfg) {
       const entidadId = req.body?.entidad_id;
-      if (!entidadId) return res.status(400).json({ error: 'Falta entidad_id' });
+      if (!entidadId) return res.status(400).json({ error: 'Falta elegir la entidad' });
       const { rows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidadId]);
       if (!rows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
       fks[entidadCfg.columnaFk] = entidadId;
@@ -1202,7 +1230,14 @@ router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
         rol: 'operador', // nunca 'admin': los paneles externos no tienen ese concepto
         email: req.user.email,
         panel,
-        nivel_acceso: 'operador',
+        // Es una VISTA, no un turno de trabajo: 'lectura' cierra las 2
+        // mutaciones externas (subir documento en agencia, firmar lote en
+        // proveedor) vía requireNivelOperador. Sin esto un superadmin
+        // podría sellar un eslabón en la cadena de custodia CON EL RUT Y LA
+        // RAZÓN SOCIAL del proveedor — el eslabón no distingue quién lo
+        // firmó, y `proveedor_lotes.firmado_at` deja al proveedor real sin
+        // poder firmar. Es exactamente lo que el panel promete impedir.
+        nivel_acceso: 'lectura',
         ...fks,
       },
       config.jwt.accessSecret,

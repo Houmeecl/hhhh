@@ -4,6 +4,8 @@ import http from 'node:http';
 import express from 'express';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { config } from '../src/config.js';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
@@ -227,6 +229,50 @@ test('un proveedor no puede firmar la asignación de otro proveedor (404: no se 
     body: '{}',
   });
   assert.equal(res.status, 404);
+});
+
+test('caso crítico: un token de VISTA de superadmin NO puede firmar el lote suplantando al proveedor', { skip: SALTO_PROD }, async () => {
+  // El token que emite POST /api/admin/entrar-a-panel satisface a
+  // propósito requireHomePanel('proveedor') — así funciona el acceso
+  // multi-panel. Lo que NO debe poder hacer es escribir: firmar sellaría
+  // un eslabón con el RUT y la razón social del proveedor real, sin dejar
+  // rastro en el propio eslabón de que lo firmó otra persona, y dejaría la
+  // asignación marcada como firmada (el proveedor real recibiría 409).
+  const tokenVista = jwt.sign(
+    {
+      sub: `imp:${crypto.randomUUID()}:proveedor`, imp: true, imp_by: crypto.randomUUID(),
+      rol: 'operador', email: `super-${sufijo}@ejemplo.cl`, panel: 'proveedor',
+      nivel_acceso: 'lectura', proveedor_id: proveedorB.id,
+    },
+    config.jwt.accessSecret,
+    { expiresIn: '5m' }
+  );
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes/${asignacionBId}/firmar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenVista}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(res.status, 403);
+
+  // Y la asignación sigue sin firmar: el proveedor real conserva su turno.
+  const { rows } = await query(`SELECT firmado_at FROM proveedor_lotes WHERE id = $1`, [asignacionBId]);
+  assert.equal(rows[0].firmado_at, null);
+});
+
+test('el token de vista SÍ puede leer (es una vista, no un bloqueo total)', { skip: SALTO_PROD }, async () => {
+  const tokenVista = jwt.sign(
+    {
+      sub: `imp:${crypto.randomUUID()}:proveedor`, imp: true, imp_by: crypto.randomUUID(),
+      rol: 'operador', email: `super-${sufijo}@ejemplo.cl`, panel: 'proveedor',
+      nivel_acceso: 'lectura', proveedor_id: proveedorB.id,
+    },
+    config.jwt.accessSecret,
+    { expiresIn: '5m' }
+  );
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes`, {
+    headers: { Authorization: `Bearer ${tokenVista}` },
+  });
+  assert.equal(res.status, 200);
 });
 
 test('una cuenta con nivel_acceso="lectura" recibe 403 antes de llegar a la lógica de negocio (migración 070)', { skip: SALTO_PROD }, async () => {

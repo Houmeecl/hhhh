@@ -15,6 +15,13 @@ const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador', 'proveedor'];
 
+// Etiqueta legible de cada panel para el copy visible: 'aduana_verde' es
+// el nombre interno histórico del canal que hoy se llama "terreno".
+const NOMBRE_PANEL = {
+  sicrep: 'sicrep', aduana_verde: 'terreno', puerto: 'Puerto',
+  mandante: 'Mandante', agencia: 'Agencia', trazador: 'Trazador', proveedor: 'Proveedor',
+};
+
 // ---------- POST /api/auth/login ----------
 router.post('/login', loginLimiter, async (req, res, next) => {
   try {
@@ -100,7 +107,10 @@ router.get('/me', requireAuth, async (req, res) => {
       user: {
         id: req.user.sub,
         email: req.user.email,
-        nombre: `Superadmin (vista de ${req.user.panel})`,
+        // Etiqueta legible, nunca el slug: 'aduana_verde' es el nombre
+        // histórico interno del canal que en todo el copy visible se llama
+        // "terreno" (ver README).
+        nombre: `Superadmin (vista de ${NOMBRE_PANEL[req.user.panel] || req.user.panel})`,
         rol: req.user.rol,
         panel: req.user.panel,
         cliente_id: null,

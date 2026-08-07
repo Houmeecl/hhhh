@@ -83,7 +83,9 @@ function EntrarAOtroPanel() {
     setMsg(''); setCargando(true);
     try {
       const { accessToken } = await api.entrarAPanel(panel, entidadId || undefined);
-      window.open(`/impersonar/${panel}?t=${encodeURIComponent(accessToken)}`, '_blank', 'noopener');
+      // En el fragmento (#), no en el query: así el token no llega al
+      // servidor ni queda en el access.log — ver EntrarComoSuperadmin.jsx.
+      window.open(`/impersonar/${panel}#t=${encodeURIComponent(accessToken)}`, '_blank', 'noopener');
     } catch (e) { setMsg(e.message); }
     setCargando(false);
   }

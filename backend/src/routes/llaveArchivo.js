@@ -37,7 +37,11 @@ router.post('/', loginLimiter, async (req, res, next) => {
       `SELECT ca.id AS credencial_id, ca.token_hash, ca.pin_hash, ca.activo AS credencial_activa,
               ca.intentos_fallidos, ca.bloqueado_hasta,
               u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.cliente_id,
-              u.puerto_id, u.mandante_id, u.agencia_id, u.trazador_id, u.proveedor_id, u.must_reset_password
+              u.puerto_id, u.mandante_id, u.agencia_id, u.trazador_id, u.proveedor_id, u.must_reset_password,
+              -- Sin estas dos, signAccess() cae a sus defaults (false /
+              -- 'operador'): una cuenta de solo lectura entrando por llave
+              -- de archivo quedaría habilitada para escribir.
+              u.es_superadmin, u.nivel_acceso
        FROM credenciales_archivo ca JOIN usuarios u ON u.id = ca.usuario_id
        WHERE ca.serial = $1`,
       [serial]

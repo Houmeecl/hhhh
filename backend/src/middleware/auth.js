@@ -75,13 +75,29 @@ export function requireNivelOperador(req, res, next) {
   next();
 }
 
+// El `sub` de una sesión de vista de superadmin es `imp:<uuid>:<panel>`,
+// que no entra en actividad_log.usuario_id (UUID). Sin traducirlo, el
+// INSERT falla y el catch de abajo lo degrada a un warning: la sesión
+// quedaría sin ninguna huella auditable. Se registra al superadmin REAL
+// (imp_by) y se deja constancia de la vista en el detalle.
+const SUB_IMP = /^imp:([0-9a-f-]{36}):(.+)$/i;
+function normalizarActor(usuarioId, detalle) {
+  const m = typeof usuarioId === 'string' ? usuarioId.match(SUB_IMP) : null;
+  if (!m) return { usuarioId: usuarioId || null, detalle };
+  return {
+    usuarioId: m[1],
+    detalle: { ...(detalle || {}), via: 'vista_superadmin', panel_vista: m[2] },
+  };
+}
+
 // Registra una acción en actividad_log.
 export async function logActividad({ usuarioId, accion, entidad, entidadId, detalle, ip }) {
   try {
+    const actor = normalizarActor(usuarioId, detalle);
     await query(
       `INSERT INTO actividad_log (usuario_id, accion, entidad, entidad_id, detalle, ip)
        VALUES ($1,$2,$3,$4,$5,$6)`,
-      [usuarioId || null, accion, entidad || null, entidadId || null, detalle ? JSON.stringify(detalle) : null, ip || null]
+      [actor.usuarioId, accion, entidad || null, entidadId || null, actor.detalle ? JSON.stringify(actor.detalle) : null, ip || null]
     );
   } catch (e) {
     console.warn('[actividad_log]', e.message);

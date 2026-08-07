@@ -137,6 +137,22 @@ Ver `.env.example`. Las principales:
   un PIN de 6 dígitos, emitidos una sola vez desde Usuarios.jsx. El PIN se verifica en el servidor
   (bcrypt + bloqueo tras 5 fallos), no en el archivo. Es explícitamente la vía más débil de las
   tres — un archivo se puede copiar — y así se lo dice la interfaz en cada pantalla donde aparece.
+- **Paneles aislados**: la cuenta pertenece a un solo panel (`usuarios.panel`) y el JWT lo firma;
+  cada router lo exige. La única excepción es el **superadmin** (`usuarios.es_superadmin`, con un
+  CHECK que obliga a que sea admin del panel sicrep): desde el sidebar del admin puede abrir una
+  **vista de 5 minutos, de solo lectura y sin refresh**, de cualquier otro panel. No se aflojó
+  ningún control — se emite un token sintético que ya los cumple, con `sub` no-UUID (`imp:…`) para
+  que cualquier mal uso falle en vez de devolver datos ajenos, y con `nivel_acceso: 'lectura'` para
+  que la vista **no pueda firmar un lote ni subir un documento**: eso sellaría un eslabón en la
+  cadena de custodia con el RUT del actor real. Todo lo que hace la vista queda en el log de
+  actividad a nombre del superadmin. Un admin sin la marca no puede emitir credenciales sobre una
+  cuenta superadmin (sería una escalada). **El admin del seed nace como superadmin**; para marcar a
+  otro se usa el botón de Usuarios.jsx, que solo ve otro superadmin.
+- **Nivel de acceso** (`usuarios.nivel_acceso`: `operador` | `lectura`) para las cuentas de los
+  paneles externos, independiente del rol interno. Hoy restringe las dos únicas operaciones de
+  escritura que existen fuera de sicrep/terreno: subir un documento en Agencia y firmar un lote en
+  Proveedor. Puerto, Mandante y Trazador son de solo lectura por diseño, así que ahí el campo no
+  cambia nada — y por eso la interfaz no lo ofrece donde no tiene efecto.
 - **Rate limiting** en el login (`express-rate-limit`).
 - **helmet** y **CORS restringido**.
 - Tokens de activación/reset **hasheados** (SHA-256) con expiración.

@@ -221,10 +221,18 @@ export default function Usuarios({ yo }) {
                   ) : <span className="muted">{PANEL_LABEL[u.panel] || u.panel}</span>}
                 </td>
                 <td>
-                  <select value={u.nivel_acceso || 'operador'} onChange={(e) => cambiar(u, 'nivel_acceso', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                    <option value="operador">operador</option>
-                    <option value="lectura">solo lectura</option>
-                  </select>
+                  {/* Solo se ofrece en los paneles externos: ahí hay
+                      mutaciones que requireNivelOperador restringe de
+                      verdad. En sicrep/terreno lo que manda es el rol, y
+                      un selector aquí prometería un límite inexistente. */}
+                  {esInterno ? (
+                    <span className="muted" title="En este panel el permiso lo define el rol">—</span>
+                  ) : (
+                    <select value={u.nivel_acceso || 'operador'} onChange={(e) => cambiar(u, 'nivel_acceso', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                      <option value="operador">operador</option>
+                      <option value="lectura">solo lectura</option>
+                    </select>
+                  )}
                 </td>
                 <td>
                   <select value={u.estado} onChange={(e) => cambiar(u, 'estado', e.target.value)} className={`badge ${badge(u.estado)}`} style={{ border: 'none', padding: '4px 8px', borderRadius: 6 }}>
@@ -280,12 +288,16 @@ export default function Usuarios({ yo }) {
               ) : (
                 <div className="field"><label>Rol</label><select value={modal.rol} onChange={(e) => setModal({ ...modal, rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></div>
               )}
-              <div className="field"><label>Nivel de acceso</label>
-                <select value={modal.nivel_acceso} onChange={(e) => setModal({ ...modal, nivel_acceso: e.target.value })}>
-                  <option value="operador">operador (puede escribir)</option>
-                  <option value="lectura">solo lectura</option>
-                </select>
-              </div>
+              {/* Igual que en la tabla: el nivel de acceso solo tiene efecto
+                  real en los paneles externos. */}
+              {cfgExterno && (
+                <div className="field"><label>Nivel de acceso</label>
+                  <select value={modal.nivel_acceso} onChange={(e) => setModal({ ...modal, nivel_acceso: e.target.value })}>
+                    <option value="operador">operador (puede escribir)</option>
+                    <option value="lectura">solo lectura</option>
+                  </select>
+                </div>
+              )}
             </div>
             {cfgExterno && (
               <p className="muted" style={{ fontSize: 13 }}>

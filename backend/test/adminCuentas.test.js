@@ -215,6 +215,39 @@ test('PUT /admin/usuarios/:id acepta nivel_acceso pero ignora es_superadmin si e
   assert.equal(rows[0].es_superadmin, false);
 });
 
+test('un admin normal NO puede emitir credenciales sobre una cuenta superadmin (escalada de privilegio)', { skip: SALTO_PROD }, async () => {
+  // Provisionar una credencial ajena equivale a poder entrar como esa
+  // cuenta: el admin enrola su propia llave física, o se lleva el
+  // token+PIN en claro del response, y luego inicia sesión con los
+  // privilegios del dueño. Sin este guard un admin de sicrep se volvía
+  // superadmin en dos llamadas, saltándose el control de PUT /usuarios/:id.
+  const { rows } = await query(
+    `INSERT INTO usuarios (email, nombre, rol, panel, estado, password_hash, es_superadmin)
+     VALUES ($1,'Superadmin Objetivo','admin','sicrep','activo','x',true) RETURNING id`,
+    [`super-objetivo-${sufijo}@ejemplo.cl`]
+  );
+  const objetivoId = rows[0].id;
+  try {
+    for (const ruta of [`${objetivoId}/webauthn/opciones`, `${objetivoId}/llaves-archivo`]) {
+      const res = await fetch(`${baseUrl}/api/admin/usuarios/${ruta}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      assert.equal(res.status, 403, ruta);
+    }
+    // El superadmin sí puede (no es un bloqueo universal).
+    const res = await fetch(`${baseUrl}/api/admin/usuarios/${objetivoId}/llaves-archivo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(res.status, 201);
+  } finally {
+    await query(`DELETE FROM usuarios WHERE id = $1`, [objetivoId]);
+  }
+});
+
 test('PUT /admin/usuarios/:id honra es_superadmin cuando el llamador SÍ es superadmin', { skip: SALTO_PROD }, async () => {
   // El CHECK usuarios_superadmin_requiere_sicrep_admin exige panel='sicrep'
   // Y rol='admin' — usuarioGeneralId nació con rol='operador' (test de

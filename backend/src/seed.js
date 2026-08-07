@@ -33,12 +33,17 @@ async function seed() {
     );
     console.log(`\n[seed] Usuario admin actualizado.`);
   } else {
+    // El admin inicial nace como superadmin (migración 069): es la única
+    // cuenta que existe en una instalación nueva, y sin la marca nadie
+    // podría otorgarla después salvo por UPDATE a mano en la base. NO se
+    // agrega en la rama de arriba: marcar como superadmin una cuenta que
+    // ya existía sería una escalada silenciosa al correr el seed.
     await query(
-      `INSERT INTO usuarios (email, password_hash, nombre, rol, estado, must_reset_password)
-       VALUES ($1,$2,'Administrador sicr3p','admin','activo',false)`,
+      `INSERT INTO usuarios (email, password_hash, nombre, rol, estado, must_reset_password, es_superadmin)
+       VALUES ($1,$2,'Administrador sicr3p','admin','activo',false,true)`,
       [email, hash]
     );
-    console.log(`\n[seed] Usuario admin creado.`);
+    console.log(`\n[seed] Usuario admin creado (superadmin: puede entrar a todos los paneles).`);
   }
 
   // Datos de demostración (clientes/prospectos ficticios) — SOLO con SEED_DEMO=true

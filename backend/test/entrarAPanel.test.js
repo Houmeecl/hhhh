@@ -122,6 +122,23 @@ test('POST /admin/entrar-a-panel emite un token de vista con sub sintético y ro
   assert.equal(payload.puerto_id, puertoId);
 });
 
+test('el token de vista es de SOLO LECTURA: nivel_acceso="lectura" en todos los paneles', { skip: SALTO_PROD }, async () => {
+  // Regresión de la propiedad central: con nivel_acceso='operador' este
+  // token pasaba requireNivelOperador y permitía FIRMAR UN LOTE con el RUT
+  // y la razón social del proveedor — un eslabón sellado en la cadena de
+  // custodia que no distingue quién lo firmó, y que además deja al
+  // proveedor real sin poder firmar (409). Es "vista", no suplantación.
+  for (const cuerpo of [{ panel: 'aduana_verde' }, { panel: 'puerto', entidad_id: puertoId }]) {
+    const res = await fetch(`${baseUrl}/api/admin/entrar-a-panel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    });
+    const { accessToken } = await res.json();
+    assert.equal(jwt.verify(accessToken, config.jwt.accessSecret).nivel_acceso, 'lectura', cuerpo.panel);
+  }
+});
+
 test('GET /auth/me con un token de vista responde desde el payload, sin tocar usuarios', { skip: SALTO_PROD }, async () => {
   const res = await fetch(`${baseUrl}/api/auth/me`, {
     headers: { Authorization: `Bearer ${tokenVista}` },
