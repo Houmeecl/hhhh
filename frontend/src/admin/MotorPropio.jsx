@@ -10,20 +10,42 @@ export default function MotorPropio() {
   const [stats, setStats] = useState(null);
   const [versiones, setVersiones] = useState([]);
   const [propuestas, setPropuestas] = useState([]);
+  const [fuentes, setFuentes] = useState([]);
+  const [editFuente, setEditFuente] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [edit, setEdit] = useState(null);
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
   const cargar = () => Promise.all([
-    api.motorCategorias(), api.motorEstadisticas(), api.motorVersiones(), api.motorPropuestas(),
+    api.motorCategorias(), api.motorEstadisticas(), api.motorVersiones(), api.motorPropuestas(), api.motorFuentes(),
   ])
-    .then(([c, s, v, p]) => {
+    .then(([c, s, v, p, f]) => {
       setCategorias(c.categorias); setStats(s);
       setVersiones(v.versiones || []); setPropuestas(p.propuestas || []);
+      setFuentes(f.fuentes || []);
     })
     .catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
+
+  async function guardarFuente() {
+    try {
+      await api.guardarFuenteMotor(editFuente.id, {
+        url: editFuente.url.trim() || null,
+        version_anio: editFuente.version_anio.trim() || null,
+        notas: editFuente.notas.trim() || null,
+      });
+      setEditFuente(null); cargar(); flash('Fuente actualizada.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  async function marcarOficial(f) {
+    if (!window.confirm(`¿Confirmas que tienes descargada la edición vigente de "${f.organismo} — ${f.documento}" (${f.version_anio || 'sin año'})? Solo marca oficial si ya la revisaste.`)) return;
+    try {
+      await api.guardarFuenteMotor(f.id, { estado: 'validada_oficial' });
+      cargar(); flash(`"${f.documento}" marcada como validada oficial.`);
+    } catch (e) { flash(e.message, true); }
+  }
 
   // Dispara la búsqueda de fuentes. Puede tardar: la IA hace varias
   // búsquedas web antes de responder, por eso el botón queda deshabilitado
@@ -188,6 +210,42 @@ export default function MotorPropio() {
         );
       })()}
 
+      {/* Fuentes que cita el motor (motor_categorias.fuente_metodologica_id).
+          "Validada oficial" es una firma humana, no algo que el sistema
+          verifique solo: por eso el botón pide confirmar antes de marcar. */}
+      <div style={{ marginTop: 8, marginBottom: 32 }}>
+        <h2 style={{ marginBottom: 4, fontSize: 18 }}>Fuentes metodológicas</h2>
+        <p className="muted" style={{ margin: '0 0 12px', fontSize: 13, maxWidth: 640 }}>
+          Los factores del motor citan estas fuentes. "Avalada referencial" es el estado inicial;
+          "Validada oficial" la marca quien confirmó que tiene la edición vigente del documento.
+        </p>
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr><th>Organismo</th><th>Documento</th><th>Edición</th><th>Estado</th><th style={{ textAlign: 'right' }}>Categorías</th><th></th></tr>
+            </thead>
+            <tbody>
+              {fuentes.map((f) => (
+                <tr key={f.id}>
+                  <td>{f.organismo}</td>
+                  <td>{f.documento}</td>
+                  <td className="muted">{f.version_anio || '—'}</td>
+                  <td><span className={`badge ${f.estado === 'validada_oficial' ? 'badge-green' : 'badge-gray'}`}>{f.estado === 'validada_oficial' ? 'Validada oficial' : 'Avalada referencial'}</span></td>
+                  <td style={{ textAlign: 'right' }}>{f.n_categorias}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-outline btn-sm" onClick={() => setEditFuente({ id: f.id, url: f.url || '', version_anio: f.version_anio || '', notas: f.notas || '' })}>Editar</button>{' '}
+                    {f.estado !== 'validada_oficial' && (
+                      <button className="btn btn-primary btn-sm" onClick={() => marcarOficial(f)}>Marcar oficial</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {fuentes.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 20 }}>Sin fuentes cargadas.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
         {categorias.map((c) => (
           <div className="card card-pad" key={c.codigo}>
@@ -304,6 +362,24 @@ export default function MotorPropio() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {editFuente && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setEditFuente(null)}>
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <h2 style={{ marginTop: 0 }}>Editar fuente</h2>
+            <div className="field"><label>Edición / año</label>
+              <input value={editFuente.version_anio} onChange={(e) => setEditFuente({ ...editFuente, version_anio: e.target.value })} placeholder="Ej: 2025" /></div>
+            <div className="field"><label>URL oficial</label>
+              <input value={editFuente.url} onChange={(e) => setEditFuente({ ...editFuente, url: e.target.value })} placeholder="https://..." /></div>
+            <div className="field" style={{ marginBottom: 14 }}><label>Notas</label>
+              <textarea rows={3} value={editFuente.notas} onChange={(e) => setEditFuente({ ...editFuente, notas: e.target.value })} /></div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline" onClick={() => setEditFuente(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={guardarFuente}>Guardar</button>
+            </div>
           </div>
         </div>
       )}
