@@ -161,7 +161,7 @@ export default function AnalisisSii() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <button className="btn btn-outline btn-sm"
-              onClick={() => api.abrirProveedorInformeCarbonoPdf(analisis.periodo).catch((e) => flash(e.message, true))}>
+              onClick={() => api.descargarProveedorInformeCarbonoPdf(analisis.periodo).catch((e) => flash(e.message, true))}>
               Descargar informe (PDF)
             </button>
           </div>

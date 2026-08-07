@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'crypto';
-import { hashApiKey, normalizarRut, webhookUrlValida } from '../src/services/mandante.js';
+import { hashApiKey, normalizarRut, formatearRut, webhookUrlValida } from '../src/services/mandante.js';
 
 test('hashApiKey es determinista (misma key → mismo hash)', () => {
   const key = 'smk_ejemploDeTokenAbc123';
@@ -59,4 +59,18 @@ test('webhookUrlValida rechaza vacío, null o URL malformada', () => {
   assert.equal(webhookUrlValida(null), false);
   assert.equal(webhookUrlValida(undefined), false);
   assert.equal(webhookUrlValida('no-es-una-url'), false);
+});
+
+test('formatearRut devuelve el formato chileno desde el valor normalizado', () => {
+  // Los RUT se guardan normalizados (así se cruzan con el RCV), pero los
+  // documentos que se entregan a la empresa deben mostrarlos como se escriben.
+  assert.equal(formatearRut('76222089K'), '76.222.089-K');
+  assert.equal(formatearRut('761234560'), '76.123.456-0');
+  assert.equal(formatearRut('76.123.456-0'), '76.123.456-0');
+});
+
+test('formatearRut no inventa puntuación sobre un valor que no es un RUT', () => {
+  assert.equal(formatearRut(''), '');
+  assert.equal(formatearRut(null), '');
+  assert.equal(formatearRut('K'), 'K');
 });

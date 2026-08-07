@@ -28,9 +28,9 @@ export default function PanelLogin({
   subtitulo,       // rótulo verde bajo el logo; opcional
   descripcion,     // párrafo explicativo; opcional
   placeholder,     // ejemplo de correo
-  conLlave = false, // panel proveedor: login FIDO2-primero, la contraseña
-                     // queda como respaldo secundario (default false — los
-                     // paneles existentes no cambian de comportamiento).
+  conLlave = false, // panel proveedor: además de la contraseña, ofrece entrar
+                     // con llave USB FIDO2 (default false — los paneles
+                     // existentes no cambian de comportamiento).
 }) {
   const nav = useNavigate();
   const [email, setEmail] = useState('');
@@ -134,25 +134,6 @@ export default function PanelLogin({
             />
           </div>
 
-          {conLlave && (
-            <>
-              {/* Acción primaria: entra sin contraseña con la llave USB. La
-                  contraseña queda como respaldo, más abajo. */}
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: '100%', marginBottom: 10 }}
-                disabled={loading || loadingLlave}
-                onClick={entrarConLlave}
-              >
-                {loadingLlave ? <span className="spinner" /> : (<><Icon.Shield size={16} /> Entrar con llave USB</>)}
-              </button>
-              <p className="muted" style={{ fontSize: 12, textAlign: 'center', margin: '0 0 16px' }}>
-                Si aún no tenés tu llave registrada, entrá con tu contraseña temporal.
-              </p>
-            </>
-          )}
-
           <div className="field" style={{ marginBottom: 10 }}>
             <label htmlFor="login-password">Contraseña</label>
             <input
@@ -177,9 +158,31 @@ export default function PanelLogin({
             <div className="badge badge-green" role="status" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{aviso}</div>
           )}
 
-          <button className={`btn ${conLlave ? 'btn-outline' : 'btn-primary'}`} style={{ width: '100%' }} disabled={loading || loadingLlave}>
+          <button className="btn btn-primary" style={{ width: '100%' }} disabled={loading || loadingLlave}>
             {loading ? <span className="spinner" /> : 'Iniciar sesión'}
           </button>
+
+          {/* La llave USB va DESPUÉS de la contraseña y como acción
+              secundaria: casi toda cuenta de este panel entra con el correo
+              con que la enrolamos, y la llave FIDO2 la tienen solo quienes
+              firman lotes. Cuando era el botón primario, la pantalla le
+              hablaba de un dispositivo que la mayoría no tiene. */}
+          {conLlave && (
+            <>
+              <div className="muted" style={{ fontSize: 12, textAlign: 'center', margin: '16px 0 10px' }}>
+                ¿Tienes tu llave USB registrada?
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ width: '100%' }}
+                disabled={loading || loadingLlave}
+                onClick={entrarConLlave}
+              >
+                {loadingLlave ? <span className="spinner" /> : (<><Icon.Shield size={16} /> Entrar con llave USB</>)}
+              </button>
+            </>
+          )}
         </form>
 
         {/* Solo un atajo para quien no recuerda en qué panel entra: el

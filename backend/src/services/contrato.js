@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { formatearRut } from './mandante.js';
 
 // ============================================================
 // Contrato de servicio por cliente — helpers PUROS (sin BD, sin red).
@@ -157,7 +158,9 @@ export function snapshotAuspiciador(a = {}) {
 export function snapshotProveedor(p = {}) {
   return {
     razon_social: p.nombre_empresa || '',
-    rut: p.rut || '',
+    // `proveedores.rut` se guarda normalizado (76222089K) porque así se cruza
+    // con el RCV; en el contrato tiene que leerse como se escribe en Chile.
+    rut: formatearRut(p.rut),
     contacto_email: p.contacto_email || '',
     plan: 'estandar',
     estado_contrato: p.activo === false ? 'vencido' : 'activo',

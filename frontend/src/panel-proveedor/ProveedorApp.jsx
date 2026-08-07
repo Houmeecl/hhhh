@@ -7,18 +7,19 @@ import LotesPorFirmar from './LotesPorFirmar.jsx';
 import AnalisisSii from './AnalisisSii.jsx';
 import MisDatos from './MisDatos.jsx';
 
-// Shell mínimo, sin sidebar de navegación: el proveedor solo conecta su
-// llave USB y firma los lotes que le asignaron — una sola pantalla, no
-// necesita menú de secciones (mismo espíritu que el resto de este panel).
+// Shell mínimo, sin sidebar: tres pestañas alcanzan. Arranca en la
+// contabilidad de carbono (SII) porque es lo que trae acá a toda empresa
+// enrolada; firmar lotes es un encargo puntual de unas pocas, y aterrizar en
+// "Lotes por firmar" les mostraba una tabla vacía como primera pantalla.
 export default function ProveedorApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [vista, setVista] = useState('lotes'); // 'lotes' | 'sii' | 'datos'
+  const [vista, setVista] = useState('sii'); // 'lotes' | 'sii' | 'datos'
   const [onboarding, setOnboarding] = useState(null); // null=sin saber, true=falta completar
   const [contratoVigente, setContratoVigente] = useState(null); // null=sin saber; se resuelve junto con onboarding
 
-  useEffect(() => { document.title = 'sicr3p — Panel de Proveedor'; }, []);
+  useEffect(() => { document.title = 'sicr3p — Panel de la empresa'; }, []);
 
   useEffect(() => {
     if (!authProveedor.access) { nav('/panel-proveedor/login'); return; }
@@ -54,7 +55,7 @@ export default function ProveedorApp() {
   if (user?.must_reset_password) {
     return (
       <CambiarPasswordObligatorio
-        subtitulo="Panel de Proveedor"
+        subtitulo="Panel de la empresa"
         cambiar={api.cambiarPasswordProveedor}
         onCambiada={() => api.meProveedor().then((d) => setUser(d.user))}
       />
@@ -70,7 +71,7 @@ export default function ProveedorApp() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Logo size={22} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#14b8a6' }}>Panel de Proveedor</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#14b8a6' }}>Panel de la empresa</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>
@@ -104,7 +105,7 @@ export default function ProveedorApp() {
         <>
           <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
             <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {[['lotes', 'Lotes por firmar'], ['sii', 'Compras y ventas (SII)'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
+              {[['sii', 'Compras y ventas (SII)'], ['lotes', 'Lotes por firmar'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
                 <button key={k} onClick={() => setVista(k)}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',

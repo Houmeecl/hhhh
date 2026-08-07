@@ -286,12 +286,14 @@ test('TIPOS_DE("proveedor") reusa los tipos de cliente (asesoria/mandante)', () 
 test('snapshotDe con sujeto explícito "proveedor" usa snapshotProveedor', () => {
   const d = snapshotDe(PROVEEDOR, 'asesoria', 'proveedor');
   assert.equal(d.razon_social, 'Minería del Norte SpA');
-  assert.equal(d.rut, '76520943-9');
+  // `proveedores.rut` se guarda normalizado para cruzarlo con el RCV; el
+  // contrato lo escribe como se escribe un RUT en Chile.
+  assert.equal(d.rut, '76.520.943-9');
 });
 
 test('el contrato de una empresa (proveedor) nombra su razón social igual que el de un cliente', () => {
   const texto = clausulas(snapshotDe(PROVEEDOR, 'asesoria', 'proveedor'), 'asesoria')
     .flatMap((c) => c.parrafos).join(' ');
   assert.ok(texto.includes('Minería del Norte SpA'));
-  assert.ok(texto.includes('76520943-9'));
+  assert.ok(texto.includes('76.520.943-9'));
 });

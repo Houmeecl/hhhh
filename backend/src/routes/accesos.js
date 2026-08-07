@@ -4,7 +4,7 @@ import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
-import { crearCuentaEntidad } from '../services/cuentas.js';
+import { crearCuentaEntidad, enviarActivacion } from '../services/cuentas.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -346,9 +346,54 @@ router.get('/proveedores', async (req, res, next) => {
 // Acceso web propio del proveedor (panel /panel-proveedor). enviarCorreo:
 // al proveedor le llega un mail con enlace para ingresar y definir su clave
 // (además del password temporal que ve el admin como respaldo).
-router.post('/proveedores/:id/crear-cuenta', adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'proveedor', columnaFk: 'proveedor_id', entidadId: req.params.id, enviarCorreo: true }).catch(next)
-);
+//
+// El enrolamiento en un paso (admin/Enrolar.jsx) manda solo el correo: el
+// nombre de la PERSONA de contacto todavía no se conoce — la empresa lo
+// completa después en su onboarding (representante). Como respaldo se usa la
+// razón social, que sí está desde que se creó la empresa; sin esto el
+// enrolamiento moría con "Email y nombre son obligatorios" y la invitación
+// nunca salía.
+router.post('/proveedores/:id/crear-cuenta', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query('SELECT nombre_empresa FROM proveedores WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Proveedor no encontrado.' });
+    await crearCuentaEntidad({
+      req, res, panel: 'proveedor', columnaFk: 'proveedor_id', entidadId: req.params.id,
+      enviarCorreo: true, nombrePorDefecto: rows[0].nombre_empresa,
+    });
+  } catch (err) { next(err); }
+});
+
+// Reenvía la invitación a una empresa que YA tiene su acceso web creado —
+// el caso más común en la práctica: el correo se perdió, cayó en spam o la
+// persona que lo recibió ya no está. Sin esto, enrolar de nuevo devolvía
+// "Esta entidad ya tiene un acceso web creado" y el admin quedaba sin salida.
+//
+// El enlace se manda SIEMPRE al correo registrado de la cuenta, nunca al que
+// venga en el request: reenviar no puede ser una forma de redirigir el acceso
+// de una empresa a otra casilla.
+router.post('/proveedores/:id/reenviar-invitacion', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, email, nombre FROM usuarios WHERE proveedor_id = $1 AND panel = 'proveedor' AND estado = 'activo'`,
+      [req.params.id]
+    );
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Esta empresa todavía no tiene un acceso web creado.' });
+
+    const correo = await enviarActivacion({
+      usuarioId: usuario.id, email: usuario.email, nombre: usuario.nombre, panel: 'proveedor',
+    });
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'reenviar_invitacion_proveedor', entidad: 'usuario',
+      entidadId: usuario.id, detalle: { email: usuario.email }, ip: req.ip,
+    });
+    res.json({
+      ok: true, email: usuario.email,
+      correo_enviado: correo.correoEnviado, dev_activation_link: correo.dev_activation_link,
+    });
+  } catch (err) { next(err); }
+});
 
 router.post('/proveedores', adminOnly, async (req, res, next) => {
   try {

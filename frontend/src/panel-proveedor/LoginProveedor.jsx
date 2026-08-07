@@ -1,20 +1,23 @@
 import PanelLogin from '../components/PanelLogin.jsx';
 import { authProveedor } from '../api.js';
 
-// El proveedor entra sin contraseña con su llave USB FIDO2 (registrada
-// antes por un admin) — la contraseña temporal solo sirve la primera vez,
-// antes de registrar la llave. Ver components/PanelLogin.jsx (prop
-// conLlave) y el plan "Proveedor como entidad persistente con login FIDO2".
+// Este panel lo usan hoy dos perfiles distintos que comparten la misma fila
+// de `proveedores`: la empresa que se enroló para su contabilidad de carbono
+// (entra con correo y contraseña, viene del enlace de invitación) y el
+// proveedor de un lote que firma con llave USB FIDO2. La descripción tiene
+// que servirle a los dos: si solo habla de firmar lotes, la empresa recién
+// enrolada llega a una pantalla que no le habla a ella. `conLlave` deja las
+// dos vías disponibles — ver components/PanelLogin.jsx.
 export default function LoginProveedor() {
   return (
     <PanelLogin
       panel="proveedor"
       authStore={authProveedor}
       redirect="/panel-proveedor"
-      titulo="Acceso — Proveedor"
-      subtitulo="Panel de Proveedor"
-      descripcion="Firma acá los lotes que sicr3p te asignó, con tu llave USB. Es una atestación sellada por hash sobre tu identidad ya registrada — no reemplaza ninguna firma electrónica con validez legal."
-      placeholder="contacto@proveedor.cl"
+      titulo="Acceso — Empresa"
+      subtitulo="Panel de la empresa"
+      descripcion="Entra con el correo con que te enrolamos para ver tu contabilidad de carbono, conectar el SII y mantener los datos de tu empresa. Si además firmas lotes, puedes ingresar con tu llave USB."
+      placeholder="contacto@empresa.cl"
       conLlave
     />
   );

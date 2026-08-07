@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
-import { validarRut } from '../lib/rut.js';
+import { validarRut, formatearRut } from '../lib/rut.js';
 
 // Enrolar una empresa en un solo paso: RUT (autocompleta razón social desde
 // el SII al salir del campo) + correo → crea la empresa y envía la
@@ -38,11 +38,25 @@ export default function Enrolar() {
     setOcupado(true);
     try {
       const { empresa, ya_existia } = await api.adminSiiCrearEmpresa({ nombre_empresa: nombre, rut });
-      const acceso = await api.accesosProveedorCrearCuenta(empresa.id, { email });
-      setResultado({ empresa, acceso, ya_existia });
+      // Si la empresa YA tenía acceso web, enrolar de nuevo no es un error:
+      // casi siempre el admin está acá porque el correo se perdió. Se reenvía
+      // la invitación al correo ya registrado de esa cuenta. El otro 409
+      // ('email_en_uso') es distinto — el correo pertenece a otra cuenta — y
+      // ahí sí corresponde mostrar el error, no reenviar nada.
+      let acceso, reenviada = false;
+      try {
+        acceso = await api.accesosProveedorCrearCuenta(empresa.id, { email });
+      } catch (err) {
+        if (err.data?.codigo !== 'entidad_con_cuenta') throw err;
+        acceso = await api.accesosProveedorReenviarInvitacion(empresa.id);
+        reenviada = true;
+      }
+      setResultado({ empresa, acceso, ya_existia, reenviada });
       flash(acceso.correo_enviado === false
-        ? 'Empresa enrolada; el correo no pudo enviarse — comparte el enlace de abajo.'
-        : 'Empresa enrolada e invitación enviada por correo.');
+        ? `${reenviada ? 'Invitación reenviada' : 'Empresa enrolada'}; el correo no pudo enviarse — comparte el enlace de abajo.`
+        : reenviada
+          ? `Esta empresa ya estaba enrolada — le reenviamos la invitación a ${acceso.email}.`
+          : 'Empresa enrolada e invitación enviada por correo.');
     } catch (err) { flash(err.message, true); } finally { setOcupado(false); }
   }
 
@@ -56,13 +70,15 @@ export default function Enrolar() {
       <div>
         <h1 style={{ marginTop: 0 }}>Enrolar empresa</h1>
         <div className="card" style={{ maxWidth: 560 }}>
-          <div className="badge badge-green" style={{ marginBottom: 12 }}>Empresa enrolada</div>
+          <div className="badge badge-green" style={{ marginBottom: 12 }}>
+            {resultado.reenviada ? 'Invitación reenviada' : 'Empresa enrolada'}
+          </div>
           <p style={{ fontSize: 14 }}>
-            <strong>{empresa.nombre_empresa}</strong> <span style={{ fontFamily: 'monospace' }}>{empresa.rut}</span>
+            <strong>{empresa.nombre_empresa}</strong> <span style={{ fontFamily: 'monospace' }}>{formatearRut(empresa.rut)}</span>
             {resultado.ya_existia && ' (ya estaba registrada)'} — {acceso.correo_enviado === false
               ? 'la invitación no pudo enviarse por correo.'
-              : 'recibió la invitación por correo.'} Al entrar, la empresa completa sus datos y conecta el
-            SII desde su propio panel.
+              : `recibió la invitación por correo${resultado.reenviada ? ` en ${acceso.email}` : ''}.`} Al entrar, la empresa
+            completa sus datos y conecta el SII desde su propio panel.
           </p>
           {acceso?.dev_activation_link && (
             <p className="muted" style={{ fontSize: 12, wordBreak: 'break-all' }}>

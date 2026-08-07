@@ -96,7 +96,7 @@ async function request(path, { method = 'GET', body, formData, authed = false, a
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(data.error || 'Ocurrió un error');
-    err.data = data; // payload completo (ej. lista de documentos rechazados)
+    err.data = data; // payload completo (ej. lista de documentos rechazados, `codigo` del conflicto)
     throw err;
   }
   return data;
@@ -321,7 +321,9 @@ export const api = {
   adminSiiDescargar: (proveedorId, b) => request(`/admin/sii/${proveedorId}/descargar`, { method: 'POST', body: b, authed: true }),
   adminSiiAnalisis: (proveedorId, periodo) => request(`/admin/sii/${proveedorId}/analisis/${periodo}`, { authed: true }),
   adminSiiPeriodos: (proveedorId) => request(`/admin/sii/${proveedorId}/periodos`, { authed: true }),
-  abrirInformeCarbonoPdf: (proveedorId, periodo) => abrirPdfAuth(`/api/admin/sii/${proveedorId}/informe/${periodo}.pdf`),
+  // Igual que en el panel de la empresa: descarga real, no window.open.
+  descargarInformeCarbonoPdf: (proveedorId, periodo) =>
+    descargarAuth(`/api/admin/sii/${proveedorId}/informe/${periodo}.pdf`, auth, `informe-carbono-${periodo}.pdf`),
   adminSiiContrato: (proveedorId) => request(`/admin/sii/${proveedorId}/contrato`, { authed: true }),
   adminSiiEmitirContrato: (proveedorId, tipo) => request(`/admin/sii/${proveedorId}/contrato`, { method: 'POST', body: { tipo }, authed: true }),
   abrirSiiContratoPdf: (proveedorId) => abrirPdfAuth(`/api/admin/sii/${proveedorId}/contrato.pdf`),
@@ -423,6 +425,8 @@ export const api = {
   accesosCrearProveedor: (b) => request('/admin/accesos/proveedores', { method: 'POST', body: b, authed: true }),
   accesosEditarProveedor: (id, b) => request(`/admin/accesos/proveedores/${id}`, { method: 'PUT', body: b, authed: true }),
   accesosProveedorCrearCuenta: (id, b) => request(`/admin/accesos/proveedores/${id}/crear-cuenta`, { method: 'POST', body: b, authed: true }),
+  // Reenvía la invitación al correo YA registrado de la empresa (no acepta uno nuevo).
+  accesosProveedorReenviarInvitacion: (id) => request(`/admin/accesos/proveedores/${id}/reenviar-invitacion`, { method: 'POST', authed: true }),
 
   // Panel del mostrador presencial (authedAv: sesión propia, separada del panel núcleo)
   editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
@@ -518,7 +522,12 @@ export const api = {
   proveedorSiiAnalisis: (periodo) => request(`/panel-proveedor/sii/analisis/${periodo}`, { authedProveedor: true }),
   proveedorSiiGuardarCredenciales: (body) => request('/panel-proveedor/sii/credenciales', { method: 'POST', body, authedProveedor: true }),
   proveedorSiiBorrarCredenciales: () => request('/panel-proveedor/sii/credenciales', { method: 'DELETE', authedProveedor: true }),
-  abrirProveedorInformeCarbonoPdf: (periodo) => abrirPdfAuth(`/api/panel-proveedor/sii/informe/${periodo}.pdf`, authProveedor),
+  // El botón dice "Descargar informe": va por descargarAuth y no por
+  // abrirPdfAuth, que abre el blob con window.open — los bloqueadores de
+  // ventanas emergentes lo matan y la empresa se queda sin su informe sin
+  // ningún mensaje que se lo explique.
+  descargarProveedorInformeCarbonoPdf: (periodo) =>
+    descargarAuth(`/api/panel-proveedor/sii/informe/${periodo}.pdf`, authProveedor, `informe-carbono-${periodo}.pdf`),
 };
 
 async function abrirPdfAuth(url, store = auth) {

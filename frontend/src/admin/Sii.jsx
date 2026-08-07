@@ -221,7 +221,7 @@ function GenerarEmpresa({ empresa, sesion, onSesion, flash, onDescargado }) {
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
             <button className="btn btn-outline btn-sm"
-              onClick={() => api.abrirInformeCarbonoPdf(empresa.id, analisis.periodo).catch((e) => flash(e.message, true))}>
+              onClick={() => api.descargarInformeCarbonoPdf(empresa.id, analisis.periodo).catch((e) => flash(e.message, true))}>
               Descargar informe (PDF)
             </button>
           </div>

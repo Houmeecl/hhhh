@@ -15,6 +15,20 @@ export function normalizarRut(rut) {
   return String(rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
 }
 
+// Inversa de normalizarRut: 76222089K → 76.222.089-K. Los RUT se guardan
+// normalizados (así se cruzan), pero un documento que se le entrega a una
+// empresa, a un mandante o a una autoridad tiene que mostrarlos como se
+// escriben en Chile. Si el valor no tiene la forma de un RUT se devuelve tal
+// cual, para no inventar puntuación sobre un dato que no se entiende.
+export function formatearRut(rut) {
+  const limpio = normalizarRut(rut);
+  if (limpio.length < 2) return String(rut || '');
+  const cuerpo = limpio.slice(0, -1);
+  const dv = limpio.slice(-1);
+  if (!/^\d+$/.test(cuerpo)) return String(rut || '');
+  return `${cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}-${dv}`;
+}
+
 // Rangos de IPv4 privados/locales — bloqueo básico de SSRF para webhooks
 // configurados por el propio mandante. No resuelve DNS (no protege de DNS
 // rebinding); es una barrera simple contra apuntar el webhook a la red interna.

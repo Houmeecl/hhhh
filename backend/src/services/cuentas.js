@@ -94,9 +94,15 @@ export function generarPasswordTemporal(largo = 12) {
 // se muestra UNA sola vez en el response — la cuenta queda activa de
 // inmediato con must_reset_password=true. Un solo login por entidad
 // (UNIQUE parcial en la migración de cada panel).
-export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId, nivelAcceso = 'operador', enviarCorreo = false }) {
+// `nombrePorDefecto`: nombre a usar cuando el llamador no manda uno. Lo ocupa
+// el enrolamiento de empresas en un solo paso (admin/Enrolar.jsx), que a
+// propósito solo pide RUT y correo: el nombre de la PERSONA de contacto no se
+// conoce todavía — la empresa lo completa después en su propio onboarding
+// (representante). Sin esto el enrolamiento fallaba con "Email y nombre son
+// obligatorios" y la empresa nunca recibía su invitación.
+export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId, nivelAcceso = 'operador', enviarCorreo = false, nombrePorDefecto = '' }) {
   const email = String(req.body.email || '').toLowerCase().trim();
-  const nombre = String(req.body.nombre || '').trim();
+  const nombre = String(req.body.nombre || '').trim() || String(nombrePorDefecto || '').trim();
   if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios.' });
 
   const password = generarPasswordTemporal();
@@ -109,11 +115,18 @@ export async function crearCuentaEntidad({ req, res, panel, columnaFk, entidadId
        ON CONFLICT (email) DO NOTHING RETURNING id`,
       [email, nombre, panel, entidadId, nivelAcceso, hash]
     ));
+  // Los dos 409 tienen causas distintas y el llamador necesita distinguirlas:
+  // "esta entidad ya tiene acceso" se resuelve reenviando la invitación
+  // (admin/Enrolar.jsx lo hace solo), mientras que "el correo ya está en uso"
+  // apunta a OTRA cuenta y no se arregla reenviando nada. El `codigo` es lo
+  // que permite decidir sin leer el texto del mensaje.
   } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ error: 'Esta entidad ya tiene un acceso web creado.' });
+    if (e.code === '23505') {
+      return res.status(409).json({ codigo: 'entidad_con_cuenta', error: 'Esta entidad ya tiene un acceso web creado.' });
+    }
     throw e;
   }
-  if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo.' });
+  if (!rows[0]) return res.status(409).json({ codigo: 'email_en_uso', error: 'Ya existe un usuario con ese correo.' });
 
   // La contraseña NUNCA se guarda en el log de actividad, solo su hash en `usuarios`.
   await logActividad({

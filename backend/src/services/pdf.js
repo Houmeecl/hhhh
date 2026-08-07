@@ -6,6 +6,7 @@ import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
+import { formatearRut } from './mandante.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -1083,7 +1084,7 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
   doc.roundedRect(M, 148, W, 46, 8).fillAndStroke(LIGHT, BORDER);
   doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('EMPRESA', M + 16, 160);
   doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
-    .text(`${empresa?.nombre_empresa || ''}  ·  ${empresa?.rut || ''}`, M + 16, 173);
+    .text(`${empresa?.nombre_empresa || ''}  ·  ${formatearRut(empresa?.rut)}`, M + 16, 173);
 
   let y = 216;
   const c = analisis.resumen.compra, v = analisis.resumen.venta;
