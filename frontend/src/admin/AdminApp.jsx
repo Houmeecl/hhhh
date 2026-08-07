@@ -81,12 +81,27 @@ function EntrarAOtroPanel() {
 
   async function entrar() {
     setMsg(''); setCargando(true);
+    // La pestaña se abre ACÁ, todavía dentro del gesto del clic. Si se
+    // abriera después del await, el navegador la trata como popup no
+    // solicitado y la bloquea en silencio: el botón parecía no hacer nada.
+    // Va sin 'noopener' porque con esa opción window.open devuelve null y
+    // se pierde la referencia para redirigirla; el vínculo se corta a mano
+    // con opener = null (el destino es del mismo origen, no un tercero).
+    const pestana = window.open('', '_blank');
+    if (pestana) pestana.opener = null;
     try {
       const { accessToken } = await api.entrarAPanel(panel, entidadId || undefined);
       // En el fragmento (#), no en el query: así el token no llega al
       // servidor ni queda en el access.log — ver EntrarComoSuperadmin.jsx.
-      window.open(`/impersonar/${panel}#t=${encodeURIComponent(accessToken)}`, '_blank', 'noopener');
-    } catch (e) { setMsg(e.message); }
+      const destino = `/impersonar/${panel}#t=${encodeURIComponent(accessToken)}`;
+      // Si aun así la bloqueó (algunos navegadores con el bloqueo estricto),
+      // se usa la pestaña actual en vez de dejar al usuario sin nada.
+      if (pestana) pestana.location.replace(destino);
+      else window.location.assign(destino);
+    } catch (e) {
+      if (pestana) pestana.close();
+      setMsg(e.message);
+    }
     setCargando(false);
   }
 
