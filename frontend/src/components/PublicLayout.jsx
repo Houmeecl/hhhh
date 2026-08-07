@@ -67,6 +67,19 @@ export default function PublicLayout({ children }) {
           <a href="/auspicio" style={{ color: 'inherit' }}>{t('layout.auspicio')}</a>
           {' · '}{t('layout.tagline')} · www.sicr3p.cl
         </span>
+
+        {/* Reconocimiento territorial. Va acá, junto a donde ya decimos
+            desde dónde operamos, y NO como una opción del selector de
+            idiomas: el ckunsa no tiene hablantes nativos y acuñar los
+            términos que faltarían le corresponde al Consejo Lingüístico
+            Ckunsa, no a sicr3p (ver el comentario en lib/i18n.js). El
+            texto explica la ausencia en vez de disimularla. */}
+        <span style={{ fontSize: 12, opacity: .75, maxWidth: 720, lineHeight: 1.6 }}>
+          {t('layout.territorio')}{' '}
+          <a href="https://www.lenguackunsa.cl" target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+            {t('layout.territorio_enlace')}
+          </a>
+        </span>
       </footer>
     </div>
   );

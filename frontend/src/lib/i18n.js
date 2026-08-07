@@ -12,6 +12,27 @@
 // ============================================================
 import { useSyncExternalStore } from 'react';
 
+// Antes de agregar una lengua originaria acá, dos cosas que ya se
+// investigaron y no hay que volver a discutir:
+//
+//  - "atacameño" NO es un idioma aparte: es el nombre en castellano del
+//    pueblo Lickanantay, y su lengua ES el ckunsa (grafía fijada por el
+//    Consejo Lingüístico Ckunsa en 2021; antes ckunza/kunza/cunza).
+//    Ofrecer "kunza" y "atacameño" por separado sería el mismo error que
+//    ofrecer "castellano" y "español".
+//  - El ckunsa no tiene hablantes nativos desde hace más de un siglo. No
+//    existe vocabulario documentado para "informe", "contraseña" ni
+//    "emisiones", y acuñarlo le corresponde al Consejo Lingüístico, no a
+//    nosotros. Un selector de idioma PROMETE que la app funciona en esa
+//    lengua; con ckunsa mostraría términos inventados o media pantalla en
+//    castellano. Por eso el reconocimiento va como texto en el pie
+//    ('layout.territorio'), fuera de esta lista.
+//
+// El aymara sí es lengua viva (~156.000 personas aymara en Chile, Censo
+// 2017; alfabeto unificado desde 1984 y grafemario normado en Chile), así
+// que sí es traducible — pero por un traductor humano de la Academia
+// Nacional de la Lengua Aymara o la U. de Tarapacá, nunca por traducción
+// automática, cuyo desempeño en aymara está documentado como malo.
 export const IDIOMAS = ['es', 'en', 'pt', 'pe'];
 const STORAGE_IDIOMA = 'idioma';
 
@@ -285,6 +306,8 @@ const DICCIONARIOS = {
     'layout.inscribete': 'Inscribe tu empresa',
     'layout.mis_datos': 'Mis datos personales',
     'layout.auspicio': 'Auspicia la Ruta sicr3p',
+    'layout.territorio': 'En la Región de Antofagasta, donde opera sicr3p, está el territorio del pueblo Lickanantay (atacameño), cuya lengua ancestral es el ckunsa. Esta plataforma no la ofrece como idioma: traducirla sin el Consejo Lingüístico Ckunsa Lickanantay —a quien le corresponde esa decisión— sería un adorno, no un reconocimiento.',
+    'layout.territorio_enlace': 'lenguackunsa.cl',
 
     // Comprobante del terminal POS (bilingüe es/en; los datos no cambian)
     'pos.sello_alt': 'Sello verificable de contabilidad de carbono trazable — sicr3p',
@@ -798,6 +821,8 @@ const DICCIONARIOS = {
     'layout.inscribete': 'Register your company',
     'layout.mis_datos': 'My personal data',
     'layout.auspicio': 'Sponsor the sicr3p Route',
+    'layout.territorio': 'The Antofagasta Region, where sicr3p operates, contains the territory of the Lickanantay (Atacameño) people, whose ancestral language is Ckunsa. This platform does not offer it as a language option: translating it without the Consejo Lingüístico Ckunsa Lickanantay — whose decision that is — would be decoration, not recognition.',
+    'layout.territorio_enlace': 'lenguackunsa.cl',
 
     'pos.sello_alt': 'Verifiable seal of traceable carbon accounting — sicr3p',
     'pos.copiado': '✓ Copied',
@@ -1306,6 +1331,8 @@ const DICCIONARIOS = {
     'layout.inscribete': 'Inscreva sua empresa',
     'layout.mis_datos': 'Meus dados pessoais',
     'layout.auspicio': 'Patrocine a Rota sicr3p',
+    'layout.territorio': 'Na Região de Antofagasta, onde a sicr3p opera, fica o território do povo Lickanantay (atacamenho), cuja língua ancestral é o ckunsa. Esta plataforma não a oferece como idioma: traduzi-la sem o Consejo Lingüístico Ckunsa Lickanantay — a quem cabe essa decisão — seria enfeite, não reconhecimento.',
+    'layout.territorio_enlace': 'lenguackunsa.cl',
 
     // Passaporte Digital de Produto (/pasaporte/:id)
     'pas.titulo': 'Passaporte Digital de Produto',
