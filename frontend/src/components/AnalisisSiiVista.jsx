@@ -24,7 +24,7 @@ export default function AnalisisSiiVista({ a }) {
             <div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{em.total_co2e_tref} tCO₂e</div>
               <div className="muted" style={{ fontSize: 13 }}>
-                Emisiones estimadas de tus compras — {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos procesados
+                Emisiones de tus compras — calculadas sobre {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos del SII
                 {em.metodo_fisico > 0 && ` · ${fmtInt(em.metodo_fisico)} por unidades físicas, ${fmtInt(em.metodo_gasto)} por gasto`}
               </div>
             </div>
