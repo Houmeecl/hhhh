@@ -66,6 +66,28 @@ before(async () => {
   await insertar(3, 'sin_coincidencia'); // catch-all del motor    → NO va al export
   await insertar(2, null);               // anterior a la migración 077 → NO va al export
 
+  // Catch-all del motor cuya categoría mapea FUERA de Alcance 3 (energía
+  // eléctrica → Alcance 2). Con el filtro 'Alcance 3%' en el WHERE, este
+  // documento desaparecía de la consulta antes de que se calculara el saldo
+  // no atribuido: ni salía en el export ni se contaba como excluido.
+  const { rows: cat2 } = await query(
+    `SELECT codigo, nombre FROM motor_categorias WHERE alcance_ghg LIKE 'Alcance 2%' ORDER BY codigo LIMIT 1`
+  );
+  await query(
+    `INSERT INTO facturas
+       (sesion_id, rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo, categoria_origen, status, motor)
+     VALUES ($1,$2,$3,7,$4,$5,'sin_coincidencia','procesada','propio')`,
+    [sesionId, RUT_PROVEEDOR, RUT_MANDANTE, cat2[0].nombre, cat2[0].codigo]
+  );
+  // Clasificado de verdad, pero con un código que ya no existe en el catálogo
+  // (categoría borrada del panel). El JOIN interno lo hacía desaparecer.
+  await query(
+    `INSERT INTO facturas
+       (sesion_id, rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo, categoria_origen, status, motor)
+     VALUES ($1,$2,$3,4,'Categoría borrada','no_existe_en_el_catalogo','glosa','procesada','propio')`,
+    [sesionId, RUT_PROVEEDOR, RUT_MANDANTE]
+  );
+
   const app = express();
   app.use(express.json());
   app.use('/api/mandante', mandanteRoutes);
@@ -94,16 +116,73 @@ test('el catch-all del motor NO se informa como Alcance 3 Cat. 1', { skip: EN_PR
 test('lo excluido no se esconde: se informa aparte, con su CO2e y su motivo', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
   const { texto } = await get('/api/mandante/export/alcance3');
   const { no_atribuido: na } = JSON.parse(texto);
-  assert.equal(na.n_documentos, 2);
-  assert.equal(na.total_tco2e, 5);
-  assert.equal(na.sin_coincidencia, 1);
+  assert.equal(na.n_documentos, 4, 'los dos catch-all, el de procedencia sin registrar y el de código huérfano');
+  assert.equal(na.total_tco2e, 16); // 3 + 2 + 7 (Alcance 2) + 4 (código huérfano)
+  assert.equal(na.sin_coincidencia, 2);
   assert.equal(na.procedencia_no_registrada, 1);
+  assert.equal(na.alcance_no_legible, 1);
+});
+
+// El filtro `mc.alcance_ghg LIKE 'Alcance 3%'` estaba en el WHERE, o sea que
+// se aplicaba ANTES de separar lo atribuible: un documento cuyo catch-all cae
+// fuera de Alcance 3 no salía en el export NI en el saldo excluido. El pie del
+// CSV prometía declarar justo eso.
+test('el catch-all que cae fuera de Alcance 3 tampoco desaparece del saldo', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  const { texto } = await get('/api/mandante/export/alcance3');
+  const { no_atribuido: na } = JSON.parse(texto);
+  assert.equal(na.sin_coincidencia, 2, 'el catch-all de Alcance 2 se cuenta igual que el de Alcance 3');
+  assert.equal(na.total_tco2e >= 7, true, 'sus tCO2e están en el saldo, no perdidos');
+});
+
+// El JOIN interno descartaba en silencio un documento cuyo `categoria_codigo`
+// ya no está en el catálogo (categoría borrada del panel del motor).
+test('un código de categoría huérfano se informa, no se descarta', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  const { texto } = await get('/api/mandante/export/alcance3');
+  const { no_atribuido: na } = JSON.parse(texto);
+  assert.equal(na.alcance_no_legible, 1);
+});
+
+// Alcance 1 y 2 quedan fuera del informe por definición, no por falta de dato:
+// contarlos como "sin clasificar" le diría al mandante que le falta trabajo
+// donde no le falta.
+test('lo atribuido a Alcance 1 o 2 se informa aparte, no como saldo sin clasificar', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  const { rows } = await query(
+    `SELECT codigo, nombre FROM motor_categorias WHERE alcance_ghg LIKE 'Alcance 2%' ORDER BY codigo LIMIT 1`
+  );
+  const { rows: f } = await query(
+    `INSERT INTO facturas
+       (sesion_id, rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo, categoria_origen, status, motor)
+     VALUES ($1,$2,$3,9,$4,$5,'glosa','procesada','propio') RETURNING id`,
+    [sesionId, RUT_PROVEEDOR, RUT_MANDANTE, rows[0].nombre, rows[0].codigo]
+  );
+  try {
+    const { texto } = await get('/api/mandante/export/alcance3');
+    const cuerpo = JSON.parse(texto);
+    assert.equal(cuerpo.otros_alcances.n_documentos, 1);
+    assert.equal(cuerpo.otros_alcances.total_tco2e, 9);
+    assert.equal(cuerpo.no_atribuido.n_documentos, 4, 'no engorda el saldo sin clasificar');
+    assert.equal(cuerpo.filas.length, 1, 'ni entra al export de Alcance 3');
+  } finally {
+    await query(`DELETE FROM facturas WHERE id = $1`, [f[0].id]);
+  }
+});
+
+// El invariante que sostiene todo lo anterior: nada del gasto del proveedor
+// se pierde entre los tres montones. Es lo que hace que el mandante pueda
+// cuadrar este export contra lo que ve en la pantalla de proveedores.
+test('el export cuadra: filas + otros alcances + no atribuido = todo el proveedor', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  const { texto } = await get('/api/mandante/export/alcance3');
+  const cuerpo = JSON.parse(texto);
+  const totalInformado = cuerpo.filas.reduce((a, f) => a + f.total_tco2e, 0)
+    + cuerpo.no_atribuido.total_tco2e + cuerpo.otros_alcances.total_tco2e;
+  assert.equal(totalInformado, 21, '5 + 3 + 2 + 7 + 4');
 });
 
 test('el CSV declara al pie el saldo sin categoría atribuible', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
   const { texto } = await get('/api/mandante/export/alcance3?formato=csv');
   assert.match(texto, /sin categoría GHG atribuible/);
   assert.match(texto, /no incluidos arriba/);
+  assert.match(texto, /con categoría sin alcance legible/);
   // La fila que sí corresponde sigue estando, con su cifra.
   assert.match(texto, /5\.0000/);
 });

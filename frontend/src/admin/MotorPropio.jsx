@@ -185,7 +185,20 @@ export default function MotorPropio() {
                   <span className="muted">Costo estimado (30 días)</span>
                   <b>${fmt(ia.costo_estimado_clp_30d || 0, 0)} CLP</b>
                 </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '2px 0' }}>
+                  <span className="muted">Gasto de hoy / tope diario</span>
+                  <b>
+                    ${fmt(ia.costo_estimado_clp_hoy || 0, 0)} / ${fmt(ia.presupuesto_diario_clp || 0, 0)} CLP
+                  </b>
+                </div>
               </div>
+              {stats.analisis_ia_activo && ia.presupuesto_agotado && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  Se alcanzó el tope de gasto del día: los documentos se están leyendo con el respaldo de
+                  reglas. Vuelve a habilitarse solo mañana, o subiendo el tope en la configuración del
+                  servidor. Ningún documento se rechaza por esto.
+                </div>
+              )}
             </div>
             <div className="card card-pad" style={{ maxWidth: 420, flex: '1 1 300px' }}>
               <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--green-600)' }}>

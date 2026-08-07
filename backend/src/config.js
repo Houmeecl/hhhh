@@ -39,6 +39,20 @@ export const config = {
     // que el costo fijo de referencia que ya usa simple_api_uso.
     costoInputClp1k: Number(process.env.ANALISIS_IA_COSTO_INPUT_CLP_1K) || 3,
     costoOutputClp1k: Number(process.env.ANALISIS_IA_COSTO_OUTPUT_CLP_1K) || 15,
+    // Tope de gasto por día calendario (America/Santiago), estimado con los
+    // costos referenciales de arriba sobre lo ya registrado en
+    // analisis_ia_uso. Existe porque POST /api/sesiones es PÚBLICO y sin
+    // login: sin tope, el gasto de la API lo decide cualquiera desde
+    // internet. Al superarlo la IA se salta y el documento se lee con el
+    // parser de reglas — degradación, no error: nadie recibe un rechazo
+    // por haberse acabado el presupuesto.
+    // 0 (o negativo) = no se gasta nada: equivale a la IA apagada. Para
+    // operar sin tope hay que poner un número alto a propósito, no dejarlo
+    // vacío — un despliegue que no configura nada queda acotado.
+    presupuestoDiarioClp:
+      process.env.ANALISIS_IA_PRESUPUESTO_DIARIO_CLP === undefined
+        ? 20000
+        : Number(process.env.ANALISIS_IA_PRESUPUESTO_DIARIO_CLP) || 0,
   },
 
   jwt: {

@@ -126,6 +126,97 @@ export function validarRespuestaIA(input) {
   };
 }
 
+// ============================================================
+// Tope de gasto diario
+//
+// POST /api/sesiones es público y sin login, y cada archivo puede gatillar
+// hasta tres llamadas a la IA (capa de texto + dos pasadas de OCR). El
+// costo ya se estimaba y se guardaba en analisis_ia_uso sin que nadie lo
+// usara para frenar nada: esto lo usa.
+//
+// Cómo se cuenta:
+//  · La verdad está en la BD (suma del día), pero leerla en cada llamada
+//    sería una consulta por documento — se lee cada TTL_LECTURA_MS y entre
+//    medio se acumula en memoria lo que se va gastando.
+//  · El acumulado en memoria se anota ANTES de intentar el INSERT, no
+//    después: si la BD se cae, la bitácora deja de escribirse pero el
+//    proceso sigue contando lo que gasta. Sin eso, una BD caída sería
+//    justo el momento en que el tope desaparece.
+//  · Cada proceso lleva su propia cuenta (pm2 con varias instancias =
+//    varios acumuladores), y la relectura periódica de la BD los vuelve a
+//    juntar. El tope es un freno de gasto, no una cuota exacta al peso.
+// ============================================================
+const TTL_LECTURA_MS = 60 * 1000;
+const gasto = { dia: null, clp: 0, leidoEn: 0, avisado: false };
+
+// Día calendario en Chile: el presupuesto es diario para quien lo paga, y
+// quien lo mira es el admin en Santiago. Con UTC el corte caería a las 20:00
+// o 21:00 hora local según el horario de verano — un tope "diario" que se
+// reinicia a media tarde no es el que nadie configuró.
+const DIA_CL = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Santiago', year: 'numeric', month: '2-digit', day: '2-digit',
+});
+function diaChile() {
+  return DIA_CL.format(new Date());
+}
+
+function reiniciarSiCambioElDia() {
+  const hoy = diaChile();
+  if (gasto.dia !== hoy) {
+    gasto.dia = hoy;
+    gasto.clp = 0;
+    gasto.leidoEn = 0;
+    gasto.avisado = false;
+  }
+}
+
+function anotarGasto(clp) {
+  reiniciarSiCambioElDia();
+  gasto.clp += clp;
+}
+
+// true = no se llama a la IA en este documento. Nunca lanza: un fallo al
+// medir el gasto no puede dejar sin lectura a un documento legítimo.
+async function presupuestoAgotado() {
+  const tope = config.analisisIA.presupuestoDiarioClp;
+  if (!Number.isFinite(tope) || tope <= 0) return true;
+  reiniciarSiCambioElDia();
+  const ahora = Date.now();
+  if (ahora - gasto.leidoEn > TTL_LECTURA_MS) {
+    gasto.leidoEn = ahora; // se marca aunque falle: no se reintenta por documento
+    try {
+      const { rows } = await query(
+        `SELECT COALESCE(SUM(costo_estimado_clp), 0)::float8 AS clp
+           FROM analisis_ia_uso
+          WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'America/Santiago') AT TIME ZONE 'America/Santiago'`
+      );
+      // La suma de la BD reemplaza al acumulado: incluye lo gastado por los
+      // demás procesos, y lo propio ya está adentro (se insertó al vuelo).
+      // Puede quedar corta por las filas de los últimos milisegundos; el
+      // margen es de una llamada, no de un presupuesto.
+      gasto.clp = Number(rows[0]?.clp || 0);
+    } catch (e) {
+      // 42P01 = migración 033 sin correr: no hay bitácora que sumar, se
+      // sigue con lo que este proceso lleva contado en memoria.
+      if (e.code !== '42P01') console.warn('[analisisIA] no se pudo leer el gasto del día:', e.message);
+    }
+  }
+  return gasto.clp >= tope;
+}
+
+// Deja constancia en la bitácora UNA vez por día y por proceso: el admin ve
+// en el panel por qué las lecturas de hoy salieron del parser de reglas, sin
+// que cada documento saltado escriba su propia fila.
+async function avisarPresupuestoAgotado() {
+  if (gasto.avisado) return;
+  gasto.avisado = true;
+  console.warn(
+    `[analisisIA] presupuesto diario agotado (${round2(gasto.clp)} de ${config.analisisIA.presupuestoDiarioClp} CLP estimados): ` +
+    'los documentos de hoy se leen con el parser de reglas.'
+  );
+  await logUso({ exito: false, motivoError: 'presupuesto_diario_agotado', latenciaMs: 0 });
+}
+
 // Registro de uso (éxito o no) para el panel de transparencia del admin
 // — igual patrón que simpleApi.js, tolerante a la tabla ausente (42P01,
 // ej. antes de correr la migración 033).
@@ -133,6 +224,7 @@ async function logUso({ exito, motivoError, tokensEntrada, tokensSalida, latenci
   const costo = exito
     ? round2((tokensEntrada / 1000) * config.analisisIA.costoInputClp1k + (tokensSalida / 1000) * config.analisisIA.costoOutputClp1k)
     : null;
+  if (costo) anotarGasto(costo);
   try {
     await query(
       `INSERT INTO analisis_ia_uso (modelo, exito, motivo_error, tokens_entrada, tokens_salida, costo_estimado_clp, latencia_ms)
@@ -188,6 +280,21 @@ async function llamarClaude(texto) {
   }
 }
 
+// Expuesto para los tests (y para un eventual panel que quiera mostrar el
+// gasto del día sin volver a consultar): `reiniciar()` borra el acumulado en
+// memoria, que es lo único que hace falta para aislar un caso de otro.
+export const presupuestoIA = {
+  agotado: presupuestoAgotado,
+  anotarGasto,
+  gastoEnMemoria: () => round2(gasto.clp),
+  reiniciar() {
+    gasto.dia = null;
+    gasto.clp = 0;
+    gasto.leidoEn = 0;
+    gasto.avisado = false;
+  },
+};
+
 export const analisisIA = {
   get enabled() {
     return config.analisisIA.enabled;
@@ -200,6 +307,14 @@ export const analisisIA = {
   async analizarTexto(texto) {
     if (!config.analisisIA.enabled) return null;
     if (!texto || !String(texto).trim()) return null;
+    // Tope de gasto del día: se devuelve null igual que cuando la IA no
+    // está configurada, así que lecturaDocumento.js cae al parser de
+    // reglas sin enterarse. El documento se lee igual; lo que se pierde
+    // es la lectura flexible, no el cálculo.
+    if (await presupuestoAgotado()) {
+      await avisarPresupuestoAgotado();
+      return null;
+    }
     const t0 = Date.now();
     let resultado;
     try {

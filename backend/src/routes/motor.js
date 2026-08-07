@@ -353,21 +353,36 @@ router.get('/estadisticas', async (req, res, next) => {
 
     // Análisis con IA (migración 033) — llamadas, éxito, latencia y costo
     // estimado, para transparencia del admin. Defensivo si aún no migró.
-    let ia = { llamadas_30d: 0, exitosas_30d: 0, latencia_prom_ms: null, costo_estimado_clp_30d: 0 };
+    // El gasto de HOY y el tope diario van acá y no en otra pantalla porque un
+    // freno que no se ve se confunde con una falla: si la IA se apagó sola por
+    // presupuesto, el admin tiene que poder leerlo donde ya mira su costo.
+    let ia = {
+      llamadas_30d: 0, exitosas_30d: 0, latencia_prom_ms: null, costo_estimado_clp_30d: 0,
+      costo_estimado_clp_hoy: 0,
+      presupuesto_diario_clp: config.analisisIA.presupuestoDiarioClp,
+      presupuesto_agotado: false,
+    };
     try {
       const { rows: iaRows } = await query(
         `SELECT COUNT(*) FILTER (WHERE created_at > now() - interval '30 days')::int AS llamadas,
                 COUNT(*) FILTER (WHERE exito AND created_at > now() - interval '30 days')::int AS exitosas,
                 COALESCE(AVG(latencia_ms) FILTER (WHERE created_at > now() - interval '30 days'), 0)::int AS latencia_prom,
-                COALESCE(SUM(costo_estimado_clp) FILTER (WHERE created_at > now() - interval '30 days'), 0)::numeric AS costo
+                COALESCE(SUM(costo_estimado_clp) FILTER (WHERE created_at > now() - interval '30 days'), 0)::numeric AS costo,
+                COALESCE(SUM(costo_estimado_clp) FILTER (
+                  WHERE created_at >= date_trunc('day', now() AT TIME ZONE 'America/Santiago') AT TIME ZONE 'America/Santiago'
+                ), 0)::numeric AS costo_hoy
          FROM analisis_ia_uso`
       );
       const r = iaRows[0];
+      const tope = config.analisisIA.presupuestoDiarioClp;
       ia = {
         llamadas_30d: r.llamadas,
         exitosas_30d: r.exitosas,
         latencia_prom_ms: r.llamadas > 0 ? r.latencia_prom : null,
         costo_estimado_clp_30d: Number(r.costo),
+        costo_estimado_clp_hoy: Number(r.costo_hoy),
+        presupuesto_diario_clp: tope,
+        presupuesto_agotado: tope > 0 ? Number(r.costo_hoy) >= tope : true,
       };
     } catch (err) {
       if (err.code !== '42P01') throw err; // tabla aún no migrada → todo en 0

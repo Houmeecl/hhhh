@@ -28,7 +28,7 @@ import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 import { validarSolicitud } from '../services/auspicio.js';
 import { validarInscripcion } from '../services/inscripcion.js';
 import { consultarRut } from '../services/baseapi.js';
-import { siiLimiter } from '../middleware/rateLimit.js';
+import { siiLimiter, cargaLimiter } from '../middleware/rateLimit.js';
 
 const router = express.Router();
 
@@ -223,7 +223,9 @@ async function registrarRechazos(filas) {
 }
 
 // ---------- POST /api/sesiones — procesa hasta 5 facturas ----------
-router.post('/sesiones', uploadArchivos, async (req, res, next) => {
+// `cargaLimiter` va ANTES de uploadArchivos a propósito: rechazar por límite
+// después de recibir los binarios sería pagar el ancho de banda igual.
+router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) => {
   try {
     const { rut, empresa, email, codigo } = req.body;
     const files = req.files || [];

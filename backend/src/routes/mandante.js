@@ -5,7 +5,7 @@ import { query } from '../lib/db.js';
 import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
-import { agregarAlcance3, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
+import { agregarAlcance3, parsearAlcanceGHG, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
 import { filasACsv } from '../services/csv.js';
 import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
 import { citaFuente, generateReporteCbam } from '../services/pdf.js';
@@ -160,7 +160,15 @@ router.get('/export/alcance3', async (req, res, next) => {
     const rn = rutNorm(req.mandante.rut);
     const permitidos = await proveedoresPermitidos(req.mandante.id);
     const params = [rn];
-    const cond = [`${NORM('f.rut_receptor')} = $1`, `f.rut_emisor IS NOT NULL`, `mc.alcance_ghg LIKE 'Alcance 3%'`];
+    // El filtro de Alcance 3 NO va acá. Estuvo en el WHERE y era un error con
+    // consecuencia contable: se aplicaba ANTES de separar lo atribuible, así
+    // que un documento cuya categoría catch-all mapea fuera de Alcance 3
+    // desaparecía del export Y del saldo no atribuido — subdeclaraba en
+    // silencio justo lo que el pie del CSV promete declarar. Se filtra en JS,
+    // después de clasificar. Sin filtro por estado ni por CO2e, igual que
+    // /proveedores y /proveedor/:rut/resumen: así lo que el mandante ve en
+    // esas dos pantallas cuadra con filas + otros alcances + no atribuido.
+    const cond = [`${NORM('f.rut_receptor')} = $1`, `f.rut_emisor IS NOT NULL`];
     if (permitidos.length) {
       params.push(permitidos);
       cond.push(`${NORM('f.rut_emisor')} = ANY($${params.length})`);
@@ -175,12 +183,17 @@ router.get('/export/alcance3', async (req, res, next) => {
     // que se edita desde el panel del motor, así que un renombre sacaba del
     // export —sin aviso— todo el histórico de esa categoría, bajando el
     // Alcance 3 informado por el mandante.
+    //
+    // LEFT JOIN, no JOIN: un `categoria_codigo` que ya no está en el catálogo
+    // (categoría borrada del panel del motor) hacía desaparecer el documento
+    // entero de la consulta. Ahora entra con `alcance_ghg` en NULL y sale
+    // contado en el saldo no atribuido, que es lo que de verdad es.
     const { rows } = await query(
       `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
               mc.alcance_ghg, f.total_co2e, f.categoria_origen,
               fm.organismo, fm.documento, fm.version_anio
          FROM facturas f
-         JOIN motor_categorias mc
+         LEFT JOIN motor_categorias mc
            ON mc.codigo = f.categoria_codigo
            OR (f.categoria_codigo IS NULL AND mc.nombre = f.categoria)
          LEFT JOIN fuentes_metodologicas fm ON fm.id = mc.fuente_metodologica_id
@@ -194,18 +207,37 @@ router.get('/export/alcance3', async (req, res, next) => {
     // esto": ponerlo en el CSV como una fila Cat. 1 con su fuente citada lo
     // haría indistinguible de una atribución calculada, en un documento que
     // se pega en una memoria anual bajo NCG 461 / IFRS S2. Ver migración 077.
-    const atribuibles = rows.filter((r) => r.categoria_origen === 'glosa');
-    const filas = agregarAlcance3(atribuibles);
+    //
+    // Tres montones que suman el total del proveedor, sin que ninguno pueda
+    // esconder al otro:
+    //   · atribuible y Alcance 3 → las filas del export.
+    //   · atribuible y Alcance 1 o 2 → `otros_alcances`: NO es este informe
+    //     (que es de Alcance 3), pero tampoco es un saldo sin clasificar, y
+    //     meterlo entre lo no atribuido inflaría lo que el mandante lee como
+    //     "me falta clasificar esto".
+    //   · el resto → `no_atribuido`, con su causa.
+    const alcanceDe = (r) => parsearAlcanceGHG(r.alcance_ghg).alcance;
+    const atribuibles = rows.filter((r) => r.categoria_origen === 'glosa' && alcanceDe(r) !== null);
+    const filas = agregarAlcance3(atribuibles.filter((r) => alcanceDe(r) === 3));
+    const otros = atribuibles.filter((r) => alcanceDe(r) !== 3);
     // No se esconde lo excluido: se informa aparte, con su CO2e, para que el
     // mandante sepa qué parte de su gasto quedó sin clasificar en vez de
     // creer que el export lo cubre todo.
-    const sinClasificar = rows.filter((r) => r.categoria_origen !== 'glosa');
+    const esAtribuible = new Set(atribuibles);
+    const sinClasificar = rows.filter((r) => !esAtribuible.has(r));
+    const suma = (lista) => Math.round(lista.reduce((a, r) => a + Number(r.total_co2e || 0), 0) * 10000) / 10000;
     const noAtribuido = {
       n_documentos: sinClasificar.length,
-      total_tco2e: Math.round(sinClasificar.reduce((a, r) => a + Number(r.total_co2e || 0), 0) * 10000) / 10000,
+      total_tco2e: suma(sinClasificar),
       sin_coincidencia: sinClasificar.filter((r) => r.categoria_origen === 'sin_coincidencia').length,
       procedencia_no_registrada: sinClasificar.filter((r) => r.categoria_origen == null).length,
+      // Clasificado de verdad, pero su categoría no resuelve a un alcance: el
+      // texto libre `alcance_ghg` no calza el patrón, o el código ya no está
+      // en el catálogo. Lo arregla un admin en el panel del motor, no el
+      // mandante — por eso va contado aparte de los otros dos.
+      alcance_no_legible: sinClasificar.filter((r) => r.categoria_origen === 'glosa').length,
     };
+    const otrosAlcances = { n_documentos: otros.length, total_tco2e: suma(otros) };
     const anio = req.query.anio || 'todos';
 
     if (req.query.formato === 'csv') {
@@ -224,11 +256,23 @@ router.get('/export/alcance3', async (req, res, next) => {
       // El saldo no atribuido va como comentario al pie: no puede ir como una
       // fila más (no tiene categoría GHG) ni puede omitirse, o el CSV se leería
       // como la totalidad del gasto clasificado.
-      const pie = noAtribuido.n_documentos > 0
+      // Los números del pie van en formato de máquina (punto decimal, sin
+      // separador de miles) igual que las columnas de arriba: es una línea
+      // dentro de un CSV, y una coma decimal la partiría en dos celdas.
+      const pieNoAtribuido = noAtribuido.n_documentos > 0
         ? `\n# ${noAtribuido.n_documentos} documento(s) por ${noAtribuido.total_tco2e.toFixed(4)} tCO2e sin categoría GHG atribuible`
           + ` (${noAtribuido.sin_coincidencia} sin coincidencia en el motor,`
-          + ` ${noAtribuido.procedencia_no_registrada} sin procedencia registrada): no incluidos arriba.\n`
+          + ` ${noAtribuido.procedencia_no_registrada} sin procedencia registrada,`
+          + ` ${noAtribuido.alcance_no_legible} con categoría sin alcance legible): no incluidos arriba.`
         : '';
+      // Alcance 1 y 2 quedan fuera por definición del informe, no por falta de
+      // dato: decirlo evita que el mandante lea la diferencia contra su
+      // contabilidad como documentos perdidos.
+      const pieOtros = otrosAlcances.n_documentos > 0
+        ? `\n# ${otrosAlcances.n_documentos} documento(s) por ${otrosAlcances.total_tco2e.toFixed(4)} tCO2e con categoría de Alcance 1 o 2:`
+          + ` fuera de este informe, que es solo de Alcance 3.`
+        : '';
+      const pie = pieNoAtribuido || pieOtros ? `${pieNoAtribuido}${pieOtros}\n` : '';
       res.send('\uFEFF' + csv + pie); // BOM: Excel abre con tildes/ñ correctas
     } else {
       res.json({
@@ -237,6 +281,7 @@ router.get('/export/alcance3', async (req, res, next) => {
         metodologia: { taxonomia_categorias: CITA_CATEGORIAS_ALCANCE3 },
         filas,
         no_atribuido: noAtribuido,
+        otros_alcances: otrosAlcances,
       });
     }
 
