@@ -1071,7 +1071,7 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
   const em = analisis.emisiones;
   if (em) {
     doc.roundedRect(M, y, W, 60, 8).fillAndStroke('#f0fdfa', '#14b8a6');
-    doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${em.total_co2e_tref} tCO₂e`, M + 16, y + 10);
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${em.total_co2e_tref} tCO2e`, M + 16, y + 10);
     doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
       `Emisiones de las compras, calculadas sobre ${nfp(em.documentos_calculados)} de ${nfp(em.documentos_totales)} ` +
       `documentos del SII${em.metodo_fisico > 0 ? ` · ${nfp(em.metodo_fisico)} por unidades físicas, ${nfp(em.metodo_gasto)} por gasto` : ''}.`,
