@@ -47,6 +47,7 @@ RESTART_CMD="${SICR3P_RESTART_CMD:-pm2 restart $PM2_APP}"
 # llega un commit nuevo (solo se compara el SHA exacto), o a mano con
 # `bash deploy/actualizar.sh --reintentar`.
 CUARENTENA="${SICR3P_CUARENTENA:-/var/lib/sicr3p/commits-fallidos}"
+AVISADO="$CUARENTENA.avisado"   # marca de "ya avisé hoy" (ver la guarda de cuarentena)
 
 log() {
   local linea="[$(date '+%F %T')] $*"
@@ -83,9 +84,12 @@ fi
 if [ "${1:-}" = "--reintentar" ]; then
   # Levanta la cuarentena a mano: para después de corregir la causa del fallo
   # sin necesidad de un commit nuevo (por ejemplo, arreglar el .env del VPS).
-  if [ -s "$CUARENTENA" ]; then
-    rm -f "$CUARENTENA"
+  if [ -f "$CUARENTENA" ]; then
+    rm -f "$CUARENTENA" "$AVISADO" 2>/dev/null || true
     echo "==> Cuarentena levantada: el próximo ciclo vuelve a intentar el commit de origin/$RAMA."
+    # Queda traza: es una intervención humana sobre producción.
+    mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
+    echo "[$(date '+%F %T')] cuarentena levantada a mano (--reintentar)." >> "$LOG" 2>/dev/null || true
   else
     echo "==> No había ningún commit en cuarentena."
   fi
@@ -126,10 +130,18 @@ else
   # Cuarentena: este commit ya se intentó y se revirtió. Sin esta guarda el
   # cron lo reintentaba cada 30 min indefinidamente (pg_dump + doble npm ci +
   # build + restart de producción en cada vuelta), porque tras el rollback
-  # HEAD nunca vuelve a ser igual a origin/$RAMA. Se sale EN SILENCIO: el
-  # rollback ya dejó el aviso ruidoso en el log, y repetirlo cada media hora
-  # solo lo haría ilegible.
+  # HEAD nunca vuelve a ser igual a origin/$RAMA.
   if [ -f "$CUARENTENA" ] && grep -qxF "$COMMIT_REMOTO" "$CUARENTENA" 2>/dev/null; then
+    # Se avisa UNA VEZ AL DÍA, no cada media hora ni nunca. El silencio total
+    # era peor que el ruido: una causa transitoria (un 503 del registry, un
+    # test intermitente, el health de 80 s en un disco lento) congela los
+    # deploys indefinidamente, y con `exit 0` y cero líneas de log, cron no
+    # manda correo y cualquier monitoreo por código de salida ve verde
+    # mientras producción se queda con código viejo.
+    if [ -z "$(find "$AVISADO" -mmin -1440 2>/dev/null)" ]; then
+      log "commit ${COMMIT_REMOTO:0:7} EN CUARENTENA: no se reintenta solo y producción sigue en $(git rev-parse --short HEAD). Si la causa fue transitoria, levántala con: bash deploy/actualizar.sh --reintentar"
+      touch "$AVISADO" 2>/dev/null || true
+    fi
     exit 0
   fi
   log "cambio detectado: ${COMMIT_PREVIO:0:7} → ${COMMIT_REMOTO:0:7}; iniciando actualización."
@@ -207,12 +219,25 @@ smoke_ok() {
   return 1
 }
 
+# Anota el commit en cuarentena. Nunca puede matar al llamador: con `set -e`,
+# un `echo >>` a secas abortaría el rollback ANTES de revertir (p. ej. con el
+# disco lleno — que además correlaciona con la causa del fallo, porque los
+# `npm ci`, el build y el pg_dump lo llenan) y dejaría producción con el commit
+# roto y el backend caído. Volver atrás importa más que anotar.
+anotar_cuarentena() {
+  if [ -f "$CUARENTENA" ] && grep -qxF "$COMMIT_REMOTO" "$CUARENTENA" 2>/dev/null; then
+    return 0   # ya estaba: no se duplica la línea en cada vuelta
+  fi
+  echo "$COMMIT_REMOTO" >> "$CUARENTENA" 2>/dev/null \
+    || log "ADVERTENCIA: no se pudo escribir la cuarentena en $CUARENTENA; la operación sigue, pero el cron PUEDE reintentar este commit."
+}
+
 # ---------- 8. Rollback al commit previo ----------
 rollback() {
   log "FALLO en el deploy de ${COMMIT_REMOTO:0:7}; iniciando ROLLBACK a ${COMMIT_PREVIO:0:7}."
   # Se pone el commit en cuarentena ANTES de revertir: si el rollback muere a
   # mitad de camino (exit 2), la marca ya está puesta y el cron no lo reintenta.
-  echo "$COMMIT_REMOTO" >> "$CUARENTENA"
+  anotar_cuarentena
   # `checkout -B` en vez de un checkout suelto del SHA: deja el repo EN LA RAMA
   # apuntando al commit bueno, no en detached HEAD. Con detached HEAD el
   # siguiente `git pull --ff-only` operaba sobre un HEAD suelto y la referencia
@@ -253,6 +278,9 @@ if [ -z "${SICR3P_REEXEC_COMMIT:-}" ]; then
   # ---------- 5. Pull (solo fast-forward: jamás merge ni force) ----------
   HASH_SCRIPT_ANTES="$(sha256sum "$SCRIPT_DIR/actualizar.sh" 2>/dev/null | awk '{print $1}')"
   if ! git pull --ff-only --quiet origin "$RAMA" >> "$LOG" 2>&1; then
+    # También va a cuarentena: sin esto, una historia divergida repetía este
+    # mismo camino cada 30 min, y el pg_dump de más arriba ya se había hecho.
+    anotar_cuarentena
     log "ERROR: git pull --ff-only falló — la historia local divergió de origin/$RAMA. No se hace merge ni push forzado: revisar a mano en $REPO_DIR (git status / git log --oneline -5)."
     exit 1
   fi
@@ -283,7 +311,7 @@ if ! reiniciar; then
 fi
 if health_ok; then
   if smoke_ok; then
-    rm -f "$CUARENTENA"
+    rm -f "$CUARENTENA" "$AVISADO" 2>/dev/null || true
     log "actualizado ${COMMIT_PREVIO:0:7} → $(git rev-parse --short HEAD)."
     exit 0
   fi

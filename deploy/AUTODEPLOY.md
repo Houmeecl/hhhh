@@ -46,11 +46,43 @@ bash deploy/actualizar.sh
 | Log de cada corrida (sin cambios / actualizado / rollback) | `/var/log/sicr3p-actualizar.log` |
 | Diagnósticos del agente tras un fallo | `/root/sicr3p-diagnostico-AAAA-MM-DD-HHMM.txt` |
 | Respaldos pre-deploy de la BD | `/root/backups/pre-deploy-AAAA-MM-DD-HHMM.sql.gz` |
+| Commits en cuarentena (no se reintentan) | `/var/lib/sicr3p/commits-fallidos` |
 
 Códigos de salida de `actualizar.sh`: `0` sin cambios o actualizado ·
-`1` falló y se hizo rollback (producción quedó en el commit anterior, en
-detached HEAD; volver con `git checkout <rama>`) · `2` **crítico**: ni el
-rollback pasó el health — intervención manual (el log trae los pasos).
+`1` falló y se hizo rollback (producción quedó en el commit anterior, **en la
+rama**, sin detached HEAD) · `2` **crítico**: ni el rollback pasó el health —
+intervención manual (el log trae los pasos).
+
+## Cuarentena: por qué un commit que falló no se reintenta solo
+
+Cuando un deploy falla y se revierte, el SHA de ese commit queda anotado en
+`/var/lib/sicr3p/commits-fallidos` y **el ciclo siguiente no lo vuelve a
+intentar**. Sin esto, el cron reintentaba el mismo commit roto cada 30 minutos
+para siempre — con su `pg_dump` completo, sus dos `npm ci`, su build y su
+`pm2 restart` en cada vuelta — porque tras el rollback `HEAD` nunca vuelve a
+coincidir con `origin/<rama>`.
+
+La cuarentena se levanta sola de tres maneras: llega un commit nuevo (solo se
+compara el SHA exacto, así que un commit distinto se despliega normalmente),
+un deploy termina bien, o se levanta a mano:
+
+```bash
+bash /opt/sicr3p/deploy/actualizar.sh --reintentar
+```
+
+Eso último es para cuando la causa del fallo **no estaba en el código** — un
+`.env` mal puesto, el registry de npm caído, un disco lleno — y no quieres
+tener que inventar un commit nuevo para desbloquear.
+
+Mientras un commit está en cuarentena, el log deja **un aviso al día** (no uno
+cada media hora, que lo haría ilegible; y no cero, que dejaría producción
+congelada en silencio con el cron reportando éxito).
+
+> **Ojo con el primer ciclo tras cambiar este script.** Si el deploy que trae
+> una versión nueva de `actualizar.sh` es justo el que falla, el rollback
+> restaura en disco la versión anterior — que puede no tener la cuarentena. Es
+> inherente a cualquier script de deploy que se actualiza a sí mismo: conviene
+> mirar el log del ciclo siguiente en vez de darlo por hecho.
 
 ## Desinstalar
 
@@ -70,7 +102,7 @@ que no levantan, pero no contra bugs lógicos que pasan el health check.
 
 `actualizar.sh` acepta sobreescribir por entorno: `SICR3P_DIR`, `SICR3P_RAMA`,
 `SICR3P_LOG`, `SICR3P_HEALTH_URL`, `SICR3P_FRONT_URL`, `SICR3P_BACKUP_DIR`,
-`SICR3P_LOCK`, `SICR3P_RESTART_CMD`; y `SICR3P_SKIP_BUILD=1` (salta npm/build,
+`SICR3P_LOCK`, `SICR3P_RESTART_CMD`, `SICR3P_CUARENTENA`; y `SICR3P_SKIP_BUILD=1` (salta npm/build,
 **solo para ensayos locales**, nunca en el VPS). El wrapper acepta además
 `SICR3P_DIAG_DIR`.
 
