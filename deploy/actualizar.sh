@@ -6,6 +6,8 @@
 #   bash deploy/actualizar.sh                    → una pasada manual
 #   bash deploy/actualizar.sh --instalar-cron    → cron cada 30 min (vía agente-deploy.sh)
 #   bash deploy/actualizar.sh --desinstalar-cron → quita el cron
+#   bash deploy/actualizar.sh --reintentar       → levanta la cuarentena de un
+#                                                  commit que falló (ver abajo)
 #
 # Ciclo: fetch → ¿hay commits nuevos? → respaldo BD pre-deploy →
 #        git pull --ff-only → build backend+frontend → pm2 restart →
@@ -38,6 +40,13 @@ FRONT_URL="${SICR3P_FRONT_URL:-https://sicr3p.cl/}"
 BACKUP_DIR="${SICR3P_BACKUP_DIR:-/root/backups}"
 LOCK="${SICR3P_LOCK:-/run/sicr3p-actualizar.lock}"
 RESTART_CMD="${SICR3P_RESTART_CMD:-pm2 restart $PM2_APP}"
+# Cuarentena: SHA de los commits que ya fallaron y se revirtieron. Sin esto el
+# cron reintentaba el MISMO commit roto cada 30 minutos para siempre — con su
+# pg_dump completo, sus dos `npm ci`, su build y su restart de producción en
+# cada vuelta — hasta que un humano entrara al VPS. Se limpia sola en cuanto
+# llega un commit nuevo (solo se compara el SHA exacto), o a mano con
+# `bash deploy/actualizar.sh --reintentar`.
+CUARENTENA="${SICR3P_CUARENTENA:-/var/lib/sicr3p/commits-fallidos}"
 
 log() {
   local linea="[$(date '+%F %T')] $*"
@@ -71,9 +80,21 @@ if [ "${1:-}" = "--desinstalar-cron" ]; then
   fi
   exit 0
 fi
+if [ "${1:-}" = "--reintentar" ]; then
+  # Levanta la cuarentena a mano: para después de corregir la causa del fallo
+  # sin necesidad de un commit nuevo (por ejemplo, arreglar el .env del VPS).
+  if [ -s "$CUARENTENA" ]; then
+    rm -f "$CUARENTENA"
+    echo "==> Cuarentena levantada: el próximo ciclo vuelve a intentar el commit de origin/$RAMA."
+  else
+    echo "==> No había ningún commit en cuarentena."
+  fi
+  exit 0
+fi
 
 mkdir -p "$(dirname "$LOG")" 2>/dev/null || true
 touch "$LOG"
+mkdir -p "$(dirname "$CUARENTENA")" 2>/dev/null || true
 
 # ---------- 2. Lock: nunca dos deploys a la vez ----------
 exec 9>"$LOCK"
@@ -100,6 +121,15 @@ else
   COMMIT_REMOTO="$(git rev-parse "origin/$RAMA")"
   if [ "$COMMIT_PREVIO" = "$COMMIT_REMOTO" ]; then
     log "sin cambios (HEAD ya es origin/$RAMA en ${COMMIT_PREVIO:0:7})."
+    exit 0
+  fi
+  # Cuarentena: este commit ya se intentó y se revirtió. Sin esta guarda el
+  # cron lo reintentaba cada 30 min indefinidamente (pg_dump + doble npm ci +
+  # build + restart de producción en cada vuelta), porque tras el rollback
+  # HEAD nunca vuelve a ser igual a origin/$RAMA. Se sale EN SILENCIO: el
+  # rollback ya dejó el aviso ruidoso en el log, y repetirlo cada media hora
+  # solo lo haría ilegible.
+  if [ -f "$CUARENTENA" ] && grep -qxF "$COMMIT_REMOTO" "$CUARENTENA" 2>/dev/null; then
     exit 0
   fi
   log "cambio detectado: ${COMMIT_PREVIO:0:7} → ${COMMIT_REMOTO:0:7}; iniciando actualización."
@@ -180,10 +210,18 @@ smoke_ok() {
 # ---------- 8. Rollback al commit previo ----------
 rollback() {
   log "FALLO en el deploy de ${COMMIT_REMOTO:0:7}; iniciando ROLLBACK a ${COMMIT_PREVIO:0:7}."
-  git checkout --quiet "$COMMIT_PREVIO"
-  log "aviso: el repo quedó en detached HEAD (${COMMIT_PREVIO:0:7}); para volver a la rama: git checkout $RAMA"
+  # Se pone el commit en cuarentena ANTES de revertir: si el rollback muere a
+  # mitad de camino (exit 2), la marca ya está puesta y el cron no lo reintenta.
+  echo "$COMMIT_REMOTO" >> "$CUARENTENA"
+  # `checkout -B` en vez de un checkout suelto del SHA: deja el repo EN LA RAMA
+  # apuntando al commit bueno, no en detached HEAD. Con detached HEAD el
+  # siguiente `git pull --ff-only` operaba sobre un HEAD suelto y la referencia
+  # local de la rama quedaba desincronizada. Mover la rama hacia atrás es
+  # seguro: cuando llegue un commit nuevo, el pull --ff-only avanza igual.
+  git checkout -B "$RAMA" "$COMMIT_PREVIO" --quiet
+  log "commit ${COMMIT_REMOTO:0:7} en cuarentena: NO se reintenta solo. Corrige la causa y sube un commit nuevo, o levanta la cuarentena con: bash deploy/actualizar.sh --reintentar"
   if ! construir; then
-    log "CRÍTICO: el build del rollback también falló. Manual: cd $REPO_DIR && git checkout $RAMA && (backend: npm ci --omit=dev · frontend: npm ci && npx vite build) && pm2 restart $PM2_APP"
+    log "CRÍTICO: el build del rollback también falló. El repo quedó en $RAMA @ ${COMMIT_PREVIO:0:7}. Manual: cd $REPO_DIR && (backend: npm ci --omit=dev · frontend: npm ci && npx vite build) && pm2 restart $PM2_APP"
     exit 2
   fi
   if ! reiniciar; then
@@ -194,7 +232,7 @@ rollback() {
     log "ROLLBACK OK: producción volvió a ${COMMIT_PREVIO:0:7} (el deploy de ${COMMIT_REMOTO:0:7} falló)."
     exit 1
   fi
-  log "CRÍTICO: ni el rollback a ${COMMIT_PREVIO:0:7} pasó el health ($HEALTH_URL). Manual: pm2 logs $PM2_APP --lines 50, revisar backend/.env y la BD; si hace falta: git checkout $RAMA y redeploy a mano."
+  log "CRÍTICO: ni el rollback a ${COMMIT_PREVIO:0:7} pasó el health ($HEALTH_URL). El repo quedó en $RAMA @ ${COMMIT_PREVIO:0:7}. Manual: pm2 logs $PM2_APP --lines 50, revisar backend/.env y la BD."
   exit 2
 }
 
@@ -245,6 +283,7 @@ if ! reiniciar; then
 fi
 if health_ok; then
   if smoke_ok; then
+    rm -f "$CUARENTENA"
     log "actualizado ${COMMIT_PREVIO:0:7} → $(git rev-parse --short HEAD)."
     exit 0
   fi
