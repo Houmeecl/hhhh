@@ -19,6 +19,23 @@ const GRAY = '#64748b';
 const LIGHT = '#f1f5f9';
 const BORDER = '#e6e9ed';
 
+// Descargo obligatorio en TODO informe que declare emisiones. Va impreso —
+// no basta con mostrarlo en pantalla: estos PDF se entregan a un mandante,
+// a un auditor o a una autoridad, y ahí el documento viaja solo. Los
+// materiales comerciales (ficha 01, dossier corporativo) afirman que cada
+// informe lo dice de forma impresa; esta constante es lo que sostiene esa
+// afirmación, así que no se quita sin corregir también esos documentos.
+const AVISO_NO_VERIFICACION =
+  'Este documento NO constituye una verificación de tercera parte acreditada (ISO 14064-3). ' +
+  'Los factores de emisión se aplican como referenciales: corresponde validarlos contra la ' +
+  'edición vigente de su fuente antes de un uso contractual o regulatorio.';
+
+// Pie de descargo al final del contenido de un informe.
+function avisoNoVerificacion(doc, x, y, ancho) {
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+    .text(AVISO_NO_VERIFICACION, x, y, { width: ancho });
+}
+
 const MESES = [
   'ene', 'feb', 'mar', 'abr', 'may', 'jun',
   'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
@@ -394,6 +411,8 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     doc.switchToPage(range.start + i);
     const oldBottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+      .text(AVISO_NO_VERIFICACION, 48, 786, { width: 499, lineBreak: true });
     doc.font('Helvetica').fontSize(8).fillColor(GRAY)
       .text(`sicr3p · Contabilidad de carbono trazable · Folio ${folio(sesion)}`, 48, 808, { width: 400, lineBreak: false });
     doc.text(`Página ${i + 1} de ${range.count}`, 400, 808, { width: 147, align: 'right', lineBreak: false });
@@ -545,6 +564,8 @@ export async function generateBalanceNatural({ balance, movimientos, activos, in
     doc.switchToPage(range.start + i);
     const oldBottom = doc.page.margins.bottom;
     doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(6.5).fillColor(GRAY)
+      .text(AVISO_NO_VERIFICACION, 48, 786, { width: 499, lineBreak: true });
     doc.font('Helvetica').fontSize(8).fillColor(GRAY)
       .text(`sicr3p · Estado de Capital Natural · Folio ${folioN}`, 48, 808, { width: 400, lineBreak: false });
     doc.text(`Página ${i + 1} de ${range.count}`, 400, 808, { width: 147, align: 'right', lineBreak: false });
@@ -1098,8 +1119,9 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
     'Emisiones calculadas con el motor propio de sicr3p sobre el detalle de cada documento tributario ' +
     '(unidades físicas cuando el documento las trae, factores por gasto en el resto), con la metodología ' +
     'vigente al momento del cálculo.',
-    M, doc.page.height - 70, { width: W }
+    M, doc.page.height - 82, { width: W }
   );
+  avisoNoVerificacion(doc, M, doc.page.height - 54, W);
 
   return bufferDoc(doc);
 }
@@ -1366,12 +1388,14 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(primera.hash_cadena), 60, py + 38, { width: W - 24 });
     py += 78;
   }
+  const pyPie = Math.max(py, 620);
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
     'sicr3p registra, calcula y sella datos desde los documentos tributarios reales del presentador, con integridad ' +
     'garantizada por una cadena de hash pública. Esta carpeta se emitió para acompañar una entrega física; su versión ' +
     'digital siempre prevalece.',
-    48, Math.max(py, 620), { width: W }
+    48, pyPie, { width: W }
   );
+  avisoNoVerificacion(doc, 48, pyPie + 34, W);
 
   return bufferDoc(doc);
 }

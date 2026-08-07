@@ -19,8 +19,8 @@ const smtpTransport = (config.smtp.host && config.smtp.user && config.smtp.pass)
   : null;
 
 // De dónde salen los correos (MAIL_FROM). En producción con SMTP propio debe
-// ser una casilla del dominio del servidor (ej. no-responder@sicr3p.cl) para
-// que el DKIM firme y el SPF pase.
+// ser una casilla del dominio de correo — sicrep.cl, no sicr3p.cl, que es el
+// del sitio (ej. no-responder@sicrep.cl) — para que el DKIM firme y el SPF pase.
 const FROM = config.resend.from;
 
 // Qué transporte se usaría según la config: SMTP propio tiene prioridad, luego

@@ -430,7 +430,13 @@ honesto— vive ahora en la portada.
 
 ## Alcance
 
-Este código cubre la **Etapa 1 completa** más los ítems de **Etapa 2** que no requieren
-servicios externos (informes mensuales, cadena comprador-vendedor, verificador DTE local,
-módulo Capital Natural). El estado del backlog está en **`ETAPA2.md`** y la hoja de ruta
-restante (SII/RCV, motor propio, BigQuery, API mandantes, etc.) en **`ETAPA3.md`**.
+Este código cubre la **Etapa 1 completa**, la **Etapa 2** (informes mensuales, cadena
+comprador-vendedor, verificador DTE local, Capital Natural, BigQuery, API de mandantes) y
+buena parte de lo que originalmente era Etapa 3: **conexión al SII y descarga del registro
+de compras y ventas**, **motor de cálculo propio** con fuentes metodológicas citadas y
+versionado, informes PDF, cadena de integridad, siete paneles por perfil, y los módulos
+REP, CBAM, Pasaporte de Origen, Torre logística, APL e Instituto.
+
+El estado detallado está en **`ETAPA2.md`** y **`ETAPA3.md`** — esos dos archivos son la
+fuente de verdad del avance; lo que queda pendiente ahí (PCAF, ISO 14083 por envío, bonos
+vía socio acreditado) está marcado como tal.
