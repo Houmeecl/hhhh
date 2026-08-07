@@ -995,6 +995,104 @@ export async function generateReporteCbam({ mandante, lotes }) {
   return bufferDoc(doc);
 }
 
+// ---------- INFORME DE CONTABILIDAD DE CARBONO (SII) ----------
+// A partir de analizarPeriodo() (services/analisisSiiProveedor.js): compras
+// y ventas descargadas del SII de un período, con las emisiones calculadas
+// documento a documento. Lenguaje corporativo: las emisiones se dicen
+// "calculadas sobre N documentos del SII" (no "estimadas"), sin afirmar
+// certificación, sin la palabra "huella".
+function folioInforme(proveedorId, periodo) {
+  const seq = String(parseInt((proveedorId || '').replace(/\D/g, '').slice(-4) || '1', 10) % 10000).padStart(4, '0');
+  return `CC-${(periodo || '').replace('-', '')}-${seq}`;
+}
+
+function tablaPorTipo(doc, x, y, ancho, titulo, filas) {
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text(titulo, x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!filas?.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin documentos en este período.', x, y);
+    return doc.y + 12;
+  }
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Tipo de documento', x + 6, y + 4).text('Docs', x + ancho - 190, y + 4, { width: 50, align: 'right' })
+    .text('Neto', x + ancho - 140, y + 4, { width: 65, align: 'right' })
+    .text('Total', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+  let zebra = false;
+  for (const f of filas) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 15).fill(LIGHT);
+    zebra = !zebra;
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(f.nombre, x + 6, y + 3, { width: ancho - 200 })
+      .text(f.resumen ? 'resumen' : nfp(f.n), x + ancho - 190, y + 3, { width: 50, align: 'right' })
+      .text(nfp(f.neto), x + ancho - 140, y + 3, { width: 65, align: 'right' })
+      .text(nfp(f.total), x + ancho - 70, y + 3, { width: 64, align: 'right' });
+    y += 15;
+  }
+  return y + 14;
+}
+
+export async function generateInformeCarbono({ empresa, periodo, analisis }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const M = 48;
+  const W = doc.page.width - M * 2;
+
+  drawLogo(doc, M, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`${folioInforme(empresa?.id, periodo)} · Emitido el ${fechaCorta(new Date())}`, M, 50, { width: W, align: 'right' });
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
+    .text('Contabilidad de carbono', M, 96, { width: W });
+  doc.font('Helvetica').fontSize(10.5).fillColor(GRAY)
+    .text(`Compras y ventas del período ${periodo} — Registro de Compras y Ventas del SII`, M, doc.y + 4, { width: W });
+
+  doc.roundedRect(M, 148, W, 46, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('EMPRESA', M + 16, 160);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+    .text(`${empresa?.nombre_empresa || ''}  ·  ${empresa?.rut || ''}`, M + 16, 173);
+
+  let y = 216;
+  const c = analisis.resumen.compra, v = analisis.resumen.venta;
+  const mitad = (W - 16) / 2;
+  doc.roundedRect(M, y, mitad, 54, 6).fillAndStroke('#fff', BORDER);
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('COMPRAS', M + 12, y + 10);
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text(`${nfp(c.n)} documentos`, M + 12, y + 24);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(`$${nfp(c.total)}`, M + 12, y + 40);
+
+  doc.roundedRect(M + mitad + 16, y, mitad, 54, 6).fillAndStroke('#fff', BORDER);
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('VENTAS', M + mitad + 28, y + 10);
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(NAVY).text(`${nfp(v.n)} documentos`, M + mitad + 28, y + 24);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(`$${nfp(v.total)}`, M + mitad + 28, y + 40);
+
+  y += 76;
+
+  const em = analisis.emisiones;
+  if (em) {
+    doc.roundedRect(M, y, W, 60, 8).fillAndStroke('#f0fdfa', '#14b8a6');
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${em.total_co2e_tref} tCO₂e`, M + 16, y + 10);
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
+      `Emisiones de las compras, calculadas sobre ${nfp(em.documentos_calculados)} de ${nfp(em.documentos_totales)} ` +
+      `documentos del SII${em.metodo_fisico > 0 ? ` · ${nfp(em.metodo_fisico)} por unidades físicas, ${nfp(em.metodo_gasto)} por gasto` : ''}.`,
+      M + 16, y + 36, { width: W - 32 }
+    );
+    y += 76;
+  }
+
+  y = tablaPorTipo(doc, M, y, W, 'Compras por tipo de documento', analisis.por_tipo?.compra);
+  y = tablaPorTipo(doc, M, y, W, 'Ventas por tipo de documento', analisis.por_tipo?.venta);
+
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+    'Emisiones calculadas con el motor propio de sicr3p sobre el detalle de cada documento tributario ' +
+    '(unidades físicas cuando el documento las trae, factores por gasto en el resto), con la metodología ' +
+    'vigente al momento del cálculo.',
+    M, doc.page.height - 70, { width: W }
+  );
+
+  return bufferDoc(doc);
+}
+
 // ---------- CREDENCIAL VIRTUAL — Firma del actor de la cadena (atestación) ----------
 // IMPORTANTE (honestidad, ver migraciones 038/039): esto NO es una firma
 // electrónica con validez legal (Ley N° 19.799 de Chile). Es una

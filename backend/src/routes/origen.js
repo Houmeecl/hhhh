@@ -7,7 +7,7 @@ import { requireAuth, requireRole, requireHomePanel, requireNivelOperador, logAc
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
-import { generateCredencialTarjeta, generateCredencialProveedor } from '../services/pdf.js';
+import { generateCredencialTarjeta, generateCredencialProveedor, generateInformeCarbono } from '../services/pdf.js';
 import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
 import { analizarPeriodo, periodosDescargados, descargarYCalcular } from '../services/analisisSiiProveedor.js';
 import { cifrar, descifrar, cifradoDisponible } from '../services/cripto.js';
@@ -1632,6 +1632,21 @@ proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, re
 proveedorPanelRouter.get('/sii/analisis/:periodo', async (req, res, next) => {
   try {
     res.json(await analizarPeriodo(query, req.user.proveedor_id, req.params.periodo));
+  } catch (err) { next(err); }
+});
+
+// GET /api/panel-proveedor/sii/informe/:periodo.pdf — la propia empresa
+// descarga su informe de contabilidad de carbono del período.
+proveedorPanelRouter.get('/sii/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.user.proveedor_id]);
+    const empresa = rows[0];
+    if (!empresa) return res.status(403).json({ error: 'Cuenta de proveedor no encontrada.' });
+    const analisis = await analizarPeriodo(query, empresa.id, req.params.periodo);
+    const pdf = await generateInformeCarbono({ empresa, periodo: req.params.periodo, analisis });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="carbono-${empresa.rut}-${req.params.periodo}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

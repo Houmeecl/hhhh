@@ -320,6 +320,7 @@ export const api = {
   adminSiiDescargar: (proveedorId, b) => request(`/admin/sii/${proveedorId}/descargar`, { method: 'POST', body: b, authed: true }),
   adminSiiAnalisis: (proveedorId, periodo) => request(`/admin/sii/${proveedorId}/analisis/${periodo}`, { authed: true }),
   adminSiiPeriodos: (proveedorId) => request(`/admin/sii/${proveedorId}/periodos`, { authed: true }),
+  abrirInformeCarbonoPdf: (proveedorId, periodo) => abrirPdfAuth(`/api/admin/sii/${proveedorId}/informe/${periodo}.pdf`),
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   reenviarActivacion: (id) => request(`/admin/usuarios/${id}/reenviar-activacion`, { method: 'POST', authed: true }),
@@ -513,6 +514,7 @@ export const api = {
   proveedorSiiAnalisis: (periodo) => request(`/panel-proveedor/sii/analisis/${periodo}`, { authedProveedor: true }),
   proveedorSiiGuardarCredenciales: (body) => request('/panel-proveedor/sii/credenciales', { method: 'POST', body, authedProveedor: true }),
   proveedorSiiBorrarCredenciales: () => request('/panel-proveedor/sii/credenciales', { method: 'DELETE', authedProveedor: true }),
+  abrirProveedorInformeCarbonoPdf: (periodo) => abrirPdfAuth(`/api/panel-proveedor/sii/informe/${periodo}.pdf`, authProveedor),
 };
 
 async function abrirPdfAuth(url, store = auth) {

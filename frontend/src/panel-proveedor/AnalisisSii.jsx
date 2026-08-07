@@ -157,7 +157,17 @@ export default function AnalisisSii() {
         </div>
       )}
 
-      {analisis && <AnalisisSiiVista a={analisis} />}
+      {analisis && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+            <button className="btn btn-outline btn-sm"
+              onClick={() => api.abrirProveedorInformeCarbonoPdf(analisis.periodo).catch((e) => flash(e.message, true))}>
+              Descargar informe (PDF)
+            </button>
+          </div>
+          <AnalisisSiiVista a={analisis} />
+        </div>
+      )}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );

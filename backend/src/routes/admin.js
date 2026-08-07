@@ -10,7 +10,7 @@ import {
   PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
   generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
 } from '../services/contrato.js';
-import { generateContrato } from '../services/pdf.js';
+import { generateContrato, generateInformeCarbono } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
 import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
 import { validarCredencialesSii } from '../services/siiProveedor.js';
@@ -1632,6 +1632,21 @@ router.get('/sii/:proveedorId/analisis/:periodo', async (req, res, next) => {
       analisis: await analizarPeriodo(query, req.params.proveedorId, req.params.periodo),
       periodos: await periodosDescargados(query, req.params.proveedorId),
     });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/informe/:periodo.pdf — informe de
+// contabilidad de carbono del período, ya descargado (sin costo, sin clave).
+router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const empresa = rows[0];
+    if (!empresa) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const analisis = await analizarPeriodo(query, empresa.id, req.params.periodo);
+    const pdf = await generateInformeCarbono({ empresa, periodo: req.params.periodo, analisis });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="carbono-${empresa.rut}-${req.params.periodo}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 
