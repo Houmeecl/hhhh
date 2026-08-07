@@ -87,3 +87,48 @@ test('generateInformeCarbono nunca recibe ni imprime una clave: la firma no acep
   const buf = await generateInformeCarbono({ empresa: EMPRESA, periodo: ANALISIS.periodo, analisis: ANALISIS, password: 'no-debiera-usarse' });
   assert.equal(buf.subarray(0, 5).toString('latin1'), '%PDF-');
 });
+
+// El desglose por alcance es lo que el mandante o el banco lee primero, así
+// que tiene que estar impreso — no solo en pantalla. Incluye la fila
+// "Sin clasificar": si se omitiera, los tres alcances no sumarían el total
+// y el informe no cuadraría.
+test('generateInformeCarbono imprime la tabla de alcances GHG con el saldo sin clasificar', async () => {
+  const conAlcances = {
+    ...ANALISIS,
+    emisiones: {
+      ...ANALISIS.emisiones,
+      total_co2e_tref: 41.5,
+      motor_versiones: [3, 4],
+      por_alcance: {
+        alcances: [
+          { alcance: 1, tco2e: 12.5, n_documentos: 3, categorias: [] },
+          { alcance: 2, tco2e: 8, n_documentos: 2, categorias: [] },
+          { alcance: 3, tco2e: 19, n_documentos: 4, categorias: [] },
+        ],
+        sin_clasificar: { tco2e: 2, n_documentos: 1, inferido_por_nombre: 1 },
+      },
+    },
+  };
+  const texto = textoDelPdf(await generateInformeCarbono({ empresa: EMPRESA, periodo: ANALISIS.periodo, analisis: conAlcances }));
+  assert.match(texto, /Emisiones por alcance/);
+  assert.match(texto, /Alcance 1/);
+  assert.match(texto, /Alcance 2/);
+  assert.match(texto, /Alcance 3/);
+  assert.match(texto, /Sin alcance atribuido/, 'el saldo sin alcance no se puede omitir: los alcances no sumarían el total');
+  assert.match(texto, /clasificados por el nombre del proveedor/, 'el motivo tiene que estar impreso, no solo el número');
+  // Números en formato chileno (coma decimal), como el resto del informe.
+  assert.match(texto, /12,50/);
+  assert.match(texto, /30,1%/);
+  // La versión citada es la ESTAMPADA al calcular, no la vigente al emitir.
+  assert.match(texto, /v3, v4/);
+  assert.match(texto, /WRI\/WBCSD 2011/, 'las categorías de Alcance 3 tienen que citar su estándar');
+});
+
+// Un análisis sin `por_alcance` (períodos descargados antes de la migración
+// 076, o el motor sin configurar) tiene que seguir generando el PDF.
+test('generateInformeCarbono no exige por_alcance: el informe sale igual sin el desglose', async () => {
+  const buf = await generateInformeCarbono({ empresa: EMPRESA, periodo: ANALISIS.periodo, analisis: ANALISIS });
+  const texto = textoDelPdf(buf);
+  assert.equal(buf.subarray(0, 5).toString('latin1'), '%PDF-');
+  assert.doesNotMatch(texto, /Emisiones por alcance/);
+});

@@ -93,6 +93,16 @@ export function normalizarUnidad(unidad) {
 // gana la primera categoría leída (comportamiento previo).
 // Devuelve el código de categoría (default 'servicios', catch-all).
 export function clasificar(texto, categorias) {
+  return clasificarConSenal(texto, categorias).codigo;
+}
+
+// Igual que clasificar(), pero además dice SI hubo coincidencia de palabra
+// clave o si se cayó al catch-all. La diferencia importa río abajo: cuando
+// no hubo coincidencia, el código devuelto ('servicios') es un default de
+// cálculo, NO una clasificación del documento. Atribuirle el alcance GHG de
+// esa categoría (Alcance 3 · Cat. 1) sería presentar un default como si
+// fuera una atribución calculada — ver services/alcanceGhg.js.
+export function clasificarConSenal(texto, categorias) {
   const activas = [...(categorias?.values() || [])].filter((c) => c.activo);
   if (activas.length === 0) {
     // Error de configuración explícito — jamás el crash silencioso de
@@ -112,9 +122,9 @@ export function clasificar(texto, categorias) {
       }
     }
   }
-  if (mejor) return mejor.codigo;
+  if (mejor) return { codigo: mejor.codigo, coincidencia: true };
   const servicios = categorias.get('servicios');
-  return servicios?.activo ? 'servicios' : activas[0].codigo;
+  return { codigo: servicios?.activo ? 'servicios' : activas[0].codigo, coincidencia: false };
 }
 
 // Calcula el CO2e (tCO2e) de un ítem de factura, eligiendo método físico o
@@ -124,7 +134,7 @@ export function clasificar(texto, categorias) {
 // cruzada Σítems≈total — ver public.js). Es un helper de bajo nivel — la
 // política de origen por defecto (conservadora) vive en calcularFactura.
 export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, categorias, origen = 'xml') {
-  const codigo = clasificar(`${nombre || ''} ${descripcion || ''}`, categorias);
+  const { codigo, coincidencia } = clasificarConSenal(`${nombre || ''} ${descripcion || ''}`, categorias);
   const cat = categorias.get(codigo);
   const unidadCanonica = (origen === 'xml' || origen === 'ia_verificada') ? normalizarUnidad(unidad) : null;
 
@@ -142,6 +152,9 @@ export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, c
     co2e,
     categoria: cat.nombre,
     categoria_codigo: codigo,
+    // false cuando el código salió del catch-all: hay factor con que calcular,
+    // pero no hay clasificación real del ítem.
+    categoria_coincidencia: coincidencia,
     metodo,
   };
 }
@@ -172,6 +185,15 @@ export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {})
   return {
     total_co2e: total,
     categoria: dominante?.categoria || 'Sin categoría',
+    // `categoria` es el NOMBRE, que se edita desde el panel del motor y por
+    // eso no sirve como clave. `categoria_codigo` es el código estable: es lo
+    // que se persiste y con lo que se hace JOIN para resolver el alcance GHG.
+    // Aditivo sobre el shape drop-in de analyzeInvoice(), igual que
+    // `items_descartados` — ningún llamador existente se entera.
+    categoria_codigo: dominante?.categoria_codigo || null,
+    // Si el ítem dominante cayó al catch-all, la categoría del documento es un
+    // default de cálculo y no se le puede atribuir un alcance GHG.
+    categoria_coincidencia: dominante ? dominante.categoria_coincidencia === true : false,
     items: items.map(({ descripcion, cantidad, co2e, porcentaje_total, metodo }) => ({ descripcion, cantidad, co2e, porcentaje_total, metodo })),
     items_descartados: descartados,
   };

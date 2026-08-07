@@ -1,4 +1,4 @@
-import { fmtInt, fmtFecha } from '../api.js';
+import { fmt, fmtInt, fmtFecha } from '../api.js';
 import { formatearRut } from '../lib/rut.js';
 
 // Vista del análisis de compras/ventas del SII de una empresa: resumen,
@@ -23,20 +23,32 @@ export default function AnalisisSiiVista({ a }) {
         <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid #14b8a6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{em.total_co2e_tref} tCO₂e</div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{fmt(em.total_co2e_tref, 2)} tCO₂e</div>
               <div className="muted" style={{ fontSize: 13 }}>
                 Emisiones de tus compras — calculadas sobre {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos del SII
                 {em.metodo_fisico > 0 && ` · ${fmtInt(em.metodo_fisico)} por unidades físicas, ${fmtInt(em.metodo_gasto)} por gasto`}
               </div>
             </div>
-            <span className="badge badge-green">Contabilidad de carbono</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span className="badge badge-green">Contabilidad de carbono</span>
+              {/* El backend marca `referencial: true` desde que existe este
+                  cálculo y la vista nunca lo decía: sola, la insignia verde se
+                  leía como un aval. */}
+              {em.referencial && <span className="badge badge-amber">Estimación referencial</span>}
+            </div>
           </div>
           <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-            Calculada a partir del detalle de cada documento tributario con nuestro motor de cálculo, aplicando
-            unidades físicas cuando el documento las incluye y factores por gasto en el resto. Alineada con el GHG Protocol.
+            Calculada con nuestro motor sobre lo que trae cada documento tributario: el detalle de sus ítems cuando el
+            SII lo entrega, y el monto del documento cuando solo llega el registro del RCV. Se aplican unidades físicas
+            si el documento las incluye y factores por gasto en el resto.
+            Es una estimación referencial: los factores son de referencia y no constituyen una verificación de tercera parte.
+            {em.motor_versiones?.length > 0 && ` Motor de cálculo v${em.motor_versiones.join(', v')}.`}
+            {em.documentos_sin_version > 0 && ` ${fmtInt(em.documentos_sin_version)} documento${em.documentos_sin_version === 1 ? '' : 's'} sin versión de motor registrada.`}
           </p>
         </div>
       )}
+
+      <PorAlcanceTabla porAlcance={em?.por_alcance} total={em?.total_co2e_tref} />
 
       <div className={a.por_tipo?.compra?.length && a.por_tipo?.venta?.length ? 'two-col-grid' : undefined}>
         <PorTipoTabla titulo="Compras por tipo de documento" filas={a.por_tipo?.compra} />
@@ -71,7 +83,18 @@ export default function AnalisisSiiVista({ a }) {
                     </td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.neto)}</td>
                     <td style={{ textAlign: 'right' }}>{CLP(d.total)}</td>
-                    <td style={{ textAlign: 'right' }}>{d.co2e != null ? d.co2e : '—'}</td>
+                    {/* El método es el indicador de calidad del dato: "físico"
+                        salió de unidades reales del documento, "gasto" de una
+                        proporción sobre el monto. La nota metodológica ya lo
+                        promete en agregado; acá se puede ver documento a documento. */}
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {d.co2e != null ? d.co2e : '—'}
+                      {d.metodo && (
+                        <span className="muted" style={{ fontSize: 11, marginLeft: 6, color: d.metodo === 'fisico' ? '#16a34a' : undefined }}>
+                          {d.metodo === 'fisico' ? 'físico' : 'gasto'}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {a.documentos.length === 0 && (
@@ -82,6 +105,92 @@ export default function AnalisisSiiVista({ a }) {
           </div>
         </div>
       </details>
+    </div>
+  );
+}
+
+// Desglose por alcance GHG (1/2/3). El alcance sale de la categoría con que
+// el motor clasificó cada documento, resuelta contra la versión del motor con
+// la que se calculó — no contra el catálogo de hoy.
+//
+// "Sin clasificar" se muestra SIEMPRE que exista y NO es un residuo menor:
+// solo entra a un alcance el documento cuya categoría salió de la glosa real
+// de sus ítems. Los que se clasificaron por el nombre del proveedor o con el
+// catch-all del motor quedan acá a propósito (ver services/alcanceGhg.js).
+// Su CO2e está dentro del total, así que esconderlos dejaría tres alcances
+// que no suman — un informe que no cuadra. Cada motivo trae su propia salida.
+const DESC_ALCANCE = {
+  1: 'Emisiones directas de la propia operación',
+  2: 'Electricidad comprada',
+  3: 'Cadena de valor (proveedores, residuos, viajes)',
+};
+
+// Motivo → qué le pasó al documento y qué puede hacer quien lo lee. El orden
+// es el de utilidad para la empresa: primero lo que ella misma puede resolver.
+const MOTIVOS_SIN_ALCANCE = [
+  ['inferido_por_nombre', 'se clasificaron por el nombre del proveedor, no por el detalle del documento — el RCV no trae ese detalle, así que no se les atribuye alcance'],
+  ['descarga_antigua', 'se descargaron antes de esta clasificación — vuelve a descargar el período para clasificarlos'],
+  ['sin_coincidencia', 'no coinciden con ninguna categoría del motor'],
+  ['motor_sin_categoria', 'el motor no les dejó categoría (por ejemplo, notas de crédito)'],
+  ['alcance_no_legible', 'su categoría no tiene un alcance GHG legible — avísanos para corregir el catálogo'],
+];
+
+function PorAlcanceTabla({ porAlcance, total }) {
+  if (!porAlcance) return null; // backend anterior a esta versión
+  const { alcances = [], sin_clasificar: sin } = porAlcance;
+  if (!alcances.length && !sin?.n_documentos) return null;
+  const pct = (n) => (total > 0 ? `${fmt((n / total) * 100, 1)}%` : '—');
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>Emisiones por alcance (GHG Protocol)</h3>
+      <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Alcance</th><th>Qué incluye</th><th style={{ textAlign: 'right' }}>Docs</th><th style={{ textAlign: 'right' }}>tCO₂e</th><th style={{ textAlign: 'right' }}>%</th></tr></thead>
+          <tbody>
+            {alcances.map((a) => (
+              <tr key={a.alcance}>
+                <td style={{ fontWeight: 600 }}>Alcance {a.alcance}</td>
+                <td>
+                  {DESC_ALCANCE[a.alcance]}
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {a.categorias.map((c) => `${c.nombre}${c.categoria_ghg ? ` (Cat. ${c.categoria_ghg})` : ''}`).join(' · ')}
+                  </div>
+                </td>
+                <td style={{ textAlign: 'right' }}>{fmtInt(a.n_documentos)}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(a.tco2e, 2)}</td>
+                <td style={{ textAlign: 'right' }}>{pct(a.tco2e)}</td>
+              </tr>
+            ))}
+            {sin?.n_documentos > 0 && (
+              <tr>
+                <td style={{ fontWeight: 600 }}>Sin alcance atribuido</td>
+                <td className="muted">
+                  Su CO₂e está incluido en el total del período.
+                  {MOTIVOS_SIN_ALCANCE.filter(([clave]) => sin[clave] > 0).map(([clave, texto]) => (
+                    <div key={clave}>{fmtInt(sin[clave])} {texto}.</div>
+                  ))}
+                </td>
+                <td style={{ textAlign: 'right' }}>{fmtInt(sin.n_documentos)}</td>
+                <td style={{ textAlign: 'right' }}>{fmt(sin.tco2e, 2)}</td>
+                <td style={{ textAlign: 'right' }}>{pct(sin.tco2e)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      {alcances.length === 0 && (
+        <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+          Ningún documento de este período trae el detalle de sus ítems, así que no hay alcances que atribuir.
+          El registro del SII entrega el monto de cada documento, no lo que se compró. Para tener alcances 1/2/3
+          con respaldo, sube los documentos con su detalle.
+        </p>
+      )}
+      <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
+        Solo se atribuye alcance al documento cuya categoría salió del detalle de sus propios ítems, y se usa
+        la categoría principal (la de mayor CO₂e del documento). Categorías de Alcance 3 según GHG Protocol —
+        Corporate Value Chain (Scope 3) Standard, WRI/WBCSD 2011.
+      </p>
     </div>
   );
 }

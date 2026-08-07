@@ -1067,6 +1067,75 @@ function tablaPorTipo(doc, x, y, ancho, titulo, filas) {
   return y + 14;
 }
 
+// Desglose por alcance GHG. La fila "sin clasificar" NO es opcional: su CO2e
+// está dentro del total del informe, así que omitirla dejaría tres alcances
+// que no suman lo que dice el número grande de arriba.
+// Motivos por los que un documento calculado NO recibe alcance. Espejo de
+// MOTIVOS_SIN_ALCANCE en el frontend y de los contadores que arma
+// services/alcanceGhg.js — si se agrega uno allá, tiene que aparecer acá o
+// el informe mostraría un saldo sin explicar.
+const MOTIVOS_SIN_ALCANCE = [
+  ['inferido_por_nombre', 'clasificados por el nombre del proveedor, no por el detalle del documento'],
+  ['descarga_antigua', 'descargados antes de esta clasificación'],
+  ['sin_coincidencia', 'sin coincidencia con ninguna categoría del motor'],
+  ['motor_sin_categoria', 'sin categoría asignada por el motor (ej. notas de crédito)'],
+  ['alcance_no_legible', 'con un alcance GHG no legible en el catálogo'],
+];
+
+function tablaPorAlcance(doc, x, y, ancho, porAlcance, total) {
+  const alcances = porAlcance?.alcances || [];
+  const sin = porAlcance?.sin_clasificar;
+  if (!alcances.length && !sin?.n_documentos) return y;
+  const DESC = {
+    1: 'Emisiones directas de la operación',
+    2: 'Electricidad comprada',
+    3: 'Cadena de valor (proveedores, residuos, viajes)',
+  };
+  const pct = (n) => (total > 0 ? `${nf((n / total) * 100, 1)}%` : '—');
+
+  if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('Emisiones por alcance (GHG Protocol)', x, y, { width: ancho });
+  y = doc.y + 8;
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Alcance', x + 6, y + 4).text('Docs', x + ancho - 190, y + 4, { width: 50, align: 'right' })
+    .text('tCO2e', x + ancho - 140, y + 4, { width: 65, align: 'right' })
+    .text('%', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+
+  const filas = [
+    ...alcances.map((a) => ({ etiqueta: `Alcance ${a.alcance}`, desc: DESC[a.alcance], n: a.n_documentos, co2e: a.tco2e })),
+    ...(sin?.n_documentos > 0
+      ? [{
+        etiqueta: 'Sin alcance atribuido',
+        // La causa importa para quien lee el informe: no es lo mismo un
+        // documento que se clasificó por el nombre del proveedor que uno
+        // descargado antes de que existiera esta clasificación.
+        desc: MOTIVOS_SIN_ALCANCE
+          .filter(([clave]) => sin[clave] > 0)
+          .map(([clave, texto]) => `${nfp(sin[clave])} ${texto}`)
+          .join(' · ') || 'Sin categoría asignada',
+        n: sin.n_documentos,
+        co2e: sin.tco2e,
+      }]
+      : []),
+  ];
+  let zebra = false;
+  for (const f of filas) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 22).fill(LIGHT);
+    zebra = !zebra;
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: ancho - 200 });
+    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(f.desc, x + 6, y + 12, { width: ancho - 200 });
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(nfp(f.n), x + ancho - 190, y + 6, { width: 50, align: 'right' })
+      .text(nf(f.co2e, 2), x + ancho - 140, y + 6, { width: 65, align: 'right' })
+      .text(pct(f.co2e), x + ancho - 70, y + 6, { width: 64, align: 'right' });
+    y += 22;
+  }
+  return y + 14;
+}
+
 export async function generateInformeCarbono({ empresa, periodo, analisis }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const M = 48;
@@ -1111,16 +1180,29 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
       M + 16, y + 36, { width: W - 32 }
     );
     y += 76;
+    y = tablaPorAlcance(doc, M, y, W, em.por_alcance, em.total_co2e_tref);
   }
 
   y = tablaPorTipo(doc, M, y, W, 'Compras por tipo de documento', analisis.por_tipo?.compra);
   y = tablaPorTipo(doc, M, y, W, 'Ventas por tipo de documento', analisis.por_tipo?.venta);
 
+  // La versión que se cita es la ESTAMPADA al calcular (migración 076), no la
+  // vigente al emitir el PDF: si alguien editó el motor después, este informe
+  // sigue diciendo con qué se calculó de verdad.
+  const versiones = em?.motor_versiones?.length ? ` Motor de cálculo v${em.motor_versiones.join(', v')}.` : '';
+  // Si parte del período se calculó sin versión estampada, se dice: callarlo
+  // haría leer "v3, v4" como si cubriera todos los documentos del informe.
+  const sinVersion = em?.documentos_sin_version > 0
+    ? ` ${nfp(em.documentos_sin_version)} documento(s) sin versión de motor registrada.`.replace('(s)', em.documentos_sin_version === 1 ? '' : 's')
+    : '';
   doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
-    'Emisiones calculadas con el motor propio de sicr3p sobre el detalle de cada documento tributario ' +
-    '(unidades físicas cuando el documento las trae, factores por gasto en el resto), con la metodología ' +
-    'vigente al momento del cálculo.',
-    M, doc.page.height - 82, { width: W }
+    'Emisiones calculadas con el motor propio de sicr3p sobre lo que entrega el SII de cada documento ' +
+    'tributario: el detalle de sus ítems cuando está disponible, y el monto del documento cuando solo llega ' +
+    'el registro del RCV (unidades físicas cuando el documento las trae, factores por gasto en el resto). ' +
+    'Es una estimación referencial. Solo se atribuye alcance al documento cuya categoría salió del detalle ' +
+    'de sus propios ítems, usando su categoría principal; el resto se informa aparte. Categorías de Alcance 3 ' +
+    'según GHG Protocol — Corporate Value Chain (Scope 3) Standard, WRI/WBCSD 2011.' + versiones + sinVersion,
+    M, doc.page.height - 92, { width: W }
   );
   avisoNoVerificacion(doc, M, doc.page.height - 54, W);
 

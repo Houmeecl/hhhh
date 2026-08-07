@@ -41,14 +41,21 @@ export default function AnalisisSii() {
 
   async function descargar(e) {
     e.preventDefault();
+    const p = normalizarPeriodo(periodo);
+    if (!periodoValido(p)) { flash('Período inválido: usa AAAA-MM (ej: 2026-06).', true); return; }
+    if (p !== periodo) setPeriodo(p);
+    await bajarPeriodo(p);
+  }
+
+  // Baja (o vuelve a bajar) un período. Se comparte con el botón de
+  // reclasificación: volver a descargar es exactamente la misma operación —
+  // el UPSERT del backend es idempotente y repuebla `categoria`.
+  async function bajarPeriodo(p) {
     // Si NO hay credenciales guardadas, exigimos clave + RUT válido acá.
     if (!guardadas) {
       if (!clave) { flash('Escribe tu clave tributaria para descargar.', true); return; }
       if (!validarRut(rut)) { flash('El RUT no es válido — revísalo antes de descargar.', true); return; }
     }
-    const p = normalizarPeriodo(periodo);
-    if (!periodoValido(p)) { flash('Período inválido: usa AAAA-MM (ej: 2026-06).', true); return; }
-    if (p !== periodo) setPeriodo(p);
     setDescargando(true);
     try {
       const body = guardadas && !clave
@@ -80,6 +87,15 @@ export default function AnalisisSii() {
     try { setAnalisis(await api.proveedorSiiAnalisis(p)); }
     catch (err) { flash(err.message, true); }
   }
+
+  // Solo se ofrece volver a bajar el período por los documentos que la bajada
+  // SÍ arregla: los anteriores a la clasificación por alcance, sin versión del
+  // motor estampada. No se pueden reclasificar desde la base — el RCV nunca
+  // guardó los ítems — así que volver a bajarlos es la única salida.
+  // Los demás motivos (clasificado por el nombre del proveedor, sin
+  // coincidencia en el motor, nota de crédito) NO cuentan acá: volver a
+  // bajarlos da el mismo resultado y el botón sería una promesa falsa.
+  const sinClasificar = analisis?.emisiones?.por_alcance?.sin_clasificar?.descarga_antigua || 0;
 
   if (error) return <div className="badge badge-red" role="alert" style={{ display: 'block', padding: 12 }}>{error}</div>;
   if (!estado) return <div style={{ padding: 40 }}><span className="spinner dark" /> Cargando…</div>;
@@ -159,7 +175,14 @@ export default function AnalisisSii() {
 
       {analisis && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8 }}>
+            {sinClasificar > 0 && (
+              <button className="btn btn-outline btn-sm" disabled={descargando}
+                onClick={() => { setPeriodo(analisis.periodo); bajarPeriodo(analisis.periodo); }}
+                title="Los documentos sin clasificar se bajaron antes de que existiera el desglose por alcance. Al volver a bajarlos, el motor los clasifica.">
+                {descargando ? <><span className="spinner dark" /> Descargando…</> : `Clasificar ${fmtInt(sinClasificar)} documento${sinClasificar === 1 ? '' : 's'} sin alcance`}
+              </button>
+            )}
             <button className="btn btn-outline btn-sm"
               onClick={() => api.descargarProveedorInformeCarbonoPdf(analisis.periodo).catch((e) => flash(e.message, true))}>
               Descargar informe (PDF)

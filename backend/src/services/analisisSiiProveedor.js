@@ -20,6 +20,7 @@
 import { versionVigente } from './motorVersiones.js';
 import { descargarComprasVentas } from './siiProveedor.js';
 import { cargarCategorias, calcularFactura } from './motorPropio.js';
+import { agregarPorAlcance } from './alcanceGhg.js';
 
 const TOP_CONTRAPARTES = 10;
 
@@ -167,31 +168,54 @@ async function conciliarConOtrosProveedores(query, proveedorId, rows) {
 // XML y corriendo el motor propio — método físico donde había unidades,
 // gasto si no). Devuelve null si ningún documento tiene cálculo (motor sin
 // configurar): el resto del análisis igual sirve.
-async function estimacionEmisiones(query, compras) {
+function estimacionEmisiones(compras) {
   const conCalculo = compras.filter((f) => f.co2e != null);
   if (conCalculo.length === 0) return null;
   const total = conCalculo.reduce((a, f) => a + Number(f.co2e || 0), 0);
   const nFisico = conCalculo.filter((f) => f.metodo === 'fisico').length;
-  const version = await versionVigente(query);
+  // Versiones del motor REALMENTE usadas al calcular, estampadas por
+  // documento (migración 076). Antes acá se llamaba a versionVigente(), que
+  // devuelve la última versión existente al momento de LEER: si alguien
+  // editaba el motor después del cálculo, el informe citaba una versión con
+  // la que ese número nunca se calculó. Citar eso era peor que no citar nada.
+  const versiones = [...new Set(conCalculo.map((f) => f.motor_version_id).filter((v) => v != null))].sort((a, b) => a - b);
   return {
     total_co2e_tref: Math.round(total * 10000) / 10000, // tCO2e referencial
     documentos_calculados: conCalculo.length,
     documentos_totales: compras.length,
     metodo_fisico: nFisico, // cuántos documentos se pudieron calcular por unidades reales
     metodo_gasto: conCalculo.length - nFisico,
-    referencial: true, // la UI lo rotula "referencial — validar"
-    motor_version_id: version?.id ?? null,
+    referencial: true, // la UI lo rotula "estimación referencial"
+    motor_versiones: versiones,
+    // Se conserva el campo singular para no romper a los consumidores que ya
+    // lo leen: solo tiene valor cuando todo el período se calculó con UNA versión.
+    motor_version_id: versiones.length === 1 ? versiones[0] : null,
+    documentos_sin_version: conCalculo.filter((f) => f.motor_version_id == null).length,
+    por_alcance: agregarPorAlcance(conCalculo),
   };
 }
 
 // Punto de entrada: arma el análisis completo de un período para un
 // proveedor a partir de dte_proveedor.
 export async function analizarPeriodo(query, proveedorId, periodo) {
+  // El alcance GHG se resuelve prefiriendo el SNAPSHOT CONGELADO de la
+  // versión del motor con que se calculó cada documento
+  // (motor_categorias_version, migración 056) y solo cae al catálogo vivo
+  // para las filas anteriores a la migración 076, que no tienen versión
+  // estampada. Es exactamente para lo que ese snapshot existe: que editar
+  // una categoría hoy no le cambie el alcance a un informe ya entregado.
   const { rows } = await query(
-    `SELECT tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo
-       FROM dte_proveedor
-      WHERE proveedor_id = $1 AND periodo = $2
-      ORDER BY tipo, fecha NULLS LAST, folio`,
+    `SELECT d.tipo, d.tipo_dte, d.folio, d.rut_contraparte, d.razon_social,
+            d.neto, d.iva, d.total, d.fecha, d.co2e, d.metodo,
+            d.categoria, d.categoria_origen, d.motor_version_id,
+            COALESCE(mcv.alcance_ghg, mc.alcance_ghg) AS alcance_ghg,
+            COALESCE(mcv.nombre, mc.nombre)           AS categoria_nombre
+       FROM dte_proveedor d
+       LEFT JOIN motor_categorias_version mcv
+              ON mcv.version_id = d.motor_version_id AND mcv.codigo = d.categoria
+       LEFT JOIN motor_categorias mc ON mc.codigo = d.categoria
+      WHERE d.proveedor_id = $1 AND d.periodo = $2
+      ORDER BY d.tipo, d.fecha NULLS LAST, d.folio`,
     [proveedorId, periodo]
   );
   const conciliaciones = await conciliarConOtrosProveedores(query, proveedorId, rows);
@@ -217,7 +241,7 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
       compra: concentracion(compras, marcados),
       venta: concentracion(ventas, marcados),
     },
-    emisiones: await estimacionEmisiones(query, compras),
+    emisiones: estimacionEmisiones(compras),
     documentos: rows,
   };
 }
@@ -237,30 +261,53 @@ export async function descargarYCalcular({ query, withTx, proveedorId, rutEmpres
   // Si el motor no está configurado, co2e queda null y el análisis igual sirve.
   let categorias = null;
   try { categorias = await cargarCategorias(query); } catch { categorias = null; }
+  // La versión se resuelve UNA vez, acá, y se estampa en cada fila: es la
+  // versión con la que estos números se calcularon de verdad. Leerla después
+  // (al armar el análisis) daría la versión vigente en ese momento, que puede
+  // ser otra si alguien editó el motor entremedio.
+  const version = categorias ? await versionVigente(query) : null;
   const co2ePorCompra = descarga.compra.map((f) => {
-    if (!categorias) return { co2e: null, metodo: null };
+    if (!categorias) return { co2e: null, metodo: null, categoria: null, categoria_origen: null };
     try {
       const calc = calcularFactura(f.items, categorias, { origen: f.origen_calculo });
       const metodo = calc.items.some((it) => it.metodo === 'fisico') ? 'fisico' : 'gasto';
-      return { co2e: calc.total_co2e, metodo };
-    } catch { return { co2e: null, metodo: null }; }
+      // De DÓNDE salió la categoría, que es lo que decide si se le puede
+      // atribuir un alcance GHG (ver el encabezado de la migración 076):
+      //   sin coincidencia de palabra clave → el motor usó su catch-all;
+      //   `origen_calculo` distinto de 'xml' → el único "ítem" del documento
+      //   es sintético y su glosa es la razón social de la contraparte.
+      const categoria_origen = !calc.categoria_codigo
+        ? null // el motor no dejó categoría (todos los ítems descartados)
+        : !calc.categoria_coincidencia
+            ? 'sin_coincidencia'
+            : (f.origen_calculo === 'xml' ? 'xml' : 'razon_social');
+      // `categoria_codigo` (no `categoria`, que es el nombre editable) es la
+      // clave estable con la que después se resuelve el alcance GHG.
+      return { co2e: calc.total_co2e, metodo, categoria: calc.categoria_codigo, categoria_origen };
+    } catch { return { co2e: null, metodo: null, categoria: null, categoria_origen: null }; }
   });
 
   let guardados = 0;
   await withTx(async (client) => {
     for (let i = 0; i < descarga.compra.length; i++) {
       const f = descarga.compra[i];
-      const { co2e, metodo } = co2ePorCompra[i];
+      const { co2e, metodo, categoria, categoria_origen } = co2ePorCompra[i];
+      // El DO UPDATE repuebla categoria/categoria_origen/motor_version_id:
+      // volver a descargar un período es la vía por la que las filas viejas
+      // (sin clasificar, anteriores a la migración 076) recuperan su alcance.
       await client.query(
         `INSERT INTO dte_proveedor
-           (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo)
-         VALUES ($1,$2,'compra',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha, co2e, metodo, categoria, categoria_origen, motor_version_id)
+         VALUES ($1,$2,'compra',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
          ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
          DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto, iva = EXCLUDED.iva,
                        total = EXCLUDED.total, fecha = EXCLUDED.fecha, co2e = EXCLUDED.co2e,
-                       metodo = EXCLUDED.metodo, descargado_at = now()`,
+                       metodo = EXCLUDED.metodo, categoria = EXCLUDED.categoria,
+                       categoria_origen = EXCLUDED.categoria_origen,
+                       motor_version_id = EXCLUDED.motor_version_id, descargado_at = now()`,
         [proveedorId, periodo, f.tipo_dte, f.folio, f.rut_contraparte, f.razon_social,
-         f.neto, f.iva, f.total, f.fecha, co2e, metodo]
+         f.neto, f.iva, f.total, f.fecha, co2e, metodo, categoria, categoria_origen,
+         co2e != null ? (version?.id ?? null) : null]
       );
       guardados += 1;
     }

@@ -206,4 +206,149 @@ test('analizarPeriodo: NO concilia contra un tercero ajeno que comparte folio po
   await query(`DELETE FROM proveedores WHERE id IN ($1, $2, $3)`, [F, rG[0].id, H]);
 });
 
+// ============================================================
+// Alcances GHG 1/2/3 (migración 076). El motor YA calculaba la categoría de
+// cada documento y `descargarYCalcular` la botaba; ahora la persiste junto
+// con la versión del motor que la produjo.
+// ============================================================
+
+test('descargarYCalcular estampa categoría y versión del motor en cada documento calculado',
+  { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+    await runMigrations();
+    await query(`DELETE FROM proveedores WHERE rut = $1`, [RUT_EMPRESA]);
+    const { rows } = await query(
+      `INSERT INTO proveedores (nombre_empresa, rut) VALUES ('Empresa Test Alcance', $1) RETURNING id`,
+      [RUT_EMPRESA]
+    );
+    const proveedorId = rows[0].id;
+
+    await descargarYCalcular(
+      { query, withTx, proveedorId, rutEmpresa: RUT_EMPRESA, rutSii: RUT_SII, password: CLAVE, periodo: PERIODO },
+      { fetcher, cfg: CFG }
+    );
+
+    const { rows: compras } = await query(
+      `SELECT co2e, categoria, motor_version_id FROM dte_proveedor WHERE proveedor_id = $1 AND tipo = 'compra'`,
+      [proveedorId]
+    );
+    assert.equal(compras.length, 1);
+    const c = compras[0];
+    if (c.co2e == null) {
+      // Motor sin sembrar: no se inventa clasificación. Es el caso que la
+      // vista rotula "sin clasificar", no un alcance adivinado.
+      assert.equal(c.categoria, null);
+      assert.equal(c.motor_version_id, null);
+    } else {
+      assert.ok(c.categoria, 'un documento con co2e tiene que traer su código de categoría');
+      assert.ok(c.motor_version_id != null, 'un documento con co2e tiene que traer la versión con que se calculó');
+      const { rows: existe } = await query(`SELECT 1 FROM motor_categorias WHERE codigo = $1`, [c.categoria]);
+      assert.equal(existe.length, 1, `la categoría estampada (${c.categoria}) debe existir en el catálogo`);
+    }
+
+    await query(`DELETE FROM proveedores WHERE id = $1`, [proveedorId]);
+  });
+
+test('analizarPeriodo: agrupa por alcance y los documentos sin categoría van a sin_clasificar, no al Alcance 3',
+  { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+    await runMigrations();
+    await query(`DELETE FROM proveedores WHERE rut = '900000101'`);
+    const { rows: rP } = await query(
+      `INSERT INTO proveedores (nombre_empresa, rut) VALUES ('Empresa Alcances', '900000101') RETURNING id`
+    );
+    const P = rP[0].id;
+    // Una versión del motor para estampar (no hay que crear categorías: las
+    // siembra la migración 017 y las congela la 056 por versión).
+    const { rows: rV } = await query(
+      `INSERT INTO motor_versiones (nota, origen) VALUES ('test alcances', 'edicion_manual') RETURNING id`
+    );
+    const V = rV[0].id;
+
+    // `categoria_origen` decide si el documento recibe alcance: solo 'xml'
+    // (la categoría salió de la glosa real de los ítems) lo habilita.
+    const filas = [
+      ['101', 'combustible', 3.0, 'xml'],           // Alcance 1
+      ['102', 'electricidad', 2.0, 'xml'],          // Alcance 2
+      ['103', 'materiales', 4.0, 'xml'],            // Alcance 3 · Cat. 1
+      ['104', 'servicios', 1.0, 'xml'],             // Alcance 3 · Cat. 1 (otra descripción, mismo alcance)
+      ['105', null, 5.0, null],                     // descargado antes de la clasificación
+      ['106', 'combustible', 6.0, 'razon_social'],  // deducido del nombre del proveedor: sin alcance
+    ];
+    for (const [folio, categoria, co2e, origen] of filas) {
+      await query(
+        `INSERT INTO dte_proveedor
+           (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, co2e, metodo, categoria, categoria_origen, motor_version_id)
+         VALUES ($1,'2025-07','compra','33',$2,'900000102','Proveedor X',100000,19000,119000,$3,'gasto',$4,$5,$6)`,
+        [P, folio, co2e, categoria, origen, categoria ? V : null]
+      );
+    }
+
+    const a = await analizarPeriodo(query, P, '2025-07');
+    const em = a.emisiones;
+    assert.equal(em.total_co2e_tref, 21, 'el total incluye lo que no recibe alcance');
+    assert.equal(em.referencial, true);
+
+    const porAlcance = Object.fromEntries(em.por_alcance.alcances.map((x) => [x.alcance, x]));
+    assert.equal(porAlcance[1].tco2e, 3);
+    assert.equal(porAlcance[2].tco2e, 2);
+    assert.equal(porAlcance[3].tco2e, 5, 'materiales + servicios caen ambos en Alcance 3');
+    assert.equal(porAlcance[3].n_documentos, 2);
+    assert.equal(porAlcance[3].categorias.length, 2, 'dentro del alcance, cada categoría del motor se muestra aparte');
+
+    // Lo que no recibe alcance NO se reparte ni se esconde, y cada motivo se
+    // cuenta aparte porque la salida del usuario es distinta en cada caso.
+    const sin = em.por_alcance.sin_clasificar;
+    assert.equal(sin.n_documentos, 2);
+    assert.equal(sin.tco2e, 11);
+    assert.equal(sin.descarga_antigua, 1);
+    assert.equal(sin.inferido_por_nombre, 1, 'la compra clasificada por el nombre del proveedor no entra a Alcance 1');
+    assert.equal(porAlcance[1].tco2e, 3, 'Alcance 1 solo lleva lo que salió del detalle del documento');
+    assert.equal(em.documentos_sin_version, 1);
+
+    // INVARIANTE del informe: alcances + sin clasificar = total del período.
+    const suma = em.por_alcance.alcances.reduce((s, x) => s + x.tco2e, 0) + em.por_alcance.sin_clasificar.tco2e;
+    assert.equal(Math.round(suma * 10000) / 10000, em.total_co2e_tref);
+
+    await query(`DELETE FROM proveedores WHERE id = $1`, [P]);
+    await query(`DELETE FROM motor_versiones WHERE id = $1`, [V]);
+  });
+
+// Antes, el análisis citaba versionVigente() — la última versión existente al
+// LEER. Si alguien editaba el motor después del cálculo, el informe citaba una
+// versión con la que ese número nunca se calculó.
+test('analizarPeriodo cita la versión ESTAMPADA al calcular, no la vigente al leer',
+  { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+    await runMigrations();
+    await query(`DELETE FROM proveedores WHERE rut = '900000103'`);
+    const { rows: rP } = await query(
+      `INSERT INTO proveedores (nombre_empresa, rut) VALUES ('Empresa Sello Versión', '900000103') RETURNING id`
+    );
+    const P = rP[0].id;
+    const { rows: rVieja } = await query(
+      `INSERT INTO motor_versiones (nota, origen) VALUES ('versión con la que se calculó', 'edicion_manual') RETURNING id`
+    );
+    const vieja = rVieja[0].id;
+
+    await query(
+      `INSERT INTO dte_proveedor
+         (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, co2e, metodo, categoria, categoria_origen, motor_version_id)
+       VALUES ($1,'2025-08','compra','33','201','900000104','Proveedor Y',100000,19000,119000,7,'gasto','electricidad','xml',$2)`,
+      [P, vieja]
+    );
+
+    // Alguien edita el motor DESPUÉS del cálculo: nace una versión más nueva.
+    const { rows: rNueva } = await query(
+      `INSERT INTO motor_versiones (nota, origen) VALUES ('edición posterior', 'edicion_manual') RETURNING id`
+    );
+    const nueva = rNueva[0].id;
+    assert.ok(nueva > vieja);
+
+    const a = await analizarPeriodo(query, P, '2025-08');
+    assert.deepEqual(a.emisiones.motor_versiones, [vieja]);
+    assert.equal(a.emisiones.motor_version_id, vieja);
+    assert.notEqual(a.emisiones.motor_version_id, nueva);
+
+    await query(`DELETE FROM proveedores WHERE id = $1`, [P]);
+    await query(`DELETE FROM motor_versiones WHERE id IN ($1, $2)`, [vieja, nueva]);
+  });
+
 after(async () => { await pool.end(); });
