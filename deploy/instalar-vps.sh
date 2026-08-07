@@ -92,7 +92,11 @@ npm ci
 npx vite build
 
 # ---------- 5. nginx ----------
-SERVER_NAME="${DOMINIO:-_}"
+# Con dominio se sirve también por www — sin esto el navegador muestra el
+# candado en rojo al entrar por www.$DOMINIO (nginx ni siquiera responde
+# ese Host, y el certificado tampoco lo cubre).
+SERVER_NAME="${DOMINIO:+$DOMINIO www.$DOMINIO}"
+SERVER_NAME="${SERVER_NAME:-_}"
 cat > /etc/nginx/sites-available/sicr3p <<NGINX
 server {
     listen 80;
@@ -176,8 +180,16 @@ fi
 # ---------- 8. HTTPS con certbot (solo con dominio) ----------
 if [ -n "$DOMINIO" ]; then
   apt-get install -y certbot python3-certbot-nginx
-  certbot --nginx -d "$DOMINIO" --non-interactive --agree-tos -m "admin@$DOMINIO" || \
-    echo "AVISO: certbot falló (¿el DNS de $DOMINIO ya apunta a $IP_PUBLICA?). Reintenta: certbot --nginx -d $DOMINIO"
+  # Se pide el certificado para el dominio Y www — certbot exige que ambos
+  # ya resuelvan al DNS de este servidor, así que si www.$DOMINIO todavía no
+  # apunta acá, cae al dominio solo (mejor tener HTTPS en uno que en ninguno)
+  # y avisa cómo completar www después con deploy/agregar-www.sh.
+  certbot --nginx -d "$DOMINIO" -d "www.$DOMINIO" --non-interactive --agree-tos -m "admin@$DOMINIO" || {
+    echo "AVISO: certbot con www falló (¿el DNS de www.$DOMINIO ya apunta a $IP_PUBLICA?). Reintentando solo con $DOMINIO..."
+    certbot --nginx -d "$DOMINIO" --non-interactive --agree-tos -m "admin@$DOMINIO" || \
+      echo "AVISO: certbot falló también para $DOMINIO solo. Reintenta a mano: certbot --nginx -d $DOMINIO -d www.$DOMINIO"
+    echo "==> Cuando el DNS de www.$DOMINIO esté listo: bash deploy/agregar-www.sh $DOMINIO"
+  }
 fi
 
 # ---------- 9. Credenciales ----------
