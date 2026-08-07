@@ -4,12 +4,30 @@ import { api, fmtFecha } from '../api.js';
 import PasswordUnaVez from '../components/PasswordUnaVez.jsx';
 
 const ROLES = ['admin', 'operador', 'cliente'];
-const PANELES = ['sicrep', 'aduana_verde'];
-const PANEL_LABEL = { sicrep: 'sicrep', aduana_verde: 'sicr3p (terreno)' };
+// Paneles internos: el alta es directa y el rol se elige. Los 5 paneles
+// externos también se dan de alta desde acá (pantalla única de cuentas),
+// pero exigen elegir la entidad (puerto/mandante/…) y su rol es fijo
+// 'operador' — lo que varía es nivel_acceso (lectura | operador).
+const PANELES_INTERNOS = ['sicrep', 'aduana_verde'];
+const PANEL_LABEL = {
+  sicrep: 'sicrep', aduana_verde: 'sicr3p (terreno)',
+  puerto: 'Puerto', mandante: 'Mandante', agencia: 'Agencia', trazador: 'Trazador', proveedor: 'Proveedor',
+};
+const PANELES_EXTERNOS = [
+  { valor: 'puerto', lista: (d) => d.puertos, cargar: () => api.puertos(), nombre: (e) => e.nombre },
+  { valor: 'mandante', lista: (d) => d.mandantes, cargar: () => api.mandantes(), nombre: (e) => e.nombre_empresa },
+  { valor: 'agencia', lista: (d) => d.agencias, cargar: () => api.agencias(), nombre: (e) => e.nombre },
+  { valor: 'trazador', lista: (d) => d.trazadores, cargar: () => api.accesosTrazadores(), nombre: (e) => e.nombre },
+  { valor: 'proveedor', lista: (d) => d.proveedores, cargar: () => api.accesosProveedores(), nombre: (e) => e.nombre_empresa },
+];
+const TODOS_PANELES = [...PANELES_INTERNOS, ...PANELES_EXTERNOS.map((p) => p.valor)];
 
-export default function Usuarios() {
+export default function Usuarios({ yo }) {
   const [usuarios, setUsuarios] = useState([]);
   const [modal, setModal] = useState(null);
+  const [filtroPanel, setFiltroPanel] = useState('');
+  // Entidades del panel externo elegido en el modal de alta: null mientras cargan.
+  const [entidadesModal, setEntidadesModal] = useState(null);
   const [toast, setToast] = useState(null);
   // Contraseña temporal a mostrar una sola vez (creación o "generar nueva").
   // Distinto del `toast`: esto no se autocierra, porque el valor no vuelve
@@ -29,6 +47,18 @@ export default function Usuarios() {
   const cargar = () => api.usuarios().then((r) => setUsuarios(r.usuarios)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
   function flash(msg, err = false, persist = false) { setToast({ msg, err, persist }); if (!persist) setTimeout(() => setToast(null), 3500); }
+
+  const cfgExterno = modal ? PANELES_EXTERNOS.find((p) => p.valor === modal.panel) : null;
+
+  useEffect(() => {
+    setEntidadesModal(null);
+    if (!cfgExterno) return;
+    let vigente = true;
+    cfgExterno.cargar()
+      .then((d) => { if (vigente) setEntidadesModal((cfgExterno.lista(d) || []).filter((e) => e.activo !== false)); })
+      .catch((e) => { if (vigente) { setEntidadesModal([]); flash(e.message, true); } });
+    return () => { vigente = false; };
+  }, [modal?.panel]);
 
   async function crear() {
     try {
@@ -143,26 +173,57 @@ export default function Usuarios() {
     <div>
       <div className="admin-head">
         <h1>Usuarios y roles</h1>
-        <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador', panel: 'sicrep' })}>+ Nuevo usuario</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <select value={filtroPanel} onChange={(e) => setFiltroPanel(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)' }}>
+            <option value="">Todos los paneles</option>
+            {TODOS_PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
+          </select>
+          <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador', panel: 'sicrep', entidad_id: '', nivel_acceso: 'operador' })}>+ Nuevo usuario</button>
+        </div>
       </div>
 
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th>Llaves</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Nivel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th>Llaves</th><th></th></tr></thead>
           <tbody>
-            {usuarios.map((u) => (
+            {usuarios.filter((u) => !filtroPanel || (u.panel || 'sicrep') === filtroPanel).map((u) => {
+              const esInterno = PANELES_INTERNOS.includes(u.panel || 'sicrep');
+              return (
               <tr key={u.id}>
-                <td><b>{u.nombre}</b></td>
+                <td>
+                  <b>{u.nombre}</b>
+                  {u.es_superadmin && <span className="badge badge-amber" style={{ marginLeft: 6 }}>superadmin</span>}
+                  {/* Solo otro superadmin puede otorgar/quitar la marca, y solo
+                      sobre una cuenta admin de sicrep (CHECK migración 069). */}
+                  {yo?.es_superadmin && u.panel === 'sicrep' && u.rol === 'admin' && u.id !== yo.id && (
+                    <button className="btn btn-sm btn-outline" style={{ marginLeft: 6, fontSize: 11, padding: '2px 6px' }}
+                      onClick={() => cambiar(u, 'es_superadmin', !u.es_superadmin)}>
+                      {u.es_superadmin ? 'Quitar superadmin' : 'Hacer superadmin'}
+                    </button>
+                  )}
+                </td>
                 <td className="muted">{u.email}</td>
                 <td>
-                  <select value={u.rol} onChange={(e) => cambiar(u, 'rol', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                    {ROLES.map((r) => <option key={r}>{r}</option>)}
-                  </select>
+                  {esInterno ? (
+                    <select value={u.rol} onChange={(e) => cambiar(u, 'rol', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                      {ROLES.map((r) => <option key={r}>{r}</option>)}
+                    </select>
+                  ) : <span className="muted">{u.rol}</span>}
                 </td>
                 <td>
-                  <select value={u.panel || 'sicrep'} onChange={(e) => cambiar(u, 'panel', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
-                    {PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
+                  {/* Cuentas externas: el panel está atado a su entidad (FK +
+                      CHECK en la BD) — no se cambia desde acá. */}
+                  {esInterno ? (
+                    <select value={u.panel || 'sicrep'} onChange={(e) => cambiar(u, 'panel', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                      {PANELES_INTERNOS.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
+                    </select>
+                  ) : <span className="muted">{PANEL_LABEL[u.panel] || u.panel}</span>}
+                </td>
+                <td>
+                  <select value={u.nivel_acceso || 'operador'} onChange={(e) => cambiar(u, 'nivel_acceso', e.target.value)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)' }}>
+                    <option value="operador">operador</option>
+                    <option value="lectura">solo lectura</option>
                   </select>
                 </td>
                 <td>
@@ -189,7 +250,8 @@ export default function Usuarios() {
                   <button className="btn btn-sm btn-outline" onClick={() => reenviar(u)}>Generar contraseña nueva</button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>
@@ -203,12 +265,37 @@ export default function Usuarios() {
             <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
               <div className="field"><label>Nombre</label><input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} /></div>
               <div className="field"><label>Email</label><input value={modal.email} onChange={(e) => setModal({ ...modal, email: e.target.value })} /></div>
-              <div className="field"><label>Rol</label><select value={modal.rol} onChange={(e) => setModal({ ...modal, rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></div>
-              <div className="field"><label>Panel</label><select value={modal.panel} onChange={(e) => setModal({ ...modal, panel: e.target.value })}>{PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}</select></div>
+              <div className="field"><label>Panel</label>
+                <select value={modal.panel} onChange={(e) => setModal({ ...modal, panel: e.target.value, entidad_id: '' })}>
+                  {TODOS_PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
+                </select>
+              </div>
+              {cfgExterno ? (
+                <div className="field"><label>Entidad ({PANEL_LABEL[modal.panel]})</label>
+                  <select value={modal.entidad_id} onChange={(e) => setModal({ ...modal, entidad_id: e.target.value })}>
+                    <option value="">{entidadesModal ? (entidadesModal.length ? 'Elegir…' : 'Sin entidades activas') : 'Cargando…'}</option>
+                    {(entidadesModal || []).map((e) => <option key={e.id} value={e.id}>{cfgExterno.nombre(e)}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <div className="field"><label>Rol</label><select value={modal.rol} onChange={(e) => setModal({ ...modal, rol: e.target.value })}>{ROLES.map((r) => <option key={r}>{r}</option>)}</select></div>
+              )}
+              <div className="field"><label>Nivel de acceso</label>
+                <select value={modal.nivel_acceso} onChange={(e) => setModal({ ...modal, nivel_acceso: e.target.value })}>
+                  <option value="operador">operador (puede escribir)</option>
+                  <option value="lectura">solo lectura</option>
+                </select>
+              </div>
             </div>
+            {cfgExterno && (
+              <p className="muted" style={{ fontSize: 13 }}>
+                La cuenta queda atada a la entidad elegida y solo ve SUS datos, con rol fijo de operador
+                del panel. Las entidades se crean en «Accesos externos».
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={crear}>Crear usuario</button>
+              <button className="btn btn-primary" onClick={crear} disabled={cfgExterno && !modal.entidad_id}>Crear usuario</button>
             </div>
           </div>
         </div>

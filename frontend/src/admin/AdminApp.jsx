@@ -48,6 +48,70 @@ const NAV = [
   { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
 ];
 
+// Bloque "Entrar a otro panel" — visible solo para cuentas es_superadmin.
+// Canjea la sesión sicrep por un token de VISTA (5 min, sin refresh) del
+// panel elegido y abre una pestaña nueva al puente /impersonar/:panel.
+const PANELES_VISTA = [
+  { valor: 'aduana_verde', etiqueta: 'Terreno', entidades: null },
+  { valor: 'puerto', etiqueta: 'Puerto', entidades: (d) => d.puertos, cargar: () => api.puertos(), nombre: (e) => e.nombre },
+  { valor: 'mandante', etiqueta: 'Mandante', entidades: (d) => d.mandantes, cargar: () => api.mandantes(), nombre: (e) => e.nombre_empresa },
+  { valor: 'agencia', etiqueta: 'Agencia', entidades: (d) => d.agencias, cargar: () => api.agencias(), nombre: (e) => e.nombre },
+  { valor: 'trazador', etiqueta: 'Trazador', entidades: (d) => d.trazadores, cargar: () => api.accesosTrazadores(), nombre: (e) => e.nombre },
+  { valor: 'proveedor', etiqueta: 'Proveedor', entidades: (d) => d.proveedores, cargar: () => api.accesosProveedores(), nombre: (e) => e.nombre_empresa },
+];
+
+function EntrarAOtroPanel() {
+  const [panel, setPanel] = useState('');
+  const [entidades, setEntidades] = useState(null); // null = panel sin entidad
+  const [entidadId, setEntidadId] = useState('');
+  const [msg, setMsg] = useState('');
+  const [cargando, setCargando] = useState(false);
+
+  const cfg = PANELES_VISTA.find((p) => p.valor === panel);
+
+  useEffect(() => {
+    setEntidades(null); setEntidadId(''); setMsg('');
+    if (!cfg || !cfg.cargar) return;
+    let vigente = true;
+    cfg.cargar()
+      .then((d) => { if (vigente) setEntidades((cfg.entidades(d) || []).filter((e) => e.activo !== false)); })
+      .catch((e) => { if (vigente) setMsg(e.message); });
+    return () => { vigente = false; };
+  }, [panel]);
+
+  async function entrar() {
+    setMsg(''); setCargando(true);
+    try {
+      const { accessToken } = await api.entrarAPanel(panel, entidadId || undefined);
+      window.open(`/impersonar/${panel}?t=${encodeURIComponent(accessToken)}`, '_blank', 'noopener');
+    } catch (e) { setMsg(e.message); }
+    setCargando(false);
+  }
+
+  const necesitaEntidad = Boolean(cfg?.cargar);
+  const listo = panel && (!necesitaEntidad || entidadId);
+
+  return (
+    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.12)' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', marginBottom: 6 }}>Entrar a otro panel</div>
+      <select value={panel} onChange={(e) => setPanel(e.target.value)} style={{ width: '100%', marginBottom: 6 }}>
+        <option value="">Panel…</option>
+        {PANELES_VISTA.map((p) => <option key={p.valor} value={p.valor}>{p.etiqueta}</option>)}
+      </select>
+      {necesitaEntidad && (
+        <select value={entidadId} onChange={(e) => setEntidadId(e.target.value)} style={{ width: '100%', marginBottom: 6 }}>
+          <option value="">{entidades ? (entidades.length ? 'Entidad…' : 'Sin entidades activas') : 'Cargando…'}</option>
+          {(entidades || []).map((e) => <option key={e.id} value={e.id}>{cfg.nombre(e)}</option>)}
+        </select>
+      )}
+      {msg && <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 6 }}>{msg}</div>}
+      <button className="btn btn-outline btn-sm" style={{ width: '100%' }} disabled={!listo || cargando} onClick={entrar}>
+        {cargando ? 'Abriendo…' : 'Abrir vista (5 min)'}
+      </button>
+    </div>
+  );
+}
+
 // El panel admin es su propia "app" instalable, distinta del sitio público
 // (que usa /manifest.webmanifest, start_url "/"): mientras se está en
 // /admin, el navegador ofrece instalar "sicr3p Admin" con su propio
@@ -136,7 +200,8 @@ export default function AdminApp() {
         </nav>
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>
-          <div className="muted" style={{ fontSize: 12, color: '#94a3b8' }}>{user?.email} · {user?.rol}</div>
+          <div className="muted" style={{ fontSize: 12, color: '#94a3b8' }}>{user?.email} · {user?.rol}{user?.es_superadmin ? ' · superadmin' : ''}</div>
+          {user?.es_superadmin && <EntrarAOtroPanel />}
           <button className="btn btn-outline btn-sm" style={{ marginTop: 10, width: '100%' }}
             onClick={() => { setMenuOpen(false); setPwd({ actual: '', nueva: '', confirmar: '' }); }}>
             Cambiar contraseña
@@ -190,7 +255,7 @@ export default function AdminApp() {
           <Route path="prospectos" element={<Prospectos />} />
           <Route path="motor-propio" element={<MotorPropio />} />
           <Route path="motor" element={<SimpleApi />} />
-          <Route path="usuarios" element={<Usuarios />} />
+          <Route path="usuarios" element={<Usuarios yo={user} />} />
           <Route path="actividad" element={<Actividad />} />
           <Route path="capacitacion/*" element={<Capacitacion />} />
           <Route path="apl" element={<Apl />} />

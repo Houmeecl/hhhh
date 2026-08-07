@@ -314,6 +314,10 @@ export const api = {
   crearUsuario: (b) => request('/admin/usuarios', { method: 'POST', body: b, authed: true }),
   editarUsuario: (id, b) => request(`/admin/usuarios/${id}`, { method: 'PUT', body: b, authed: true }),
   reenviarActivacion: (id) => request(`/admin/usuarios/${id}/reenviar-activacion`, { method: 'POST', authed: true }),
+  // Superadmin: canjea la sesión sicrep por un token de VISTA de otro
+  // panel (5 min, sin refresh) — ver EntrarComoSuperadmin.jsx.
+  entrarAPanel: (panel, entidadId) =>
+    request('/admin/entrar-a-panel', { method: 'POST', body: { panel, entidad_id: entidadId || undefined }, authed: true }),
   // Llaves USB de huella (WebAuthn/FIDO2) — registro lo hace un admin.
   llavesUsb: (usuarioId) => request(`/admin/usuarios/${usuarioId}/webauthn`, { authed: true }),
   webauthnRegistroOpciones: (usuarioId) => request(`/admin/usuarios/${usuarioId}/webauthn/opciones`, { method: 'POST', authed: true }),

@@ -21,6 +21,7 @@ import Cadena from './pages/Cadena.jsx';
 import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
 import ActivarCuenta from './components/ActivarCuenta.jsx';
+import EntrarComoSuperadmin from './components/EntrarComoSuperadmin.jsx';
 import LoginAv from './admin-av/LoginAv.jsx';
 import LoginPuerto from './panel-puerto/LoginPuerto.jsx';
 import LoginMandante from './panel-mandante/LoginMandante.jsx';
@@ -93,6 +94,11 @@ export default function App() {
       <Route path="/mis-datos" element={<MisDatos />} />
       <Route path="/cadena" element={<Cadena />} />
       <Route path="/constancia/:serial" element={<ConstanciaPublica />} />
+
+      {/* Puente de la vista de superadmin: guarda el token de vista en el
+          almacén del panel elegido y redirige a su raíz (ver
+          EntrarComoSuperadmin.jsx). */}
+      <Route path="/impersonar/:panel" element={<EntrarComoSuperadmin />} />
 
       {/* Admin — panel sicrep (núcleo/plataforma) */}
       <Route path="/admin/login" element={<Login />} />
