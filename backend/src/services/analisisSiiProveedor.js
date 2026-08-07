@@ -13,7 +13,7 @@
 //     definitiva ni una "certificación".
 // ============================================================
 import { versionVigente } from './motorVersiones.js';
-import { descargarComprasVentas } from './baseapiSii.js';
+import { descargarComprasVentas } from './siiProveedor.js';
 import { cargarCategorias, calcularFactura } from './motorPropio.js';
 
 const TOP_CONTRAPARTES = 10;

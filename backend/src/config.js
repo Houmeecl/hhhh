@@ -82,6 +82,20 @@ export const config = {
     timeoutMs: parseInt(process.env.BASEAPI_TIMEOUT_MS || '15000', 10),
   },
 
+  // Descarga del RCV/DTE del contribuyente (clave por request). El proveedor
+  // es intercambiable sin tocar rutas ni el cálculo: 'baseapi' (por defecto)
+  // o 'simpleapi' (mismo contrato rut+clave → JSON). SimpleAPI usa su propia
+  // API Key en la cabecera Authorization; sin key queda apagado.
+  sii: {
+    proveedor: (process.env.SII_PROVEEDOR || 'baseapi').toLowerCase(),
+    simpleapi: {
+      enabled: Boolean(process.env.SIMPLEAPI_KEY),
+      key: process.env.SIMPLEAPI_KEY || '',
+      base: process.env.SIMPLEAPI_BASE || 'https://servicios.simpleapi.cl/api',
+      timeoutMs: parseInt(process.env.SIMPLEAPI_TIMEOUT_MS || '20000', 10),
+    },
+  },
+
   resend: {
     apiKey: process.env.RESEND_API_KEY || '',
     from: process.env.MAIL_FROM || 'sicr3p <no-responder@sicrep.cl>',

@@ -160,6 +160,17 @@ function SesionSii({ sesion, onSesion, flash }) {
         🔒 Es el RUT de la persona (o representante) que entra al SII con su clave — no el RUT de la
         empresa. Se valida contra el SII antes de habilitar las descargas y no se guarda.
       </p>
+      <details style={{ marginTop: 10 }}>
+        <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--muted)' }}>¿El SII rechaza las credenciales?</summary>
+        <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+          Para descargar el RCV de una empresa, usa el <strong>RUT de la empresa y su Clave
+          Tributaria</strong> (la que abre sesión en sii.cl digitando directo el RUT de la empresa),
+          no la clave del representante legal. Si solo tienes la del representante, créale clave a la
+          empresa en sii.cl → Servicios Online → «Clave tributaria y representantes electrónicos».
+          Otras causas del rechazo: clave provisoria sin cambiar, clave bloqueada por reintentos, o
+          RUT mal escrito. Prueba primero entrando a sii.cl con ese RUT y esa clave.
+        </div>
+      </details>
     </div>
   );
 }

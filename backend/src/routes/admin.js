@@ -13,7 +13,7 @@ import {
 import { generateContrato } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
 import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
-import { validarCredencialesSii } from '../services/baseapiSii.js';
+import { validarCredencialesSii } from '../services/siiProveedor.js';
 import { rutValido } from '../services/dte.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';

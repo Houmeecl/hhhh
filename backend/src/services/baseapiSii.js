@@ -33,13 +33,13 @@ export const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 //   entrada:true      → culpa del input (RUT/período/clave faltante) → 400
 //   credenciales:true → la clave SII no autentica → 400
 //   fuente:true       → BaseAPI/SII caído o mal configurado → 502
-const errEntrada = (msg) => Object.assign(new Error(msg), { entrada: true });
-const errFuente = (msg, status) => Object.assign(new Error(msg), { fuente: true, status });
+export const errEntrada = (msg) => Object.assign(new Error(msg), { entrada: true });
+export const errFuente = (msg, status) => Object.assign(new Error(msg), { fuente: true, status });
 
 // Un RUT normalizado (solo dígitos + DV) al formato con guión que espera
 // la API: '760000000' -> '76000000-0'. Lanza si el DV no cuadra: no
 // gastamos una llamada pagada en un RUT que el SII no puede tener.
-function rutConGuion(rutCrudo) {
+export function rutConGuion(rutCrudo) {
   const norm = normalizarRut(rutCrudo);
   if (norm.length < 7 || norm.length > 9) throw errEntrada('RUT inválido');
   const con = `${norm.slice(0, -1)}-${norm.slice(-1)}`;

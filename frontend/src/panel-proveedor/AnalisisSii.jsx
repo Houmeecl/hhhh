@@ -134,6 +134,16 @@ export default function AnalisisSii() {
         <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
           🔒 Tu clave se guarda cifrada y solo se usa para consultar el SII a tu nombre. Puedes borrarla cuando quieras.
         </p>
+        <details style={{ marginTop: 8 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--muted)' }}>¿El SII rechaza tu clave?</summary>
+          <div className="muted" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.6 }}>
+            Usa el <strong>RUT de tu empresa y su Clave Tributaria</strong> (la que abre sesión en
+            sii.cl digitando directo el RUT de la empresa), no la del representante legal. Si solo
+            tienes la del representante, crea la clave de la empresa en sii.cl → Servicios Online →
+            «Clave tributaria y representantes electrónicos». Revisa también que la clave no sea
+            provisoria ni esté bloqueada: prueba primero entrando a sii.cl.
+          </div>
+        </details>
       </div>
 
       {estado.periodos?.length > 0 && (
