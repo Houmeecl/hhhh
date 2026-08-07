@@ -29,6 +29,7 @@ import { validarSolicitud } from '../services/auspicio.js';
 import { validarInscripcion } from '../services/inscripcion.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiter, cargaLimiter } from '../middleware/rateLimit.js';
+import { presupuestoIA } from '../services/analisisIA.js';
 
 const router = express.Router();
 
@@ -223,8 +224,10 @@ async function registrarRechazos(filas) {
 }
 
 // ---------- POST /api/sesiones — procesa hasta 5 facturas ----------
-// `cargaLimiter` va ANTES de uploadArchivos a propósito: rechazar por límite
-// después de recibir los binarios sería pagar el ancho de banda igual.
+// `cargaLimiter` va ANTES de uploadArchivos a propósito: lo que ahorra no es
+// el ancho de banda (nginx bufferiza el cuerpo completo antes de que Express
+// vea la petición) sino el parseo y el buffer en memoria de multer, hasta
+// 5 × 15 MB por envío.
 router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) => {
   try {
     const { rut, empresa, email, codigo } = req.body;
@@ -252,6 +255,29 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         error: 'La carga de documentos requiere un código de acceso o una sesión de cliente. '
           + 'Inscribe tu empresa en /inscripcion para obtener acceso.',
       });
+    }
+    // El chequeo de arriba solo mira que venga ALGO en `codigo`, así que un
+    // código inventado alcanzaba para gatillar la pre-lectura completa —OCR
+    // y hasta tres llamadas a la IA por archivo— antes de que la transacción
+    // descubriera, mucho más abajo, que no existe. Esta consulta lo descarta
+    // barato. NO reemplaza a la validación de la transacción: esa es la
+    // autoritativa (toma `FOR UPDATE` y consume los créditos sin carrera);
+    // esta solo evita gastar antes de saber si hay con qué pagar.
+    if (codigo) {
+      const { rows: previo } = await query(
+        `SELECT activo, creditos, creditos_usados FROM codigos_acceso WHERE upper(codigo) = upper($1)`,
+        [String(codigo).trim()]
+      );
+      const c = previo[0];
+      if (!c || !c.activo) {
+        return res.status(400).json({ error: 'Código inválido o inactivo.' });
+      }
+      const restantes = c.creditos - c.creditos_usados;
+      if (restantes < files.length) {
+        return res.status(400).json({
+          error: `Tu código tiene ${restantes} crédito${restantes === 1 ? '' : 's'} y estás subiendo ${files.length} facturas.`,
+        });
+      }
     }
 
     // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
@@ -289,9 +315,18 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
       // "vuelve a escanear", que no aplica aquí.
       const todosPorTipo = indicesRechazados.every((i) => lecturas[i].motivo === 'tipo_documento_no_calculable');
       const tipos = indicesRechazados.map((i) => lecturas[i].tipo_detectado || lecturas[i].dte?.tipo_nombre).filter(Boolean).join(', ');
+      // Si hoy se alcanzó el tope de gasto de la IA, el documento se leyó
+      // SOLO con el parser de reglas. Puede estar perfecto y no haberse
+      // podido leer igual, así que mandarlo a reescanear ("buena luz, sin
+      // cortes") sería echarle la culpa al cliente de una decisión nuestra.
+      // No se afirma que la causa sea el tope —el documento igual puede
+      // estar ilegible— pero sí se dice que puede no ser él.
+      const iaEnPausa = await presupuestoIA.agotado().catch(() => false);
       const error = todosPorTipo
         ? `${plural ? `Estos documentos son de tipo: ${tipos}` : `"${nombres[0]}" es de tipo: ${tipos || 'no calculable'}`} — hoy sicr3p calcula CO2e solo desde facturas y boletas de compra. Sube el documento original o contacta soporte.`
-        : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
+        : iaEnPausa
+          ? `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}. Hoy la lectura avanzada está en pausa por límite de uso del servicio, así que puede no ser tu documento: vuelve a intentarlo mañana o escríbenos y lo procesamos nosotros.`
+          : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
       return res.status(422).json({ error, rechazados: nombres });
     }
 

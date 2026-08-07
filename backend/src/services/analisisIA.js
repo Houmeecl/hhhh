@@ -129,19 +129,32 @@ export function validarRespuestaIA(input) {
 // ============================================================
 // Tope de gasto diario
 //
-// POST /api/sesiones es público y sin login, y cada archivo puede gatillar
-// hasta tres llamadas a la IA (capa de texto + dos pasadas de OCR). El
-// costo ya se estimaba y se guardaba en analisis_ia_uso sin que nadie lo
-// usara para frenar nada: esto lo usa.
+// Un envío a POST /api/sesiones puede gatillar hasta tres llamadas a la IA
+// por archivo (capa de texto + dos pasadas de OCR). El costo ya se estimaba
+// y se guardaba en analisis_ia_uso sin que nadie lo usara para frenar nada:
+// esto lo usa.
+//
+// QUÉ PASA AL SUPERARLO — con precisión, porque es fácil venderlo mejor de
+// lo que es: la IA se salta y el documento se lee con el parser de reglas.
+// Para el documento que el parser sabe leer, eso es degradación invisible.
+// Para el que SOLO la IA sabía leer (layout raro, ruido de OCR), no: la
+// cascada termina en `sin_senal` y de ahí, con MOTOR_EXTERNO=off, sale un
+// 422 al cliente; con el motor externo encendido, ese documento se va al
+// tercero, que no tiene tope. O sea: el tope acota el gasto de la IA, no el
+// gasto total, y no es gratis para el usuario. Por eso el 422 de public.js
+// consulta `presupuestoIA.agotado()` antes de decidir qué decirle.
 //
 // Cómo se cuenta:
 //  · La verdad está en la BD (suma del día), pero leerla en cada llamada
 //    sería una consulta por documento — se lee cada TTL_LECTURA_MS y entre
 //    medio se acumula en memoria lo que se va gastando.
 //  · El acumulado en memoria se anota ANTES de intentar el INSERT, no
-//    después: si la BD se cae, la bitácora deja de escribirse pero el
-//    proceso sigue contando lo que gasta. Sin eso, una BD caída sería
-//    justo el momento en que el tope desaparece.
+//    después: si la BD se cae con el proceso ya andando, la bitácora deja
+//    de escribirse pero el proceso sigue contando lo que gasta. Lo que esto
+//    NO cubre es arrancar con la BD caída: ahí el acumulador parte en cero
+//    y no hay de dónde leer el gasto del día. En la práctica queda tapado
+//    porque POST /sesiones necesita la BD para todo lo demás, pero el tope
+//    por sí solo no lo resuelve.
 //  · Cada proceso lleva su propia cuenta (pm2 con varias instancias =
 //    varios acumuladores), y la relectura periódica de la BD los vuelve a
 //    juntar. El tope es un freno de gasto, no una cuota exacta al peso.
@@ -170,9 +183,13 @@ function reiniciarSiCambioElDia() {
   }
 }
 
+// Se descarta lo que no sea un número finito: sumar un NaN al acumulador lo
+// deja en NaN, y `NaN >= tope` es falso — el tope se destaparía solo.
 function anotarGasto(clp) {
+  const n = Number(clp);
+  if (!Number.isFinite(n) || n < 0) return;
   reiniciarSiCambioElDia();
-  gasto.clp += clp;
+  gasto.clp += n;
 }
 
 // true = no se llama a la IA en este documento. Nunca lanza: un fallo al
@@ -204,26 +221,40 @@ async function presupuestoAgotado() {
   return gasto.clp >= tope;
 }
 
-// Deja constancia en la bitácora UNA vez por día y por proceso: el admin ve
-// en el panel por qué las lecturas de hoy salieron del parser de reglas, sin
-// que cada documento saltado escriba su propia fila.
-async function avisarPresupuestoAgotado() {
+// Avisa UNA vez por día y por proceso. Va al log del servidor y NO a
+// `analisis_ia_uso`: esa tabla es la bitácora de LLAMADAS a la API, y una
+// llamada que no ocurrió no puede aparecer ahí — contaría en `llamadas_30d`,
+// bajaría el porcentaje de éxito y arrastraría el promedio de latencia del
+// panel. Lo que el admin necesita ver (que hoy se alcanzó el tope) lo muestra
+// el propio panel del motor, calculado del gasto del día.
+function avisarPresupuestoAgotado() {
   if (gasto.avisado) return;
   gasto.avisado = true;
   console.warn(
     `[analisisIA] presupuesto diario agotado (${round2(gasto.clp)} de ${config.analisisIA.presupuestoDiarioClp} CLP estimados): ` +
     'los documentos de hoy se leen con el parser de reglas.'
   );
-  await logUso({ exito: false, motivoError: 'presupuesto_diario_agotado', latenciaMs: 0 });
 }
 
 // Registro de uso (éxito o no) para el panel de transparencia del admin
 // — igual patrón que simpleApi.js, tolerante a la tabla ausente (42P01,
 // ej. antes de correr la migración 033).
 async function logUso({ exito, motivoError, tokensEntrada, tokensSalida, latenciaMs }) {
-  const costo = exito
-    ? round2((tokensEntrada / 1000) * config.analisisIA.costoInputClp1k + (tokensSalida / 1000) * config.analisisIA.costoOutputClp1k)
-    : null;
+  // El costo se calcula de los TOKENS, no del éxito: Anthropic cobra igual
+  // una respuesta que después no valida contra el esquema (motivo
+  // 'esquema_invalido', donde el `usage` sí llega). Contarla solo cuando la
+  // lectura sirvió dejaba un agujero real en el tope: un documento que hace
+  // alucinar al modelo una y otra vez quemaba presupuesto sin mover el
+  // contador ni una vez.
+  //
+  // `Number.isFinite` no es defensa de estilo: si la respuesta viene sin
+  // `usage` (llamarClaude ya lo tolera con `data.usage || {}`), los tokens
+  // son undefined y el costo sale NaN. Un solo NaN en la columna hace que
+  // SUM(costo_estimado_clp) del día sea NaN, y NaN >= tope es FALSO: el tope
+  // desaparecería hasta el otro día, y el panel mostraría $0 tan tranquilo.
+  const bruto = (Number(tokensEntrada) / 1000) * config.analisisIA.costoInputClp1k
+    + (Number(tokensSalida) / 1000) * config.analisisIA.costoOutputClp1k;
+  const costo = Number.isFinite(bruto) && bruto >= 0 ? round2(bruto) : null;
   if (costo) anotarGasto(costo);
   try {
     await query(
@@ -312,7 +343,7 @@ export const analisisIA = {
     // reglas sin enterarse. El documento se lee igual; lo que se pierde
     // es la lectura flexible, no el cálculo.
     if (await presupuestoAgotado()) {
-      await avisarPresupuestoAgotado();
+      avisarPresupuestoAgotado();
       return null;
     }
     const t0 = Date.now();
@@ -325,7 +356,15 @@ export const analisisIA = {
     }
     const validado = validarRespuestaIA(resultado.input);
     if (!validado) {
-      await logUso({ exito: false, motivoError: 'esquema_invalido', latenciaMs: Date.now() - t0 });
+      // Con tokens: la llamada se hizo y se paga, aunque la respuesta no
+      // sirva. Va al costo del día como cualquier otra.
+      await logUso({
+        exito: false,
+        motivoError: 'esquema_invalido',
+        tokensEntrada: resultado.usage.input_tokens,
+        tokensSalida: resultado.usage.output_tokens,
+        latenciaMs: Date.now() - t0,
+      });
       return null;
     }
     await logUso({

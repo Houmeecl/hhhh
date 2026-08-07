@@ -24,16 +24,20 @@ const siiLimiterOpts = (max) => ({
 export const siiLimiter = rateLimit(siiLimiterOpts(10));
 export const siiLimiterAdmin = rateLimit(siiLimiterOpts(30));
 
-// Carga de documentos en el flujo público (POST /api/sesiones), que no pide
-// login: cada archivo puede gatillar hasta tres llamadas a la API de IA
-// (capa de texto + dos pasadas de OCR), así que el límite general de 300 por
-// cuarto de hora deja pasar más gasto del que nadie autorizó. Mismo criterio
-// que siiLimiter: lo que cuesta plata por request va con su propio tope.
-// El freno de gasto en pesos lo pone el presupuesto diario de analisisIA.js;
-// esto acota la ráfaga, que es lo que un limitador sí sabe hacer.
+// Carga de documentos en el flujo público (POST /api/sesiones). Cada archivo
+// puede gatillar hasta tres llamadas a la API de IA (capa de texto + dos
+// pasadas de OCR), así que el límite general de 300 por cuarto de hora deja
+// pasar más gasto del que nadie autorizó.
+//
+// El número es alto a propósito. Quien de verdad frena al abusador es la
+// pre-validación del código de acceso en public.js (sin código válido no se
+// llega a leer nada) y el presupuesto diario de analisisIA.js; este límite
+// solo corta la ráfaga. Un tope bajo castigaría al cliente que paga —sube su
+// mes en tandas de 5, y una empresa detrás de un NAT comparte la IP entre
+// todos sus usuarios— sin molestar al que rota direcciones.
 export const cargaLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 15,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiados envíos seguidos. Intenta nuevamente en un rato.' },

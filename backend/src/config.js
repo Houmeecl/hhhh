@@ -9,6 +9,33 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const bool = (v, def = false) =>
   v === undefined ? def : ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
 
+// Monto en pesos desde el entorno. Distingue tres casos que `Number(v) || def`
+// confunde, y los tres pasan de verdad:
+//  · sin definir o vacío  → el default (dotenv entrega '' para `VAR=`, no
+//    undefined, así que una línea sin valor caía en 0);
+//  · escrito en es-CL     → '20.000' es veinte mil, no veinte. Se acepta solo
+//    el patrón inequívoco de miles (grupos exactos de 3); un decimal de
+//    verdad ('20.5') no calza y se lee como número normal;
+//  · basura               → se avisa y se usa el default, en vez de apagar
+//    el gasto en silencio.
+export const montoClp = (raw, def, nombre) => {
+  const s = String(raw ?? '').trim();
+  if (s === '') return def;
+  const n = Number(/^\d{1,3}(\.\d{3})+$/.test(s) ? s.replace(/\./g, '') : s);
+  if (!Number.isFinite(n) || n < 0) {
+    console.warn(`[config] ${nombre}="${s}" no es un monto válido; se usa ${def}.`);
+    return def;
+  }
+  return n;
+};
+
+// El tope de gasto diario de la IA se lee ANTES del objeto config porque
+// `analisisIA.enabled` depende de él: con tope en 0 la IA no puede llamarse
+// nunca, así que declararla "activa" en el panel sería mentir.
+const presupuestoIaClp = montoClp(
+  process.env.ANALISIS_IA_PRESUPUESTO_DIARIO_CLP, 20000, 'ANALISIS_IA_PRESUPUESTO_DIARIO_CLP'
+);
+
 export const config = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '4000', 10),
@@ -30,29 +57,36 @@ export const config = {
   // La IA SOLO extrae y clasifica: el cálculo de CO2e sigue siendo 100%
   // del motor propio determinista — nunca lo calcula la IA.
   analisisIA: {
-    enabled: bool(process.env.ANALISIS_IA, true) && Boolean(process.env.ANTHROPIC_API_KEY),
+    // Con el tope en 0 la IA no puede llamarse nunca: se apaga acá, para que
+    // el panel muestre "Inactivo" en vez de un "Activo" que no lo es.
+    enabled: bool(process.env.ANALISIS_IA, true)
+      && Boolean(process.env.ANTHROPIC_API_KEY)
+      && presupuestoIaClp > 0,
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     modelo: process.env.ANALISIS_IA_MODELO || 'claude-sonnet-5',
     timeoutMs: parseInt(process.env.ANALISIS_IA_TIMEOUT_MS || '15000', 10),
-    // Referenciales (ajustar según tarifa vigente de Anthropic) — solo
-    // para el costo estimado que se muestra en el panel de admin, igual
-    // que el costo fijo de referencia que ya usa simple_api_uso.
+    // Referenciales (ajustar según tarifa vigente de Anthropic). OJO: ya no
+    // son solo un indicador de panel — desde el tope diario, estos dos
+    // números DECIDEN cuándo se corta el gasto de la IA. Subirlos hace que
+    // el presupuesto se agote antes; bajarlos, después.
     costoInputClp1k: Number(process.env.ANALISIS_IA_COSTO_INPUT_CLP_1K) || 3,
     costoOutputClp1k: Number(process.env.ANALISIS_IA_COSTO_OUTPUT_CLP_1K) || 15,
     // Tope de gasto por día calendario (America/Santiago), estimado con los
-    // costos referenciales de arriba sobre lo ya registrado en
-    // analisis_ia_uso. Existe porque POST /api/sesiones es PÚBLICO y sin
-    // login: sin tope, el gasto de la API lo decide cualquiera desde
-    // internet. Al superarlo la IA se salta y el documento se lee con el
-    // parser de reglas — degradación, no error: nadie recibe un rechazo
-    // por haberse acabado el presupuesto.
-    // 0 (o negativo) = no se gasta nada: equivale a la IA apagada. Para
-    // operar sin tope hay que poner un número alto a propósito, no dejarlo
-    // vacío — un despliegue que no configura nada queda acotado.
-    presupuestoDiarioClp:
-      process.env.ANALISIS_IA_PRESUPUESTO_DIARIO_CLP === undefined
-        ? 20000
-        : Number(process.env.ANALISIS_IA_PRESUPUESTO_DIARIO_CLP) || 0,
+    // costos de arriba sobre lo ya registrado en analisis_ia_uso. Existe
+    // porque POST /api/sesiones lo puede disparar cualquiera con un código
+    // de acceso —incluso uno inválido, ver la pre-validación en public.js—
+    // y cada archivo puede costar hasta tres llamadas.
+    //
+    // Al superarlo la IA se salta y el documento se lee con el parser de
+    // reglas. Para casi todos los documentos eso es degradación silenciosa;
+    // para los que SOLO la IA sabía leer no lo es (ver el comentario de
+    // analisisIA.js): terminan rechazados con el motor externo apagado, o
+    // se van al motor externo si está encendido. Por eso el tope se elige
+    // como un freno de daño, no como una cuota de operación.
+    //
+    // 0 = la IA queda apagada del todo (`enabled` de arriba). Para operar
+    // sin tope hay que poner un número alto a propósito.
+    presupuestoDiarioClp: presupuestoIaClp,
   },
 
   jwt: {

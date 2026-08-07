@@ -46,10 +46,15 @@ after(async () => {
   if (fetchOriginal) globalThis.fetch = fetchOriginal;
   Object.assign(config.analisisIA, original);
   presupuestoIA.reiniciar();
-  await query(
-    `DELETE FROM analisis_ia_uso WHERE modelo = $1 OR motivo_error = 'presupuesto_diario_agotado'`,
-    ['modelo-de-prueba']
-  ).catch(() => {});
+  // La guarda de producción va también en el `after()`, no solo en el
+  // `before()`: la suite corre en el VPS como compuerta del deploy
+  // (deploy/actualizar.sh) con el .env apuntando a la BD REAL. Un DELETE sin
+  // guarda acá borraría filas de producción en cada actualización — y con
+  // `.catch(() => {})`, en silencio. El filtro por `modelo` también acota:
+  // solo se borra lo que este archivo escribió.
+  if (!EN_PRODUCCION) {
+    await query(`DELETE FROM analisis_ia_uso WHERE modelo = $1`, ['modelo-de-prueba']).catch(() => {});
+  }
   await pool.end();
 });
 
@@ -79,6 +84,23 @@ test('config: sin variable de entorno el tope no queda infinito', () => {
   assert.equal(original.presupuestoDiarioClp > 0, true);
 });
 
+// Los tres casos que `Number(v) || def` confunde, y que apagaban la IA en
+// silencio: dotenv entrega '' (no undefined) para una línea `VAR=`, y un
+// monto pegado en formato es-CL ('20.000') se leía como veinte pesos.
+test('config: el tope se lee bien vacío, en es-CL y con basura', async () => {
+  const { montoClp } = await import('../src/config.js');
+  assert.equal(montoClp(undefined, 20000, 'X'), 20000, 'sin definir → default');
+  assert.equal(montoClp('', 20000, 'X'), 20000, 'vacío → default, no 0');
+  assert.equal(montoClp('   ', 20000, 'X'), 20000);
+  assert.equal(montoClp('20.000', 20000, 'X'), 20000, 'es-CL: veinte mil, no veinte');
+  assert.equal(montoClp('1.234.567', 0, 'X'), 1234567);
+  assert.equal(montoClp('5000', 20000, 'X'), 5000);
+  assert.equal(montoClp('20.5', 20000, 'X'), 20.5, 'un decimal de verdad no es separador de miles');
+  assert.equal(montoClp('0', 20000, 'X'), 0, 'cero explícito SÍ se respeta: apaga la IA a propósito');
+  assert.equal(montoClp('mucho', 20000, 'X'), 20000, 'basura → default, con aviso');
+  assert.equal(montoClp('-5', 20000, 'X'), 20000, 'negativo → default');
+});
+
 test('gasto del día por sobre el tope → analizarTexto devuelve null sin llamar a la API', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
   config.analisisIA.enabled = true; // como si hubiera ANTHROPIC_API_KEY
   config.analisisIA.presupuestoDiarioClp = 100;
@@ -106,27 +128,42 @@ test('con el presupuesto agotado el documento se lee igual, con el parser de reg
   Object.assign(config.analisisIA, original);
 });
 
-test('el aviso de presupuesto agotado se registra una sola vez, no una por documento', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+// `analisis_ia_uso` es la bitácora de LLAMADAS a la API. Una llamada que no
+// se hizo no puede aparecer ahí: contaría en `llamadas_30d` del panel, bajaría
+// el porcentaje de éxito y arrastraría el promedio de latencia.
+test('saltarse la IA no escribe una llamada que nunca ocurrió', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
   config.analisisIA.enabled = true;
   config.analisisIA.presupuestoDiarioClp = 100;
   await gastarHoy(500);
 
-  const antes = await contarAvisos();
+  const antes = await contarFilas();
   for (let i = 0; i < 3; i += 1) await analisisIA.analizarTexto('FACTURA N° 1\nServicio $ 10.000');
-  const despues = await contarAvisos();
-  assert.equal(despues - antes, 1, 'una fila por día y proceso, no una por documento saltado');
+  assert.equal(await contarFilas(), antes, 'ni una fila nueva por los documentos saltados');
 
   Object.assign(config.analisisIA, original);
 });
 
-async function contarAvisos() {
-  const { rows } = await query(
-    `SELECT count(*)::int AS n FROM analisis_ia_uso WHERE motivo_error = 'presupuesto_diario_agotado'`
-  );
+async function contarFilas() {
+  const { rows } = await query(`SELECT count(*)::int AS n FROM analisis_ia_uso`);
   return rows[0].n;
 }
 
-test('el gasto se cuenta aunque la bitácora no se pueda escribir (una BD caída no destapa el tope)', () => {
+// Un solo NaN en la columna hace que SUM() del día sea NaN, y `NaN >= tope`
+// es FALSO: el tope desaparecería hasta el otro día, con el panel mostrando
+// $0 tan tranquilo. Pasa de verdad si la respuesta viene sin `usage`.
+test('un costo no numérico no se acumula ni destapa el tope', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  presupuestoIA.reiniciar();
+  presupuestoIA.anotarGasto(50);
+  presupuestoIA.anotarGasto(Number('no es un número')); // NaN: se ignora
+  assert.equal(presupuestoIA.gastoEnMemoria(), 50);
+  presupuestoIA.reiniciar();
+});
+
+// Con el proceso ya andando y la BD caída, la bitácora deja de escribirse
+// pero el acumulador sigue contando. (Arrancar con la BD caída es otra cosa:
+// ahí el acumulador parte en cero y esto no lo cubre — está dicho en el
+// encabezado del servicio.)
+test('el gasto se sigue contando en memoria aunque la bitácora no se pueda escribir', () => {
   presupuestoIA.reiniciar();
   presupuestoIA.anotarGasto(120.5);
   presupuestoIA.anotarGasto(30);

@@ -195,8 +195,10 @@ export default function MotorPropio() {
               {stats.analisis_ia_activo && ia.presupuesto_agotado && (
                 <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
                   Se alcanzó el tope de gasto del día: los documentos se están leyendo con el respaldo de
-                  reglas. Vuelve a habilitarse solo mañana, o subiendo el tope en la configuración del
-                  servidor. Ningún documento se rechaza por esto.
+                  reglas. Se vuelve a habilitar sola mañana, o antes si subes el tope en la configuración
+                  del servidor. Los documentos que el respaldo de reglas sabe leer siguen procesándose
+                  igual; los que solo la IA podía leer terminan rechazados —con un mensaje que dice que
+                  puede no ser su documento— o pasan al motor externo si está encendido.
                 </div>
               )}
             </div>
