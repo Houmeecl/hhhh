@@ -106,6 +106,35 @@ function filasDe(json) {
   return [];
 }
 
+// Tipos que el RCV NO detalla documento a documento: boletas electrónicas
+// (39/41) y comprobantes de pago electrónico (48). Solo vienen agregados en
+// `resumenPorTipo` — si se ignoraran, las ventas de una empresa boletera
+// aparecerían en cero.
+const SIN_DETALLE_RCV = new Set([39, 41, 48]);
+
+// Convierte una entrada de `resumenPorTipo` en una fila-resumen del período
+// (una por tipo, folio fijo => el UPSERT la mantiene idempotente). Solo para
+// los tipos sin detalle: los demás ya vienen documento a documento en
+// `datos` y sumarlos de nuevo duplicaría los montos.
+export function normalizarResumenRcv(r) {
+  if (!r || typeof r !== 'object') return null;
+  const codigo = Number(r.codigoTipoDoc);
+  if (!SIN_DETALLE_RCV.has(codigo)) return null;
+  const n = Number(r.totalDocumentos || 0);
+  const total = montoNum(r.montoTotal);
+  if (!n && !total) return null; // resumen vacío: nada que guardar
+  return {
+    tipo_dte: String(codigo),
+    folio: `resumen-${codigo}`,
+    rut_contraparte: null,
+    razon_social: `${r.tipoDocumento || 'Documentos'} — resumen del período (${n} docs)`,
+    neto: montoNum(r.montoNeto),
+    iva: montoNum(r.montoIva),
+    total,
+    fecha: null,
+  };
+}
+
 // Llamada base a BaseAPI con credenciales del contribuyente en el cuerpo.
 // `password` NO se registra en ningún lado: ni en console, ni en el throw.
 async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cfg = config.baseapi } = {}) {
@@ -167,12 +196,18 @@ export async function validarCredencialesSii({ rut, password }, opts = {}) {
   }
 }
 
-// Descarga el RCV de un período/tipo y devuelve las filas normalizadas.
+// Descarga el RCV de un período/tipo y devuelve las filas normalizadas,
+// más una fila-resumen por cada tipo agregado (boletas 39/41, comprobantes
+// 48) que el RCV no detalla documento a documento.
 export async function descargarRcv({ rut, password, rutEmpresa, periodo, tipo }, opts = {}) {
   if (!PERIODO_RE.test(String(periodo || ''))) throw new Error('Período inválido (usa AAAA-MM).');
   if (tipo !== 'compra' && tipo !== 'venta') throw new Error('Tipo inválido (compra|venta).');
   const json = await llamar(`/sii/rcv/${periodo}/${tipo}`, { rut, password, rutEmpresa }, opts);
-  return filasDe(json).map(normalizarFilaRcv).filter(Boolean);
+  const filas = filasDe(json).map(normalizarFilaRcv).filter(Boolean);
+  const resumen = Array.isArray(json?.data?.resumenPorTipo)
+    ? json.data.resumenPorTipo.map(normalizarResumenRcv).filter(Boolean)
+    : [];
+  return [...filas, ...resumen];
 }
 
 // Normaliza un DTE recibido (compra) trayendo el DETALLE de ítems desde el

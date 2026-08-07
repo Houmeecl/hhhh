@@ -37,6 +37,9 @@ export default function AnalisisSiiVista({ a }) {
         </div>
       )}
 
+      <PorTipoTabla titulo="Compras por tipo de documento" filas={a.por_tipo?.compra} />
+      <PorTipoTabla titulo="Ventas por tipo de documento" filas={a.por_tipo?.venta} />
+
       <ContraparteTabla titulo="Principales proveedores (compras)" filas={a.concentracion.compra} />
       <ContraparteTabla titulo="Principales clientes (ventas)" filas={a.concentracion.venta} />
 
@@ -66,6 +69,38 @@ export default function AnalisisSiiVista({ a }) {
           </div>
         </div>
       </details>
+    </div>
+  );
+}
+
+// Desglose por tipo de documento: separa facturas, notas de crédito/débito,
+// guías de despacho y boletas (resumen agregado del período) para no leer
+// todo como facturación.
+function PorTipoTabla({ titulo, filas }) {
+  if (!filas || filas.length === 0) return null;
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0, fontSize: 15 }}>{titulo}</h3>
+      <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Tipo</th><th style={{ textAlign: 'right' }}>Docs</th><th style={{ textAlign: 'right' }}>Neto</th><th style={{ textAlign: 'right' }}>IVA</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+          <tbody>
+            {filas.map((f, i) => (
+              <tr key={i}>
+                <td>{f.nombre} <span className="muted" style={{ fontFamily: 'monospace', fontSize: 12 }}>({f.tipo_dte})</span></td>
+                <td style={{ textAlign: 'right' }}>{f.resumen ? <span className="muted">resumen</span> : fmtInt(f.n)}</td>
+                <td style={{ textAlign: 'right' }}>{CLP(f.neto)}</td>
+                <td style={{ textAlign: 'right' }}>{CLP(f.iva)}</td>
+                <td style={{ textAlign: 'right' }}>{CLP(f.total)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: '8px 0 0' }}>
+        Las notas de crédito y guías de despacho se muestran por separado; las boletas electrónicas
+        llegan del SII como resumen agregado del período, sin detalle por documento.
+      </p>
     </div>
   );
 }

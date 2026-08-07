@@ -18,6 +18,40 @@ import { cargarCategorias, calcularFactura } from './motorPropio.js';
 
 const TOP_CONTRAPARTES = 10;
 
+// Nombres de los tipos de DTE que aparecen en el RCV, para que el desglose
+// distinga facturas, notas, GUÍAS DE DESPACHO y boletas (estas últimas
+// llegan como resumen agregado del período, no documento a documento).
+export const NOMBRES_TIPO_DTE = {
+  30: 'Factura', 32: 'Factura exenta', 33: 'Factura electrónica',
+  34: 'Factura exenta electrónica', 35: 'Boleta', 38: 'Boleta exenta',
+  39: 'Boleta electrónica', 41: 'Boleta exenta electrónica',
+  45: 'Factura de compra', 46: 'Factura de compra electrónica',
+  48: 'Comprobante de pago electrónico', 52: 'Guía de despacho electrónica',
+  56: 'Nota de débito electrónica', 61: 'Nota de crédito electrónica',
+  110: 'Factura de exportación', 111: 'Nota de débito de exportación',
+  112: 'Nota de crédito de exportación',
+};
+
+// Agrupa filas por tipo de DTE: cuántos documentos y montos por tipo. Las
+// notas de crédito y guías de despacho quedan visibles por separado para
+// no leerlas como facturación.
+function porTipo(filas) {
+  const mapa = new Map();
+  for (const f of filas) {
+    const k = f.tipo_dte || '?';
+    const prev = mapa.get(k) || { tipo_dte: k, nombre: NOMBRES_TIPO_DTE[Number(k)] || `Tipo ${k}`, n: 0, neto: 0, iva: 0, total: 0, resumen: true };
+    prev.n += 1;
+    prev.neto += Number(f.neto || 0);
+    prev.iva += Number(f.iva || 0);
+    prev.total += Number(f.total || 0);
+    // Una fila 'resumen-NN' agrega N documentos del período en una sola:
+    // el conteo por filas no aplica y la UI muestra "resumen" en su lugar.
+    if (!String(f.folio || '').startsWith('resumen-')) prev.resumen = false;
+    mapa.set(k, prev);
+  }
+  return [...mapa.values()].sort((a, b) => b.total - a.total);
+}
+
 // Suma neto/iva/total y cuenta documentos de un arreglo de filas.
 function totales(filas) {
   return filas.reduce(
@@ -115,6 +149,7 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
   return {
     periodo,
     resumen: { compra: totales(compras), venta: totales(ventas) },
+    por_tipo: { compra: porTipo(compras), venta: porTipo(ventas) },
     concentracion: {
       compra: concentracion(compras, marcados),
       venta: concentracion(ventas, marcados),

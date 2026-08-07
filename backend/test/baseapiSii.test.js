@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizarFilaRcv, normalizarDteRecibido, descargarRcv, descargarComprasVentas, validarCredencialesSii, PERIODO_RE,
+  normalizarFilaRcv, normalizarDteRecibido, normalizarResumenRcv, descargarRcv, descargarComprasVentas, validarCredencialesSii, PERIODO_RE,
 } from '../src/services/baseapiSii.js';
 
 // Config inyectada: nunca la key real, nunca red real.
@@ -109,6 +109,37 @@ test('RCV con 400 da un mensaje accionable de período/empresa', async () => {
     () => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG }),
     /revisa el período/
   );
+});
+
+test('resumenPorTipo: boletas/comprobantes entran como fila-resumen; los tipos con detalle NO se duplican', async () => {
+  // El RCV no detalla boletas (39/41) ni comprobantes (48): solo vienen en
+  // resumenPorTipo. Los tipos detallados (33) también aparecen ahí y deben
+  // ignorarse para no sumar dos veces.
+  const fetcher = fakeFetch({
+    success: true,
+    data: {
+      totalRegistros: 1,
+      datos: [FILA_COMPRA],
+      resumenPorTipo: [
+        { tipoDocumento: 'Boleta Electrónica', codigoTipoDoc: 39, totalDocumentos: 1250, montoNeto: 5000000, montoIva: 950000, montoTotal: 5950000 },
+        { tipoDocumento: 'Factura Electrónica', codigoTipoDoc: 33, totalDocumentos: 1, montoNeto: 350000, montoIva: 66500, montoTotal: 416500 },
+        { tipoDocumento: 'Comprobante de pago', codigoTipoDoc: 48, totalDocumentos: 0, montoNeto: 0, montoIva: 0, montoTotal: 0 },
+      ],
+    },
+  });
+  const filas = await descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG });
+  assert.equal(filas.length, 2); // detalle 33 + resumen 39 (la 33 del resumen se ignora, la 48 vacía también)
+  const boletas = filas.find((f) => f.tipo_dte === '39');
+  assert.equal(boletas.folio, 'resumen-39'); // folio fijo => UPSERT idempotente
+  assert.equal(boletas.total, 5950000);
+  assert.match(boletas.razon_social, /1250 docs/);
+  assert.equal(boletas.rut_contraparte, null);
+});
+
+test('normalizarResumenRcv ignora tipos con detalle y resúmenes vacíos', () => {
+  assert.equal(normalizarResumenRcv({ codigoTipoDoc: 33, totalDocumentos: 5, montoTotal: 100 }), null);
+  assert.equal(normalizarResumenRcv({ codigoTipoDoc: 39, totalDocumentos: 0, montoTotal: 0 }), null);
+  assert.equal(normalizarResumenRcv({ codigoTipoDoc: 41, totalDocumentos: 3, montoTotal: 30000 }).tipo_dte, '41');
 });
 
 // DTE recibido tal como lo entrega BaseAPI (sin XML: cae a un ítem por el total).
