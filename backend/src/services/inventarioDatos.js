@@ -469,6 +469,19 @@ export const INVENTARIO = {
     base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
     retencion: 'Se puede dar de baja cuando termina la relación con el proveedor.',
   },
+  dte_proveedor: {
+    clasificacion: PERSONAL, columnas: ['rut_contraparte'],
+    nota: 'Detalle del Registro de Compras y Ventas (RCV) que el proveedor descarga del SII con su '
+      + 'clave tributaria (migración 071). La clave NUNCA se guarda acá ni en ninguna parte: viaja por '
+      + 'request a BaseAPI y se descarta (ver services/baseapiSii.js). El dato personal identificador es '
+      + 'el RUT de las contrapartes (proveedores y clientes del proveedor), que pueden ser personas '
+      + 'naturales — mismo criterio que `clientes`, donde la razón social se toma como dato de la empresa. '
+      + '`razon_social` viaja junto al RUT solo como etiqueta legible. Se guarda para el análisis de '
+      + 'compras/ventas del propio proveedor.',
+    finalidad: 'Analizar las compras y ventas del proveedor (resumen, cruce de contrapartes y estimación referencial de emisiones).',
+    base: BASE.CONSENTIMIENTO, cadena: CADENA.NINGUNA,
+    retencion: 'El proveedor puede re-descargar un período en cualquier momento (UPSERT); se borra al dar de baja la cuenta (ON DELETE CASCADE).',
+  },
   credenciales_webauthn: {
     clasificacion: PERSONAL, columnas: ['nombre_dispositivo'],
     nota: '`public_key`/`credential_id`/`counter` son material criptográfico de la llave FIDO2, no '

@@ -4,6 +4,7 @@ import Logo from '../components/Logo.jsx';
 import { api, authProveedor } from '../api.js';
 import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import LotesPorFirmar from './LotesPorFirmar.jsx';
+import AnalisisSii from './AnalisisSii.jsx';
 
 // Shell mínimo, sin sidebar de navegación: el proveedor solo conecta su
 // llave USB y firma los lotes que le asignaron — una sola pantalla, no
@@ -12,6 +13,7 @@ export default function ProveedorApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
+  const [vista, setVista] = useState('lotes'); // 'lotes' | 'sii'
 
   useEffect(() => { document.title = 'sicr3p — Panel de Proveedor'; }, []);
 
@@ -70,8 +72,24 @@ export default function ProveedorApp() {
         </div>
       </div>
 
+      <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4 }}>
+          {[['lotes', 'Lotes por firmar'], ['sii', 'Compras y ventas (SII)']].map(([k, label]) => (
+            <button key={k} onClick={() => setVista(k)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',
+                fontSize: 14, fontWeight: 600,
+                color: vista === k ? 'var(--navy)' : '#64748b',
+                borderBottom: vista === k ? '3px solid #14b8a6' : '3px solid transparent',
+              }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-        <LotesPorFirmar />
+        {vista === 'lotes' ? <LotesPorFirmar /> : <AnalisisSii />}
       </main>
     </div>
   );

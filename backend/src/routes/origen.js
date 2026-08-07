@@ -9,6 +9,8 @@ import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadena
 import { generarClave, generarSerial } from '../services/posTerminal.js';
 import { generateCredencialTarjeta, generateCredencialProveedor } from '../services/pdf.js';
 import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
+import { descargarComprasVentas } from '../services/baseapiSii.js';
+import { analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
 import {
   ROLES,
   TIPOS,
@@ -1415,6 +1417,96 @@ proveedorPanelRouter.post('/lotes/:asignacionId/firmar', requireNivelOperador, a
       });
     }
     res.status(resultado.status).json(resultado.body);
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// Compras y ventas del SII (RCV) del propio proveedor.
+//
+// El proveedor escribe su clave tributaria y descarga su Registro de
+// Compras y Ventas de un período. La clave viaja por request a BaseAPI y
+// se descarta al terminar el handler: NUNCA se guarda en BD ni se registra
+// en logActividad. Lo que sí guardamos es el DETALLE de los documentos
+// (dte_proveedor) para poder analizarlo sin volver a pedir la clave.
+// ============================================================
+
+// GET /api/panel-proveedor/sii/estado — identidad del proveedor (para
+// prellenar el RUT) + períodos ya descargados. Sin costo, sin clave.
+proveedorPanelRouter.get('/sii/estado', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT rut, nombre_empresa FROM proveedores WHERE id = $1`, [req.user.proveedor_id]
+    );
+    const proveedor = rows[0];
+    if (!proveedor) return res.status(403).json({ error: 'Cuenta de proveedor no encontrada.' });
+    res.json({ proveedor, periodos: await periodosDescargados(query, req.user.proveedor_id) });
+  } catch (err) { next(err); }
+});
+
+// POST /api/panel-proveedor/sii/descargar — { periodo, rut, password }.
+// `rut`+`password` autentican en el SII (persona que se autentica, puede
+// ser el representante). El RUT de la empresa contra el que se guardan los
+// DTE SALE de la fila `proveedores` del usuario logueado, NUNCA del body:
+// nadie puede descargar los datos de otra empresa.
+proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, res, next) => {
+  const b = req.body || {};
+  try {
+    const { rows } = await query(
+      `SELECT id, rut, activo FROM proveedores WHERE id = $1`, [req.user.proveedor_id]
+    );
+    const proveedor = rows[0];
+    if (!proveedor || !proveedor.activo) return res.status(403).json({ error: 'Cuenta de proveedor inactiva.' });
+
+    let descarga;
+    try {
+      descarga = await descargarComprasVentas({
+        rut: b.rut,
+        password: b.password,
+        rutEmpresa: proveedor.rut, // identidad de PROVEEDORES, nunca del body
+        periodo: b.periodo,
+      });
+    } catch (e) {
+      // 400 para errores de entrada/credenciales; 502 si la fuente falló.
+      const status = e.credenciales || /inválid|Período|clave|RUT/i.test(e.message) ? 400 : 502;
+      return res.status(status).json({ error: e.message });
+    }
+
+    // UPSERT idempotente: re-descargar un período no duplica.
+    let guardados = 0;
+    await withTx(async (client) => {
+      for (const [tipo, filas] of [['compra', descarga.compra], ['venta', descarga.venta]]) {
+        for (const f of filas) {
+          await client.query(
+            `INSERT INTO dte_proveedor
+               (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, fecha)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+             ON CONFLICT (proveedor_id, periodo, tipo, COALESCE(tipo_dte, ''), folio, COALESCE(rut_contraparte, ''))
+             DO UPDATE SET razon_social = EXCLUDED.razon_social, neto = EXCLUDED.neto,
+                           iva = EXCLUDED.iva, total = EXCLUDED.total, fecha = EXCLUDED.fecha,
+                           descargado_at = now()`,
+            [proveedor.id, b.periodo, tipo, f.tipo_dte, f.folio, f.rut_contraparte,
+             f.razon_social, f.neto, f.iva, f.total, f.fecha]
+          );
+          guardados += 1;
+        }
+      }
+    });
+
+    // El detalle (accion + período), NUNCA la clave.
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'proveedor_descarga_sii', entidad: 'dte_proveedor',
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: guardados }, ip: req.ip,
+    });
+
+    res.json({ periodo: b.periodo, documentos: guardados, analisis: await analizarPeriodo(query, proveedor.id, b.periodo) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/panel-proveedor/sii/analisis/:periodo — análisis de lo ya
+// descargado. Sin costo, sin clave.
+proveedorPanelRouter.get('/sii/analisis/:periodo', async (req, res, next) => {
+  try {
+    res.json(await analizarPeriodo(query, req.user.proveedor_id, req.params.periodo));
   } catch (err) { next(err); }
 });
 

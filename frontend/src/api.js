@@ -494,6 +494,11 @@ export const api = {
   // el admin desde Origen.jsx, nunca declara su propia identidad.
   proveedorLotes: () => request('/panel-proveedor/lotes', { authedProveedor: true }),
   proveedorFirmar: (asignacionId, body) => request(`/panel-proveedor/lotes/${asignacionId}/firmar`, { method: 'POST', body, authedProveedor: true }),
+  // Compras y ventas del SII (RCV). La clave se manda solo para descargar
+  // y el backend la reenvía por request a BaseAPI; nunca se guarda.
+  proveedorSiiEstado: () => request('/panel-proveedor/sii/estado', { authedProveedor: true }),
+  proveedorSiiDescargar: (body) => request('/panel-proveedor/sii/descargar', { method: 'POST', body, authedProveedor: true }),
+  proveedorSiiAnalisis: (periodo) => request(`/panel-proveedor/sii/analisis/${periodo}`, { authedProveedor: true }),
 };
 
 async function abrirPdfAuth(url, store = auth) {
