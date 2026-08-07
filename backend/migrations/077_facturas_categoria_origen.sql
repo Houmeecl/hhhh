@@ -1,0 +1,46 @@
+-- ============================================================
+-- 077: procedencia de la categoría en `facturas`, para que el export de
+-- Alcance 3 del mandante no presente el default del motor como atribución.
+--
+-- Es el mismo problema que cerró la migración 076 en `dte_proveedor`, en la
+-- ruta que tiene más consecuencias: GET /api/mandante/export/alcance3
+-- (routes/mandante.js) arma un CSV que el mandante pega en su memoria anual
+-- bajo NCG 461 / IFRS S2.
+--
+-- Cuando ninguna palabra clave calza con la glosa de los ítems, el motor
+-- devuelve su catch-all `servicios` (services/motorPropio.js), que la
+-- migración 017 mapea a 'Alcance 3 · Cat. 1 — servicios adquiridos'. O sea:
+-- "no pude clasificar este documento" salía en el CSV como una fila Cat. 1
+-- con su n_documentos, su total_tco2e y su fuente metodológica citada,
+-- indistinguible de una atribución calculada.
+--
+-- Agrava que el catch-all no siempre es `servicios`: si esa categoría se
+-- desactiva desde el panel del motor (la migración 075 ya desactivó
+-- `transporte`, así que no es hipotético), clasificar() cae a la primera
+-- categoría activa por orden de código, y ahí el default puede terminar
+-- siendo `combustible` — Alcance 1, emisiones directas.
+--
+--   'glosa'            → la categoría salió de una palabra clave que calzó
+--                        con la glosa real de un ítem del documento.
+--   'sin_coincidencia' → ninguna calzó y el motor usó su catch-all. Hay
+--                        factor con que calcular; no hay clasificación.
+--
+-- (En dte_proveedor el valor equivalente a 'glosa' se llama 'xml', porque
+-- allá lo que hay que distinguir es si el ítem venía del XML del DTE o era
+-- sintético. Acá los documentos se suben con su detalle real, así que esa
+-- distinción no aplica y el nombre del valor lo refleja.)
+--
+-- `categoria_codigo` va aparte de `categoria` porque `categoria` guarda el
+-- NOMBRE de la categoría, que se edita desde el panel del motor. El export
+-- del mandante hoy hace JOIN por ese nombre: renombrar una categoría deja
+-- fuera del CSV, sin aviso, todos los documentos históricos, bajando el
+-- Alcance 3 informado. El código es la clave estable.
+--
+-- SIN BACKFILL: la coincidencia se decide al clasificar, y esa decisión no
+-- quedó registrada. Las filas anteriores quedan en NULL, que el export trata
+-- como "procedencia no registrada" — se informan aparte, nunca como Cat. 1.
+-- ============================================================
+
+ALTER TABLE facturas ADD COLUMN IF NOT EXISTS categoria_codigo TEXT;
+ALTER TABLE facturas ADD COLUMN IF NOT EXISTS categoria_origen TEXT
+  CHECK (categoria_origen IS NULL OR categoria_origen IN ('glosa', 'sin_coincidencia'));

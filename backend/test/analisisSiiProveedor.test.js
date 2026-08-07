@@ -265,20 +265,21 @@ test('analizarPeriodo: agrupa por alcance y los documentos sin categoría van a 
 
     // `categoria_origen` decide si el documento recibe alcance: solo 'xml'
     // (la categoría salió de la glosa real de los ítems) lo habilita.
+    // [folio, categoria, co2e, categoria_origen, motor_version_id]
     const filas = [
-      ['101', 'combustible', 3.0, 'xml'],           // Alcance 1
-      ['102', 'electricidad', 2.0, 'xml'],          // Alcance 2
-      ['103', 'materiales', 4.0, 'xml'],            // Alcance 3 · Cat. 1
-      ['104', 'servicios', 1.0, 'xml'],             // Alcance 3 · Cat. 1 (otra descripción, mismo alcance)
-      ['105', null, 5.0, null],                     // descargado antes de la clasificación
-      ['106', 'combustible', 6.0, 'razon_social'],  // deducido del nombre del proveedor: sin alcance
+      ['101', 'combustible', 3.0, 'xml', V],           // Alcance 1
+      ['102', 'electricidad', 2.0, 'xml', V],          // Alcance 2
+      ['103', 'materiales', 4.0, 'xml', V],            // Alcance 3 · Cat. 1
+      ['104', 'servicios', 1.0, 'xml', V],             // Alcance 3 · Cat. 1 (otra descripción, mismo alcance)
+      ['105', 'materiales', 5.0, null, null],          // descargado antes de la columna `categoria_origen`
+      ['106', 'combustible', 6.0, 'razon_social', V],  // deducido del nombre del proveedor: sin alcance
     ];
-    for (const [folio, categoria, co2e, origen] of filas) {
+    for (const [folio, categoria, co2e, origen, version] of filas) {
       await query(
         `INSERT INTO dte_proveedor
            (proveedor_id, periodo, tipo, tipo_dte, folio, rut_contraparte, razon_social, neto, iva, total, co2e, metodo, categoria, categoria_origen, motor_version_id)
          VALUES ($1,'2025-07','compra','33',$2,'900000102','Proveedor X',100000,19000,119000,$3,'gasto',$4,$5,$6)`,
-        [P, folio, co2e, categoria, origen, categoria ? V : null]
+        [P, folio, co2e, categoria, origen, version]
       );
     }
 
@@ -299,7 +300,7 @@ test('analizarPeriodo: agrupa por alcance y los documentos sin categoría van a 
     const sin = em.por_alcance.sin_clasificar;
     assert.equal(sin.n_documentos, 2);
     assert.equal(sin.tco2e, 11);
-    assert.equal(sin.descarga_antigua, 1);
+    assert.equal(sin.descarga_antigua, 1, 'con categoría pero sin procedencia: solo esta se arregla volviendo a descargar');
     assert.equal(sin.inferido_por_nombre, 1, 'la compra clasificada por el nombre del proveedor no entra a Alcance 1');
     assert.equal(porAlcance[1].tco2e, 3, 'Alcance 1 solo lleva lo que salió del detalle del documento');
     assert.equal(em.documentos_sin_version, 1);

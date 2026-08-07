@@ -394,11 +394,16 @@ router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => 
         const { rows: fRows } = await client.query(
             `INSERT INTO facturas
                (sesion_id, numero_venta, archivo_original, rut_emisor, rut_receptor,
-                total_co2e, categoria, status, motor, clay_id,
+                total_co2e, categoria, categoria_codigo, categoria_origen,
+                status, motor, clay_id,
                 hash_documento, hash_anterior, hash_cadena, eslabon)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,'procesada',$8,$9,$10,$11,$12,$13) RETURNING *`,
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'procesada',$10,$11,$12,$13,$14,$15) RETURNING *`,
             [sesion.id, d.numero_venta, `clay:${d.clay_id}`, d.rut_emisor, d.rut_receptor,
-             calc.total_co2e, calc.categoria, MOTOR_CLAY, d.clay_id,
+             calc.total_co2e, calc.categoria, calc.categoria_codigo,
+             // Ver migración 077: sin coincidencia de palabra clave, la
+             // categoría es el default del motor y no una clasificación.
+             calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
+             MOTOR_CLAY, d.clay_id,
              hDoc, estado.ultimo_hash, hCad, eslabon]
         );
         const factura = fRows[0];

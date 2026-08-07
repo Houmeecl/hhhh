@@ -170,18 +170,42 @@ router.get('/export/alcance3', async (req, res, next) => {
       cond.push(`EXTRACT(YEAR FROM f.created_at) = $${params.length}`);
     }
 
+    // JOIN por `categoria_codigo` (clave estable) con respaldo por nombre para
+    // las filas anteriores a la migración 077: `categoria` guarda el NOMBRE,
+    // que se edita desde el panel del motor, así que un renombre sacaba del
+    // export —sin aviso— todo el histórico de esa categoría, bajando el
+    // Alcance 3 informado por el mandante.
     const { rows } = await query(
       `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
-              mc.alcance_ghg, f.total_co2e,
+              mc.alcance_ghg, f.total_co2e, f.categoria_origen,
               fm.organismo, fm.documento, fm.version_anio
          FROM facturas f
-         JOIN motor_categorias mc ON mc.nombre = f.categoria
+         JOIN motor_categorias mc
+           ON mc.codigo = f.categoria_codigo
+           OR (f.categoria_codigo IS NULL AND mc.nombre = f.categoria)
          LEFT JOIN fuentes_metodologicas fm ON fm.id = mc.fuente_metodologica_id
         WHERE ${cond.join(' AND ')}`,
       params
     );
 
-    const filas = agregarAlcance3(rows);
+    // Solo se informa como Alcance 3 el documento cuya categoría salió de una
+    // palabra clave que calzó con la glosa de sus ítems. El catch-all del
+    // motor ('servicios', que mapea a Cat. 1) significa "no pude clasificar
+    // esto": ponerlo en el CSV como una fila Cat. 1 con su fuente citada lo
+    // haría indistinguible de una atribución calculada, en un documento que
+    // se pega en una memoria anual bajo NCG 461 / IFRS S2. Ver migración 077.
+    const atribuibles = rows.filter((r) => r.categoria_origen === 'glosa');
+    const filas = agregarAlcance3(atribuibles);
+    // No se esconde lo excluido: se informa aparte, con su CO2e, para que el
+    // mandante sepa qué parte de su gasto quedó sin clasificar en vez de
+    // creer que el export lo cubre todo.
+    const sinClasificar = rows.filter((r) => r.categoria_origen !== 'glosa');
+    const noAtribuido = {
+      n_documentos: sinClasificar.length,
+      total_tco2e: Math.round(sinClasificar.reduce((a, r) => a + Number(r.total_co2e || 0), 0) * 10000) / 10000,
+      sin_coincidencia: sinClasificar.filter((r) => r.categoria_origen === 'sin_coincidencia').length,
+      procedencia_no_registrada: sinClasificar.filter((r) => r.categoria_origen == null).length,
+    };
     const anio = req.query.anio || 'todos';
 
     if (req.query.formato === 'csv') {
@@ -197,17 +221,26 @@ router.get('/export/alcance3', async (req, res, next) => {
       })));
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="alcance3_${rn}_${anio}.csv"`);
-      res.send('\uFEFF' + csv); // BOM: Excel abre con tildes/ñ correctas
+      // El saldo no atribuido va como comentario al pie: no puede ir como una
+      // fila más (no tiene categoría GHG) ni puede omitirse, o el CSV se leería
+      // como la totalidad del gasto clasificado.
+      const pie = noAtribuido.n_documentos > 0
+        ? `\n# ${noAtribuido.n_documentos} documento(s) por ${noAtribuido.total_tco2e.toFixed(4)} tCO2e sin categoría GHG atribuible`
+          + ` (${noAtribuido.sin_coincidencia} sin coincidencia en el motor,`
+          + ` ${noAtribuido.procedencia_no_registrada} sin procedencia registrada): no incluidos arriba.\n`
+        : '';
+      res.send('\uFEFF' + csv + pie); // BOM: Excel abre con tildes/ñ correctas
     } else {
       res.json({
         mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa },
         periodo: { anio },
         metodologia: { taxonomia_categorias: CITA_CATEGORIAS_ALCANCE3 },
         filas,
+        no_atribuido: noAtribuido,
       });
     }
 
-    const detalle = { rut_mandante: req.mandante.rut, anio, n_filas: filas.length, formato: req.query.formato === 'csv' ? 'csv' : 'json' };
+    const detalle = { rut_mandante: req.mandante.rut, anio, n_filas: filas.length, n_no_atribuidos: noAtribuido.n_documentos, formato: req.query.formato === 'csv' ? 'csv' : 'json' };
     logActividad({ usuarioId: null, accion: 'export_alcance3_mandante', entidad: 'mandante', entidadId: req.mandante.id, detalle, ip: req.ip });
     bigquery.exportAcceso({ tipo: 'export_alcance3_mandante', actor: { tipo: 'mandante', id: req.mandante.id }, rut_consultado: req.mandante.rut, detalle });
   } catch (err) { next(err); }

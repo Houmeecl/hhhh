@@ -366,6 +366,12 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             rut_receptor: dte.rut_receptor || rut,
             total_co2e: calc.total_co2e,
             categoria: calc.categoria,
+            // Procedencia de la categoría (migración 077): 'glosa' solo si una
+            // palabra clave calzó de verdad. Si el motor cayó a su catch-all,
+            // el export de Alcance 3 del mandante NO puede presentarlo como
+            // una atribución a Cat. 1.
+            categoria_codigo: calc.categoria_codigo,
+            categoria_origen: calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
             items: calc.items,
           };
           motor = 'propio';
@@ -389,6 +395,8 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             rut_receptor: textoParseado.rut_receptor || rut,
             total_co2e: calc.total_co2e,
             categoria: calc.categoria,
+            categoria_codigo: calc.categoria_codigo,
+            categoria_origen: calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
             items: calc.items,
           };
           motor = lectura.motor;
@@ -427,9 +435,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
         const { rows: fRows } = await client.query(
           `INSERT INTO facturas
              (sesion_id, invoice_id_simple, numero_venta, archivo_original,
-              rut_emisor, rut_receptor, total_co2e, categoria, status, motor,
+              rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo,
+              categoria_origen, status, motor,
               hash_documento, hash_anterior, hash_cadena, eslabon, motor_version_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -439,6 +448,10 @@ router.post('/sesiones', uploadArchivos, async (req, res, next) => {
             analysis.rut_receptor,
             analysis.total_co2e,
             analysis.categoria,
+            // El motor externo no informa procedencia: quedan en NULL, que el
+            // export trata como "no registrada" y nunca como Cat. 1.
+            analysis.categoria_codigo ?? null,
+            analysis.categoria_origen ?? null,
             'procesada',
             motor,
             hDoc,

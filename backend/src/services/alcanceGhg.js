@@ -76,16 +76,18 @@ const r4 = (n) => Math.round(n * 10000) / 10000;
 // dejaría tres alcances que no suman — un informe que no cuadra. Van a
 // `sin_clasificar`, separados por CAUSA, porque la salida del usuario es
 // distinta en cada caso y ofrecerle la equivocada es peor que no ofrecer nada:
-//   · `descarga_antigua`     → sin versión del motor estampada (anterior a la
-//     migración 076). Volver a descargar el período SÍ lo clasifica.
+//   · `descarga_antigua`     → tiene categoría pero no consta de dónde salió
+//     (descargado antes de la columna `categoria_origen`, migración 076).
+//     Volver a descargar el período es lo único que lo puede clasificar.
 //   · `inferido_por_nombre`  → 'razon_social'. Se arregla con el detalle real
 //     del documento, no volviendo a bajar el RCV.
 //   · `sin_coincidencia`     → el catch-all del motor. Se arregla agregando la
 //     palabra clave que falta al catálogo (panel del motor).
 //   · `motor_sin_categoria`  → el motor corrió y no dejó categoría (nota de
 //     crédito, todos los ítems descartados). No hay nada que reintentar.
-//   · `alcance_no_legible`   → la categoría existe pero su `alcance_ghg` (texto
-//     libre editable) no calza el patrón. Lo arregla un admin en el panel.
+//   · `alcance_no_legible`   → la categoría no resuelve a un alcance: su
+//     `alcance_ghg` (texto libre editable) no calza el patrón, o el código ya
+//     no está en el catálogo. Lo arregla un admin en el panel del motor.
 export function agregarPorAlcance(filas = []) {
   const porAlcance = new Map(); // 1|2|3 → { tco2e, n_documentos, categorias: Map }
   const sinClasificar = {
@@ -104,12 +106,17 @@ export function agregarPorAlcance(filas = []) {
     if (f.co2e == null) continue; // documento sin cálculo: no aporta al total, no es "sin clasificar"
     const co2e = Number(f.co2e || 0);
     const { alcance, categoria: catGhg } = parsearAlcanceGHG(f.alcance_ghg);
+    // `descarga_antigua` se decide por la AUSENCIA de `categoria_origen` en una
+    // fila que sí tiene categoría — eso solo puede pasar si se descargó antes
+    // de que existiera la columna, y es el único caso que volver a descargar
+    // arregla. Antes se decidía por `motor_version_id == null`, que también es
+    // cierto en un despliegue sin versiones del motor (versionVigente()
+    // devuelve null): ahí un documento recién bajado se rotulaba "descargado
+    // antes de esta clasificación" y encendía un botón que no lo cambiaba.
     const motivo = !f.categoria
-      ? (f.motor_version_id == null ? 'descarga_antigua' : 'motor_sin_categoria')
+      ? 'motor_sin_categoria'
       : f.categoria_origen === 'razon_social' ? 'inferido_por_nombre'
         : f.categoria_origen === 'sin_coincidencia' ? 'sin_coincidencia'
-          // Categoría de una descarga anterior a la columna `categoria_origen`:
-          // no consta de dónde salió, así que no se le atribuye alcance.
           : f.categoria_origen !== 'xml' ? 'descarga_antigua'
             : alcance === null ? 'alcance_no_legible'
               : null;

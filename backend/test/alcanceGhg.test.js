@@ -179,7 +179,7 @@ test('un documento sin cálculo (co2e null) no entra a ningún bucket', () => {
 test('sin_clasificar desglosa cada motivo y los subtotales cuadran con el total', () => {
   const r = agregarPorAlcance([
     { categoria: 'electricidad', alcance_ghg: 'Alcance 2 — electricidad comprada', co2e: 4, categoria_origen: 'xml', motor_version_id: 7 },
-    { categoria: null, alcance_ghg: null, co2e: 2, motor_version_id: null },  // bajado antes de la clasificación
+    { categoria: 'materiales', alcance_ghg: 'Alcance 3 · Cat. 1 — bienes', co2e: 2, motor_version_id: null }, // bajado antes de la columna
     { categoria: null, alcance_ghg: null, co2e: 0, motor_version_id: 7 },     // nota de crédito
     { categoria: 'combustible', alcance_ghg: 'Alcance 1 — combustión propia', co2e: 5, categoria_origen: 'razon_social', motor_version_id: 7 },
     { categoria: 'servicios', alcance_ghg: 'Alcance 3 · Cat. 1 — servicios', co2e: 1, categoria_origen: 'sin_coincidencia', motor_version_id: 7 },
@@ -200,10 +200,25 @@ test('sin_clasificar desglosa cada motivo y los subtotales cuadran con el total'
 
 // Una fila con categoría pero SIN `categoria_origen` es una descarga anterior
 // a esa columna: no consta de dónde salió, así que no se le atribuye alcance.
+// Es el ÚNICO caso que volver a descargar el período arregla — por eso el
+// botón de re-descarga se ofrece solo por este contador.
 test('una categoría sin procedencia registrada no recibe alcance', () => {
   const { alcances, sin_clasificar } = agregarPorAlcance([
     { categoria: 'electricidad', alcance_ghg: 'Alcance 2 — electricidad comprada', co2e: 6, motor_version_id: 7 },
   ]);
   assert.deepEqual(alcances, []);
   assert.equal(sin_clasificar.descarga_antigua, 1);
+});
+
+// Regresión: antes `descarga_antigua` se decidía por `motor_version_id == null`,
+// que también es cierto en un despliegue sin versiones del motor. Un documento
+// recién bajado que el motor no pudo categorizar quedaba rotulado "descargado
+// antes de esta clasificación" y encendía el botón de volver a descargar, que
+// no lo cambia.
+test('sin versiones del motor, un documento sin categoría NO se rotula como descarga antigua', () => {
+  const { sin_clasificar } = agregarPorAlcance([
+    { categoria: null, alcance_ghg: null, co2e: 3, motor_version_id: null },
+  ]);
+  assert.equal(sin_clasificar.motor_sin_categoria, 1);
+  assert.equal(sin_clasificar.descarga_antigua, 0, 'volver a descargar no lo cambiaría: no se ofrece');
 });

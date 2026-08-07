@@ -88,7 +88,7 @@ export default function AnalisisSiiVista({ a }) {
                         proporción sobre el monto. La nota metodológica ya lo
                         promete en agregado; acá se puede ver documento a documento. */}
                     <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                      {d.co2e != null ? d.co2e : '—'}
+                      {d.co2e != null ? fmt(d.co2e, 4) : '—'}
                       {d.metodo && (
                         <span className="muted" style={{ fontSize: 11, marginLeft: 6, color: d.metodo === 'fisico' ? '#16a34a' : undefined }}>
                           {d.metodo === 'fisico' ? 'físico' : 'gasto'}
@@ -132,7 +132,7 @@ const MOTIVOS_SIN_ALCANCE = [
   ['descarga_antigua', 'se descargaron antes de esta clasificación — vuelve a descargar el período para clasificarlos'],
   ['sin_coincidencia', 'no coinciden con ninguna categoría del motor'],
   ['motor_sin_categoria', 'el motor no les dejó categoría (por ejemplo, notas de crédito)'],
-  ['alcance_no_legible', 'su categoría no tiene un alcance GHG legible — avísanos para corregir el catálogo'],
+  ['alcance_no_legible', 'su categoría no resuelve a un alcance GHG (texto no legible, o categoría fuera del catálogo actual) — avísanos para corregirlo'],
 ];
 
 function PorAlcanceTabla({ porAlcance, total }) {
@@ -179,7 +179,10 @@ function PorAlcanceTabla({ porAlcance, total }) {
           </tbody>
         </table>
       </div>
-      {alcances.length === 0 && (
+      {/* Solo cuando la causa dominante es realmente la falta de detalle. Si
+          todo quedó fuera por notas de crédito o por un alcance ilegible en el
+          catálogo, esta explicación sería falsa y la salida que sugiere, inútil. */}
+      {alcances.length === 0 && sin?.inferido_por_nombre > 0 && (
         <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
           Ningún documento de este período trae el detalle de sus ítems, así que no hay alcances que atribuir.
           El registro del SII entrega el monto de cada documento, no lo que se compró. Para tener alcances 1/2/3

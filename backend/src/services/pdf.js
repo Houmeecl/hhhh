@@ -1120,18 +1120,26 @@ function tablaPorAlcance(doc, x, y, ancho, porAlcance, total) {
       }]
       : []),
   ];
+  // El alto de fila se MIDE, no se asume: la descripción de "Sin alcance
+  // atribuido" enumera hasta cinco motivos y con alto fijo de 22 pt se
+  // desbordaba sobre el título de la sección siguiente y, cerca del pie,
+  // sobre la nota metodológica y el aviso de no verificación.
+  const anchoDesc = ancho - 200;
   let zebra = false;
   for (const f of filas) {
-    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
-    if (zebra) doc.rect(x, y, ancho, 22).fill(LIGHT);
+    doc.font('Helvetica').fontSize(7);
+    const altoDesc = doc.heightOfString(f.desc, { width: anchoDesc });
+    const alto = Math.max(22, 12 + altoDesc + 4);
+    if (y + alto > doc.page.height - 100) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, alto).fill(LIGHT);
     zebra = !zebra;
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: ancho - 200 });
-    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(f.desc, x + 6, y + 12, { width: ancho - 200 });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: anchoDesc });
+    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(f.desc, x + 6, y + 12, { width: anchoDesc });
     doc.font('Helvetica').fontSize(8).fillColor(NAVY)
       .text(nfp(f.n), x + ancho - 190, y + 6, { width: 50, align: 'right' })
       .text(nf(f.co2e, 2), x + ancho - 140, y + 6, { width: 65, align: 'right' })
       .text(pct(f.co2e), x + ancho - 70, y + 6, { width: 64, align: 'right' });
-    y += 22;
+    y += alto;
   }
   return y + 14;
 }
@@ -1173,7 +1181,7 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
   const em = analisis.emisiones;
   if (em) {
     doc.roundedRect(M, y, W, 60, 8).fillAndStroke('#f0fdfa', '#14b8a6');
-    doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${em.total_co2e_tref} tCO2e`, M + 16, y + 10);
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${nf(em.total_co2e_tref, 2)} tCO2e`, M + 16, y + 10);
     doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
       `Emisiones de las compras, calculadas sobre ${nfp(em.documentos_calculados)} de ${nfp(em.documentos_totales)} ` +
       `documentos del SII${em.metodo_fisico > 0 ? ` · ${nfp(em.metodo_fisico)} por unidades físicas, ${nfp(em.metodo_gasto)} por gasto` : ''}.`,
