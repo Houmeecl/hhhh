@@ -25,9 +25,11 @@ import Apl from './Apl.jsx';
 import Auspiciadores from './Auspiciadores.jsx';
 import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
+import Enrolar from './Enrolar.jsx';
 
 const NAV = [
   { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
+  { to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
   { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
   { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
   { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
@@ -281,6 +283,7 @@ export default function AdminApp() {
           <Route path="auspiciadores" element={<Auspiciadores rol={user?.rol} />} />
           <Route path="datos" element={<Datos rol={user?.rol} />} />
           <Route path="sii" element={<Sii />} />
+          <Route path="enrolar" element={<Enrolar />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>
