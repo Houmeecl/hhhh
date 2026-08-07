@@ -16,6 +16,7 @@ export default function ProveedorApp() {
   const [checking, setChecking] = useState(true);
   const [vista, setVista] = useState('lotes'); // 'lotes' | 'sii' | 'datos'
   const [onboarding, setOnboarding] = useState(null); // null=sin saber, true=falta completar
+  const [contratoVigente, setContratoVigente] = useState(null); // null=sin saber; se resuelve junto con onboarding
 
   useEffect(() => { document.title = 'sicr3p — Panel de Proveedor'; }, []);
 
@@ -33,8 +34,8 @@ export default function ProveedorApp() {
         // Si aún no completó sus datos, se muestra el onboarding primero.
         if (!d.user.must_reset_password) {
           api.proveedorPerfil()
-            .then((p) => setOnboarding(!p.onboarding_completado))
-            .catch(() => setOnboarding(false));
+            .then((p) => { setOnboarding(!p.onboarding_completado); setContratoVigente(Boolean(p.contrato_vigente)); })
+            .catch(() => { setOnboarding(false); setContratoVigente(false); });
         }
       })
       .catch((e) => {
@@ -82,7 +83,22 @@ export default function ProveedorApp() {
 
       {onboarding ? (
         <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-          <MisDatos onboarding onListo={() => { setOnboarding(false); setVista('sii'); }} />
+          <MisDatos onboarding onListo={() => {
+            setOnboarding(false);
+            api.proveedorPerfil().then((p) => setContratoVigente(Boolean(p.contrato_vigente))).catch(() => setContratoVigente(false));
+          }} />
+        </main>
+      ) : !contratoVigente ? (
+        <main style={{ maxWidth: 560, margin: '0 auto', padding: '60px 20px' }}>
+          <div className="card" style={{ textAlign: 'center', padding: '36px 28px' }}>
+            <span className="badge badge-amber" style={{ marginBottom: 14 }}>Cuenta en revisión</span>
+            <h2 style={{ margin: '0 0 10px' }}>Ya recibimos tus datos</h2>
+            <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+              El equipo de sicr3p está preparando el contrato de tu empresa. En cuanto quede
+              emitido, tu cuenta se activa sola y podrás conectar el SII y ver tu contabilidad
+              de carbono desde acá — no necesitas hacer nada más por ahora.
+            </p>
+          </div>
         </main>
       ) : (
         <>

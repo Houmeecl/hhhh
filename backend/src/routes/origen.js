@@ -1433,7 +1433,15 @@ proveedorPanelRouter.get('/perfil', async (req, res, next) => {
     );
     const p = rows[0];
     if (!p) return res.status(403).json({ error: 'Cuenta de proveedor no encontrada.' });
-    res.json({ perfil: p, onboarding_completado: p.onboarding_completado_at != null });
+    const contrato = await query(
+      `SELECT 1 FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' LIMIT 1`,
+      [req.user.proveedor_id]
+    );
+    res.json({
+      perfil: p,
+      onboarding_completado: p.onboarding_completado_at != null,
+      contrato_vigente: contrato.rows.length > 0,
+    });
   } catch (err) { next(err); }
 });
 
@@ -1481,6 +1489,26 @@ proveedorPanelRouter.put('/perfil', requireNivelOperador, async (req, res, next)
 // request a BaseAPI y se cifra para almacenarla. Además guardamos el
 // DETALLE de los documentos (dte_proveedor) con su cálculo de emisiones.
 // ============================================================
+
+// Gate de activación: la empresa completa sus datos y de ahí en más puede
+// entrar a su panel, pero el SII (y la contabilidad de carbono que depende
+// de él) queda bloqueado hasta que sicr3p emite su contrato. Mismo criterio
+// de "vigente" que usa el resto del sistema (admin.js, migración 074):
+// cualquier contrato con estado <> 'anulado' cuenta, sin exigir un estado
+// "activo" que no existe como tal (ver services/contrato.js ESTADOS).
+async function requireContratoVigente(req, res, next) {
+  try {
+    const { rows } = await query(
+      `SELECT 1 FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' LIMIT 1`,
+      [req.user.proveedor_id]
+    );
+    if (!rows[0]) {
+      return res.status(403).json({ error: 'Tu cuenta todavía no tiene contrato — el equipo de sicr3p te avisará cuando esté activa.' });
+    }
+    next();
+  } catch (err) { next(err); }
+}
+proveedorPanelRouter.use('/sii', requireContratoVigente);
 
 // GET /api/panel-proveedor/sii/estado — identidad del proveedor (para
 // prellenar el RUT), si tiene credenciales SII guardadas, y los períodos ya

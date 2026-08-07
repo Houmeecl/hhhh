@@ -12,6 +12,7 @@ import { signAccess } from '../src/middleware/auth.js';
 import { verificarCadenaCompleta } from '../src/services/cadenaHash.js';
 import origenRoutes, { proveedorPanelRouter, firmaProveedorRouter } from '../src/routes/origen.js';
 import accesosRoutes from '../src/routes/accesos.js';
+import adminRoutes from '../src/routes/admin.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
@@ -101,6 +102,7 @@ before(async () => {
   app.use(express.json());
   app.use('/api/admin/origen', origenRoutes);
   app.use('/api/admin/accesos', accesosRoutes);
+  app.use('/api/admin', adminRoutes);
   app.use('/api/panel-proveedor', proveedorPanelRouter);
   app.use('/api/firma-proveedor', firmaProveedorRouter);
   server = http.createServer(app);
@@ -452,4 +454,80 @@ test('caso crítico: una credencial credenciales_proveedor (rol=proveedor) de AN
     body: JSON.stringify({ serial, clave }),
   });
   assert.equal(resAuthOtraVez.status, 409);
+});
+
+// ---------- Activación de cuenta gatillada por el contrato ----------
+// La empresa completa sus datos y entra a su panel, pero el SII (y la
+// contabilidad de carbono) queda bloqueado hasta que el admin le emite el
+// contrato. `proveedorB` todavía no tiene contrato en este punto del archivo.
+
+test('GET /api/panel-proveedor/perfil devuelve contrato_vigente=false antes de que el admin emita el contrato', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/perfil`, {
+    headers: { Authorization: `Bearer ${proveedorBTokenPayload}` },
+  });
+  const body = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(body.contrato_vigente, false);
+});
+
+test('sin contrato vigente, GET /api/panel-proveedor/sii/estado responde 403 (cuenta no activada)', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/sii/estado`, {
+    headers: { Authorization: `Bearer ${proveedorBTokenPayload}` },
+  });
+  const body = await res.json();
+  assert.equal(res.status, 403);
+  assert.match(body.error, /contrato/i);
+});
+
+test('sin contrato vigente, GET /api/panel-proveedor/lotes SÍ funciona (el gate es solo del SII)', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/panel-proveedor/lotes`, {
+    headers: { Authorization: `Bearer ${proveedorBTokenPayload}` },
+  });
+  assert.equal(res.status, 200);
+});
+
+test('el admin emite el contrato de proveedorB → la cuenta queda activada', { skip: SALTO_PROD }, async () => {
+  const resContrato = await fetch(`${baseUrl}/api/admin/sii/${proveedorB.id}/contrato`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${adminToken}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  const bodyContrato = await resContrato.json();
+  assert.equal(resContrato.status, 201, JSON.stringify(bodyContrato));
+
+  const resPerfil = await fetch(`${baseUrl}/api/panel-proveedor/perfil`, {
+    headers: { Authorization: `Bearer ${proveedorBTokenPayload}` },
+  });
+  const bodyPerfil = await resPerfil.json();
+  assert.equal(bodyPerfil.contrato_vigente, true);
+
+  const resEstado = await fetch(`${baseUrl}/api/panel-proveedor/sii/estado`, {
+    headers: { Authorization: `Bearer ${proveedorBTokenPayload}` },
+  });
+  assert.equal(resEstado.status, 200);
+});
+
+test('con contrato vigente, una cuenta nivel_acceso="lectura" SÍ puede leer /sii/estado y /sii/analisis (solo bloquea escribir, no leer)', { skip: SALTO_PROD }, async () => {
+  const tokenLectura = signAccess({
+    id: crypto.randomUUID(), rol: 'operador', email: `prov-b-lectura-sii-${sufijo}@ejemplo.cl`,
+    panel: 'proveedor', proveedor_id: proveedorB.id, nivel_acceso: 'lectura',
+  });
+
+  const resEstado = await fetch(`${baseUrl}/api/panel-proveedor/sii/estado`, {
+    headers: { Authorization: `Bearer ${tokenLectura}` },
+  });
+  assert.equal(resEstado.status, 200);
+
+  const resAnalisis = await fetch(`${baseUrl}/api/panel-proveedor/sii/analisis/2026-01`, {
+    headers: { Authorization: `Bearer ${tokenLectura}` },
+  });
+  assert.equal(resAnalisis.status, 200);
+
+  // Pero sigue sin poder escribir: requireNivelOperador no quedó pisado por el gate nuevo.
+  const resDescargar = await fetch(`${baseUrl}/api/panel-proveedor/sii/descargar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenLectura}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ periodo: '2026-01' }),
+  });
+  assert.equal(resDescargar.status, 403);
 });
