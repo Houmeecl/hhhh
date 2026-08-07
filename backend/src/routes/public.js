@@ -321,11 +321,17 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
       // cortes") sería echarle la culpa al cliente de una decisión nuestra.
       // No se afirma que la causa sea el tope —el documento igual puede
       // estar ilegible— pero sí se dice que puede no ser él.
-      const iaEnPausa = await presupuestoIA.agotado().catch(() => false);
+      //
+      // `enabled &&` no es redundante: con el tope en 0 la IA está apagada
+      // por configuración, no en pausa por gasto, y `agotado()` devuelve
+      // true igual. Sin este chequeo, ese despliegue mandaría a TODOS sus
+      // clientes a "intentar mañana" una lectura que no va a existir nunca.
+      const iaEnPausa = config.analisisIA.enabled
+        && await presupuestoIA.agotado().catch(() => false);
       const error = todosPorTipo
         ? `${plural ? `Estos documentos son de tipo: ${tipos}` : `"${nombres[0]}" es de tipo: ${tipos || 'no calculable'}`} — hoy sicr3p calcula CO2e solo desde facturas y boletas de compra. Sube el documento original o contacta soporte.`
         : iaEnPausa
-          ? `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}. Hoy la lectura avanzada está en pausa por límite de uso del servicio, así que puede no ser tu documento: vuelve a intentarlo mañana o escríbenos y lo procesamos nosotros.`
+          ? `No pudimos leer automáticamente ${plural ? `estos documentos: ${nombres.map((n) => `"${n}"`).join(', ')}` : `"${nombres[0]}"`}. Hoy la lectura avanzada está en pausa por límite de uso del servicio, así que puede no ser tu documento: vuelve a intentarlo mañana o escríbenos y lo procesamos nosotros.`
           : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
       return res.status(422).json({ error, rechazados: nombres });
     }

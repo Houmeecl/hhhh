@@ -167,6 +167,43 @@ test('lo atribuido a Alcance 1 o 2 se informa aparte, no como saldo sin clasific
   }
 });
 
+// `motor_categorias.nombre` no es único y se edita libre desde el panel del
+// motor. El respaldo por nombre —el camino de TODO el histórico anterior a la
+// migración 077, que no tiene `categoria_codigo`— calzaba entonces con dos
+// filas del catálogo y duplicaba el documento en el export: Alcance 3
+// sobredeclarado en una memoria anual.
+test('dos categorías con el mismo nombre no duplican el documento', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  const { rows: orig } = await query(`SELECT codigo, nombre FROM motor_categorias WHERE codigo = 'servicios'`);
+  const gemela = `zz_gemela_${sufijo}`;
+  const { rows: base } = await query(
+    `SELECT alcance_ghg, factor_gasto_kgco2e_clp1000 AS factor FROM motor_categorias WHERE codigo = 'servicios'`
+  );
+  await query(
+    `INSERT INTO motor_categorias (codigo, nombre, alcance_ghg, factor_gasto_kgco2e_clp1000, activo)
+     VALUES ($1, $2, $3, $4, true)`,
+    [gemela, orig[0].nombre, base[0].alcance_ghg, base[0].factor]
+  );
+  // El documento tiene que resolverse POR NOMBRE (categoria_codigo NULL) —
+  // es el caso del histórico anterior a la migración 077, y el único donde
+  // la rama ambigua del JOIN se activa.
+  const { rows: f } = await query(
+    `INSERT INTO facturas
+       (sesion_id, rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo, categoria_origen, status, motor)
+     VALUES ($1,$2,$3,6,$4,NULL,'glosa','procesada','propio') RETURNING id`,
+    [sesionId, RUT_PROVEEDOR, RUT_MANDANTE, orig[0].nombre]
+  );
+  try {
+    const { texto } = await get('/api/mandante/export/alcance3');
+    const cuerpo = JSON.parse(texto);
+    assert.equal(cuerpo.filas.length, 1);
+    assert.equal(cuerpo.filas[0].n_documentos, 2, 'el histórico entra una sola vez, no una por categoría homónima');
+    assert.equal(cuerpo.filas[0].total_tco2e, 11, '5 + 6: ningún CO2e se cuenta dos veces');
+  } finally {
+    await query(`DELETE FROM facturas WHERE id = $1`, [f[0].id]);
+    await query(`DELETE FROM motor_categorias WHERE codigo = $1`, [gemela]);
+  }
+});
+
 // El invariante que sostiene todo lo anterior: nada del gasto del proveedor
 // se pierde entre los tres montones. Es lo que hace que el mandante pueda
 // cuadrar este export contra lo que ve en la pantalla de proveedores.

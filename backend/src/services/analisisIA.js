@@ -340,8 +340,9 @@ export const analisisIA = {
     if (!texto || !String(texto).trim()) return null;
     // Tope de gasto del día: se devuelve null igual que cuando la IA no
     // está configurada, así que lecturaDocumento.js cae al parser de
-    // reglas sin enterarse. El documento se lee igual; lo que se pierde
-    // es la lectura flexible, no el cálculo.
+    // reglas sin enterarse. Lo que le pasa al documento desde ahí depende
+    // de si el parser lo sabe leer — ver el encabezado de este archivo; no
+    // es degradación gratis para todos.
     if (await presupuestoAgotado()) {
       avisarPresupuestoAgotado();
       return null;

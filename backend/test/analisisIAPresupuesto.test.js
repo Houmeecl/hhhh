@@ -14,11 +14,13 @@ import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 // ============================================================
 // Tope de gasto diario de la API de IA.
 //
-// POST /api/sesiones es público y sin login, y cada archivo puede gatillar
-// hasta tres llamadas a la IA. Lo que se prueba acá es que el tope existe y
-// que DEGRADA en vez de fallar: al superarse, el documento se sigue leyendo
-// con el parser de reglas y nadie recibe un rechazo por haberse acabado el
-// presupuesto.
+// Un envío a POST /api/sesiones puede gatillar hasta tres llamadas a la IA
+// por archivo. Lo que se prueba acá es que el tope existe y que la lectura
+// cae al parser de reglas en vez de fallar. OJO con el alcance de esa
+// promesa: el documento que el parser SÍ sabe leer se procesa igual (es el
+// caso que cubre el fixture); el que solo la IA sabía leer termina
+// rechazado, con un mensaje que dice que puede no ser culpa del documento
+// (routes/public.js), o se va al motor externo si está encendido.
 //
 // La API real de Anthropic no se toca: `fetch` se reemplaza por un espía que
 // falla si alguien lo llama. Que el espía quede sin usar ES el resultado que

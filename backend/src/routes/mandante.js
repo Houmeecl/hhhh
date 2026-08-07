@@ -166,8 +166,10 @@ router.get('/export/alcance3', async (req, res, next) => {
     // desaparecía del export Y del saldo no atribuido — subdeclaraba en
     // silencio justo lo que el pie del CSV promete declarar. Se filtra en JS,
     // después de clasificar. Sin filtro por estado ni por CO2e, igual que
-    // /proveedores y /proveedor/:rut/resumen: así lo que el mandante ve en
-    // esas dos pantallas cuadra con filas + otros alcances + no atribuido.
+    // /proveedores: así el total que el mandante ve en esa pantalla cuadra
+    // con filas + otros alcances + no atribuido. (Con /proveedor/:rut/resumen
+    // no tiene por qué cuadrar: esa vista trae hasta 200 documentos y admite
+    // filtro por mes.)
     const cond = [`${NORM('f.rut_receptor')} = $1`, `f.rut_emisor IS NOT NULL`];
     if (permitidos.length) {
       params.push(permitidos);
@@ -188,14 +190,27 @@ router.get('/export/alcance3', async (req, res, next) => {
     // (categoría borrada del panel del motor) hacía desaparecer el documento
     // entero de la consulta. Ahora entra con `alcance_ghg` en NULL y sale
     // contado en el saldo no atribuido, que es lo que de verdad es.
+    //
+    // LATERAL con LIMIT 1, y no un JOIN directo, porque el respaldo por
+    // nombre puede calzar con MÁS DE UNA categoría: `motor_categorias.nombre`
+    // no es único y se edita libre desde el panel del motor. Con el JOIN
+    // directo, dos categorías del mismo nombre duplicaban cada documento
+    // histórico (los que no tienen `categoria_codigo`) y el CSV sobredeclaraba
+    // Alcance 3 — en un documento que se pega en una memoria anual. El
+    // `ORDER BY codigo` hace la elección estable y no al azar del planificador.
     const { rows } = await query(
       `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
               mc.alcance_ghg, f.total_co2e, f.categoria_origen,
               fm.organismo, fm.documento, fm.version_anio
          FROM facturas f
-         LEFT JOIN motor_categorias mc
-           ON mc.codigo = f.categoria_codigo
-           OR (f.categoria_codigo IS NULL AND mc.nombre = f.categoria)
+         LEFT JOIN LATERAL (
+           SELECT c.alcance_ghg, c.fuente_metodologica_id
+             FROM motor_categorias c
+            WHERE c.codigo = f.categoria_codigo
+               OR (f.categoria_codigo IS NULL AND c.nombre = f.categoria)
+            ORDER BY c.codigo
+            LIMIT 1
+         ) mc ON true
          LEFT JOIN fuentes_metodologicas fm ON fm.id = mc.fuente_metodologica_id
         WHERE ${cond.join(' AND ')}`,
       params
