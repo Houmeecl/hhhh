@@ -224,6 +224,10 @@ export const api = {
   // `panel` opcional: los logins por panel lo mandan (el servidor rechaza
   // cuentas de otro panel); el acceso único /ingresar no lo manda.
   webauthnLoginVerificar: (email, respuesta, panel) => request('/auth/webauthn/login/verificar', { method: 'POST', body: { email, respuesta, panel } }),
+  // Login con llave de archivo (.sicr3p-llave guardado en un pendrive) + PIN.
+  // Más simple que la llave FIDO2 y también más débil — ver pages/AccesoUnico.jsx.
+  loginLlaveArchivo: (serial, token, pin, panel) =>
+    request('/auth/llave-archivo', { method: 'POST', body: { serial, token, pin, panel } }),
   me: () => request('/auth/me', { authed: true }),
   meAv: () => request('/auth/me', { authedAv: true }),
   mePuerto: () => request('/auth/me', { authedPuerto: true }),
@@ -316,6 +320,13 @@ export const api = {
   webauthnRegistroVerificar: (usuarioId, respuesta, nombreDispositivo) =>
     request(`/admin/usuarios/${usuarioId}/webauthn/verificar`, { method: 'POST', body: { respuesta, nombre_dispositivo: nombreDispositivo }, authed: true }),
   webauthnEliminar: (usuarioId, credencialId) => request(`/admin/usuarios/${usuarioId}/webauthn/${credencialId}`, { method: 'DELETE', authed: true }),
+  // Llaves de archivo — la vía más simple y también la más débil de
+  // las tres (un archivo se puede copiar); ver Usuarios.jsx.
+  llavesArchivo: (usuarioId) => request(`/admin/usuarios/${usuarioId}/llaves-archivo`, { authed: true }),
+  emitirLlaveArchivo: (usuarioId, nombre) =>
+    request(`/admin/usuarios/${usuarioId}/llaves-archivo`, { method: 'POST', body: { nombre }, authed: true }),
+  revocarLlaveArchivo: (usuarioId, credencialId) =>
+    request(`/admin/usuarios/${usuarioId}/llaves-archivo/${credencialId}/revocar`, { method: 'POST', authed: true }),
   actividad: () => request('/admin/actividad', { authed: true }),
 
   // Corredor Bioceánico

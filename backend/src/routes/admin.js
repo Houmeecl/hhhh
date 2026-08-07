@@ -4,7 +4,6 @@ import { generateRegistrationOptions, verifyRegistrationResponse } from '@simple
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
-import { siiLimiter } from '../middleware/rateLimit.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generarPasswordTemporal } from '../services/cuentas.js';
 import {
@@ -25,6 +24,8 @@ import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
 import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
 import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
+import { siiLimiterAdmin } from '../middleware/rateLimit.js';
+import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
 
 const router = express.Router();
 
@@ -139,7 +140,7 @@ router.get('/clientes', async (req, res, next) => {
 // autocompletar el alta de clientes. Va ANTES de las rutas /clientes/:id
 // en orden de lectura, pero Express igual la distingue por el prefijo
 // fijo /clientes/sii/. Apagado limpio (503) si no hay BASEAPI_API_KEY.
-router.get('/clientes/sii/:rut', adminOnly, siiLimiter, async (req, res, next) => {
+router.get('/clientes/sii/:rut', adminOnly, siiLimiterAdmin, async (req, res, next) => {
   try {
     if (!config.baseapi.enabled) {
       return res.status(503).json({ error: 'Consulta SII no configurada (BASEAPI_API_KEY).' });
@@ -877,7 +878,8 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
     const { rows } = await query(
       `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
               u.created_at, c.nombre_empresa AS cliente,
-              (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb
+              (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb,
+              (SELECT count(*) FROM credenciales_archivo ca WHERE ca.usuario_id = u.id AND ca.activo) AS num_llaves_archivo
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
        ORDER BY u.created_at DESC`
     );
@@ -1062,6 +1064,83 @@ router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, async (req, res
     );
     if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada' });
     await logActividad({ usuarioId: req.user.sub, accion: 'eliminar_llave_webauthn', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Llave de archivo (credencial en un .sicr3p-llave) — ver migración 068 ----------
+// Tercera vía de acceso junto a la contraseña y la llave USB de huella:
+// más simple de repartir, y por eso MÁS DÉBIL — un archivo se puede
+// copiar. El PIN que la acompaña se verifica en el servidor (con
+// bloqueo tras varios fallos), nunca cifrando el archivo. El registro
+// también lo hace un admin; el login ya emitido es público y vive en
+// routes/llaveArchivo.js.
+router.get('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, serial, nombre, activo, intentos_fallidos, bloqueado_hasta, created_at, last_used_at
+       FROM credenciales_archivo WHERE usuario_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ llaves: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const nombre = String(req.body?.nombre || '').trim() || null;
+    const token = generarToken();
+    const pin = generarPin();
+    const pinHash = await bcrypt.hash(pin, config.bcryptRounds);
+
+    // Reintenta ante una colisión de serial (improbable, 2 bytes de espacio
+    // compartido con tarjetas/credenciales de otro prefijo) en vez de fallar.
+    let creada;
+    for (let intento = 0; intento < 5 && !creada; intento++) {
+      try {
+        const { rows: ins } = await query(
+          `INSERT INTO credenciales_archivo (usuario_id, serial, token_hash, pin_hash, nombre)
+           VALUES ($1,$2,$3,$4,$5) RETURNING id, serial, nombre, created_at`,
+          [usuario.id, generarSerialLlave(), hashToken(token), pinHash, nombre]
+        );
+        creada = ins[0];
+      } catch (e) {
+        if (e.code !== '23505') throw e;
+      }
+    }
+    if (!creada) return res.status(500).json({ error: 'No se pudo generar un serial único, intenta de nuevo' });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_llave_archivo', entidad: 'usuario', entidadId: usuario.id, detalle: { serial: creada.serial }, ip: req.ip });
+
+    // El token y el PIN viajan en claro SOLO en esta respuesta — igual que
+    // la clave de una tarjeta de viaje o una credencial de proveedor.
+    res.status(201).json({
+      credencial: creada,
+      pin,
+      archivo: {
+        version: 1,
+        tipo: 'llave-archivo',
+        serial: creada.serial,
+        email: usuario.email,
+        emitida: creada.created_at,
+        token,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `UPDATE credenciales_archivo SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo`,
+      [req.params.credId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada o ya revocada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'revocar_llave_archivo', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

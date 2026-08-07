@@ -45,6 +45,12 @@ export default function AccesoUnico() {
   const [loading, setLoading] = useState(false);
   const [loadingLlave, setLoadingLlave] = useState(false);
 
+  // --- llave de archivo (.sicr3p-llave guardado en un pendrive) ---
+  const [mostrarArchivo, setMostrarArchivo] = useState(false);
+  const [archivoLlave, setArchivoLlave] = useState(null); // {serial, token, email}
+  const [pinArchivo, setPinArchivo] = useState('');
+  const [loadingArchivo, setLoadingArchivo] = useState(false);
+
   // --- estado del modo Clientes (magic link) ---
   const [emailCliente, setEmailCliente] = useState('');
   const [enviado, setEnviado] = useState(false);
@@ -98,6 +104,41 @@ export default function AccesoUnico() {
       }
     } finally {
       setLoadingLlave(false);
+    }
+  }
+
+  // El archivo .sicr3p-llave es JSON plano (no cifrado a propósito: un
+  // PIN corto cifrando el archivo se rompería offline en segundos; el
+  // PIN se verifica en el servidor, con bloqueo tras varios fallos).
+  function leerArchivoLlave(file) {
+    setError('');
+    const lector = new FileReader();
+    lector.onload = () => {
+      try {
+        const datos = JSON.parse(lector.result);
+        if (datos?.tipo !== 'llave-archivo' || datos?.version !== 1 || !datos.serial || !datos.token) {
+          throw new Error('shape');
+        }
+        setArchivoLlave(datos);
+      } catch {
+        setArchivoLlave(null);
+        setError('El archivo no es una llave sicr3p válida.');
+      }
+    };
+    lector.onerror = () => setError('No se pudo leer el archivo.');
+    lector.readAsText(file);
+  }
+
+  async function entrarConArchivo(e) {
+    e.preventDefault();
+    if (!archivoLlave) { setError('Selecciona tu archivo .sicr3p-llave.'); return; }
+    setError(''); setAviso(''); setLoadingArchivo(true);
+    try {
+      entrarCon(await api.loginLlaveArchivo(archivoLlave.serial, archivoLlave.token, pinArchivo));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingArchivo(false);
     }
   }
 
@@ -194,8 +235,51 @@ export default function AccesoUnico() {
                 disabled={loading || loadingLlave}
                 onClick={entrarConLlave}
               >
-                {loadingLlave ? <span className="spinner" /> : (<><Icon.Shield size={16} /> Entrar con llave USB</>)}
+                {loadingLlave ? <span className="spinner" /> : (<><Icon.Shield size={16} /> Entrar con llave FIDO2</>)}
               </button>
+
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ width: '100%', marginTop: 10 }}
+                onClick={() => setMostrarArchivo((v) => !v)}
+              >
+                {mostrarArchivo ? 'Ocultar' : '¿Tienes una llave de archivo?'}
+              </button>
+
+              {mostrarArchivo && (
+                <div style={{ marginTop: 10, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <p className="muted" style={{ fontSize: 12, marginTop: 0, lineHeight: 1.5 }}>
+                    Es más simple que una llave FIDO2 — y también menos segura: el archivo se puede
+                    copiar. El PIN se verifica en el servidor, no en el archivo.
+                  </p>
+                  <div className="field" style={{ marginBottom: 10 }}>
+                    <label htmlFor="au-archivo-llave">Archivo .sicr3p-llave</label>
+                    <input
+                      id="au-archivo-llave" type="file" accept=".sicr3p-llave,application/json"
+                      onChange={(e) => e.target.files[0] && leerArchivoLlave(e.target.files[0])}
+                    />
+                    {archivoLlave && (
+                      <span className="muted" style={{ fontSize: 12 }}>
+                        Llave {archivoLlave.serial} — {archivoLlave.email}
+                      </span>
+                    )}
+                  </div>
+                  <div className="field" style={{ marginBottom: 10 }}>
+                    <label htmlFor="au-pin-archivo">PIN</label>
+                    <input
+                      id="au-pin-archivo" type="password" inputMode="numeric" maxLength={6}
+                      value={pinArchivo} onChange={editar(setPinArchivo)} placeholder="6 dígitos"
+                    />
+                  </div>
+                  <button
+                    type="button" className="btn btn-outline" style={{ width: '100%' }}
+                    disabled={loadingArchivo} onClick={entrarConArchivo}
+                  >
+                    {loadingArchivo ? <span className="spinner" /> : (<><Icon.Upload size={16} /> Entrar con la llave de archivo</>)}
+                  </button>
+                </div>
+              )}
             </form>
           )}
 

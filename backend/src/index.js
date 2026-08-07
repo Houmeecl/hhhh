@@ -25,6 +25,7 @@ import { torreRouter } from './routes/torre.js';
 import capacitacionRoutes from './routes/capacitacion.js';
 import aplRoutes from './routes/apl.js';
 import webauthnRoutes from './routes/webauthn.js';
+import llaveArchivoRoutes from './routes/llaveArchivo.js';
 import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
 import trazadorRoutes from './routes/trazador.js';
@@ -50,6 +51,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true, mock: config.simple.mo
 app.use('/api', apiLimiter, publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth/webauthn', webauthnRoutes);
+app.use('/api/auth/llave-archivo', llaveArchivoRoutes);
 app.use('/api/admin/corredor', corredorRoutes);
 app.use('/api/admin/capital', capitalRoutes);
 app.use('/api/admin/informes', informesRoutes);

@@ -9,17 +9,20 @@ export const loginLimiter = rateLimit({
   message: { error: 'Demasiados intentos. Intenta nuevamente en unos minutos.' },
 });
 
-// Consultas públicas de situación tributaria (autocompletado del
-// formulario de inscripción). Mucho más estricto que el límite general:
-// cada consulta a BaseAPI consume cuota pagada, y este endpoint no puede
-// convertirse en un proxy SII abierto a internet.
-export const siiLimiter = rateLimit({
+// Consultas de situación tributaria (BaseAPI). Mucho más estricto que el
+// límite general: cada consulta consume cuota pagada, y el endpoint
+// público no puede convertirse en un proxy SII abierto a internet.
+// Dos instancias separadas: el tráfico anónimo de /inscripcion no debe
+// competir por cupo con el admin dando de alta clientes desde la misma IP.
+const siiLimiterOpts = (max) => ({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 10,
+  max,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas consultas de RUT. Intenta más tarde.' },
 });
+export const siiLimiter = rateLimit(siiLimiterOpts(10));
+export const siiLimiterAdmin = rateLimit(siiLimiterOpts(30));
 
 // Límite general de la API pública.
 export const apiLimiter = rateLimit({

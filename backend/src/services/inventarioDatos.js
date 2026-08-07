@@ -479,6 +479,15 @@ export const INVENTARIO = {
     base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
     retencion: 'Un admin la elimina cuando la llave se pierde o el usuario deja de usarla; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
   },
+  credenciales_archivo: {
+    clasificacion: PERSONAL, columnas: ['nombre'],
+    nota: '`token_hash`/`pin_hash` son material de autenticación hasheado (sha256/bcrypt), no un dato '
+      + 'de la persona. `nombre` sí es personal: es una etiqueta libre que en la práctica suele llevar '
+      + 'el nombre de su dueño — mismo criterio que `nombre_dispositivo` en `credenciales_webauthn`.',
+    finalidad: 'Permitir el login de esa cuenta con un archivo credencial guardado en un pendrive, más un PIN verificado en el servidor.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Un admin la revoca cuando el pendrive se pierde; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
+  },
 };
 
 // Las tablas donde hay que buscar cuando alguien ejerce su derecho de

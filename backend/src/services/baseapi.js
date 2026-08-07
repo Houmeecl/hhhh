@@ -22,6 +22,7 @@
 import { config } from '../config.js';
 import { query as dbQuery } from '../lib/db.js';
 import { normalizarRut } from './mandante.js';
+import { rutValido } from './dte.js';
 
 export const CACHE_DIAS = 30;
 
@@ -58,6 +59,9 @@ export async function consultarSituacionTributaria(rut, { fetcher = fetch, cfg =
   const norm = normalizarRut(rut);
   if (norm.length < 7 || norm.length > 9) throw new Error('RUT inválido');
   const rutConGuion = `${norm.slice(0, -1)}-${norm.slice(-1)}`;
+  // Un RUT con dígito verificador incorrecto no existe: rechazarlo acá
+  // evita gastar una consulta pagada en algo que el SII jamás va a tener.
+  if (!rutValido(rutConGuion)) throw new Error('RUT inválido');
 
   const res = await fetcher(`${cfg.base}/sii/contribuyente/situacion-tributaria`, {
     method: 'POST',

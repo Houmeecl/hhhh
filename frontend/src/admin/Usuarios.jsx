@@ -15,10 +15,16 @@ export default function Usuarios() {
   // Distinto del `toast`: esto no se autocierra, porque el valor no vuelve
   // a estar disponible una vez cerrado.
   const [pwdResultado, setPwdResultado] = useState(null);
-  // Llaves USB de huella (WebAuthn/FIDO2) de un usuario: { usuario, llaves }.
+  // Llaves USB de huella (WebAuthn/FIDO2) de un usuario, más las llaves
+  // de archivo (ver migración 068): { usuario, llaves, llavesArchivo }.
   const [llavesModal, setLlavesModal] = useState(null);
   const [nombreLlaveNueva, setNombreLlaveNueva] = useState('');
   const [registrandoLlave, setRegistrandoLlave] = useState(false);
+  const [nombreArchivoNueva, setNombreArchivoNueva] = useState('');
+  const [emitiendoArchivo, setEmitiendoArchivo] = useState(false);
+  // PIN de una llave de archivo recién emitida — se muestra UNA sola vez,
+  // igual que la contraseña temporal (no se autocierra ni se puede recuperar).
+  const [pinResultado, setPinResultado] = useState(null); // {serial, pin}
 
   const cargar = () => api.usuarios().then((r) => setUsuarios(r.usuarios)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -56,10 +62,10 @@ export default function Usuarios() {
 
   // ---------- Llaves USB de huella (WebAuthn/FIDO2) ----------
   async function abrirLlaves(u) {
-    setNombreLlaveNueva('');
+    setNombreLlaveNueva(''); setNombreArchivoNueva('');
     try {
-      const r = await api.llavesUsb(u.id);
-      setLlavesModal({ usuario: u, llaves: r.llaves });
+      const [r, ra] = await Promise.all([api.llavesUsb(u.id), api.llavesArchivo(u.id)]);
+      setLlavesModal({ usuario: u, llaves: r.llaves, llavesArchivo: ra.llaves });
     } catch (e) { flash(e.message, true); }
   }
 
@@ -93,6 +99,46 @@ export default function Usuarios() {
     } catch (e) { flash(e.message, true); }
   }
 
+  // ---------- Llaves de archivo (.sicr3p-llave en un pendrive) ----------
+  // El archivo Y el PIN viajan en claro UNA sola vez, acá: el archivo se
+  // descarga de inmediato y el PIN se muestra en pantalla, igual que una
+  // contraseña temporal.
+  async function emitirLlaveArchivo() {
+    if (!llavesModal) return;
+    setEmitiendoArchivo(true);
+    try {
+      const r = await api.emitirLlaveArchivo(llavesModal.usuario.id, nombreArchivoNueva.trim() || null);
+      const blob = new Blob([JSON.stringify(r.archivo, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `sicr3p-llave-${r.archivo.serial}.sicr3p-llave`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setPinResultado({ serial: r.archivo.serial, pin: r.pin });
+      setNombreArchivoNueva('');
+      await abrirLlaves(llavesModal.usuario);
+      cargar();
+    } catch (e) { flash(e.message, true); }
+    finally { setEmitiendoArchivo(false); }
+  }
+
+  async function revocarLlaveArchivo(credencialId) {
+    if (!llavesModal) return;
+    if (!confirm('¿Revocar esta llave de archivo? No se puede reactivar; habría que emitir una nueva.')) return;
+    try {
+      await api.revocarLlaveArchivo(llavesModal.usuario.id, credencialId);
+      flash('Llave revocada.');
+      await abrirLlaves(llavesModal.usuario);
+      cargar();
+    } catch (e) { flash(e.message, true); }
+  }
+
+  const estadoLlaveArchivo = (l) => {
+    if (!l.activo) return 'revocada';
+    if (l.bloqueado_hasta && new Date(l.bloqueado_hasta) > new Date()) return 'bloqueada';
+    return 'activa';
+  };
+
   return (
     <div>
       <div className="admin-head">
@@ -103,7 +149,7 @@ export default function Usuarios() {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th>Llave USB</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th>Llaves</th><th></th></tr></thead>
           <tbody>
             {usuarios.map((u) => (
               <tr key={u.id}>
@@ -128,7 +174,10 @@ export default function Usuarios() {
                 <td className="muted" style={{ fontSize: 13 }}>{u.ultimo_login ? fmtFecha(u.ultimo_login) : 'Nunca'}</td>
                 <td>
                   <button className="btn btn-sm btn-outline" onClick={() => abrirLlaves(u)}>
-                    {Number(u.num_llaves_usb) > 0 ? `${u.num_llaves_usb} registrada${u.num_llaves_usb > 1 ? 's' : ''}` : 'Registrar'}
+                    {(() => {
+                      const total = Number(u.num_llaves_usb || 0) + Number(u.num_llaves_archivo || 0);
+                      return total > 0 ? `${total} registrada${total > 1 ? 's' : ''}` : 'Registrar';
+                    })()}
                   </button>
                 </td>
                 <td>
@@ -168,9 +217,9 @@ export default function Usuarios() {
       {llavesModal && (
         <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setLlavesModal(null)}>
           <div className="modal" style={{ maxWidth: 480 }}>
-            <h2 style={{ marginTop: 0 }}>Llaves USB de {llavesModal.usuario.nombre}</h2>
+            <h2 style={{ marginTop: 0 }}>Llaves FIDO2 de {llavesModal.usuario.nombre}</h2>
             <p className="muted" style={{ fontSize: 13 }}>
-              Login sin contraseña con una llave USB FIDO2 con sensor biométrico (YubiKey Bio,
+              Login sin contraseña con una llave FIDO2 con sensor biométrico (YubiKey Bio,
               Kensington VeriMark, Feitian BioPass). La verificación se hace dentro de la llave: este
               panel nunca la recibe, solo una firma que confirma que su dueño la tocó.
             </p>
@@ -205,6 +254,65 @@ export default function Usuarios() {
               <button className="btn btn-primary" onClick={registrarLlave} disabled={registrandoLlave}>
                 {registrandoLlave ? <span className="spinner" /> : 'Conectar y registrar llave'}
               </button>
+            </div>
+
+            <hr style={{ margin: '22px 0', border: 'none', borderTop: '1px solid var(--border)' }} />
+
+            <h2 style={{ marginTop: 0 }}>Llaves de archivo</h2>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Un archivo <code>.sicr3p-llave</code> guardado en un pendrive común, más un PIN. Es más
+              simple de repartir que una llave USB — y por eso <b>menos segura</b>: cualquiera que
+              copie el archivo Y conozca el PIN puede entrar. Revócala si el pendrive se pierde. Para
+              cambiar el PIN no hay edición: revoca y emite una nueva.
+            </p>
+
+            {llavesModal.llavesArchivo.length > 0 && (
+              <table className="data" style={{ marginBottom: 16 }}>
+                <thead><tr><th>Nombre</th><th>Serial</th><th>Emitida</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+                <tbody>
+                  {llavesModal.llavesArchivo.map((l) => (
+                    <tr key={l.id}>
+                      <td>{l.nombre || '—'}</td>
+                      <td className="muted" style={{ fontSize: 13 }}>{l.serial}</td>
+                      <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(l.created_at)}</td>
+                      <td className="muted" style={{ fontSize: 13 }}>{l.last_used_at ? fmtFecha(l.last_used_at) : 'Nunca'}</td>
+                      <td><span className={`badge ${estadoLlaveArchivo(l) === 'activa' ? 'badge-green' : estadoLlaveArchivo(l) === 'bloqueada' ? 'badge-amber' : 'badge-red'}`}>{estadoLlaveArchivo(l)}</span></td>
+                      <td>{l.activo && <button className="btn btn-sm btn-outline" onClick={() => revocarLlaveArchivo(l.id)}>Revocar</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            <div className="field" style={{ marginBottom: 14 }}>
+              <label>Nombre de la llave nueva (opcional)</label>
+              <input
+                value={nombreArchivoNueva}
+                onChange={(e) => setNombreArchivoNueva(e.target.value)}
+                placeholder="USB azul de oficina"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={emitirLlaveArchivo} disabled={emitiendoArchivo}>
+                {emitiendoArchivo ? <span className="spinner" /> : 'Emitir y descargar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pinResultado && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setPinResultado(null)}>
+          <div className="modal" style={{ maxWidth: 440 }}>
+            <h2 style={{ marginTop: 0 }}>PIN de la llave {pinResultado.serial}</h2>
+            <p className="muted" style={{ fontSize: 13 }}>El archivo ya se descargó.</p>
+            <PasswordUnaVez
+              password={pinResultado.pin}
+              mensaje="Copia este PIN ahora — no volverá a mostrarse. Entrégalo por un canal distinto al del archivo (no los guardes juntos)."
+            />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+              <button className="btn btn-outline" onClick={() => setPinResultado(null)}>Cerrar</button>
             </div>
           </div>
         </div>

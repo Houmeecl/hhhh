@@ -4,7 +4,12 @@ import { useState } from 'react';
 // contraseña temporal viaja una sola vez en este response y nunca vuelve
 // a estar disponible — quien crea la cuenta debe copiarla ahora y
 // entregarla a la persona por un canal seguro, fuera de este sistema.
-export default function PasswordUnaVez({ password }) {
+export default function PasswordUnaVez({
+  password,
+  mensaje = 'Cuenta creada. Copia esta contraseña temporal ahora — no volverá a mostrarse. '
+    + 'Entrégasela a la persona de forma segura (no por este mismo sistema). '
+    + 'Deberá cambiarla en su primer inicio de sesión.',
+}) {
   const [copiado, setCopiado] = useState(false);
 
   async function copiar() {
@@ -21,9 +26,7 @@ export default function PasswordUnaVez({ password }) {
   return (
     <>
       <div className="badge badge-green" style={{ display: 'block', padding: 12, marginBottom: 10 }}>
-        Cuenta creada. Copia esta contraseña temporal ahora — no volverá a mostrarse.
-        Entrégasela a la persona de forma segura (no por este mismo sistema).
-        Deberá cambiarla en su primer inicio de sesión.
+        {mensaje}
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <div style={{ flex: 1, fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all', background: '#f8fafc', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>

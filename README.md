@@ -128,11 +128,15 @@ Ver `.env.example`. Las principales:
 
 - Contraseñas con **bcrypt** (costo ≥ 12).
 - **JWT** de acceso corto (15 min) + **refresh token**.
-- Login opcional sin contraseña con una llave USB **FIDO2/WebAuthn** con sensor biométrico
+- Login opcional sin contraseña con una llave **FIDO2/WebAuthn** con sensor biométrico
   (YubiKey Bio, Kensington VeriMark, Feitian BioPass — hardware estándar, sin fabricar nada
   propio). El verificador biométrico se valida dentro de la llave; el servidor solo recibe una
   firma criptográfica, nunca el dato biométrico. Un admin registra la llave desde Usuarios.jsx;
   el login vive en `/ingresar` (acceso único; /panel/ingresar redirige ahí) junto al login por contraseña.
+- Tercera vía: **llave de archivo** — un `.sicr3p-llave` (token de alta entropía, sin cifrar) más
+  un PIN de 6 dígitos, emitidos una sola vez desde Usuarios.jsx. El PIN se verifica en el servidor
+  (bcrypt + bloqueo tras 5 fallos), no en el archivo. Es explícitamente la vía más débil de las
+  tres — un archivo se puede copiar — y así se lo dice la interfaz en cada pantalla donde aparece.
 - **Rate limiting** en el login (`express-rate-limit`).
 - **helmet** y **CORS restringido**.
 - Tokens de activación/reset **hasheados** (SHA-256) con expiración.
