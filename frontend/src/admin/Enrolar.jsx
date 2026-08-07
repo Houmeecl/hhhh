@@ -73,10 +73,10 @@ export default function Enrolar() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Enrolar cliente</h1>
+      <h1 style={{ marginTop: 0 }}>Enrolar empresa</h1>
       <p className="muted" style={{ fontSize: 14, maxWidth: 720, marginTop: 0 }}>
-        Da de alta un cliente de principio a fin: trae sus datos del SII, crea la empresa, entrega el
-        acceso web (con correo para que defina su clave) y déjalo listo para conectar el SII y generar.
+        Ingresa el RUT y el correo de la empresa. Al enrolarla se le envía una invitación por correo
+        para que active su cuenta, complete sus datos y conecte el SII desde su propio panel.
       </p>
 
       <Stepper paso={paso} />
@@ -111,7 +111,7 @@ export default function Enrolar() {
           <h2 style={{ marginTop: 0, fontSize: 16 }}>2. Datos de la empresa</h2>
           <div className="field"><label>RUT</label><input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76000000-0" /></div>
           <div className="field"><label>Nombre de la empresa</label><input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Empresa SpA" /></div>
-          {giro && <div className="field"><label>Giro (referencial)</label><input value={giro} onChange={(e) => setGiro(e.target.value)} /></div>}
+          {giro && <div className="field"><label>Giro o actividad</label><input value={giro} onChange={(e) => setGiro(e.target.value)} /></div>}
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <button className="btn btn-outline" onClick={() => setPaso(0)}>Atrás</button>
             <button className="btn btn-primary" onClick={crearEmpresa} disabled={ocupado}>
@@ -143,30 +143,29 @@ export default function Enrolar() {
 
       {paso === 3 && empresa && (
         <div className="card" style={{ marginBottom: 20 }}>
-          <h2 style={{ marginTop: 0, fontSize: 16 }}>4. Conectar el SII</h2>
-          <div className="badge badge-green" style={{ marginBottom: 12 }}>Cliente enrolado</div>
+          <h2 style={{ marginTop: 0, fontSize: 16 }}>4. Invitación enviada</h2>
+          <div className="badge badge-green" style={{ marginBottom: 12 }}>Empresa enrolada</div>
           <ul className="muted" style={{ fontSize: 14, lineHeight: 1.7, paddingLeft: 18 }}>
-            <li>Empresa <strong>{empresa.nombre_empresa}</strong> <span style={{ fontFamily: 'monospace' }}>{empresa.rut}</span> creada.</li>
+            <li>Empresa <strong>{empresa.nombre_empresa}</strong> <span style={{ fontFamily: 'monospace' }}>{empresa.rut}</span> registrada.</li>
             <li>{acceso
-              ? (acceso.correo_enviado === false ? 'Acceso creado (el correo no salió — comparte el enlace de abajo).' : 'Acceso web creado y correo de ingreso enviado.')
-              : 'Acceso web pendiente (lo omitiste): puedes crearlo luego en Accesos externos.'}</li>
+              ? (acceso.correo_enviado === false ? 'Cuenta creada; el correo no pudo enviarse — comparte el enlace de abajo.' : 'Invitación enviada por correo a la empresa.')
+              : 'Invitación pendiente (la omitiste): puedes enviarla luego desde Accesos externos.'}</li>
           </ul>
           {acceso?.dev_activation_link && (
             <p className="muted" style={{ fontSize: 12, wordBreak: 'break-all' }}>
-              Enlace de activación: <code>{acceso.dev_activation_link}</code>
+              Enlace de invitación: <code>{acceso.dev_activation_link}</code>
             </p>
           )}
           <p style={{ fontSize: 14 }}>
-            Para descargar y calcular su Registro de Compras y Ventas, conéctate al SII con el RUT y la
-            clave de la empresa. El cliente también puede conectarlo desde su propio panel.
+            La empresa recibió un correo para activar su cuenta, completar sus datos y conectar el SII
+            desde su propio panel. No necesitas hacer nada más.
           </p>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => navigate('/admin/sii')}>Conectar SII y generar</button>
-            <button className="btn btn-outline" onClick={() => {
-              // Reiniciar para enrolar otro cliente.
+            <button className="btn btn-primary" onClick={() => {
               setPaso(0); setRut(''); setNombre(''); setGiro(''); setEmail('');
               setEmpresa(null); setSii(null); setAcceso(null);
-            }}>Enrolar otro cliente</button>
+            }}>Enrolar otra empresa</button>
+            <button className="btn btn-outline" onClick={() => navigate('/admin/sii')}>Ir a la contabilidad de carbono</button>
           </div>
         </div>
       )}

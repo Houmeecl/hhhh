@@ -39,7 +39,7 @@ export default function Sii() {
       <p className="muted" style={{ fontSize: 14, maxWidth: 760, marginTop: 0 }}>
         Primero inicia sesión con la API del SII (RUT y clave de la persona que ingresa al SII).
         Después elige una empresa y genera: sicr3p descarga los documentos del período, extrae el
-        detalle y calcula la estimación referencial de emisiones. La clave se usa solo mientras esta
+        detalle y genera la contabilidad de carbono del período. La clave se usa solo mientras esta
         pantalla está abierta y no se guarda.
       </p>
 

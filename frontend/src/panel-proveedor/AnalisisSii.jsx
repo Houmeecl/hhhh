@@ -89,8 +89,7 @@ export default function AnalisisSii() {
       <h1 style={{ marginTop: 0 }}>Compras y ventas (SII)</h1>
       <p className="muted" style={{ fontSize: 14, maxWidth: 720 }}>
         Descarga tu Registro de Compras y Ventas del SII y sicr3p lo analiza: resumen del período,
-        con quién compras y vendes, y una estimación referencial de emisiones a partir del detalle
-        de tus compras.
+        con quién compras y vendes, y tu contabilidad de carbono a partir del detalle de tus compras.
       </p>
 
       <div className="card" style={{ marginBottom: 20 }}>

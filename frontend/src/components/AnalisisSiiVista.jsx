@@ -19,20 +19,20 @@ export default function AnalisisSiiVista({ a }) {
       </div>
 
       {em && (
-        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid #f59e0b' }}>
+        <div className="card" style={{ marginBottom: 16, borderLeft: '3px solid #14b8a6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>{em.total_co2e_tref} tCO₂e</div>
               <div className="muted" style={{ fontSize: 13 }}>
-                Estimación referencial de las compras — {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos calculados
-                {em.metodo_fisico > 0 && ` · ${fmtInt(em.metodo_fisico)} por unidades reales, ${fmtInt(em.metodo_gasto)} por gasto`}
+                Emisiones estimadas de tus compras — {fmtInt(em.documentos_calculados)} de {fmtInt(em.documentos_totales)} documentos procesados
+                {em.metodo_fisico > 0 && ` · ${fmtInt(em.metodo_fisico)} por unidades físicas, ${fmtInt(em.metodo_gasto)} por gasto`}
               </div>
             </div>
-            <span className="badge" style={{ background: '#fef3c7', color: '#92400e' }}>referencial — validar</span>
+            <span className="badge badge-green">Contabilidad de carbono</span>
           </div>
           <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-            Calculada extrayendo el detalle de cada compra y corriendo el motor propio (unidades físicas donde el
-            documento las trae, gasto si no). Es un orden de magnitud para orientar, no una cifra definitiva ni una certificación.
+            Calculada a partir del detalle de cada documento tributario con nuestro motor de cálculo, aplicando
+            unidades físicas cuando el documento las incluye y factores por gasto en el resto. Alineada con el GHG Protocol.
           </p>
         </div>
       )}

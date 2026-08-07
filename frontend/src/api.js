@@ -503,6 +503,9 @@ export const api = {
   // el admin desde Origen.jsx, nunca declara su propia identidad.
   proveedorLotes: () => request('/panel-proveedor/lotes', { authedProveedor: true }),
   proveedorFirmar: (asignacionId, body) => request(`/panel-proveedor/lotes/${asignacionId}/firmar`, { method: 'POST', body, authedProveedor: true }),
+  // Datos de la empresa que ella misma completa en su onboarding.
+  proveedorPerfil: () => request('/panel-proveedor/perfil', { authedProveedor: true }),
+  proveedorGuardarPerfil: (body) => request('/panel-proveedor/perfil', { method: 'PUT', body, authedProveedor: true }),
   // Compras y ventas del SII (RCV). La clave se manda solo para descargar
   // y el backend la reenvía por request a BaseAPI; nunca se guarda.
   proveedorSiiEstado: () => request('/panel-proveedor/sii/estado', { authedProveedor: true }),

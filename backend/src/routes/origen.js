@@ -1421,6 +1421,54 @@ proveedorPanelRouter.post('/lotes/:asignacionId/firmar', requireNivelOperador, a
   } catch (err) { next(err); }
 });
 
+// GET /api/panel-proveedor/perfil — datos de la empresa que ella misma
+// mantiene, y si ya completó su onboarding. Reúne todo lo del formulario.
+proveedorPanelRouter.get('/perfil', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre_empresa, rut, giro, direccion, telefono, representante,
+              cargo, contacto_email, onboarding_completado_at
+         FROM proveedores WHERE id = $1`,
+      [req.user.proveedor_id]
+    );
+    const p = rows[0];
+    if (!p) return res.status(403).json({ error: 'Cuenta de proveedor no encontrada.' });
+    res.json({ perfil: p, onboarding_completado: p.onboarding_completado_at != null });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/panel-proveedor/perfil — la empresa guarda/actualiza sus datos.
+// El RUT no se toca desde acá (identidad de la cuenta). Marca el onboarding
+// como completado la primera vez.
+proveedorPanelRouter.put('/perfil', requireNivelOperador, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const nombre = String(b.nombre_empresa || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'La razón social es obligatoria.' });
+    const email = b.contacto_email ? String(b.contacto_email).trim() : null;
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      return res.status(400).json({ error: 'El correo de contacto no es correcto.' });
+    }
+    const txt = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
+    const { rows } = await query(
+      `UPDATE proveedores
+          SET nombre_empresa = $2, giro = $3, direccion = $4, telefono = $5,
+              representante = $6, cargo = $7, contacto_email = $8,
+              onboarding_completado_at = COALESCE(onboarding_completado_at, now())
+        WHERE id = $1
+        RETURNING id, nombre_empresa, rut, giro, direccion, telefono, representante,
+                  cargo, contacto_email, onboarding_completado_at`,
+      [req.user.proveedor_id, nombre, txt(b.giro), txt(b.direccion), txt(b.telefono),
+       txt(b.representante), txt(b.cargo), email]
+    );
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'proveedor_perfil', entidad: 'proveedor',
+      entidadId: req.user.proveedor_id, detalle: { onboarding: true }, ip: req.ip,
+    });
+    res.json({ perfil: rows[0], onboarding_completado: true });
+  } catch (err) { next(err); }
+});
+
 // ============================================================
 // Compras y ventas del SII (RCV) del propio proveedor.
 //

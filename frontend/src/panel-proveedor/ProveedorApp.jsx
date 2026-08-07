@@ -5,6 +5,7 @@ import { api, authProveedor } from '../api.js';
 import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import LotesPorFirmar from './LotesPorFirmar.jsx';
 import AnalisisSii from './AnalisisSii.jsx';
+import MisDatos from './MisDatos.jsx';
 
 // Shell mínimo, sin sidebar de navegación: el proveedor solo conecta su
 // llave USB y firma los lotes que le asignaron — una sola pantalla, no
@@ -13,7 +14,8 @@ export default function ProveedorApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [vista, setVista] = useState('lotes'); // 'lotes' | 'sii'
+  const [vista, setVista] = useState('lotes'); // 'lotes' | 'sii' | 'datos'
+  const [onboarding, setOnboarding] = useState(null); // null=sin saber, true=falta completar
 
   useEffect(() => { document.title = 'sicr3p — Panel de Proveedor'; }, []);
 
@@ -28,6 +30,12 @@ export default function ProveedorApp() {
         // de mostrar datos ajenos.
         if (d.user.panel !== 'proveedor') { authProveedor.clear(); nav('/panel-proveedor/login'); return; }
         setUser(d.user); setChecking(false);
+        // Si aún no completó sus datos, se muestra el onboarding primero.
+        if (!d.user.must_reset_password) {
+          api.proveedorPerfil()
+            .then((p) => setOnboarding(!p.onboarding_completado))
+            .catch(() => setOnboarding(false));
+        }
       })
       .catch((e) => {
         if (!vigente) return;
@@ -72,25 +80,35 @@ export default function ProveedorApp() {
         </div>
       </div>
 
-      <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4 }}>
-          {[['lotes', 'Lotes por firmar'], ['sii', 'Compras y ventas (SII)']].map(([k, label]) => (
-            <button key={k} onClick={() => setVista(k)}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',
-                fontSize: 14, fontWeight: 600,
-                color: vista === k ? 'var(--navy)' : '#64748b',
-                borderBottom: vista === k ? '3px solid #14b8a6' : '3px solid transparent',
-              }}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {onboarding ? (
+        <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
+          <MisDatos onboarding onListo={() => { setOnboarding(false); setVista('sii'); }} />
+        </main>
+      ) : (
+        <>
+          <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
+            <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {[['lotes', 'Lotes por firmar'], ['sii', 'Compras y ventas (SII)'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
+                <button key={k} onClick={() => setVista(k)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',
+                    fontSize: 14, fontWeight: 600,
+                    color: vista === k ? 'var(--navy)' : '#64748b',
+                    borderBottom: vista === k ? '3px solid #14b8a6' : '3px solid transparent',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-        {vista === 'lotes' ? <LotesPorFirmar /> : <AnalisisSii />}
-      </main>
+          <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
+            {vista === 'lotes' && <LotesPorFirmar />}
+            {vista === 'sii' && <AnalisisSii />}
+            {vista === 'datos' && <MisDatos />}
+          </main>
+        </>
+      )}
     </div>
   );
 }
