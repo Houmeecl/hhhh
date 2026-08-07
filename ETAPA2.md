@@ -6,7 +6,7 @@ servicios externos pasa a **ETAPA3.md**.
 
 | # | Funcionalidad | Estado |
 |---|---------------|--------|
-| 1 | Conexión SII / RCV | ⏭ Etapa 3 (requiere credenciales/scraping SII). |
+| 1 | Conexión SII / RCV | ✅ **Implementado** — la empresa conecta su RUT/clave tributaria desde su propio panel (`panel-proveedor/AnalisisSii.jsx`) vía proveedor intercambiable BaseAPI/SimpleAPI (`services/siiProveedor.js`); la clave solo se persiste **cifrada (AES-256-GCM)** y solo si la empresa opta por guardarla (con opción de borrarla), nunca en texto plano ni en logs. Detalle en ETAPA3.md → "Conexión SII / RCV". |
 | 2 | Informes mensuales acumulativos | ✅ **Implementado** — panel admin → Trazabilidad → "Informe mensual" (`GET /api/admin/informes/mensual[.pdf]`). |
 | 3 | Trazabilidad en cadena comprador–vendedor | ✅ **Implementado** — panel admin → Trazabilidad → "Cadena de valor" (aguas arriba/abajo por `rut_emisor`/`rut_receptor`). |
 | 4 | Valorización de inventario con carbono (FIFO/PMP) | ✅ **Implementado** — panel admin → Trazabilidad → "Valorización". Entradas automáticas desde DTE XML (precio real por ítem, CO2e repartido por monto); FIFO y PMP en CLP + CO2e. |

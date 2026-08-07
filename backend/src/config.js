@@ -83,9 +83,11 @@ export const config = {
   },
 
   // Descarga del RCV/DTE del contribuyente (clave por request). El proveedor
-  // es intercambiable sin tocar rutas ni el cálculo: 'baseapi' (por defecto)
-  // o 'simpleapi' (mismo contrato rut+clave → JSON). SimpleAPI usa su propia
-  // API Key en la cabecera Authorization; sin key queda apagado.
+  // es intercambiable sin tocar rutas ni el cálculo: 'baseapi' (por defecto,
+  // trae el XML del DTE recibido → habilita método físico en compras),
+  // 'simpleapi' o 'apigateway' (mismo contrato rut+clave → JSON, pero sin
+  // detalle de ítems: sus compras se calculan por gasto). Cada uno usa su
+  // propia API Key; sin key ese adaptador queda apagado.
   sii: {
     proveedor: (process.env.SII_PROVEEDOR || 'baseapi').toLowerCase(),
     simpleapi: {
@@ -93,6 +95,12 @@ export const config = {
       key: process.env.SIMPLEAPI_KEY || '',
       base: process.env.SIMPLEAPI_BASE || 'https://servicios.simpleapi.cl/api',
       timeoutMs: parseInt(process.env.SIMPLEAPI_TIMEOUT_MS || '20000', 10),
+    },
+    apigateway: {
+      enabled: Boolean(process.env.APIGATEWAY_API_KEY),
+      key: process.env.APIGATEWAY_API_KEY || '',
+      base: process.env.APIGATEWAY_BASE || 'https://app.apigateway.cl/api/v2',
+      timeoutMs: parseInt(process.env.APIGATEWAY_TIMEOUT_MS || '20000', 10),
     },
   },
 

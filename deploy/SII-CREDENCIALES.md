@@ -75,5 +75,11 @@ Si la empresa consultada es distinta de la persona que se autentica, agregar
 
 Por defecto sicr3p usa **BaseAPI** (`api.baseapi.cl`). El proveedor es
 intercambiable con la variable de entorno `SII_PROVEEDOR` (`baseapi` por
-defecto; `simpleapi` como alternativa de mismo contrato rut+clave → JSON).
-Cambiar de proveedor no altera el flujo del panel ni el cálculo.
+defecto; `simpleapi` o `apigateway` como alternativas de mismo contrato
+rut+clave → JSON). Cambiar de proveedor no altera el flujo del panel ni
+el cálculo — salvo un matiz: **BaseAPI trae el XML del DTE recibido** y
+habilita el método físico de cálculo en compras; **SimpleAPI y
+apigateway.cl no exponen ese detalle** (su RCV no entrega el listado de
+ítems de cada documento), así que con esos dos las compras se calculan
+por gasto. Cada proveedor usa su propia API Key (`BASEAPI_API_KEY`,
+`SIMPLEAPI_KEY`, `APIGATEWAY_API_KEY`), documentadas en `.env.example`.

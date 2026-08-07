@@ -12,9 +12,12 @@
 import { config } from '../config.js';
 import * as baseapi from './baseapiSii.js';
 import * as simpleapi from './siiSimpleapi.js';
+import * as apigateway from './siiApigateway.js';
+
+const ADAPTADORES = { simpleapi, apigateway };
 
 function adaptador(nombre = config.sii?.proveedor) {
-  return String(nombre).toLowerCase() === 'simpleapi' ? simpleapi : baseapi;
+  return ADAPTADORES[String(nombre).toLowerCase()] || baseapi;
 }
 
 export function validarCredencialesSii(cred, opts = {}) {
