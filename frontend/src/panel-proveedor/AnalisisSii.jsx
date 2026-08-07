@@ -95,7 +95,16 @@ export default function AnalisisSii() {
   // Los demás motivos (clasificado por el nombre del proveedor, sin
   // coincidencia en el motor, nota de crédito) NO cuentan acá: volver a
   // bajarlos da el mismo resultado y el botón sería una promesa falsa.
-  const sinClasificar = analisis?.emisiones?.por_alcance?.sin_clasificar?.descarga_antigua || 0;
+  //
+  // Y aun con documentos así, el botón exige que el proveedor de datos del SII
+  // activo PUEDA traer el detalle. Con simpleapi o apigateway no puede: volver
+  // a bajar mueve esos documentos de "descargados antes" a "clasificados por
+  // el nombre del proveedor", el contador baja a cero, el alcance sigue sin
+  // existir, y el usuario queda creyendo que lo arregló.
+  const puedeReintentar = analisis?.proveedor_sii?.puede_traer_detalle === true;
+  const sinClasificar = puedeReintentar
+    ? (analisis?.emisiones?.por_alcance?.sin_clasificar?.descarga_antigua || 0)
+    : 0;
 
   if (error) return <div className="badge badge-red" role="alert" style={{ display: 'block', padding: 12 }}>{error}</div>;
   if (!estado) return <div style={{ padding: 40 }}><span className="spinner dark" /> Cargando…</div>;

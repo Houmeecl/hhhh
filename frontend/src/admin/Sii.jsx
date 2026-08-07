@@ -225,7 +225,9 @@ function GenerarEmpresa({ empresa, sesion, onSesion, flash, onDescargado }) {
               Descargar informe (PDF)
             </button>
           </div>
-          <AnalisisSiiVista a={analisis} />
+          {/* El admin mira la empresa de OTRO: el texto no le habla en
+              imperativo ("vuelve a descargar") como al dueño del período. */}
+          <AnalisisSiiVista a={analisis} esPropio={false} />
         </div>
       )}
 

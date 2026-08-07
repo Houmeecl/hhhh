@@ -1,6 +1,7 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { descargarYCalcular, analizarPeriodo } from '../src/services/analisisSiiProveedor.js';
+import { proveedorSiiActivo } from '../src/services/siiProveedor.js';
 import { query, pool, withTx } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
@@ -353,3 +354,24 @@ test('analizarPeriodo cita la versión ESTAMPADA al calcular, no la vigente al l
   });
 
 after(async () => { await pool.end(); });
+
+// ============================================================
+// Capacidad del adaptador SII activo. La interfaz la usa para NO ofrecer
+// "Clasificar N documentos" (que vuelve a descargar el período) en un
+// despliegue donde volver a descargar no puede clasificar nada: simpleapi y
+// apigateway fabrican UN ítem sintético cuya glosa es la razón social de la
+// contraparte, así que el contador bajaba a cero, el alcance seguía sin
+// existir, y el usuario quedaba creyendo que lo había arreglado.
+// ============================================================
+test('proveedorSiiActivo: solo baseapi declara que puede traer el detalle', () => {
+  assert.equal(proveedorSiiActivo({ proveedor: 'baseapi' }).puede_traer_detalle, true);
+  assert.equal(proveedorSiiActivo({ proveedor: 'simpleapi' }).puede_traer_detalle, false);
+  assert.equal(proveedorSiiActivo({ proveedor: 'apigateway' }).puede_traer_detalle, false);
+});
+
+test('proveedorSiiActivo: un nombre desconocido cae a baseapi, igual que el despacho', () => {
+  // Mismo comportamiento que `adaptador()`: si SII_PROVEEDOR trae basura, se
+  // usa baseapi. El nombre reportado tiene que decir lo que de verdad corre,
+  // no repetir la basura.
+  assert.deepEqual(proveedorSiiActivo({ proveedor: 'inventado' }), { nombre: 'baseapi', puede_traer_detalle: true });
+});

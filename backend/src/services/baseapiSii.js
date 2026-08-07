@@ -247,6 +247,13 @@ export function normalizarDteRecibido(doc) {
   };
 }
 
+// Este adaptador PUEDE traer la glosa real de los ítems (descargarDteRecibidos
+// baja el XML del DTE). "Puede", no "siempre": si el emisor no publicó el XML
+// o el documento no lo tiene, ese documento igual sale sin detalle. Lo que
+// habilita esta bandera es OFRECER "volver a descargar para clasificar" — ver
+// siiProveedor.js — porque acá el reintento sí puede cambiar el resultado.
+export const PUEDE_TRAER_DETALLE = true;
+
 // Descarga los DTE recibidos (compras) CON su XML, para extraer el detalle.
 // Este endpoint EXIGE rut_empresa; si no se indica, se consulta la propia
 // empresa autenticada (rut_empresa = rut).

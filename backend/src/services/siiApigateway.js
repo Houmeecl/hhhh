@@ -22,6 +22,11 @@ import {
 } from './baseapiSii.js';
 import { config } from '../config.js';
 
+// Su propio spec lo dice: "En ningún caso este recurso entregará el listado
+// de items". Ningún documento de este adaptador puede traer la glosa real de
+// sus ítems — ver siiProveedor.js.
+export const PUEDE_TRAER_DETALLE = false;
+
 // 'YYYY-MM' -> 'YYYYMM': el formato de período que exige apigateway.cl en la URL.
 const periodoUrl = (periodo) => periodo.replace('-', '');
 

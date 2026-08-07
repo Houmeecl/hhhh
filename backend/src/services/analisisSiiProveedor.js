@@ -18,7 +18,7 @@
 //     definitiva ni una "certificación".
 // ============================================================
 import { versionVigente } from './motorVersiones.js';
-import { descargarComprasVentas } from './siiProveedor.js';
+import { descargarComprasVentas, proveedorSiiActivo } from './siiProveedor.js';
 import { cargarCategorias, calcularFactura } from './motorPropio.js';
 import { agregarPorAlcance } from './alcanceGhg.js';
 
@@ -235,6 +235,10 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
 
   return {
     periodo,
+    // Capacidad del adaptador SII activo. La interfaz la necesita para no
+    // ofrecer "volver a descargar para clasificar" en un despliegue donde
+    // volver a descargar no puede clasificar nada (ver siiProveedor.js).
+    proveedor_sii: proveedorSiiActivo(),
     resumen: { compra: totales(compras), venta: totales(ventas) },
     por_tipo: { compra: porTipo(compras), venta: porTipo(ventas) },
     concentracion: {

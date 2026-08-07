@@ -7,7 +7,10 @@ import { formatearRut } from '../lib/rut.js';
 // (panel-proveedor/AnalisisSii.jsx) y la sección admin "SII" (admin/Sii.jsx).
 const CLP = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`;
 
-export default function AnalisisSiiVista({ a }) {
+// `esPropio`: quién está mirando. El panel de la empresa ve su propio período
+// (tuteo, imperativo); el admin mira la empresa de otro desde /admin → SII,
+// donde decirle "vuelve a descargar" no corresponde.
+export default function AnalisisSiiVista({ a, esPropio = true }) {
   const c = a.resumen.compra, v = a.resumen.venta;
   const em = a.emisiones;
   return (
@@ -48,7 +51,12 @@ export default function AnalisisSiiVista({ a }) {
         </div>
       )}
 
-      <PorAlcanceTabla porAlcance={em?.por_alcance} total={em?.total_co2e_tref} />
+      <PorAlcanceTabla
+        porAlcance={em?.por_alcance}
+        total={em?.total_co2e_tref}
+        puedeReintentar={a.proveedor_sii?.puede_traer_detalle === true}
+        esPropio={esPropio}
+      />
 
       <div className={a.por_tipo?.compra?.length && a.por_tipo?.venta?.length ? 'two-col-grid' : undefined}>
         <PorTipoTabla titulo="Compras por tipo de documento" filas={a.por_tipo?.compra} />
@@ -127,15 +135,29 @@ const DESC_ALCANCE = {
 
 // Motivo → qué le pasó al documento y qué puede hacer quien lo lee. El orden
 // es el de utilidad para la empresa: primero lo que ella misma puede resolver.
-const MOTIVOS_SIN_ALCANCE = [
-  ['inferido_por_nombre', 'se clasificaron por el nombre del proveedor, no por el detalle del documento — el RCV no trae ese detalle, así que no se les atribuye alcance'],
-  ['descarga_antigua', 'se descargaron antes de esta clasificación — vuelve a descargar el período para clasificarlos'],
-  ['sin_coincidencia', 'no coinciden con ninguna categoría del motor'],
-  ['motor_sin_categoria', 'el motor no les dejó categoría (por ejemplo, notas de crédito)'],
-  ['alcance_no_legible', 'su categoría no resuelve a un alcance GHG (texto no legible, o categoría fuera del catálogo actual) — avísanos para corregirlo'],
-];
+//
+// `descarga_antigua` es el único motivo con una salida accionable, y solo si
+// el proveedor de datos del SII activo PUEDE traer el detalle: si no puede,
+// volver a descargar da el mismo resultado y el imperativo sería mentira.
+// Esta vista además la usa el admin mirando la empresa de OTRO, donde
+// "vuelve a descargar" tampoco corresponde — por eso el texto se elige.
+function motivosSinAlcance({ puedeReintentar, esPropio }) {
+  const antigua = !puedeReintentar
+    ? 'se descargaron antes de esta clasificación — el registro del SII de este servicio no trae el detalle de los ítems, así que volver a descargarlos no los clasifica'
+    : esPropio
+      ? 'se descargaron antes de esta clasificación — vuelve a descargar el período para clasificarlos'
+      : 'se descargaron antes de esta clasificación — se clasifican volviendo a descargar el período';
+  return [
+    ['inferido_por_nombre', 'se clasificaron por el nombre del proveedor, no por el detalle del documento — el RCV no trae ese detalle, así que no se les atribuye alcance'],
+    ['descarga_antigua', antigua],
+    ['sin_coincidencia', 'no coinciden con ninguna categoría del motor'],
+    ['motor_sin_categoria', 'el motor no les dejó categoría (por ejemplo, notas de crédito)'],
+    ['alcance_no_legible', 'su categoría no resuelve a un alcance GHG (texto no legible, o categoría fuera del catálogo actual) — avísanos para corregirlo'],
+  ];
+}
 
-function PorAlcanceTabla({ porAlcance, total }) {
+function PorAlcanceTabla({ porAlcance, total, puedeReintentar, esPropio }) {
+  const MOTIVOS_SIN_ALCANCE = motivosSinAlcance({ puedeReintentar, esPropio });
   if (!porAlcance) return null; // backend anterior a esta versión
   const { alcances = [], sin_clasificar: sin } = porAlcance;
   if (!alcances.length && !sin?.n_documentos) return null;
@@ -181,12 +203,19 @@ function PorAlcanceTabla({ porAlcance, total }) {
       </div>
       {/* Solo cuando la causa dominante es realmente la falta de detalle. Si
           todo quedó fuera por notas de crédito o por un alcance ilegible en el
-          catálogo, esta explicación sería falsa y la salida que sugiere, inútil. */}
+          catálogo, esta explicación sería falsa y la salida que sugiere, inútil.
+          El texto NO ofrece "subir los documentos con su detalle": esa carga no
+          existe en este panel, y aunque existiera iría a otra tabla que no
+          alimenta esta pantalla. */}
       {alcances.length === 0 && sin?.inferido_por_nombre > 0 && (
         <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
-          Ningún documento de este período trae el detalle de sus ítems, así que no hay alcances que atribuir.
-          El registro del SII entrega el monto de cada documento, no lo que se compró. Para tener alcances 1/2/3
-          con respaldo, sube los documentos con su detalle.
+          Ningún documento de este período trae el detalle de sus ítems, así que no hay alcances que atribuir:
+          el registro del SII entrega el monto de cada documento, no lo que se compró. El CO₂e del período sigue
+          siendo válido —se calcula por gasto— pero no se puede repartir en alcances 1/2/3 sin inventar de dónde
+          viene cada peso.
+          {puedeReintentar
+            ? ' Los documentos cuyo emisor publique el XML en el SII sí se clasifican solos en la próxima descarga.'
+            : ' El servicio de datos del SII configurado en este despliegue no entrega ese detalle para ningún documento.'}
         </p>
       )}
       <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>

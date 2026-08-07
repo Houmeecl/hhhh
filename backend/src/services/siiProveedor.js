@@ -27,3 +27,23 @@ export function validarCredencialesSii(cred, opts = {}) {
 export function descargarComprasVentas(args, opts = {}) {
   return adaptador(opts.proveedor).descargarComprasVentas(args, opts);
 }
+
+// Qué proveedor está activo y si PUEDE traer la glosa real de los ítems.
+//
+// Existe para que la interfaz no ofrezca lo que este despliegue no puede
+// cumplir. El botón "Clasificar N documentos" vuelve a descargar el período
+// con la idea de que esta vez llegue el detalle; con simpleapi o apigateway
+// eso no puede pasar nunca —fabrican UN ítem sintético cuya glosa es la razón
+// social de la contraparte— así que el contador bajaba a cero, el alcance GHG
+// seguía sin existir, y el usuario quedaba creyendo que lo había arreglado.
+//
+// `puede`, no `trae`: con baseapi el reintento PUEDE cambiar el resultado
+// (depende de si el emisor publicó el XML), que es justo lo que hace honesto
+// ofrecer el botón.
+export function proveedorSiiActivo(opts = {}) {
+  const nombre = String(opts.proveedor || config.sii?.proveedor || 'baseapi').toLowerCase();
+  return {
+    nombre: ADAPTADORES[nombre] ? nombre : 'baseapi',
+    puede_traer_detalle: adaptador(opts.proveedor).PUEDE_TRAER_DETALLE === true,
+  };
+}

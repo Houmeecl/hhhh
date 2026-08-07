@@ -26,6 +26,12 @@ import {
   normalizarFilaRcv, normalizarResumenRcv,
 } from './baseapiSii.js';
 
+// SimpleRCV no expone el XML del DTE: ningún documento de este adaptador
+// puede traer la glosa real de sus ítems. Ver siiProveedor.js — de acá
+// depende que la interfaz no ofrezca "volver a descargar para clasificar",
+// que con este proveedor no clasifica nada.
+export const PUEDE_TRAER_DETALLE = false;
+
 // Llamada base a SimpleAPI. `password` (PasswordSII) NO se registra jamás.
 async function llamar(path, { rut, password, rutEmpresa, periodo }, { fetcher = fetch, cfg = config.sii.simpleapi } = {}) {
   if (!cfg.enabled || !cfg.key) throw errFuente('SimpleAPI no está configurada (SIMPLEAPI_KEY)');
