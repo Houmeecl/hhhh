@@ -1543,24 +1543,36 @@ proveedorPanelRouter.post('/sii/descargar', requireNivelOperador, async (req, re
         periodo: b.periodo,
       });
     } catch (e) {
-      const status = e.credenciales || /inválid|Período|clave|RUT/i.test(e.message) ? 400 : 502;
-      return res.status(status).json({ error: e.message });
+      // Solo los errores MARCADOS por baseapiSii se mapean acá; cualquier
+      // otro (BD, motor) se relanza al manejador global → 500 sin filtrar
+      // el mensaje interno.
+      if (e.credenciales || e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
     }
 
-    // Guardar la clave (cifrada) si vino en el body y el proveedor no pidió lo contrario.
+    // Guardar la clave (cifrada) si vino en el body y el proveedor no pidió
+    // lo contrario. Si este guardado falla, la descarga YA fue exitosa: se
+    // responde igual el análisis y solo se avisa que la clave no quedó.
+    let credencialesGuardadas = false;
     if (guardarAhora && cifradoDisponible()) {
-      await query(
-        `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
-         VALUES ($1,$2,$3, now())
-         ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
-        [proveedor.id, normalizarRutLocal(rutSii), cifrar(password)]
-      );
+      try {
+        await query(
+          `INSERT INTO credenciales_sii_proveedor (proveedor_id, rut_sii, clave_cifrada, actualizada_at)
+           VALUES ($1,$2,$3, now())
+           ON CONFLICT (proveedor_id) DO UPDATE SET rut_sii = EXCLUDED.rut_sii, clave_cifrada = EXCLUDED.clave_cifrada, actualizada_at = now()`,
+          [proveedor.id, normalizarRutLocal(rutSii), cifrar(password)]
+        );
+        credencialesGuardadas = true;
+      } catch (e) {
+        console.error('[sii] descarga OK pero no se pudo guardar la credencial cifrada:', e.message);
+      }
     }
 
     // El detalle (accion + período), NUNCA la clave.
     await logActividad({
       usuarioId: req.user.sub, accion: 'proveedor_descarga_sii', entidad: 'dte_proveedor',
-      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: resultado.documentos, credenciales_guardadas: guardarAhora }, ip: req.ip,
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: resultado.documentos, credenciales_guardadas: credencialesGuardadas }, ip: req.ip,
     });
 
     res.json({ periodo: b.periodo, documentos: resultado.documentos, analisis: resultado.analisis });

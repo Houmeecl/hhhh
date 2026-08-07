@@ -27,14 +27,23 @@ import { rutValido, parseDte } from './dte.js';
 // 'YYYY-MM' — el mismo formato que exige BaseAPI para el período.
 export const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+// Los errores de este módulo llevan banderas para que las rutas mapeen el
+// status SIN inspeccionar mensajes (y sin arriesgarse a clasificar como
+// 400/502 un error interno de BD que venga de más adentro):
+//   entrada:true      → culpa del input (RUT/período/clave faltante) → 400
+//   credenciales:true → la clave SII no autentica → 400
+//   fuente:true       → BaseAPI/SII caído o mal configurado → 502
+const errEntrada = (msg) => Object.assign(new Error(msg), { entrada: true });
+const errFuente = (msg, status) => Object.assign(new Error(msg), { fuente: true, status });
+
 // Un RUT normalizado (solo dígitos + DV) al formato con guión que espera
 // la API: '760000000' -> '76000000-0'. Lanza si el DV no cuadra: no
 // gastamos una llamada pagada en un RUT que el SII no puede tener.
 function rutConGuion(rutCrudo) {
   const norm = normalizarRut(rutCrudo);
-  if (norm.length < 7 || norm.length > 9) throw new Error('RUT inválido');
+  if (norm.length < 7 || norm.length > 9) throw errEntrada('RUT inválido');
   const con = `${norm.slice(0, -1)}-${norm.slice(-1)}`;
-  if (!rutValido(con)) throw new Error('RUT inválido');
+  if (!rutValido(con)) throw errEntrada('RUT inválido');
   return con;
 }
 
@@ -100,8 +109,8 @@ function filasDe(json) {
 // Llamada base a BaseAPI con credenciales del contribuyente en el cuerpo.
 // `password` NO se registra en ningún lado: ni en console, ni en el throw.
 async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cfg = config.baseapi } = {}) {
-  if (!cfg.enabled || !cfg.key) throw new Error('BaseAPI no está configurada (BASEAPI_API_KEY)');
-  if (!password || typeof password !== 'string') throw new Error('Falta la clave tributaria.');
+  if (!cfg.enabled || !cfg.key) throw errFuente('BaseAPI no está configurada (BASEAPI_API_KEY)');
+  if (!password || typeof password !== 'string') throw errEntrada('Falta la clave tributaria.');
 
   const body = { rut: rutConGuion(rut), password };
   // rut_empresa solo si el proveedor consulta como representante de una
@@ -121,7 +130,7 @@ async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cf
     });
   } catch {
     // Nunca propagamos el error crudo: podría llevar el cuerpo (con la clave).
-    throw new Error('No se pudo contactar al SII en este momento. Intenta más tarde.');
+    throw errFuente('No se pudo contactar al SII en este momento. Intenta más tarde.');
   }
 
   if (!res.ok) {
@@ -134,12 +143,12 @@ async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cf
     if (res.status === 400) {
       // En RCV/DTE un 400 es período/empresa inválidos. Mensaje accionable,
       // sin cuerpo crudo de la respuesta remota.
-      throw Object.assign(new Error('El SII rechazó la consulta: revisa el período (AAAA-MM) y que el RUT de la empresa exista en el SII.'), { status: 400 });
+      throw Object.assign(errEntrada('El SII rechazó la consulta: revisa el período (AAAA-MM) y que el RUT de la empresa exista en el SII.'), { status: 400 });
     }
-    throw Object.assign(new Error(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`), { status: res.status });
+    throw errFuente(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`, res.status);
   }
   const json = await res.json().catch(() => null);
-  if (!json || json.success === false) throw new Error('El SII no entregó una respuesta válida.');
+  if (!json || json.success === false) throw errFuente('El SII no entregó una respuesta válida.');
   return json;
 }
 

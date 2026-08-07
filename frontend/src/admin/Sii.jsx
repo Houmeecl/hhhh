@@ -81,7 +81,7 @@ export default function Sii() {
           flash={flash}
         />
       )}
-      {toast && <div className={`toast ${toast.err ? 'toast-err' : ''}`}>{toast.msg}</div>}
+      {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
 }
@@ -177,8 +177,9 @@ function AltaEmpresa({ onClose, onCreada, flash }) {
     if (!validarRut(rut)) { flash('El RUT no es válido.', true); return; }
     setCreando(true);
     try {
-      const { empresa } = await api.adminSiiCrearEmpresa({ nombre_empresa: nombre, rut });
-      onCreada(empresa);
+      const r = await api.adminSiiCrearEmpresa({ nombre_empresa: nombre, rut });
+      if (r.ya_existia) flash('Ese RUT ya estaba registrado — se abre la empresa existente (no se renombró).');
+      onCreada(r.empresa);
     } catch (e) {
       flash(e.message, true);
     } finally {

@@ -13,6 +13,7 @@ import {
 import { generateContrato } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
 import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
+import { rutValido } from '../services/dte.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
 import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
@@ -1524,18 +1525,32 @@ router.post('/sii/empresas', adminOnly, async (req, res, next) => {
   try {
     const nombre = String(req.body?.nombre_empresa || '').trim();
     const rut = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
-    if (!nombre || rut.length < 7) return res.status(400).json({ error: 'Nombre y RUT válido son obligatorios.' });
+    // Módulo 11 también en el servidor: la columna proveedores.rut se
+    // documenta como normalizada y válida (migración 062), y un RUT malo
+    // recién fallaría al descargar.
+    const conGuion = rut.length >= 7 ? `${rut.slice(0, -1)}-${rut.slice(-1)}` : '';
+    if (!nombre || !conGuion || !rutValido(conGuion)) {
+      return res.status(400).json({ error: 'Nombre y RUT válido (módulo 11) son obligatorios.' });
+    }
+    // Si el RUT ya existe NO se renombra en silencio (un typo podría pisar
+    // otra empresa): se devuelve la existente y el frontend lo informa.
     const { rows } = await query(
       `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2)
-       ON CONFLICT (rut) DO UPDATE SET nombre_empresa = EXCLUDED.nombre_empresa
+       ON CONFLICT (rut) DO NOTHING
        RETURNING id, nombre_empresa, rut, activo`,
       [nombre, rut]
     );
-    await logActividad({
-      usuarioId: req.user.sub, accion: 'sii_crear_empresa', entidad: 'proveedor',
-      entidadId: rows[0].id, detalle: { rut }, ip: req.ip,
-    });
-    res.status(201).json({ empresa: rows[0] });
+    if (rows[0]) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'sii_crear_empresa', entidad: 'proveedor',
+        entidadId: rows[0].id, detalle: { rut }, ip: req.ip,
+      });
+      return res.status(201).json({ empresa: rows[0] });
+    }
+    const { rows: existentes } = await query(
+      `SELECT id, nombre_empresa, rut, activo FROM proveedores WHERE rut = $1`, [rut]
+    );
+    res.json({ empresa: existentes[0], ya_existia: true });
   } catch (err) { next(err); }
 });
 
@@ -1563,8 +1578,11 @@ router.post('/sii/:proveedorId/descargar', requireNivelOperador, async (req, res
         periodo: b.periodo,
       });
     } catch (e) {
-      const status = e.credenciales || /inválid|Período|clave|RUT/i.test(e.message) ? 400 : 502;
-      return res.status(status).json({ error: e.message });
+      // Solo errores MARCADOS por baseapiSii; lo interno (BD/motor) se
+      // relanza al manejador global → 500 sin filtrar el mensaje.
+      if (e.credenciales || e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
     }
 
     // Período y nº de documentos: NUNCA la clave.
