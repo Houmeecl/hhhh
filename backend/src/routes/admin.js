@@ -13,6 +13,7 @@ import {
 import { generateContrato } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
 import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
+import { validarCredencialesSii } from '../services/baseapiSii.js';
 import { rutValido } from '../services/dte.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
@@ -1496,6 +1497,35 @@ router.get('/retencion/registro', async (req, res, next) => {
 // solo toma el propio proveedor desde su panel) y genera: descarga los DTE
 // del período, calcula emisiones por documento y devuelve el análisis.
 // ============================================================
+
+// POST /api/admin/sii/sesion — PASO 1 del flujo: iniciar sesión con la API
+// del SII. Valida las credenciales de la PERSONA que ingresa al SII (RUT +
+// clave tributaria) contra /sii/auth/validar ANTES de operar empresas.
+// Por-request: acá no se guarda nada — el frontend retiene las credenciales
+// solo en memoria mientras la pantalla está abierta.
+router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    if (!b.rut || !b.password) return res.status(400).json({ error: 'Ingresa el RUT y la clave tributaria.' });
+    let valida;
+    try {
+      valida = await validarCredencialesSii({ rut: b.rut, password: b.password });
+    } catch (e) {
+      if (e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
+    }
+    if (!valida) {
+      return res.status(401).json({ error: 'El SII rechazó esas credenciales: revisa el RUT (el de la persona que ingresa al SII, no el de la empresa) y la clave tributaria.' });
+    }
+    // Solo el hecho de la validación: NUNCA la clave.
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'sii_sesion_validada', entidad: 'sii',
+      entidadId: null, detalle: { rut: String(b.rut) }, ip: req.ip,
+    });
+    res.json({ ok: true, rut: String(b.rut) });
+  } catch (err) { next(err); }
+});
 
 // GET /api/admin/sii/empresas — proveedores con su estado SII: si tienen
 // credenciales guardadas (solo el hecho, jamás la clave) y qué períodos ya

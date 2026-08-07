@@ -314,6 +314,7 @@ export const api = {
   probarCorreo: (to) => request('/admin/correo/prueba', { method: 'POST', body: { to }, authed: true }),
   // Sección admin "SII": empresas + generar (la clave viaja solo en el body
   // de la descarga; el backend no la guarda desde este camino).
+  adminSiiSesion: (b) => request('/admin/sii/sesion', { method: 'POST', body: b, authed: true }),
   adminSiiEmpresas: () => request('/admin/sii/empresas', { authed: true }),
   adminSiiCrearEmpresa: (b) => request('/admin/sii/empresas', { method: 'POST', body: b, authed: true }),
   adminSiiDescargar: (proveedorId, b) => request(`/admin/sii/${proveedorId}/descargar`, { method: 'POST', body: b, authed: true }),

@@ -3,10 +3,14 @@ import { api, fmtInt } from '../api.js';
 import { validarRut } from '../lib/rut.js';
 import AnalisisSiiVista from '../components/AnalisisSiiVista.jsx';
 
-// Sección admin "SII": las empresas (proveedores) en un solo lugar, con su
-// estado SII, alta rápida y el botón GENERAR — el admin ingresa las
-// credenciales SII de la empresa EN EL MOMENTO (por-request, nunca se
-// guardan desde acá) y sicr3p descarga los DTE del período y calcula todo.
+// Sección admin "SII" en DOS pasos:
+//   1. Iniciar sesión con la API del SII: RUT + clave tributaria de la
+//      PERSONA que ingresa al SII (se validan contra /sii/auth/validar).
+//   2. Con la sesión iniciada, elegir/agregar la empresa y GENERAR — la
+//      descarga usa las mismas credenciales validadas y el RUT de la
+//      empresa sale de la fila de la empresa, nunca del formulario.
+// Las credenciales viven SOLO en memoria mientras la pantalla está
+// abierta: no se guardan ni acá ni en el servidor.
 function periodoAnterior() {
   const d = new Date();
   d.setDate(1);
@@ -15,6 +19,7 @@ function periodoAnterior() {
 }
 
 export default function Sii() {
+  const [sesion, setSesion] = useState(null); // { rut, password } validados (solo memoria)
   const [empresas, setEmpresas] = useState(null);
   const [seleccion, setSeleccion] = useState(null); // empresa elegida
   const [toast, setToast] = useState(null);
@@ -31,10 +36,13 @@ export default function Sii() {
         <button className="btn btn-primary btn-sm" onClick={() => setAltaOpen(true)}>+ Agregar empresa</button>
       </div>
       <p className="muted" style={{ fontSize: 14, maxWidth: 760, marginTop: 0 }}>
-        Elige una empresa, ingresa sus credenciales del SII y genera: sicr3p descarga los documentos del
-        período, extrae el detalle y calcula la estimación referencial de emisiones. La clave se usa solo
-        para esa descarga y no se guarda.
+        Primero inicia sesión con la API del SII (RUT y clave de la persona que ingresa al SII).
+        Después elige una empresa y genera: sicr3p descarga los documentos del período, extrae el
+        detalle y calcula la estimación referencial de emisiones. La clave se usa solo mientras esta
+        pantalla está abierta y no se guarda.
       </p>
+
+      <SesionSii sesion={sesion} onSesion={setSesion} flash={flash} />
 
       {!empresas ? (
         <div style={{ padding: 40 }}><span className="spinner dark" /> Cargando…</div>
@@ -55,6 +63,8 @@ export default function Sii() {
                     <td style={{ fontFamily: 'monospace' }}>{e.ultimo_periodo || '—'}</td>
                     <td>
                       <button className={`btn btn-sm ${seleccion?.id === e.id ? 'btn-primary' : 'btn-outline'}`}
+                        disabled={!sesion && seleccion?.id !== e.id}
+                        title={!sesion ? 'Primero inicia sesión con la API del SII' : undefined}
                         onClick={() => setSeleccion(seleccion?.id === e.id ? null : e)}>
                         {seleccion?.id === e.id ? 'Cerrar' : 'Generar'}
                       </button>
@@ -69,15 +79,22 @@ export default function Sii() {
               </tbody>
             </table>
           </div>
+          {!sesion && (
+            <p className="muted" style={{ fontSize: 13, margin: '10px 4px 0' }}>
+              Para generar, primero inicia sesión con la API del SII (arriba).
+            </p>
+          )}
         </div>
       )}
 
-      {seleccion && <GenerarEmpresa key={seleccion.id} empresa={seleccion} flash={flash} onDescargado={cargar} />}
+      {seleccion && sesion && (
+        <GenerarEmpresa key={seleccion.id} empresa={seleccion} sesion={sesion} flash={flash} onDescargado={cargar} />
+      )}
 
       {altaOpen && (
         <AltaEmpresa
           onClose={() => setAltaOpen(false)}
-          onCreada={(emp) => { setAltaOpen(false); cargar(); setSeleccion(emp); flash('Empresa agregada — puedes generar de inmediato.'); }}
+          onCreada={(emp) => { setAltaOpen(false); cargar(); setSeleccion(emp); flash(sesion ? 'Empresa agregada — puedes generar de inmediato.' : 'Empresa agregada — inicia sesión con la API del SII para generar.'); }}
           flash={flash}
         />
       )}
@@ -86,11 +103,70 @@ export default function Sii() {
   );
 }
 
-// Formulario de generación para la empresa elegida + análisis resultante.
-function GenerarEmpresa({ empresa, flash, onDescargado }) {
-  const [periodo, setPeriodo] = useState(periodoAnterior());
-  const [rut, setRut] = useState(empresa.rut || '');
+// PASO 1 — iniciar sesión con la API del SII (validar credenciales de la
+// persona). Al validar, las credenciales quedan solo en el estado de la
+// página para las descargas siguientes.
+function SesionSii({ sesion, onSesion, flash }) {
+  const [rut, setRut] = useState('');
   const [clave, setClave] = useState('');
+  const [validando, setValidando] = useState(false);
+
+  async function iniciar(e) {
+    e.preventDefault();
+    if (!validarRut(rut)) { flash('El RUT no es válido — es el de la persona que ingresa al SII.', true); return; }
+    if (!clave) { flash('Ingresa la clave tributaria.', true); return; }
+    setValidando(true);
+    try {
+      await api.adminSiiSesion({ rut, password: clave });
+      onSesion({ rut, password: clave });
+      setClave('');
+      flash('Sesión SII iniciada — ahora elige una empresa y genera.');
+    } catch (err) {
+      flash(err.message, true);
+    } finally {
+      setValidando(false);
+    }
+  }
+
+  if (sesion) {
+    return (
+      <div className="card" style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span className="badge badge-green">Paso 1 listo</span>
+        <span>Sesión SII iniciada como <strong style={{ fontFamily: 'monospace' }}>{sesion.rut}</strong></span>
+        <span className="muted" style={{ fontSize: 13 }}>La clave queda solo en esta pantalla; al salir se descarta.</span>
+        <button className="btn btn-outline btn-sm" style={{ marginLeft: 'auto' }} onClick={() => onSesion(null)}>Cerrar sesión SII</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <h2 style={{ marginTop: 0, fontSize: 16 }}>Paso 1 — Iniciar sesión con la API del SII</h2>
+      <form onSubmit={iniciar} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div className="field" style={{ margin: 0 }}>
+          <label>RUT que ingresa al SII (persona)</label>
+          <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="12345678-9" required />
+        </div>
+        <div className="field" style={{ margin: 0 }}>
+          <label>Clave tributaria (no se guarda)</label>
+          <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" placeholder="••••••••" required />
+        </div>
+        <button className="btn btn-primary" type="submit" disabled={validando}>
+          {validando ? <><span className="spinner" /> Validando…</> : 'Iniciar sesión SII'}
+        </button>
+      </form>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
+        🔒 Es el RUT de la persona (o representante) que entra al SII con su clave — no el RUT de la
+        empresa. Se valida contra el SII antes de habilitar las descargas y no se guarda.
+      </p>
+    </div>
+  );
+}
+
+// PASO 2 — generación para la empresa elegida + análisis resultante. Usa
+// las credenciales ya validadas de la sesión (no se vuelven a pedir).
+function GenerarEmpresa({ empresa, sesion, flash, onDescargado }) {
+  const [periodo, setPeriodo] = useState(periodoAnterior());
   const [generando, setGenerando] = useState(false);
   const [analisis, setAnalisis] = useState(null);
   const [periodos, setPeriodos] = useState([]);
@@ -101,12 +177,9 @@ function GenerarEmpresa({ empresa, flash, onDescargado }) {
 
   async function generar(e) {
     e.preventDefault();
-    if (!clave) { flash('Ingresa la clave tributaria de la empresa.', true); return; }
-    if (!validarRut(rut)) { flash('El RUT no es válido — revísalo antes de generar.', true); return; }
     setGenerando(true);
     try {
-      const d = await api.adminSiiDescargar(empresa.id, { rut, password: clave, periodo });
-      setClave(''); // la clave no se retiene
+      const d = await api.adminSiiDescargar(empresa.id, { rut: sesion.rut, password: sesion.password, periodo });
       setAnalisis(d.analisis);
       flash(`Listo: ${fmtInt(d.documentos)} documentos del período ${d.periodo}.`);
       api.adminSiiPeriodos(empresa.id).then((r) => setPeriodos(r.periodos)).catch(() => {});
@@ -128,26 +201,21 @@ function GenerarEmpresa({ empresa, flash, onDescargado }) {
 
   return (
     <div className="card" style={{ marginBottom: 20 }}>
-      <h2 style={{ marginTop: 0, fontSize: 16 }}>{empresa.nombre_empresa} <span className="muted" style={{ fontFamily: 'monospace', fontSize: 13 }}>{empresa.rut}</span></h2>
+      <h2 style={{ marginTop: 0, fontSize: 16 }}>
+        Paso 2 — Generar: {empresa.nombre_empresa} <span className="muted" style={{ fontFamily: 'monospace', fontSize: 13 }}>{empresa.rut}</span>
+      </h2>
       <form onSubmit={generar} style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div className="field" style={{ margin: 0 }}>
           <label>Período</label>
           <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} required />
-        </div>
-        <div className="field" style={{ margin: 0 }}>
-          <label>RUT que ingresa al SII</label>
-          <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76000000-0" required />
-        </div>
-        <div className="field" style={{ margin: 0 }}>
-          <label>Clave tributaria (no se guarda)</label>
-          <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} autoComplete="off" placeholder="••••••••" />
         </div>
         <button className="btn btn-primary" type="submit" disabled={generando}>
           {generando ? <><span className="spinner" /> Generando…</> : 'Generar'}
         </button>
       </form>
       <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-        🔒 La clave se usa una única vez para esta descarga y se descarta — desde acá nunca se guarda.
+        Descarga con la sesión SII de <span style={{ fontFamily: 'monospace' }}>{sesion.rut}</span>; el RUT de la
+        empresa consultada es el registrado ({empresa.rut}).
       </p>
 
       {periodos.length > 0 && (
