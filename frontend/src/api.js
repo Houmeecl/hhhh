@@ -555,4 +555,13 @@ async function descargarAuth(url, store, filename) {
 export const fmt = (n, dec = 4) =>
   (Number(n) || 0).toLocaleString('es-CL', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 export const fmtInt = (n) => (Number(n) || 0).toLocaleString('es-CL');
-export const fmtFecha = (d) => (d ? new Date(d).toLocaleDateString('es-CL') : '—');
+// 'YYYY-MM-DD' (columna DATE, sin hora) se arma directo del string: pasarla
+// por `new Date()` la interpreta como medianoche UTC, y en Chile (UTC-3/-4)
+// toLocaleDateString la muestra un día antes. Con hora/zona (timestamptz)
+// sí conviene pasar por Date, para que se ajuste a la hora local real.
+export const fmtFecha = (d) => {
+  if (!d) return '—';
+  const soloFecha = String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soloFecha) return `${soloFecha[3]}-${soloFecha[2]}-${soloFecha[1]}`;
+  return new Date(d).toLocaleDateString('es-CL');
+};

@@ -1,4 +1,5 @@
 import { fmtInt, fmtFecha } from '../api.js';
+import { formatearRut } from '../lib/rut.js';
 
 // Vista del análisis de compras/ventas del SII de una empresa: resumen,
 // estimación referencial de emisiones, concentración por contraparte y
@@ -37,11 +38,15 @@ export default function AnalisisSiiVista({ a }) {
         </div>
       )}
 
-      <PorTipoTabla titulo="Compras por tipo de documento" filas={a.por_tipo?.compra} />
-      <PorTipoTabla titulo="Ventas por tipo de documento" filas={a.por_tipo?.venta} />
+      <div className={a.por_tipo?.compra?.length && a.por_tipo?.venta?.length ? 'two-col-grid' : undefined}>
+        <PorTipoTabla titulo="Compras por tipo de documento" filas={a.por_tipo?.compra} />
+        <PorTipoTabla titulo="Ventas por tipo de documento" filas={a.por_tipo?.venta} />
+      </div>
 
-      <ContraparteTabla titulo="Principales proveedores (compras)" filas={a.concentracion.compra} />
-      <ContraparteTabla titulo="Principales clientes (ventas)" filas={a.concentracion.venta} />
+      <div className={a.concentracion.compra?.length && a.concentracion.venta?.length ? 'two-col-grid' : undefined}>
+        <ContraparteTabla titulo="Principales proveedores (compras)" filas={a.concentracion.compra} />
+        <ContraparteTabla titulo="Principales clientes (ventas)" filas={a.concentracion.venta} />
+      </div>
 
       <details style={{ marginTop: 8 }}>
         <summary style={{ cursor: 'pointer', fontSize: 14 }}>Ver el detalle de los {fmtInt(a.documentos.length)} documentos</summary>
@@ -56,7 +61,7 @@ export default function AnalisisSiiVista({ a }) {
                     <td style={{ fontFamily: 'monospace' }}>{d.folio}</td>
                     <td>{d.fecha ? fmtFecha(d.fecha) : '—'}</td>
                     <td>
-                      {d.razon_social || d.rut_contraparte || '—'}
+                      {d.razon_social || (d.rut_contraparte ? formatearRut(d.rut_contraparte) : '—')}
                       {d.conciliado && d.monto_coincide && (
                         <span title="Confirmado: también aparece en el RCV que esta empresa descargó de su propio SII" style={{ marginLeft: 6, color: '#16a34a' }}>✓</span>
                       )}
@@ -130,7 +135,7 @@ function ContraparteTabla({ titulo, filas }) {
             {filas.map((f, i) => (
               <tr key={i}>
                 <td>{f.razon_social || '—'}</td>
-                <td style={{ fontFamily: 'monospace' }}>{f.rut || '—'}</td>
+                <td style={{ fontFamily: 'monospace' }}>{f.rut ? formatearRut(f.rut) : '—'}</td>
                 <td style={{ textAlign: 'right' }}>{fmtInt(f.n)}</td>
                 <td style={{ textAlign: 'right' }}>{CLP(f.total)}</td>
                 <td style={{ textAlign: 'right' }}>{f.participacion}%</td>

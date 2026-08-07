@@ -134,9 +134,20 @@ function componentesDe(declaracion) {
   return [];
 }
 
-function fechaCorta(d) {
+// 'YYYY-MM-DD' (columna DATE, sin hora) se arma directo del string: pasarla
+// por `new Date()` la interpreta como medianoche UTC y los getters locales
+// (getDate/getMonth/getFullYear) dependen del TZ del proceso — en Chile
+// mostraría un día antes. Con hora/zona sí conviene pasar por Date.
+function fechaLocal(d) {
+  const soloFecha = d && String(d).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soloFecha) return { dia: Number(soloFecha[3]), mes: Number(soloFecha[2]) - 1, anio: Number(soloFecha[1]) };
   const dt = d ? new Date(d) : new Date();
-  return `${String(dt.getDate()).padStart(2, '0')}-${MESES[dt.getMonth()]}-${dt.getFullYear()}`;
+  return { dia: dt.getDate(), mes: dt.getMonth(), anio: dt.getFullYear() };
+}
+
+function fechaCorta(d) {
+  const { dia, mes, anio } = fechaLocal(d);
+  return `${String(dia).padStart(2, '0')}-${MESES[mes]}-${anio}`;
 }
 
 // Dibuja el logotipo "sicr3p" con el punto verde sobre la i.
@@ -160,7 +171,7 @@ function bufferDoc(doc) {
 
 // Folio del libro mayor: C-AAAA-NNNN a partir del id de sesión.
 function folio(sesion) {
-  const year = new Date(sesion.fecha || sesion.created_at || Date.now()).getFullYear();
+  const year = fechaLocal(sesion.fecha || sesion.created_at || Date.now()).anio;
   const seq = String(parseInt((sesion.id || '').replace(/\D/g, '').slice(-4) || '1', 10) % 10000).padStart(4, '0');
   return `C-${year}-${seq}`;
 }
