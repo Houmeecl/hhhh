@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../lib/db.js';
-import { signAccess, requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { signAccess, requireAuth, requireRole, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { validarTarifa, validarTipoCambio } from '../services/compensacion.js';
 import { actualizarDolar } from '../services/tipoCambio.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
@@ -117,7 +117,7 @@ adminRouter.use(requireAuth, requireRole('admin'), requireHomePanel('aduana_verd
 // USD). tipo_cambio_auto (migración 020) activa el dólar automático: el
 // servidor consulta el observado BCCh (mindicador.cl) al activarlo y
 // luego cada 6 h; en manual, el valor sigue siendo el que fija el admin.
-adminRouter.put('/config', async (req, res, next) => {
+adminRouter.put('/config', requireNivelOperador, async (req, res, next) => {
   try {
     const body = req.body || {};
     const { tarifa_clp_tco2e, fuente } = body;

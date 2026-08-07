@@ -1314,7 +1314,14 @@ router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
         sub: `imp:${req.user.sub}:${panel}`,
         imp: true,
         imp_by: req.user.sub,
-        rol: 'operador', // nunca 'admin': los paneles externos no tienen ese concepto
+        // aduana_verde es un panel INTERNO (como sicrep): su propio
+        // adminRouter exige rol='admin' (routes/pos.js), igual que
+        // cualquier cuenta real de ese panel — con 'operador' la vista
+        // quedaba en "No autorizado" apenas cargaba. Los 5 paneles
+        // EXTERNOS (puerto/mandante/agencia/trazador/proveedor) no tienen
+        // ese concepto de rol: siempre 'operador', y nivel_acceso abajo es
+        // lo que los deja de solo lectura.
+        rol: panel === 'aduana_verde' ? 'admin' : 'operador',
         email: req.user.email,
         panel,
         // Es una VISTA, no un turno de trabajo: 'lectura' cierra las 2
@@ -1324,6 +1331,8 @@ router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
         // RAZÓN SOCIAL del proveedor — el eslabón no distingue quién lo
         // firmó, y `proveedor_lotes.firmado_at` deja al proveedor real sin
         // poder firmar. Es exactamente lo que el panel promete impedir.
+        // La única mutación de aduana_verde (PUT /admin/pos/config) exige
+        // este mismo nivel_acceso (ver routes/pos.js).
         nivel_acceso: 'lectura',
         ...fks,
       },

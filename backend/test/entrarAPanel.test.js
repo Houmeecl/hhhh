@@ -11,6 +11,7 @@ import { signAccess } from '../src/middleware/auth.js';
 import { hashApiKey } from '../src/services/mandante.js';
 import adminRouter from '../src/routes/admin.js';
 import authRouter from '../src/routes/auth.js';
+import { adminRouter as posAdminRouter } from '../src/routes/pos.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
@@ -52,8 +53,12 @@ before(async () => {
 
   const app = express();
   app.use(express.json());
-  app.use('/api/admin', adminRouter);
   app.use('/api/auth', authRouter);
+  // '/api/admin/pos' va ANTES del genérico '/api/admin' — mismo motivo que
+  // en index.js: si no, requireHomePanel('sicrep') de adminRouter
+  // interceptaría las rutas de aduana_verde antes de llegar a su router.
+  app.use('/api/admin/pos', posAdminRouter);
+  app.use('/api/admin', adminRouter);
   server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -171,4 +176,55 @@ test('POST /admin/entrar-a-panel con aduana_verde no exige entidad_id', { skip: 
   const payload = jwt.verify(body.accessToken, config.jwt.accessSecret);
   assert.equal(payload.panel, 'aduana_verde');
   assert.equal(payload.puerto_id, null);
+});
+
+// Regresión: aduana_verde ('Terreno') es un panel INTERNO — su adminRouter
+// (routes/pos.js) exige rol='admin' igual que cualquier cuenta real, a
+// diferencia de los 5 paneles externos (puerto/mandante/agencia/trazador/
+// proveedor) que no tienen ese concepto y siempre reciben 'operador'. Con
+// 'operador' la vista quedaba en "No autorizado" apenas cargaba el panel
+// (GET /admin/pos/compensaciones/resumen y el resto del dashboard).
+test('POST /admin/entrar-a-panel con aduana_verde emite rol=admin (panel interno)', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/entrar-a-panel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ panel: 'aduana_verde' }),
+  });
+  const { accessToken } = await res.json();
+  const payload = jwt.verify(accessToken, config.jwt.accessSecret);
+  assert.equal(payload.rol, 'admin');
+  assert.equal(payload.nivel_acceso, 'lectura');
+});
+
+test('el token de vista de aduana_verde SÍ lee el panel (GET /admin/pos/*)', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/entrar-a-panel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ panel: 'aduana_verde' }),
+  });
+  const { accessToken } = await res.json();
+
+  const resumen = await fetch(`${baseUrl}/api/admin/pos/compensaciones/resumen`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  assert.equal(resumen.status, 200);
+});
+
+test('el token de vista de aduana_verde NO puede editar la tarifa (PUT /admin/pos/config)', { skip: SALTO_PROD }, async () => {
+  // Mismo principio que el eslabón de la cadena de custodia: es una VISTA,
+  // no un turno de trabajo — nivel_acceso='lectura' debe bloquear la única
+  // mutación de este panel igual que ya bloquea las de agencia/proveedor.
+  const res = await fetch(`${baseUrl}/api/admin/entrar-a-panel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenSuperadmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ panel: 'aduana_verde' }),
+  });
+  const { accessToken } = await res.json();
+
+  const put = await fetch(`${baseUrl}/api/admin/pos/config`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tarifa_clp_tco2e: 6000 }),
+  });
+  assert.equal(put.status, 403);
 });
