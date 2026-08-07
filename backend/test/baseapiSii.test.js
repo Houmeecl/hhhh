@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  normalizarFilaRcv, normalizarDteRecibido, normalizarResumenRcv, descargarRcv, descargarComprasVentas, validarCredencialesSii, PERIODO_RE,
+  normalizarFilaRcv, normalizarDteRecibido, normalizarResumenRcv, descargarRcv, descargarDteRecibidos, descargarComprasVentas, validarCredencialesSii, PERIODO_RE,
 } from '../src/services/baseapiSii.js';
 
 // Config inyectada: nunca la key real, nunca red real.
@@ -157,6 +157,15 @@ test('normalizarDteRecibido reduce el documento y expone ítems para el cálculo
   assert.equal(n.origen_calculo, 'texto');   // sin XML => método por gasto
   assert.equal(n.items.length, 1);            // ítem sintético por el monto
   assert.equal(normalizarDteRecibido({ monto_total: 1000 }), null); // sin folio
+});
+
+test('DTE recibidos SIEMPRE envía rut_empresa (el endpoint lo exige), aunque sea igual al rut', async () => {
+  const capturas = [];
+  const fetcher = fakeFetch({ success: true, data: { documentos: [DTE_RECIBIDO] } }, { capturas });
+  // Sin rutEmpresa: debe caer al propio rut autenticado.
+  await descargarDteRecibidos({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG });
+  const enviado = JSON.parse(capturas[0].body);
+  assert.equal(enviado.rut_empresa, RUT, 'rut_empresa debe ir presente, igual al rut');
 });
 
 test('descargarComprasVentas valida, trae compras (DTE) y ventas (RCV)', async () => {

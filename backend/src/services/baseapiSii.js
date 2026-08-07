@@ -142,12 +142,11 @@ async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cf
   if (!password || typeof password !== 'string') throw errEntrada('Falta la clave tributaria.');
 
   const body = { rut: rutConGuion(rut), password };
-  // rut_empresa solo si el proveedor consulta como representante de una
-  // empresa distinta a la persona que se autentica.
-  if (rutEmpresa) {
-    const empresa = rutConGuion(rutEmpresa);
-    if (empresa !== body.rut) body.rut_empresa = empresa;
-  }
+  // rut_empresa cuando se indica la empresa a consultar. Se envía SIEMPRE
+  // que venga (aunque coincida con el RUT autenticado): el endpoint de DTE
+  // recibidos lo exige como obligatorio, y mandarlo igual al rut significa
+  // "consulta la propia empresa autenticada".
+  if (rutEmpresa) body.rut_empresa = rutConGuion(rutEmpresa);
 
   let res;
   try {
@@ -249,9 +248,11 @@ export function normalizarDteRecibido(doc) {
 }
 
 // Descarga los DTE recibidos (compras) CON su XML, para extraer el detalle.
+// Este endpoint EXIGE rut_empresa; si no se indica, se consulta la propia
+// empresa autenticada (rut_empresa = rut).
 export async function descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts = {}) {
   if (!PERIODO_RE.test(String(periodo || ''))) throw errEntrada('Período inválido: usa AAAA-MM (ej: 2026-06).');
-  const json = await llamar(`/sii/dte/recibidos/${periodo}`, { rut, password, rutEmpresa }, opts);
+  const json = await llamar(`/sii/dte/recibidos/${periodo}`, { rut, password, rutEmpresa: rutEmpresa || rut }, opts);
   const docs = Array.isArray(json?.data?.documentos) ? json.data.documentos : [];
   return docs.map(normalizarDteRecibido).filter(Boolean);
 }
