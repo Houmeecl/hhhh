@@ -5,6 +5,7 @@ import { requireAuth, requireHomePanel, logActividad } from '../middleware/auth.
 import { generateReport } from '../services/pdf.js';
 import { parseDte } from '../services/dte.js';
 import { contrapartesDeRut } from '../services/trazabilidad.js';
+import { categoriaParaMostrar } from '../services/categoriaPresentacion.js';
 
 // ============================================================
 // Etapa 2 — Informes mensuales por cliente, cadena
@@ -49,9 +50,12 @@ router.get('/mensual', async (req, res, next) => {
     if (!rut) return res.status(400).json({ error: 'Indica el RUT del cliente.' });
     const facturas = await facturasDelMes(rut, anio, mes);
     const total = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
+    // El agregado junta bajo "Sin clasificar" lo que no salió de la glosa real
+    // del documento; el detalle de cada factura sí conserva su nombre, marcado
+    // (services/categoriaPresentacion.js).
     const porCategoria = {};
     for (const f of facturas) {
-      const c = f.categoria || 'Sin categoría';
+      const c = categoriaParaMostrar(f).agregado;
       porCategoria[c] = (porCategoria[c] || 0) + Number(f.total_co2e || 0);
     }
     res.json({
@@ -61,7 +65,7 @@ router.get('/mensual', async (req, res, next) => {
       por_categoria: porCategoria,
       facturas: facturas.map((f) => ({
         id: f.id, numero_venta: f.numero_venta, archivo_original: f.archivo_original,
-        categoria: f.categoria, total_co2e: f.total_co2e, fecha: f.created_at,
+        categoria: categoriaParaMostrar(f).detalle, total_co2e: f.total_co2e, fecha: f.created_at,
         rut_emisor: f.rut_emisor, empresa: f.nombre_cliente,
       })),
     });

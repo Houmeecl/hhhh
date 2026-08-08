@@ -143,7 +143,18 @@ router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res,
         const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
         await registrarMovimientos({
           client,
-          factura: { id: null, categoria, total_co2e: total, numero_venta: `corredor ${paisMet}`, archivo_original: file.originalname },
+          factura: {
+            id: null, categoria, total_co2e: total,
+            numero_venta: `corredor ${paisMet}`, archivo_original: file.originalname,
+            // Explícito, no por omisión: esta categoría la trae el MOTOR
+            // EXTERNO (no el catch-all del motor propio), y ese adaptador
+            // devuelve 'Sin categoría' cuando no sabe, en vez de una categoría
+            // con factor físico. Vale el mismo trato que el histórico. El día
+            // que este flujo pase al motor propio hay que traer acá el
+            // `categoria_origen` real, o capitalNatural.js dejará de frenar lo
+            // que no está clasificado.
+            categoria_origen: null,
+          },
           cuentas: cuentasNaturales,
         });
       }

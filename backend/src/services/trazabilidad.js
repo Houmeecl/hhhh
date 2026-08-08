@@ -17,7 +17,10 @@ export async function contrapartesDeRut(rut) {
     `SELECT f.rut_emisor AS rut, COUNT(*)::int AS n_documentos,
             SUM(f.total_co2e)::float AS total_co2e,
             MAX(f.created_at) AS ultimo_documento,
-            array_agg(DISTINCT f.categoria) AS categorias
+            -- Solo las categorías atribuibles: el catch-all del motor no es una
+            -- clasificación del documento (services/categoriaPresentacion.js).
+            array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+              AS categorias
      FROM facturas f
      WHERE regexp_replace(COALESCE(f.rut_receptor,''), '[^0-9kK]', '', 'g') ILIKE $1
        AND f.rut_emisor IS NOT NULL
@@ -29,7 +32,10 @@ export async function contrapartesDeRut(rut) {
     `SELECT f.rut_receptor AS rut, COUNT(*)::int AS n_documentos,
             SUM(f.total_co2e)::float AS total_co2e,
             MAX(f.created_at) AS ultimo_documento,
-            array_agg(DISTINCT f.categoria) AS categorias
+            -- Solo las categorías atribuibles: el catch-all del motor no es una
+            -- clasificación del documento (services/categoriaPresentacion.js).
+            array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+              AS categorias
      FROM facturas f
      WHERE regexp_replace(COALESCE(f.rut_emisor,''), '[^0-9kK]', '', 'g') ILIKE $1
        AND f.rut_receptor IS NOT NULL

@@ -44,18 +44,36 @@ export function derivarMovimientos(factura, cuentas) {
   const refDoc = factura.numero_venta || factura.archivo_original || 's/n';
   const glosa = (detalle) => `${detalle} — ${refDoc}`;
 
-  // Toda emisión calculada carga la cuenta de carbono.
+  // ¿La categoría de este documento es una clasificación real, o el catch-all
+  // del motor? Lista BLANCA a propósito: un valor nuevo de `categoria_origen`
+  // (la migración 078 agrega 'sin_categoria' y 'operador') tiene que decidirse
+  // acá explícitamente, no colarse por omisión. Una lista negra falla abierta,
+  // que es justo lo contrario de lo que este libro necesita.
+  //
+  // NULL es el caso histórico y el del motor externo (routes/public.js escribe
+  // NULL cuando calcula el adaptador de terceros): de esos no consta de dónde
+  // salió la categoría y se dejan como estaban, porque no hay forma de saberlo
+  // hacia atrás y porque ese adaptador devuelve 'Sin categoría' cuando no sabe,
+  // no un catch-all con factor físico.
+  const ORIGEN_CLASIFICA = new Set(['glosa', 'xml', 'operador']);
+  const clasificado = factura.categoria_origen == null
+    || ORIGEN_CLASIFICA.has(factura.categoria_origen);
+
+  // Toda emisión calculada carga la cuenta de carbono. La glosa NO puede
+  // nombrar la categoría cuando el motor no la dedujo: quedaría sellada por
+  // hash —inmutable— diciendo "Agua" en un documento que este mismo código
+  // acaba de declarar sin clasificar, y así se imprime en el libro por cuenta.
   if (activa('CO2E') && total > 0) {
     movs.push({
       cuenta_codigo: 'CO2E',
       cantidad: round4(total),
       unidad: 'tCO2e',
-      glosa: glosa(factura.categoria || 'Documento'),
+      glosa: glosa(clasificado ? (factura.categoria || 'Documento') : 'Documento sin clasificar'),
     });
   }
 
   // Las cuentas FÍSICAS solo se cargan si la categoría es una clasificación
-  // del documento, no el catch-all del motor.
+  // del documento.
   //
   // Cuando ninguna palabra clave calza, `clasificarConSenal` devuelve
   // 'servicios' — que no toca cuentas físicas, así que hoy no pasa nada. Pero
@@ -66,13 +84,11 @@ export function derivarMovimientos(factura, cuentas) {
   // AGUA QUE NADIE CONSUMIÓ, en un libro sellado por cadena de hash — o sea,
   // un dato inventado y además inmutable, que es lo peor de las dos cosas.
   //
-  // El CO2E de arriba sí se carga igual: ese número se calculó de verdad
-  // (por gasto), aunque no se sepa de qué fue el gasto.
-  //
-  // `categoria_origen` es NULL en los documentos anteriores a la migración
-  // 077: de esos no consta de dónde salió la categoría y se dejan como
-  // estaban, porque no hay forma de saberlo hacia atrás.
-  if (factura.categoria_origen === 'sin_coincidencia') return movs;
+  // El CO2E de arriba sí se carga: ese número se calcula por gasto cuando no
+  // hubo coincidencia (lo fuerza motorPropio.calcularItem, justamente para que
+  // el factor físico de una categoría no se le aplique a un ítem que no fue
+  // clasificado en ella).
+  if (!clasificado) return movs;
 
   // Cuentas físicas según la categoría del documento (cantidad estimada
   // a partir del CO2e y el factor de conversión de la cuenta).

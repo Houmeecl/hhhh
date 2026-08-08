@@ -30,6 +30,7 @@ import { validarInscripcion } from '../services/inscripcion.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiter, cargaLimiter } from '../middleware/rateLimit.js';
 import { presupuestoIA } from '../services/analisisIA.js';
+import { categoriaParaMostrar, alcanceAtribuible } from '../services/categoriaPresentacion.js';
 
 const router = express.Router();
 
@@ -1094,7 +1095,9 @@ router.get('/verificar/:id', async (req, res, next) => {
         id: factura.id,
         sesion_id: factura.sesion_id,
         numero_venta: factura.numero_venta,
-        categoria: factura.categoria,
+        // Esta es la página del QR: la abre cualquiera que reciba el documento.
+        categoria: categoriaParaMostrar(factura).detalle,
+        categoria_confirmada: categoriaParaMostrar(factura).confirmada,
         total_co2e: factura.total_co2e,
         status: factura.status,
         fecha: sRows[0]?.fecha,
@@ -1151,7 +1154,19 @@ router.get('/pasaporte/:id', async (req, res, next) => {
            FROM compensaciones WHERE sesion_id = $1`,
           [factura.sesion_id]
         ),
-        query(`SELECT nombre, alcance_ghg FROM motor_categorias WHERE codigo = $1`, [factura.categoria]),
+        // Por CÓDIGO, con respaldo por nombre para lo anterior a la migración
+        // 077. Antes esta consulta comparaba `codigo` contra `factura.categoria`,
+        // que guarda el NOMBRE: nunca calzaba, así que `clasificacion_ghg` salía
+        // siempre null. Era un campo muerto — y por eso mismo hay que arreglarlo
+        // JUNTO con la regla de atribución de abajo: revivirlo a secas habría
+        // convertido un campo vacío en una afirmación falsa para los documentos
+        // que el motor no supo clasificar.
+        query(
+          `SELECT nombre, alcance_ghg FROM motor_categorias
+            WHERE codigo = $1 OR ($1 IS NULL AND nombre = $2)
+            ORDER BY codigo LIMIT 1`,
+          [factura.categoria_codigo, factura.categoria]
+        ),
       ]);
 
     // Equivalente USD server-authoritative: solo si hay tipo de cambio
@@ -1175,8 +1190,12 @@ router.get('/pasaporte/:id', async (req, res, next) => {
       },
       producto: {
         documento: factura.numero_venta,
-        categoria: factura.categoria,
-        clasificacion_ghg: aRows[0]?.alcance_ghg || null,
+        // El pasaporte es público y sin autenticación: es la cara que el
+        // titular le muestra a un tercero. La categoría va con su marca de
+        // confianza y el alcance GHG solo si es atribuible.
+        categoria: categoriaParaMostrar(factura).detalle,
+        categoria_confirmada: categoriaParaMostrar(factura).confirmada,
+        clasificacion_ghg: alcanceAtribuible(factura, aRows[0]?.alcance_ghg),
         motor: factura.motor,
         status: factura.status,
         fecha: sRows[0]?.fecha || null,

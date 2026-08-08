@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { esAtribuible, categoriaParaMostrar } from '../lib/categoria.js';
 import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
@@ -147,14 +148,21 @@ export default function Resultado() {
 
   const { sesion, facturas } = data;
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
-  const categorias = [...new Set(facturas.map((f) => f.categoria).filter(Boolean))];
+  // Solo las categorías que el motor dedujo de la glosa real del documento:
+  // el catch-all no es una clasificación y no puede contarse como tal en la
+  // tarjeta de arriba (lib/categoria.js).
+  const categorias = [...new Set(
+    facturas.filter((f) => esAtribuible(f.categoria_origen)).map((f) => f.categoria).filter(Boolean)
+  )];
   const proveedores = new Set(facturas.map((f) => f.rut_emisor).filter(Boolean)).size;
   const factura = facturas[sel] || facturas[0];
 
   // Agregación de CO2e por categoría para el donut.
   const porCategoria = Object.entries(
     facturas.reduce((acc, f) => {
-      const k = f.categoria || 'Sin categoría';
+      // Lo no clasificado se junta bajo "Sin clasificar" en vez de engordar la
+      // porción del catch-all, que se leía como el hallazgo principal.
+      const k = categoriaParaMostrar(f).agregado;
       acc[k] = (acc[k] || 0) + Number(f.total_co2e || 0);
       return acc;
     }, {})
@@ -184,7 +192,10 @@ export default function Resultado() {
             </div>
             <div className="result-card">
               <div className="big" style={{ fontSize: 20 }}>{categorias[0] || '—'}</div>
-              <div className="lbl">{categorias.length > 1 ? `+${categorias.length - 1} categorías más` : 'Categoría'}</div>
+              <div className="lbl">
+                {categorias.length > 1 ? `+${categorias.length - 1} categorías más`
+                  : categorias.length === 1 ? 'Categoría' : 'Sin categoría confirmada'}
+              </div>
             </div>
             <div className="result-card">
               <div className="big">✓</div>
@@ -230,7 +241,9 @@ export default function Resultado() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <h3 style={{ margin: '0 0 10px' }}>Detalle por ítem</h3>
-              <span className="badge badge-green">{factura.categoria}</span>
+              <span className={`badge ${esAtribuible(factura.categoria_origen) ? 'badge-green' : 'badge-gray'}`}>
+                {categoriaParaMostrar(factura).detalle}
+              </span>
             </div>
             <div className="table-scroll">
               <table className="data">
@@ -299,7 +312,7 @@ export default function Resultado() {
               <div className="green-block">
                 <div className="lbl">RESULTADO INCORPORADO</div>
                 <div className="val">{fmt(factura.total_co2e, 3)} t CO2e</div>
-                <div className="muted" style={{ fontSize: 12 }}>· {factura.categoria} · {factura.items.length} ítems</div>
+                <div className="muted" style={{ fontSize: 12 }}>· {categoriaParaMostrar(factura).detalle} · {factura.items.length} ítems</div>
               </div>
             </div>
             <Link to={`/verificar/${factura.id}`} className="btn btn-ghost btn-sm" style={{ width: '100%', marginTop: 10 }}>

@@ -6,6 +6,7 @@ import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
+import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
 import { formatearRut } from './mandante.js';
 
 // ============================================================
@@ -118,7 +119,7 @@ export function citaFuente({ organismo, documento, version_anio } = {}) {
 async function fetchAlcancesGHG() {
   try {
     const { rows } = await query(
-      `SELECT mc.nombre, mc.alcance_ghg, f.organismo, f.documento, f.version_anio
+      `SELECT mc.codigo, mc.nombre, mc.alcance_ghg, f.organismo, f.documento, f.version_anio
          FROM motor_categorias mc
          LEFT JOIN fuentes_metodologicas f ON f.id = mc.fuente_metodologica_id
         WHERE mc.activo = true AND mc.alcance_ghg IS NOT NULL
@@ -215,7 +216,13 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
   const totalCo2e = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
-  const categorias = [...new Set(facturas.map((f) => f.categoria).filter(Boolean))];
+  // Solo las categorías ATRIBUIBLES: las que salieron de la glosa real del
+  // documento. El catch-all del motor no cuenta como categoría identificada
+  // ni aporta un alcance al período — es un default de cálculo, no una
+  // conclusión. Ver services/categoriaPresentacion.js.
+  const atribuibles = facturas.filter((f) => esAtribuible(f.categoria_origen));
+  const categorias = [...new Set(atribuibles.map((f) => f.categoria).filter(Boolean))];
+  const nSinConfirmar = facturas.length - atribuibles.length;
 
   // --- Encabezado ---
   drawLogo(doc, 48, 44);
@@ -251,7 +258,10 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     { label: 'Total incorporado', value: `${nf(totalCo2e, 4)}`, unit: 't CO2e' },
     { label: 'Facturas', value: String(facturas.length), unit: 'documentos' },
     { label: 'Ítems', value: String(totalItems), unit: 'analizados' },
-    { label: 'Categorías', value: String(categorias.length || 1), unit: 'identificadas' },
+    // "|| 1" no: si no hay ninguna categoría atribuible, el número honesto es
+    // cero. Redondear hacia arriba para que la tarjeta no se vea vacía era
+    // afirmar una categoría identificada que no existe.
+    { label: 'Categorías', value: String(categorias.length), unit: 'identificadas' },
   ];
   const cw = 118, gap = 9;
   cards.forEach((c, i) => {
@@ -340,14 +350,36 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     y += 68;
   }
 
-  // Alcances GHG de las categorías presentes en el período (nota bajo la tabla,
-  // solo si hay categorías con alcance declarado).
-  const alcancePorCategoria = new Map(alcancesGhg.map((a) => [a.nombre, a.alcance_ghg]));
-  const alcancesPeriodo = [...new Set(categorias.map((c) => alcancePorCategoria.get(c)).filter(Boolean))];
+  // Alcances GHG de las categorías ATRIBUIBLES del período (nota bajo la tabla).
+  //
+  // El índice va por CÓDIGO y no por nombre: `motor_categorias.nombre` se edita
+  // desde el panel del motor, así que renombrar una categoría sacaba su alcance
+  // del informe sin aviso — el mismo acoplamiento frágil que describe la
+  // migración 077. Se conserva el respaldo por nombre para los documentos
+  // anteriores a esa migración, que no tienen `categoria_codigo`.
+  const alcancePorCodigo = new Map(alcancesGhg.map((a) => [a.codigo, a.alcance_ghg]));
+  const alcancePorNombre = new Map(alcancesGhg.map((a) => [a.nombre, a.alcance_ghg]));
+  const alcancesPeriodo = [...new Set(
+    atribuibles
+      .map((f) => alcancePorCodigo.get(f.categoria_codigo) || alcancePorNombre.get(f.categoria))
+      .filter(Boolean)
+  )];
   if (alcancesPeriodo.length) {
     if (y > 760) { doc.addPage(); y = 48; }
     doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
       .text(`Alcances del período: ${alcancesPeriodo.join('; ')}`, 48, y, { width: 499 });
+    y = doc.y + 10;
+  }
+  // Lo que quedó fuera no se esconde: su CO2e está dentro del total de arriba,
+  // así que omitirlo dejaría un informe que no cuadra consigo mismo.
+  if (nSinConfirmar > 0) {
+    if (y > 760) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
+      .text(
+        `${nSinConfirmar} ${nSinConfirmar === 1 ? 'documento no pudo clasificarse' : 'documentos no pudieron clasificarse'} `
+        + 'a partir del detalle de sus ítems: su CO2e está incluido en el total, pero no se les atribuye alcance GHG.',
+        48, y, { width: 499 }
+      );
     y = doc.y + 10;
   }
 
@@ -626,7 +658,9 @@ export async function generateLabel({ sesion, factura, declaracion }) {
   doc.font('Helvetica-Bold').fontSize(14).fillColor(NAVY)
     .text(`${nf(factura.total_co2e, 3)} t CO2e`, 36, 218, { lineBreak: false });
   doc.font('Helvetica').fontSize(8.5).fillColor(GRAY)
-    .text(`·  ${factura.categoria || 'Sin categoría'}  ·  ${nItems} ítems`, 150, 222, { width: 240 });
+    // La etiqueta se pega en un archivador: no puede afirmar una categoría que
+    // el motor no dedujo del documento (ver categoriaPresentacion.js).
+    .text(`·  ${categoriaParaMostrar(factura).detalle}  ·  ${nItems} ítems`, 150, 222, { width: 240 });
 
   return bufferDoc(doc);
 }
@@ -1070,17 +1104,9 @@ function tablaPorTipo(doc, x, y, ancho, titulo, filas) {
 // Desglose por alcance GHG. La fila "sin clasificar" NO es opcional: su CO2e
 // está dentro del total del informe, así que omitirla dejaría tres alcances
 // que no suman lo que dice el número grande de arriba.
-// Motivos por los que un documento calculado NO recibe alcance. Espejo de
-// MOTIVOS_SIN_ALCANCE en el frontend y de los contadores que arma
-// services/alcanceGhg.js — si se agrega uno allá, tiene que aparecer acá o
-// el informe mostraría un saldo sin explicar.
-const MOTIVOS_SIN_ALCANCE = [
-  ['inferido_por_nombre', 'clasificados por el nombre del proveedor, no por el detalle del documento'],
-  ['descarga_antigua', 'descargados antes de esta clasificación'],
-  ['sin_coincidencia', 'sin coincidencia con ninguna categoría del motor'],
-  ['motor_sin_categoria', 'sin categoría asignada por el motor (ej. notas de crédito)'],
-  ['alcance_no_legible', 'con un alcance GHG no legible en el catálogo'],
-];
+// Los motivos viven en services/categoriaPresentacion.js — estaban duplicados
+// acá y en el frontend, con el riesgo de que agregar uno en alcanceGhg.js
+// dejara el informe mostrando un saldo sin explicar.
 
 function tablaPorAlcance(doc, x, y, ancho, porAlcance, total) {
   const alcances = porAlcance?.alcances || [];
@@ -1367,7 +1393,9 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY)
       .text(String(f.numero_venta || '—').slice(0, 24), bx + 12, by + 12, { width: CAJA_W - 110 });
     doc.font('Helvetica').fontSize(8).fillColor(GRAY)
-      .text(String(f.categoria || 'Sin categoría').slice(0, 40), bx + 12, by + 28, { width: CAJA_W - 110 })
+      // La carpeta se imprime y se le entrega en papel al mandante: cada
+      // documento dice su categoría solo si el motor la dedujo de su glosa.
+      .text(categoriaParaMostrar(f).detalle.slice(0, 40), bx + 12, by + 28, { width: CAJA_W - 110 })
       .text(`Estado: ${f.status || '—'}`, bx + 12, by + 42, { width: CAJA_W - 110 });
     doc.font('Helvetica-Bold').fontSize(12).fillColor(GREEN)
       .text(`${nf(f.total_co2e, 3)}`, bx + 12, by + 66, { lineBreak: false });

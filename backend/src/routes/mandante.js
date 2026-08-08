@@ -6,6 +6,7 @@ import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
 import { agregarAlcance3, parsearAlcanceGHG, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
+import { categoriaParaMostrar } from '../services/categoriaPresentacion.js';
 import { filasACsv } from '../services/csv.js';
 import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
 import { citaFuente, generateReporteCbam } from '../services/pdf.js';
@@ -85,7 +86,13 @@ router.get('/proveedores', async (req, res, next) => {
               COUNT(*)::int AS n_documentos,
               SUM(f.total_co2e)::float AS total_co2e,
               MAX(f.created_at) AS ultimo_documento,
-              array_agg(DISTINCT f.categoria) AS categorias
+              -- Solo las categorías atribuibles: el catch-all del motor no es
+              -- una clasificación del documento, y esta lista alimenta la
+              -- pantalla que hoy contradecía a su propio CSV de Alcance 3.
+              array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+                AS categorias,
+              COUNT(*) FILTER (WHERE f.categoria_origen NOT IN ('glosa','operador')
+                                  OR f.categoria_origen IS NULL)::int AS n_sin_clasificar
        FROM facturas f
        WHERE ${NORM('f.rut_receptor')} = $1 AND f.rut_emisor IS NOT NULL${filtroPermitidos}
        GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 200`, params
@@ -119,15 +126,21 @@ router.get('/proveedor/:rut/resumen', async (req, res, next) => {
     if (req.query.mes) { params.push(Number(req.query.mes)); cond.push(`EXTRACT(MONTH FROM f.created_at) = $${params.length}`); }
 
     const { rows: docs } = await query(
-      `SELECT f.numero_venta, f.categoria, f.total_co2e, f.created_at
+      `SELECT f.numero_venta, f.categoria, f.categoria_origen, f.total_co2e, f.created_at
        FROM facturas f WHERE ${cond.join(' AND ')} ORDER BY f.created_at DESC LIMIT 200`, params
     );
+    // El agregado por categoría junta bajo "Sin clasificar" todo lo que no
+    // salió de la glosa real del documento: acumularlo bajo el nombre del
+    // catch-all lo convierte en un hallazgo ("Servicios: 40% de tus
+    // emisiones") que nadie calculó. El detalle de cada documento sí conserva
+    // su nombre, marcado — ver services/categoriaPresentacion.js.
     const porCategoria = {};
     let total = 0;
     for (const d of docs) {
       total += Number(d.total_co2e || 0);
-      const c = d.categoria || 'Sin categoría';
+      const c = categoriaParaMostrar(d).agregado;
       porCategoria[c] = (porCategoria[c] || 0) + Number(d.total_co2e || 0);
+      d.categoria = categoriaParaMostrar(d).detalle;
     }
     res.json({
       proveedor: req.params.rut,

@@ -138,8 +138,16 @@ export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, c
   const cat = categorias.get(codigo);
   const unidadCanonica = (origen === 'xml' || origen === 'ia_verificada') ? normalizarUnidad(unidad) : null;
 
+  // El método FÍSICO exige que la categoría sea una clasificación real del
+  // ítem, no el catch-all. El factor físico de una categoría no se le puede
+  // aplicar a un ítem que no fue clasificado en ella: con `servicios`
+  // desactivada el catch-all pasa a ser `agua` (primera activa por código),
+  // que tiene unidad m3 y factor físico — y entonces "Hormigón premezclado
+  // H30, 120 M3" se calculaba como 120 m³ de AGUA: 0,04 tCO2e en vez de 2,7
+  // por gasto, 65 veces menos. Sin coincidencia se calcula por gasto, que es
+  // el piso metodológico honesto cuando no se sabe qué se compró.
   let co2e, metodo;
-  if (unidadCanonica && cat.unidad_fisica === unidadCanonica && Number(cat.factor_fisico_kgco2e) > 0) {
+  if (coincidencia && unidadCanonica && cat.unidad_fisica === unidadCanonica && Number(cat.factor_fisico_kgco2e) > 0) {
     co2e = round4((Number(cantidad) * Number(cat.factor_fisico_kgco2e)) / 1000);
     metodo = 'fisico';
   } else {

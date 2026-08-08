@@ -359,25 +359,56 @@ test('cargarCategorias pide orden determinista a la BD (evita desempates que dep
 // `coincidencia` es false. Sin ella, cada documento no clasificado registraría
 // metros cúbicos de agua que nadie consumió, en un libro sellado por hash.
 // ============================================================
-test('con "servicios" desactivada el catch-all cae en la primera categoría activa, y lo declara', () => {
+// El fixture se ordena POR CÓDIGO, como lo entrega `cargarCategorias`
+// (`ORDER BY codigo`): sin eso el Map queda en orden de seed y `activas[0]`
+// sería `electricidad`, con lo que el test pasaría sin ejercer el caso real.
+function categoriasPorCodigo() {
   const cats = categoriasEjemplo();
-  cats.set('agua', { codigo: 'agua', nombre: 'Agua', unidad_fisica: 'm3', factor_fisico_kgco2e: 0.344, factor_gasto_kgco2e_clp1000: 0.30, palabras_clave: ['agua potable'], activo: true });
+  cats.set('agua', {
+    codigo: 'agua', nombre: 'Agua', unidad_fisica: 'm3', factor_fisico_kgco2e: 0.344,
+    factor_gasto_kgco2e_clp1000: 0.30, palabras_clave: ['agua potable'], activo: true,
+  });
+  return new Map([...cats.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+test('con "servicios" desactivada el catch-all cae en `agua`, y lo declara', () => {
+  const cats = categoriasPorCodigo();
   cats.set('servicios', { ...cats.get('servicios'), activo: false });
 
   const r = clasificarConSenal('glosa que no calza con nada', cats);
-  assert.equal(r.coincidencia, false, 'sigue declarando que NO hubo coincidencia');
-  assert.notEqual(r.codigo, 'servicios', 'no puede devolver una categoría desactivada');
+  assert.deepEqual(r, { codigo: 'agua', coincidencia: false },
+    'primera activa por orden de código — y sigue declarando que NO hubo coincidencia');
 
-  // Y con 'servicios' activa, el catch-all es esa — que no toca cuentas físicas.
+  // Con 'servicios' activa el catch-all es esa, que no toca cuentas físicas.
   cats.set('servicios', { ...cats.get('servicios'), activo: true });
-  const r2 = clasificarConSenal('glosa que no calza con nada', cats);
-  assert.deepEqual(r2, { codigo: 'servicios', coincidencia: false });
+  assert.deepEqual(clasificarConSenal('glosa que no calza con nada', cats),
+    { codigo: 'servicios', coincidencia: false });
 });
 
-test('calcularItem marca categoria_coincidencia=false en el catch-all, sea cual sea la categoría', () => {
-  const cats = categoriasEjemplo();
+// El caso que el arreglo de capitalNatural.js NO tapaba: con `agua` de
+// catch-all, un ítem en m3 tomaba el factor FÍSICO del agua. El dato inventado
+// no desaparecía, se mudaba de la cuenta AGUA a la de carbono, que sí se sella.
+test('sin coincidencia se calcula por GASTO aunque la unidad calce con el catch-all', () => {
+  const cats = categoriasPorCodigo();
   cats.set('servicios', { ...cats.get('servicios'), activo: false });
-  const it = calcularItem({ nombre: 'glosa que no calza', cantidad: 1, monto: 100000 }, cats, 'xml');
+
+  const it = calcularItem(
+    { nombre: 'Hormigón premezclado H30', cantidad: 120, unidad: 'M3', monto: 9000000 },
+    cats, 'xml'
+  );
   assert.equal(it.categoria_coincidencia, false);
-  assert.ok(it.co2e >= 0, 'igual se calcula: hay factor con qué');
+  assert.equal(it.metodo, 'gasto', '120 m3 de hormigón no son 120 m3 de agua');
+  // Por gasto: 9.000.000 CLP × 0,30 kgCO2e/1.000 CLP = 2,7 tCO2e.
+  // Por el físico del agua habrían sido 0,0413 — 65 veces menos.
+  assert.equal(it.co2e, 2.7);
+});
+
+test('con coincidencia real, el método físico sigue disponible', () => {
+  const cats = categoriasPorCodigo();
+  const it = calcularItem(
+    { nombre: 'Suministro electrico', cantidad: 500, unidad: 'kWh', monto: 450000 },
+    cats, 'xml'
+  );
+  assert.equal(it.categoria_coincidencia, true);
+  assert.equal(it.metodo, 'fisico');
 });

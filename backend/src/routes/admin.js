@@ -888,7 +888,12 @@ router.get('/metricas', async (req, res, next) => {
                     count(*)::int AS facturas,
                     COALESCE(sum(total_co2e),0)::float AS co2e
              FROM facturas GROUP BY 1 ORDER BY 1`),
-      query(`SELECT COALESCE(categoria,'Sin categoría') AS categoria,
+      // El donut agrupa bajo "Sin clasificar" todo lo que no salió de la glosa
+      // real: si el catch-all del motor sumara bajo su propio nombre, el
+      // gráfico mostraría "Servicios" como la mayor fuente de emisiones de la
+      // plataforma sin que nadie lo haya calculado.
+      query(`SELECT CASE WHEN categoria_origen IN ('glosa','operador') AND categoria IS NOT NULL
+                         THEN categoria ELSE 'Sin clasificar' END AS categoria,
                     count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
              FROM facturas GROUP BY 1 ORDER BY co2e DESC`),
     ]);

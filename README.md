@@ -302,9 +302,11 @@ cuentas ambientales del Banco Central/MMA), citando además Natural Capital Prot
 - **Plan de cuentas ambiental**: AGUA (m3), ENER (kWh), CO2E (tCO2e), MATR (t) como flujo;
   SUEL (ha) y BIOD (índice) como stock. Toggle de activación y factores de conversión
   editables por cuenta.
-- **Movimientos automáticos**: cada documento procesado (flujo público o Corredor) genera
-  cargos en las cuentas activas, con traza a la factura de origen. También hay movimientos
-  manuales (cargo/abono).
+- **Movimientos automáticos**: cada documento procesado (flujo público o Corredor) carga la
+  cuenta de carbono, con traza a la factura de origen. Las cuentas **físicas** (kWh, m³, t)
+  se cargan solo si la categoría salió de la glosa real del documento: el catch-all del motor
+  no es una clasificación, y un consumo físico inventado quedaría sellado por hash. También
+  hay movimientos manuales (cargo/abono).
 - **Activos naturales**: derechos de agua, predios, bosques u otros stocks, con extensión,
   condición (0–100) y valorización CLP manual.
 - **Informe "Estado de Capital Natural"** (PDF, folio `N-AAAA-NNNN`): balance por cuenta con
