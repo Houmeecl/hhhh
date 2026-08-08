@@ -19,6 +19,8 @@ import SolicitarAuspicio from './pages/SolicitarAuspicio.jsx';
 import MisDatos from './pages/MisDatos.jsx';
 import Cadena from './pages/Cadena.jsx';
 import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
+import LoginSuma from './juego/Login.jsx';
+import ConstanciaPublicaSuma from './juego/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
 import ActivarCuenta from './components/ActivarCuenta.jsx';
 import EntrarComoSuperadmin from './components/EntrarComoSuperadmin.jsx';
@@ -43,6 +45,7 @@ const ProveedorApp = lazy(() => import('./panel-proveedor/ProveedorApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
+const JuegoApp = lazy(() => import('./juego/JuegoApp.jsx'));
 
 const CargandoModulo = () => (
   <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -94,6 +97,7 @@ export default function App() {
       <Route path="/mis-datos" element={<MisDatos />} />
       <Route path="/cadena" element={<Cadena />} />
       <Route path="/constancia/:serial" element={<ConstanciaPublica />} />
+      <Route path="/suma/constancia/:serial" element={<ConstanciaPublicaSuma />} />
 
       {/* Puente de la vista de superadmin: guarda el token de vista en el
           almacén del panel elegido y redirige a su raíz (ver
@@ -135,6 +139,12 @@ export default function App() {
       <Route path="/panel-proveedor/login" element={<LoginProveedor />} />
       <Route path="/panel-proveedor/activar" element={<ActivarCuenta loginPath="/panel-proveedor/login" titulo="el panel de Proveedor" />} />
       <Route path="/panel-proveedor/*" element={<ProveedorApp />} />
+
+      {/* "Sube y Suma" — escaneo gamificado con código de campaña de una
+          empresa cliente. Sin /activar: el jugador entra por magic link,
+          nunca con contraseña. */}
+      <Route path="/suma/login" element={<LoginSuma />} />
+      <Route path="/suma/*" element={<JuegoApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

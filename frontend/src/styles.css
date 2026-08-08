@@ -53,6 +53,30 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
 .theme-trazador .admin-side { background: #2e1414; }
 .theme-trazador .admin-side nav a.active { background: #ef4444; color: #fff; }
 
+/* "Sube y Suma" (/suma) — app-shell propia con bottom-nav (uso desde el
+   celular en terreno, no un panel de escritorio): NO reusa .admin-shell.
+   Acento propio, distinto de --green (para no confundirse visualmente con
+   la contabilidad de carbono real que puntúa por debajo). */
+.theme-suma { --suma-accent: #0d9488; --suma-accent-dark: #0f2e2b; }
+.game-shell { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+.game-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 18px; background: var(--suma-accent-dark); color: #fff; position: sticky; top: 0; z-index: 30;
+}
+.game-content { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 16px; padding-bottom: 88px; box-sizing: border-box; min-width: 0; }
+.game-bottomnav {
+  position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff;
+  border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.game-bottomnav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 0 8px; color: #94a3b8; font-size: 11px; font-weight: 600; text-decoration: none;
+}
+.game-bottomnav a.active { color: var(--suma-accent); }
+.game-level-bar { height: 8px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+.game-level-bar > div { height: 100%; background: var(--suma-accent); border-radius: 99px; }
+
 /* Animaciones de entrada */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

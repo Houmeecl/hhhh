@@ -47,6 +47,10 @@ export const authMandante = crearAlmacenSesion('mandante');
 export const authAgencia = crearAlmacenSesion('agencia');
 export const authTrazador = crearAlmacenSesion('trazador');
 export const authProveedor = crearAlmacenSesion('proveedor');
+// Sesión del "jugador" de Sube y Suma (magic link con código de campaña,
+// rol 'jugador' — ver auth.js). Sin refresh token: el JWT dura 30 días y
+// se renueva pidiendo un enlace nuevo, igual que clienteAuth.
+export const authSuma = crearAlmacenSesion('suma');
 
 // Sesión del cliente (magic link) — storage separado del admin.
 const CLIENTE_KEY = 'sicr3p_cliente';
@@ -61,9 +65,9 @@ export const clienteAuth = {
   clear() { localStorage.removeItem(CLIENTE_KEY); localStorage.removeItem(CLIENTE_EMAIL_KEY); },
 };
 
-async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, authedTrazador = false, authedProveedor = false, cliente = false } = {}) {
-  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : authedTrazador ? authTrazador : authedProveedor ? authProveedor : auth;
-  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia || authedTrazador || authedProveedor;
+async function request(path, { method = 'GET', body, formData, authed = false, authedAv = false, authedPuerto = false, authedMandante = false, authedAgencia = false, authedTrazador = false, authedProveedor = false, authedSuma = false, cliente = false } = {}) {
+  const store = authedAv ? authAv : authedPuerto ? authPuerto : authedMandante ? authMandante : authedAgencia ? authAgencia : authedTrazador ? authTrazador : authedProveedor ? authProveedor : authedSuma ? authSuma : auth;
+  const anyAuthed = authed || authedAv || authedPuerto || authedMandante || authedAgencia || authedTrazador || authedProveedor || authedSuma;
   const headers = {};
   if (!formData) headers['Content-Type'] = 'application/json';
   if (anyAuthed && store.access) headers['Authorization'] = `Bearer ${store.access}`;
@@ -461,6 +465,24 @@ export const api = {
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
   misSesiones: () => request('/mis-sesiones', { cliente: true }),
+
+  // --- "Sube y Suma" (/suma) — escaneo gamificado con código de campaña.
+  // El magic link es el mismo mecanismo de arriba, solo que con `codigo` en
+  // el body (ver auth.js); verificarMagic() de arriba sirve para ambos.
+  jugadorSolicitarMagic: (email, codigo) => request('/auth/magic', { method: 'POST', body: { email, codigo } }),
+  jugadorPerfil: () => request('/juego/perfil', { authedSuma: true }),
+  jugadorRanking: () => request('/juego/ranking', { authedSuma: true }),
+  jugadorRecompensas: () => request('/juego/recompensas', { authedSuma: true }),
+  jugadorCanjear: (id) => request(`/juego/recompensas/${id}/canjear`, { method: 'POST', authedSuma: true }),
+  jugadorTrayectoSalida: (modo_transporte) =>
+    request('/juego/trayecto/salida', { method: 'POST', body: { modo_transporte }, authedSuma: true }),
+  jugadorTrayectoLlegada: (id) => request(`/juego/trayecto/${id}/llegada`, { method: 'POST', authedSuma: true }),
+  // Mismo POST /sesiones de siempre (el motor propio real) — solo cambia la
+  // credencial adjunta (el jugador, no un cliente ni el panel de terreno).
+  jugadorCrearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true, authedSuma: true }),
+  constanciaJuegoUrl: (serial) => `/suma/constancia/${serial}`,
+  constanciaJuegoQrUrl: (serial) => `/api/juego/constancias/${serial}/qr.png`,
+  constanciaJuegoPublica: (serial) => request(`/juego/constancias/${serial}`),
 
   // Capacitación interna — compartida por /admin y /panel-verde (el flag
   // `av` elige el almacén de token correcto, sin tocar request()).

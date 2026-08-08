@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
-import { api, clienteAuth } from '../api.js';
+import { api, clienteAuth, authSuma } from '../api.js';
 
-// Canjea el token del magic link y abre el historial del cliente.
+// Canjea el token del magic link. El mismo enlace de correo sirve para dos
+// destinos — el backend arma la MISMA URL /acceso para ambos (ver
+// POST /auth/magic en routes/auth.js) y solo la respuesta dice cuál es:
+// un cliente normal (rol 'cliente') abre su historial; un jugador de
+// "Sube y Suma" (rol 'jugador', el enlace traía un código de campaña)
+// abre el juego con su propio almacén de sesión (authSuma).
 export default function Acceso() {
   const [params] = useSearchParams();
   const nav = useNavigate();
@@ -14,7 +19,10 @@ export default function Acceso() {
     const token = params.get('token');
     if (!token) { setError('Falta el token de acceso.'); return; }
     api.verificarMagic(token)
-      .then((r) => { clienteAuth.set(r.token, r.email); nav('/mis-sesiones', { replace: true }); })
+      .then((r) => {
+        if (r.rol === 'jugador') { authSuma.set(r.token); nav('/suma', { replace: true }); return; }
+        clienteAuth.set(r.token, r.email); nav('/mis-sesiones', { replace: true });
+      })
       .catch((e) => setError(e.message));
   }, []);
 

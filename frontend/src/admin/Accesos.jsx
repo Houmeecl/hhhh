@@ -48,7 +48,7 @@ export default function Accesos() {
 
 function Codigos({ flash }) {
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ cantidad: '5', creditos: '5', empresa: '', email: '' });
+  const [form, setForm] = useState({ cantidad: '5', creditos: '5', empresa: '', email: '', modo_juego: false });
   const [creando, setCreando] = useState(false);
   const [nuevos, setNuevos] = useState([]);
 
@@ -60,7 +60,7 @@ function Codigos({ flash }) {
     try {
       const { codigos } = await api.crearCodigos({
         cantidad: Number(form.cantidad) || 1, creditos: Number(form.creditos) || 5,
-        empresa: form.empresa, email: form.email,
+        empresa: form.empresa, email: form.email, modo_juego: form.modo_juego,
       });
       setNuevos(codigos.map((c) => c.codigo));
       cargar(); flash(`${codigos.length} código(s) generados.`);
@@ -84,11 +84,16 @@ function Codigos({ flash }) {
             <div className="field"><label>Empresa (opcional)</label><input value={form.empresa} onChange={(e) => setForm({ ...form, empresa: e.target.value })} /></div>
             <div className="field"><label>Email (opcional)</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 12, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.modo_juego} onChange={(e) => setForm({ ...form, modo_juego: e.target.checked })} />
+            Código de campaña "Sube y Suma" (habilita el juego de puntos para el equipo de esta empresa)
+          </label>
           <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando}>
             {creando ? <span className="spinner" /> : 'Generar'}
           </button>
           <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
-            El invitado entra en <b>sicr3p.cl/prueba</b> con su código. Cada factura procesada consume 1 crédito.
+            El invitado entra en <b>sicr3p.cl/prueba</b> con su código (o en <b>/suma/login</b> si es de campaña).
+            Cada factura procesada consume 1 crédito.
           </p>
         </div>
         {nuevos.length > 0 && (
@@ -112,7 +117,10 @@ function Codigos({ flash }) {
                   : { texto: 'No conectado', clase: 'badge-gray' };
               return (
               <tr key={c.id}>
-                <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{c.codigo}</td>
+                <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>
+                  {c.codigo}
+                  {c.modo_juego && <div><span className="badge badge-gray" style={{ fontSize: 10, marginTop: 2 }}>Sube y Suma</span></div>}
+                </td>
                 <td className="muted" style={{ fontSize: 13 }}>{c.empresa || '—'}{c.email && <div style={{ fontSize: 12 }}>{c.email}</div>}</td>
                 <td className="num"><b>{c.creditos - c.creditos_usados}</b> / {c.creditos}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{c.ultimo_uso ? fmtFecha(c.ultimo_uso) : '—'}</td>
