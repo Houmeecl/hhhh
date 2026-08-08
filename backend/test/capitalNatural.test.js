@@ -146,3 +146,52 @@ test('hashMovimientoNatural no depende de la hora del día, solo de la fecha', (
   const b = hashMovimientoNatural({ ...MOV_A, fecha: new Date('2026-07-01T23:00:00Z') });
   assert.equal(a, b);
 });
+
+// ============================================================
+// El catch-all del motor no inventa consumo físico.
+//
+// Cuando ninguna palabra clave calza, el motor devuelve 'servicios', que no
+// toca cuentas físicas — así que hoy el riesgo está dormido. Pero si un admin
+// desactiva 'servicios' desde el panel (lo que ya se hizo con 'transporte' en
+// la migración 075), el catch-all pasa a la primera categoría activa por
+// orden de código: `agua`. Desde ahí, cada documento que el motor no supo
+// clasificar registraría metros cúbicos de agua que nadie consumió, en un
+// libro sellado por cadena de hash: dato inventado y además inmutable.
+//
+// La señal es `categoria_origen = 'sin_coincidencia'` (migración 077).
+// ============================================================
+test('sin coincidencia con categoría de agua: NO carga m3 inventados, pero sí el CO2e real', () => {
+  const movs = derivarMovimientos(
+    { categoria: 'Agua', categoria_origen: 'sin_coincidencia', total_co2e: 0.344, numero_venta: 'V-CATCH' },
+    cuentas()
+  );
+  assert.deepEqual(movs.map((m) => m.cuenta_codigo), ['CO2E'], 'solo la cuenta de carbono');
+  assert.equal(movs[0].cantidad, 0.344, 'el CO2e se calculó de verdad, aunque no se sepa de qué fue el gasto');
+});
+
+test('sin coincidencia con categoría de energía o materiales: mismo criterio', () => {
+  for (const categoria of ['Energía eléctrica', 'Insumos y materiales']) {
+    const movs = derivarMovimientos(
+      { categoria, categoria_origen: 'sin_coincidencia', total_co2e: 1, numero_venta: 'V-CATCH' },
+      cuentas()
+    );
+    assert.deepEqual(movs.map((m) => m.cuenta_codigo), ['CO2E'], `${categoria}: solo CO2E`);
+  }
+});
+
+test('clasificado de verdad ("glosa"): las cuentas físicas se cargan igual que siempre', () => {
+  const movs = derivarMovimientos(
+    { categoria: 'Agua', categoria_origen: 'glosa', total_co2e: 0.344, numero_venta: 'V-OK' },
+    cuentas()
+  );
+  const agua = movs.find((m) => m.cuenta_codigo === 'AGUA');
+  assert.ok(agua, 'una categoría que sí salió de la glosa carga su cuenta física');
+  assert.equal(agua.cantidad, 1000);
+});
+
+test('documento anterior a la migración 077 (sin procedencia): se comporta como antes', () => {
+  // De estos no consta de dónde salió la categoría, y no hay forma de saberlo
+  // hacia atrás. Cambiarles el comportamiento reescribiría el histórico.
+  const movs = derivarMovimientos({ categoria: 'Agua', total_co2e: 0.344, numero_venta: 'V-VIEJA' }, cuentas());
+  assert.ok(movs.some((m) => m.cuenta_codigo === 'AGUA'));
+});

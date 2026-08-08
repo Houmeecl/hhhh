@@ -54,6 +54,26 @@ export function derivarMovimientos(factura, cuentas) {
     });
   }
 
+  // Las cuentas FÍSICAS solo se cargan si la categoría es una clasificación
+  // del documento, no el catch-all del motor.
+  //
+  // Cuando ninguna palabra clave calza, `clasificarConSenal` devuelve
+  // 'servicios' — que no toca cuentas físicas, así que hoy no pasa nada. Pero
+  // si un admin desactiva 'servicios' desde el panel (lo que ya se hizo con
+  // 'transporte' en la migración 075), el catch-all pasa a ser la primera
+  // categoría activa por orden de código: hoy, `agua`. Desde ese momento cada
+  // documento que el motor no supo clasificar registraría METROS CÚBICOS DE
+  // AGUA QUE NADIE CONSUMIÓ, en un libro sellado por cadena de hash — o sea,
+  // un dato inventado y además inmutable, que es lo peor de las dos cosas.
+  //
+  // El CO2E de arriba sí se carga igual: ese número se calculó de verdad
+  // (por gasto), aunque no se sepa de qué fue el gasto.
+  //
+  // `categoria_origen` es NULL en los documentos anteriores a la migración
+  // 077: de esos no consta de dónde salió la categoría y se dejan como
+  // estaban, porque no hay forma de saberlo hacia atrás.
+  if (factura.categoria_origen === 'sin_coincidencia') return movs;
+
   // Cuentas físicas según la categoría del documento (cantidad estimada
   // a partir del CO2e y el factor de conversión de la cuenta).
   switch (factura.categoria) {

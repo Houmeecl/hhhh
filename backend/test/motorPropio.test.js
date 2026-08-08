@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { normalizarUnidad, clasificar, calcularItem, calcularFactura, evaluarItems, MONTO_MAX_CLP_ITEM, CANTIDAD_MAX_ITEM } from '../src/services/motorPropio.js';
+import { normalizarUnidad, clasificar, clasificarConSenal, calcularItem, calcularFactura, evaluarItems, MONTO_MAX_CLP_ITEM, CANTIDAD_MAX_ITEM } from '../src/services/motorPropio.js';
 import { parseDte } from '../src/services/dte.js';
 
 // Mismas categorías/seed de migrations/010_motor_propio.sql, en memoria (sin BD).
@@ -343,4 +343,41 @@ test('cantidad negativa con monto positivo se descarta: el físico jamás resta 
 test('cargarCategorias pide orden determinista a la BD (evita desempates que dependan del orden físico de lectura)', () => {
   const src = fs.readFileSync(fileURLToPath(new URL('../src/services/motorPropio.js', import.meta.url)), 'utf8');
   assert.match(src, /SELECT \* FROM motor_categorias ORDER BY codigo/);
+});
+
+// ============================================================
+// El catch-all cuando 'servicios' está desactivada.
+//
+// Desactivar una categoría desde el panel del motor es una operación normal
+// —ya se hizo con 'transporte' en la migración 075—, y con 'servicios' fuera
+// el catch-all pasa a la primera categoría activa POR ORDEN DE CÓDIGO, que
+// en el catálogo real es `agua`. El motor sigue calculando bien (hay factor),
+// pero el código que devuelve deja de parecerse a "no pude clasificar esto".
+//
+// Este test fija ese comportamiento para que se vea: la salvaguarda de verdad
+// está río abajo, en capitalNatural.js, que no carga cuentas físicas cuando
+// `coincidencia` es false. Sin ella, cada documento no clasificado registraría
+// metros cúbicos de agua que nadie consumió, en un libro sellado por hash.
+// ============================================================
+test('con "servicios" desactivada el catch-all cae en la primera categoría activa, y lo declara', () => {
+  const cats = categoriasEjemplo();
+  cats.set('agua', { codigo: 'agua', nombre: 'Agua', unidad_fisica: 'm3', factor_fisico_kgco2e: 0.344, factor_gasto_kgco2e_clp1000: 0.30, palabras_clave: ['agua potable'], activo: true });
+  cats.set('servicios', { ...cats.get('servicios'), activo: false });
+
+  const r = clasificarConSenal('glosa que no calza con nada', cats);
+  assert.equal(r.coincidencia, false, 'sigue declarando que NO hubo coincidencia');
+  assert.notEqual(r.codigo, 'servicios', 'no puede devolver una categoría desactivada');
+
+  // Y con 'servicios' activa, el catch-all es esa — que no toca cuentas físicas.
+  cats.set('servicios', { ...cats.get('servicios'), activo: true });
+  const r2 = clasificarConSenal('glosa que no calza con nada', cats);
+  assert.deepEqual(r2, { codigo: 'servicios', coincidencia: false });
+});
+
+test('calcularItem marca categoria_coincidencia=false en el catch-all, sea cual sea la categoría', () => {
+  const cats = categoriasEjemplo();
+  cats.set('servicios', { ...cats.get('servicios'), activo: false });
+  const it = calcularItem({ nombre: 'glosa que no calza', cantidad: 1, monto: 100000 }, cats, 'xml');
+  assert.equal(it.categoria_coincidencia, false);
+  assert.ok(it.co2e >= 0, 'igual se calcula: hay factor con qué');
 });
