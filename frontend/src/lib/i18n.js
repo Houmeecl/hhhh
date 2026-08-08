@@ -1597,11 +1597,19 @@ const DICCIONARIOS = {
   // Perú, y los sellos de documento tributario (SII) describen una
   // capacidad real del motor sobre el DTE chileno, no el comprobante
   // electrónico peruano — adaptar esas claves sería afirmar algo falso.
+  //
+  // `landing.trust_3` NO se sobrescribe, a propósito. Decía "Huella de Carbono
+  // Perú (MINAM)": una atribución a un organismo público que no pasó por la
+  // diligencia de fuentes (docs/ no tiene una sola línea que la respalde,
+  // mientras las fuentes chilenas sí tienen su estado y su año de vigencia en
+  // `fuentes_metodologicas`). Cae a 'es' y dice "Factores HuellaChile", que es
+  // lo que el motor usa de verdad — para un lector peruano eso es información
+  // útil y verdadera, no una omisión: le dice con qué factores se calculó.
+  // Volver a ponerla exige antes la fuente citada, su vigencia y su estado.
   pe: {
     'ver.rut': 'RUC',
     'pas.rut': 'RUC',
     'calc.u.clp': 'S//mes',
-    'landing.trust_3': 'Huella de Carbono Perú (MINAM)',
   },
 };
 

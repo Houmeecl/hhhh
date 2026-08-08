@@ -6,8 +6,9 @@ import { IDIOMAS, useIdioma } from '../lib/i18n.js';
 // Nombre legible de cada idioma/variante para el aria-label de los botones
 // (las banderas no son accesibles por sí solas para lectores de pantalla).
 const NOMBRE_IDIOMA = { es: 'Español (Chile)', en: 'English', pt: 'Português', pe: 'Español (Perú)' };
-// 'pe' no es un idioma nuevo: mismo español, con RUC/Sol/Huella de Carbono
-// Perú en vez de RUT/CLP/HuellaChile (ver comentario en lib/i18n.js).
+// 'pe' no es un idioma nuevo: mismo español, con RUC y soles en vez de RUT y
+// pesos. Los factores siguen siendo los chilenos y la variante lo dice así
+// (ver el comentario del bloque `pe` en lib/i18n.js).
 const BANDERA_IDIOMA = { es: '🇨🇱', en: '🇺🇸', pt: '🇧🇷', pe: '🇵🇪' };
 
 // Selector de banderas clicables. Se usa en este layout y en el layout
