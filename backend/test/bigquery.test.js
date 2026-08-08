@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, rowCompensacion, bigquery } from '../src/services/bigquery.js';
+import {
+  rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, rowCompensacion,
+  rowPuntosEvento, rowCanje, rowTrayecto, bigquery,
+} from '../src/services/bigquery.js';
 
 test('rowFactura normaliza RUT y tipos para el warehouse', () => {
   const r = rowFactura(
@@ -122,5 +125,84 @@ test('rowCompensacion tolera campos ausentes sin lanzar (omitido sin terminal)',
 
 test('exportCompensacion apagado es no-op silencioso', async () => {
   const res = await bigquery.exportCompensacion({ id: 'c3', sesion_id: 's3' }, {});
+  assert.equal(res, false);
+});
+
+// ---------- "Sube y Suma": puntos_eventos / canjes / trayectos ----------
+
+test('rowPuntosEvento mapea el evento completo', () => {
+  const row = rowPuntosEvento({
+    id: 'e1', jugador_id: 'j1', tipo: 'documento_escaneado', puntos: '10',
+    factura_id: 'f1', mision_id: null, trayecto_id: null, created_at: '2026-08-08T00:00:00Z',
+  });
+  assert.equal(row.id, 'e1');
+  assert.equal(row.jugador_id, 'j1');
+  assert.equal(row.tipo, 'documento_escaneado');
+  assert.equal(row.puntos, 10);
+  assert.equal(row.factura_id, 'f1');
+  assert.equal(row.mision_id, null);
+  assert.equal(row.trayecto_id, null);
+  assert.equal(row.created_at, '2026-08-08T00:00:00.000Z');
+});
+
+test('rowPuntosEvento tolera campos ausentes sin lanzar', () => {
+  const row = rowPuntosEvento({ id: 'e2', jugador_id: 'j2', tipo: 'mision_completada', puntos: 50 });
+  assert.equal(row.factura_id, null);
+  assert.equal(row.mision_id, null);
+  assert.equal(row.trayecto_id, null);
+  assert.ok(row.created_at.endsWith('Z'));
+});
+
+test('exportPuntosEvento apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportPuntosEvento({ id: 'e3', jugador_id: 'j3', tipo: 'documento_escaneado', puntos: 10 });
+  assert.equal(res, false);
+});
+
+test('rowCanje mapea el canje completo', () => {
+  const row = rowCanje({
+    id: 'c1', jugador_id: 'j1', recompensa_id: 'r1', puntos_gastados: '100',
+    serial: 'SUMA-ABC123', hash: 'abc', created_at: '2026-08-08T00:00:00Z',
+  });
+  assert.equal(row.id, 'c1');
+  assert.equal(row.jugador_id, 'j1');
+  assert.equal(row.recompensa_id, 'r1');
+  assert.equal(row.puntos_gastados, 100);
+  assert.equal(row.serial, 'SUMA-ABC123');
+  assert.equal(row.hash, 'abc');
+  assert.equal(row.created_at, '2026-08-08T00:00:00.000Z');
+});
+
+test('rowCanje tolera campos ausentes (canje de insignia, sin serial)', () => {
+  const row = rowCanje({ id: 'c2', jugador_id: 'j2', recompensa_id: 'r2', puntos_gastados: 50 });
+  assert.equal(row.serial, null);
+  assert.equal(row.hash, null);
+});
+
+test('exportCanje apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportCanje({ id: 'c3', jugador_id: 'j3', recompensa_id: 'r3', puntos_gastados: 50 });
+  assert.equal(res, false);
+});
+
+test('rowTrayecto mapea el trayecto cerrado', () => {
+  const row = rowTrayecto({
+    id: 't1', jugador_id: 'j1', salida_at: '2026-08-08T08:00:00Z', llegada_at: '2026-08-08T08:30:00Z',
+    modo_transporte: 'bicicleta', puntos: '30', created_at: '2026-08-08T08:00:00Z',
+  });
+  assert.equal(row.id, 't1');
+  assert.equal(row.jugador_id, 'j1');
+  assert.equal(row.salida_at, '2026-08-08T08:00:00.000Z');
+  assert.equal(row.llegada_at, '2026-08-08T08:30:00.000Z');
+  assert.equal(row.modo_transporte, 'bicicleta');
+  assert.equal(row.puntos, 30);
+});
+
+test('rowTrayecto tolera un trayecto sin cerrar (llegada_at null)', () => {
+  const row = rowTrayecto({ id: 't2', jugador_id: 'j2', salida_at: '2026-08-08T08:00:00Z', puntos: 0 });
+  assert.equal(row.llegada_at, null);
+  assert.equal(row.modo_transporte, null);
+});
+
+test('exportTrayecto apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportTrayecto({ id: 't3', jugador_id: 'j3', salida_at: new Date(), puntos: 10 });
   assert.equal(res, false);
 });

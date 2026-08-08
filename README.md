@@ -323,8 +323,9 @@ la misma API se puede respaldar con Elasticsearch/OpenSearch sin cambiar el fron
 
 ### Export a BigQuery (data warehouse)
 
-Todo lo que se escanea (facturas + ítems del flujo público y documentos del Corredor) se
-puede replicar a **BigQuery** para análisis y cruces a gran escala:
+Todo lo que se escanea (facturas + ítems del flujo público y documentos del Corredor),
+más los cruces de datos auditados y la capa de gamificación de Sube y Suma (puntaje,
+canjes y trayectos), se puede replicar a **BigQuery** para análisis y cruces a gran escala:
 
 1. Crea el dataset con `backend/bigquery/schema.sql` (región `southamerica-west1`,
    RUT normalizados, particionado por fecha y clusterizado por RUT).
@@ -382,6 +383,9 @@ de créditos que arriba: 1 crédito = 1 factura, la campaña también tiene un c
 - Trayecto: el jugador puede marcar hora de salida/llegada y medio de transporte
   usado para llegar a escanear, con puntos extra para medios de bajo carbono
   (caminando, bicicleta, transporte público).
+- Panel de impacto (`/suma/impacto`): muestra el CO2e real detrás de los puntos
+  del jugador (suma del `total_co2e` de sus documentos escaneados) — nunca dice
+  "huella" ni "certificación", aclara que es un resumen de su participación.
 
 ### API para mandantes
 

@@ -107,3 +107,44 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.accesos_cruce` (
 )
 PARTITION BY DATE(created_at)
 CLUSTER BY rut_consultado, actor_id;
+
+-- "Sube y Suma" — capa de gamificación (juego de escaneo para empleados
+-- de una empresa cliente). Las tres tablas son append-only (una fila por
+-- evento, nunca se reemplazan), sin PARTITION BY/CLUSTER BY: volumen bajo,
+-- igual que line_items.
+
+-- Bitácora de puntaje: cada vez que un jugador escanea un documento,
+-- completa una misión o cierra un trayecto de bajo carbono.
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.puntos_eventos` (
+  id           STRING NOT NULL,
+  jugador_id   STRING NOT NULL,
+  tipo         STRING NOT NULL,    -- documento_escaneado | mision_completada | trayecto_registrado
+  puntos       INT64 NOT NULL,
+  factura_id   STRING,
+  mision_id    STRING,
+  trayecto_id  STRING,
+  created_at   TIMESTAMP NOT NULL
+);
+
+-- Canje de una recompensa simbólica (insignia o constancia) por puntos.
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.canjes` (
+  id               STRING NOT NULL,
+  jugador_id       STRING NOT NULL,
+  recompensa_id    STRING NOT NULL,
+  puntos_gastados  INT64 NOT NULL,
+  serial           STRING,
+  hash             STRING,
+  created_at       TIMESTAMP NOT NULL
+);
+
+-- Trayecto de ida/vuelta a la empresa — solo se exporta ya cerrado (con
+-- llegada_at/puntos), nunca al abrirse.
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.trayectos` (
+  id               STRING NOT NULL,
+  jugador_id       STRING NOT NULL,
+  salida_at        TIMESTAMP NOT NULL,
+  llegada_at       TIMESTAMP,
+  modo_transporte  STRING,          -- caminando | bicicleta | transporte_publico | auto | moto | otro
+  puntos           INT64 NOT NULL,
+  created_at       TIMESTAMP NOT NULL
+);

@@ -301,6 +301,9 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     }
 
     let puntosGanados = 0;
+    // Eventos de puntaje del jugador (ver bloque `if (jugador)` más abajo),
+    // exportados a BigQuery recién después del commit de la transacción.
+    const eventosJuego = [];
 
     // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
     // segundos por archivo y antes corría con la fila de cadena_estado
@@ -566,12 +569,14 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         // estas tablas.
         if (jugador) {
           const puntosDoc = calcularPuntosPorFactura();
-          await otorgarPuntos(client, {
+          const eventoDoc = await otorgarPuntos(client, {
             jugadorId: jugador.jugadorId, tipo: 'documento_escaneado', puntos: puntosDoc, facturaId: factura.id,
           });
-          await evaluarMisionesContador(client, {
+          if (eventoDoc) eventosJuego.push(eventoDoc);
+          const eventosMision = await evaluarMisionesContador(client, {
             jugadorId: jugador.jugadorId, tipoMision: 'contar_documentos', incremento: 1,
           });
+          eventosJuego.push(...eventosMision);
           puntosGanados += puntosDoc;
         }
 
@@ -622,6 +627,7 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
 
     // Export al data warehouse (no bloqueante; apagado por defecto).
     bigquery.exportSesion({ sesion: result, facturas });
+    eventosJuego.forEach((e) => bigquery.exportPuntosEvento(e));
 
     // Envío del informe por correo (no bloqueante: nunca afecta la respuesta).
     (async () => {

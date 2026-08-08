@@ -7,6 +7,7 @@ import Escanear from './Escanear.jsx';
 import Trayecto from './Trayecto.jsx';
 import Misiones from './Misiones.jsx';
 import Recompensas from './Recompensas.jsx';
+import Impacto from './Impacto.jsx';
 
 // "Sube y Suma" es su propia app instalable (PWA), distinta del panel
 // núcleo — mismo service worker (sw.js), solo cambia el manifest mientras
@@ -90,6 +91,7 @@ export default function JuegoApp() {
           <Route path="trayecto" element={<Trayecto />} />
           <Route path="misiones" element={<Misiones />} />
           <Route path="recompensas" element={<Recompensas />} />
+          <Route path="impacto" element={<Impacto />} />
           <Route path="*" element={<Navigate to="/suma" replace />} />
         </Routes>
       </div>

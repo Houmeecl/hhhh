@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { query } from '../lib/db.js';
 
 // ============================================================
 // "Sube y Suma" — helpers puros de puntaje/nivel/trayecto (sin BD) +
@@ -98,28 +99,32 @@ export function hashCanje({ serial, jugador_id, recompensa_codigo, puntos_gastad
 // la MISMA transacción del llamador (client ya abierto con BEGIN). No hace
 // su propio commit/rollback — eso es responsabilidad de withTx.
 export async function otorgarPuntos(client, { jugadorId, tipo, puntos, facturaId = null, misionId = null, trayectoId = null }) {
-  if (puntos <= 0) return;
-  await client.query(
+  if (puntos <= 0) return null;
+  const { rows } = await client.query(
     `INSERT INTO puntos_eventos (jugador_id, tipo, puntos, factura_id, mision_id, trayecto_id)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
     [jugadorId, tipo, puntos, facturaId, misionId, trayectoId]
   );
   await client.query(
     `UPDATE jugadores SET puntos_totales = puntos_totales + $2 WHERE id = $1`,
     [jugadorId, puntos]
   );
+  return rows[0];
 }
 
 // Suma progreso a todas las misiones activas de un tipo dado para un
 // jugador; si alguna se completa recién ahora (progreso cruza meta_valor
 // por primera vez), otorga sus puntos de recompensa. Idempotente frente a
 // reintentos: una misión ya completada (completada_at IS NOT NULL) no
-// vuelve a otorgar puntos aunque su progreso siga sumando.
+// vuelve a otorgar puntos aunque su progreso siga sumando. Devuelve los
+// eventos de puntos_eventos de las misiones recién completadas en esta
+// llamada (para que el llamador los exporte a BigQuery tras el commit).
 export async function evaluarMisionesContador(client, { jugadorId, tipoMision, incremento = 1 }) {
   const { rows: misiones } = await client.query(
     `SELECT id, meta_valor, puntos_recompensa FROM misiones WHERE tipo = $1 AND activo = true`,
     [tipoMision]
   );
+  const eventos = [];
   for (const m of misiones) {
     const { rows } = await client.query(
       `INSERT INTO misiones_progreso (jugador_id, mision_id, progreso)
@@ -135,9 +140,26 @@ export async function evaluarMisionesContador(client, { jugadorId, tipoMision, i
         `UPDATE misiones_progreso SET completada_at = now() WHERE jugador_id = $1 AND mision_id = $2`,
         [jugadorId, m.id]
       );
-      await otorgarPuntos(client, {
+      const evento = await otorgarPuntos(client, {
         jugadorId, tipo: 'mision_completada', puntos: m.puntos_recompensa, misionId: m.id,
       });
+      if (evento) eventos.push(evento);
     }
   }
+  return eventos;
+}
+
+// Panel de impacto personal: el CO2e real detrás de los puntos de un
+// jugador — nunca "huella", nunca certificación. Cada evento
+// 'documento_escaneado' siempre trae factura_id (viene de un INSERT en
+// facturas ya confirmado dentro de la misma transacción, ver public.js),
+// así que el INNER JOIN no necesita LEFT ni filtro de nulos.
+export async function impactoDeJugador(jugadorId) {
+  const { rows } = await query(
+    `SELECT COUNT(*)::int AS documentos, COALESCE(SUM(f.total_co2e), 0)::float AS co2e_total
+     FROM puntos_eventos pe JOIN facturas f ON f.id = pe.factura_id
+     WHERE pe.jugador_id = $1 AND pe.tipo = 'documento_escaneado'`,
+    [jugadorId]
+  );
+  return { documentos: rows[0].documentos, co2e_total: rows[0].co2e_total };
 }

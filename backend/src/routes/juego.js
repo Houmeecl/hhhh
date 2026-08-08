@@ -4,7 +4,9 @@ import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import {
   nivelDePuntos, calcularPuntosTrayecto, esModoBajoCarbono,
   generarSerialCanje, hashCanje, otorgarPuntos, evaluarMisionesContador,
+  impactoDeJugador,
 } from '../services/juego.js';
+import { bigquery } from '../services/bigquery.js';
 
 // ============================================================
 // "Sube y Suma" — /api/juego, rol 'jugador' (magic link con código de
@@ -53,6 +55,16 @@ router.get('/perfil', async (req, res, next) => {
       nivel,
       misiones,
     });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /impacto — CO2e real detrás de los puntos del jugador ----------
+router.get('/impacto', async (req, res, next) => {
+  try {
+    const jugador = await jugadorDe(req);
+    if (!jugador) return res.status(404).json({ error: 'Jugador no encontrado' });
+    const impacto = await impactoDeJugador(jugador.id);
+    res.json(impacto);
   } catch (err) { next(err); }
 });
 
@@ -141,6 +153,8 @@ router.post('/recompensas/:id/canjear', async (req, res, next) => {
     });
     await logActividad({ accion: 'juego_canje', entidad: 'canje', entidadId: canje.id, ip: req.ip });
     res.status(201).json({ canje });
+    // Export al data warehouse (no bloqueante; apagado por defecto).
+    bigquery.exportCanje(canje);
   } catch (err) { next(err); }
 });
 
@@ -164,7 +178,7 @@ router.post('/trayecto/salida', async (req, res, next) => {
 // ---------- POST /trayecto/:id/llegada ----------
 router.post('/trayecto/:id/llegada', async (req, res, next) => {
   try {
-    const trayecto = await withTx(async (client) => {
+    const { trayecto, eventos } = await withTx(async (client) => {
       const { rows: tRows } = await client.query(
         `SELECT * FROM trayectos WHERE id = $1 AND jugador_id = $2 FOR UPDATE`,
         [req.params.id, req.user.jugadorId]
@@ -181,19 +195,25 @@ router.post('/trayecto/:id/llegada', async (req, res, next) => {
         `UPDATE trayectos SET llegada_at = $2, puntos = $3 WHERE id = $1 RETURNING *`,
         [t.id, llegadaAt, puntos]
       );
-      await otorgarPuntos(client, {
+      const eventos = [];
+      const eventoTrayecto = await otorgarPuntos(client, {
         jugadorId: req.user.jugadorId, tipo: 'trayecto_registrado', puntos, trayectoId: t.id,
       });
+      if (eventoTrayecto) eventos.push(eventoTrayecto);
       // Solo un trayecto de bajo carbono avanza la misión 'primer_trayecto_verde'
       // (su descripción exige caminando/bicicleta/transporte público).
       if (esModoBajoCarbono(t.modo_transporte)) {
-        await evaluarMisionesContador(client, {
+        const eventosMision = await evaluarMisionesContador(client, {
           jugadorId: req.user.jugadorId, tipoMision: 'contar_trayectos', incremento: 1,
         });
+        eventos.push(...eventosMision);
       }
-      return rows[0];
+      return { trayecto: rows[0], eventos };
     });
     res.json({ trayecto });
+    // Export al data warehouse (no bloqueante; apagado por defecto).
+    bigquery.exportTrayecto(trayecto);
+    eventos.forEach((e) => bigquery.exportPuntosEvento(e));
   } catch (err) { next(err); }
 });
 

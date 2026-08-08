@@ -10,6 +10,7 @@ import {
   hashCanje,
   otorgarPuntos,
   evaluarMisionesContador,
+  impactoDeJugador,
 } from '../src/services/juego.js';
 import { query, withTx } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
@@ -105,10 +106,11 @@ async function crearJugadorDePrueba() {
   return jug[0].id;
 }
 
-test('otorgarPuntos suma a jugadores.puntos_totales y deja constancia en puntos_eventos', { skip: SALTO_PROD }, async () => {
+test('otorgarPuntos suma a jugadores.puntos_totales, deja constancia en puntos_eventos y devuelve la fila insertada', { skip: SALTO_PROD }, async () => {
   const jugadorId = await crearJugadorDePrueba();
+  let evento;
   await withTx(async (client) => {
-    await otorgarPuntos(client, { jugadorId, tipo: 'documento_escaneado', puntos: 10 });
+    evento = await otorgarPuntos(client, { jugadorId, tipo: 'documento_escaneado', puntos: 10 });
   });
   const { rows } = await query(`SELECT puntos_totales FROM jugadores WHERE id = $1`, [jugadorId]);
   assert.equal(rows[0].puntos_totales, 10);
@@ -116,25 +118,31 @@ test('otorgarPuntos suma a jugadores.puntos_totales y deja constancia en puntos_
   assert.equal(eventos.length, 1);
   assert.equal(eventos[0].tipo, 'documento_escaneado');
   assert.equal(eventos[0].puntos, 10);
+  assert.equal(evento.jugador_id, jugadorId);
+  assert.equal(evento.tipo, 'documento_escaneado');
+  assert.equal(evento.puntos, 10);
 });
 
-test('otorgarPuntos con 0 puntos no inserta evento ni suma', { skip: SALTO_PROD }, async () => {
+test('otorgarPuntos con 0 puntos no inserta evento ni suma, y devuelve null', { skip: SALTO_PROD }, async () => {
   const jugadorId = await crearJugadorDePrueba();
+  let evento;
   await withTx(async (client) => {
-    await otorgarPuntos(client, { jugadorId, tipo: 'trayecto_registrado', puntos: 0 });
+    evento = await otorgarPuntos(client, { jugadorId, tipo: 'trayecto_registrado', puntos: 0 });
   });
   const { rows } = await query(`SELECT puntos_totales FROM jugadores WHERE id = $1`, [jugadorId]);
   assert.equal(rows[0].puntos_totales, 0);
   const { rows: eventos } = await query(`SELECT * FROM puntos_eventos WHERE jugador_id = $1`, [jugadorId]);
   assert.equal(eventos.length, 0);
+  assert.equal(evento, null);
 });
 
-test('evaluarMisionesContador completa la misión al alcanzar la meta y otorga sus puntos una sola vez', { skip: SALTO_PROD }, async () => {
+test('evaluarMisionesContador completa la misión al alcanzar la meta, otorga sus puntos una sola vez y devuelve el evento', { skip: SALTO_PROD }, async () => {
   const jugadorId = await crearJugadorDePrueba();
   // Misión sembrada 'primeros_5': contar_documentos, meta 5, recompensa 50.
+  const eventosPorRonda = [];
   for (let i = 0; i < 5; i++) {
     await withTx(async (client) => {
-      await evaluarMisionesContador(client, { jugadorId, tipoMision: 'contar_documentos', incremento: 1 });
+      eventosPorRonda.push(await evaluarMisionesContador(client, { jugadorId, tipoMision: 'contar_documentos', incremento: 1 }));
     });
   }
   const { rows: progreso } = await query(
@@ -148,12 +156,68 @@ test('evaluarMisionesContador completa la misión al alcanzar la meta y otorga s
   const { rows: jugador } = await query(`SELECT puntos_totales FROM jugadores WHERE id = $1`, [jugadorId]);
   assert.equal(jugador[0].puntos_totales, 50);
 
-  // Un sexto documento no debe volver a otorgar los 50 puntos de la misión.
+  // Las primeras 4 rondas no completan la misión: array vacío. La quinta
+  // (la que cruza la meta) devuelve el evento 'mision_completada' de 50 puntos.
+  for (let i = 0; i < 4; i++) assert.deepEqual(eventosPorRonda[i], []);
+  assert.equal(eventosPorRonda[4].length, 1);
+  assert.equal(eventosPorRonda[4][0].tipo, 'mision_completada');
+  assert.equal(eventosPorRonda[4][0].puntos, 50);
+
+  // Un sexto documento no debe volver a otorgar los 50 puntos de la misión,
+  // ni devolver un evento (ya está completada).
+  let eventosSexto;
   await withTx(async (client) => {
-    await evaluarMisionesContador(client, { jugadorId, tipoMision: 'contar_documentos', incremento: 1 });
+    eventosSexto = await evaluarMisionesContador(client, { jugadorId, tipoMision: 'contar_documentos', incremento: 1 });
   });
+  assert.deepEqual(eventosSexto, []);
   const { rows: jugadorDespues } = await query(`SELECT puntos_totales FROM jugadores WHERE id = $1`, [jugadorId]);
   assert.equal(jugadorDespues[0].puntos_totales, 50);
+});
+
+// ---------- impactoDeJugador (con BD) ----------
+
+test('impactoDeJugador: sin eventos devuelve ceros', { skip: SALTO_PROD }, async () => {
+  const jugadorId = await crearJugadorDePrueba();
+  const r = await impactoDeJugador(jugadorId);
+  assert.deepEqual(r, { documentos: 0, co2e_total: 0 });
+});
+
+test('impactoDeJugador: suma el total_co2e de las facturas ligadas a sus eventos "documento_escaneado"', { skip: SALTO_PROD }, async () => {
+  const jugadorId = await crearJugadorDePrueba();
+  const { rows: [sesion] } = await query(
+    `INSERT INTO sesiones (rut_cliente, nombre_cliente) VALUES ('11.111.111-1', 'Empresa Impacto') RETURNING id`
+  );
+  const { rows: facturas } = await query(
+    `INSERT INTO facturas (sesion_id, total_co2e) VALUES ($1, 1.5), ($1, 2.25) RETURNING id`,
+    [sesion.id]
+  );
+  await withTx(async (client) => {
+    await otorgarPuntos(client, { jugadorId, tipo: 'documento_escaneado', puntos: 10, facturaId: facturas[0].id });
+    await otorgarPuntos(client, { jugadorId, tipo: 'documento_escaneado', puntos: 10, facturaId: facturas[1].id });
+    // Un evento de otro tipo (misión completada) no debe sumar CO2e aunque
+    // traiga un factura_id — solo cuenta lo que el jugador escaneó.
+    await otorgarPuntos(client, { jugadorId, tipo: 'mision_completada', puntos: 50, facturaId: facturas[0].id });
+  });
+  const r = await impactoDeJugador(jugadorId);
+  assert.equal(r.documentos, 2);
+  assert.equal(r.co2e_total, 3.75);
+});
+
+test('impactoDeJugador: nunca mezcla el CO2e de otro jugador', { skip: SALTO_PROD }, async () => {
+  const jugadorA = await crearJugadorDePrueba();
+  const jugadorB = await crearJugadorDePrueba();
+  const { rows: [sesion] } = await query(
+    `INSERT INTO sesiones (rut_cliente, nombre_cliente) VALUES ('22.222.222-2', 'Empresa Impacto B') RETURNING id`
+  );
+  const { rows: [factura] } = await query(
+    `INSERT INTO facturas (sesion_id, total_co2e) VALUES ($1, 9.9) RETURNING id`,
+    [sesion.id]
+  );
+  await withTx(async (client) => {
+    await otorgarPuntos(client, { jugadorId: jugadorA, tipo: 'documento_escaneado', puntos: 10, facturaId: factura.id });
+  });
+  const impactoB = await impactoDeJugador(jugadorB);
+  assert.deepEqual(impactoB, { documentos: 0, co2e_total: 0 });
 });
 
 test('runMigrations es idempotente: correrla otra vez no duplica misiones/recompensas de Sube y Suma', { skip: SALTO_PROD }, async () => {

@@ -471,6 +471,7 @@ export const api = {
   // el body (ver auth.js); verificarMagic() de arriba sirve para ambos.
   jugadorSolicitarMagic: (email, codigo) => request('/auth/magic', { method: 'POST', body: { email, codigo } }),
   jugadorPerfil: () => request('/juego/perfil', { authedSuma: true }),
+  jugadorImpacto: () => request('/juego/impacto', { authedSuma: true }),
   jugadorRanking: () => request('/juego/ranking', { authedSuma: true }),
   jugadorRecompensas: () => request('/juego/recompensas', { authedSuma: true }),
   jugadorCanjear: (id) => request(`/juego/recompensas/${id}/canjear`, { method: 'POST', authedSuma: true }),

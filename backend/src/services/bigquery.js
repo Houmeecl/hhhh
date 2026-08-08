@@ -166,6 +166,48 @@ export function rowDocumentoCorredor(doc) {
   };
 }
 
+// "Sube y Suma" — capa de gamificación. Las tres tablas son append-only
+// (nunca se actualizan tras crearse, salvo `trayectos` que se cierra una
+// sola vez con llegada_at/puntos — se exporta ya cerrado), así que usan el
+// insertId implícito (= id de la fila), sin el patrón id-created_at que sí
+// necesitan declaraciones_embalaje/compensaciones (esas sí se reemplazan).
+export function rowPuntosEvento(evento) {
+  return {
+    id: evento.id,
+    jugador_id: evento.jugador_id,
+    tipo: evento.tipo,
+    puntos: Number(evento.puntos || 0),
+    factura_id: evento.factura_id || null,
+    mision_id: evento.mision_id || null,
+    trayecto_id: evento.trayecto_id || null,
+    created_at: new Date(evento.created_at || Date.now()).toISOString(),
+  };
+}
+
+export function rowCanje(canje) {
+  return {
+    id: canje.id,
+    jugador_id: canje.jugador_id,
+    recompensa_id: canje.recompensa_id,
+    puntos_gastados: Number(canje.puntos_gastados || 0),
+    serial: canje.serial || null,
+    hash: canje.hash || null,
+    created_at: new Date(canje.created_at || Date.now()).toISOString(),
+  };
+}
+
+export function rowTrayecto(trayecto) {
+  return {
+    id: trayecto.id,
+    jugador_id: trayecto.jugador_id,
+    salida_at: new Date(trayecto.salida_at || Date.now()).toISOString(),
+    llegada_at: trayecto.llegada_at ? new Date(trayecto.llegada_at).toISOString() : null,
+    modo_transporte: trayecto.modo_transporte || null,
+    puntos: Number(trayecto.puntos || 0),
+    created_at: new Date(trayecto.created_at || Date.now()).toISOString(),
+  };
+}
+
 // Evento de auditoría: alguien (staff o mandante) cruzó datos de una
 // contraparte. `actor` = { tipo: 'usuario'|'mandante', id }.
 export function rowAcceso({ tipo, actor, rut_consultado, detalle }) {
@@ -226,5 +268,23 @@ export const bigquery = {
   // Copia externa opt-in del mismo evento que ya queda en actividad_log.
   exportAcceso({ tipo, actor, rut_consultado, detalle }) {
     return exportar('accesos_cruce', [rowAcceso({ tipo, actor, rut_consultado, detalle })]);
+  },
+
+  // "Sube y Suma": evento de puntaje (documento escaneado, misión
+  // completada, trayecto registrado) — se exporta después del commit de
+  // la transacción que lo generó (ver routes/public.js y routes/juego.js).
+  exportPuntosEvento(evento) {
+    return exportar('puntos_eventos', [rowPuntosEvento(evento)]);
+  },
+
+  // Canje de una recompensa simbólica.
+  exportCanje(canje) {
+    return exportar('canjes', [rowCanje(canje)]);
+  },
+
+  // Trayecto ya cerrado (con llegada_at/puntos) — un trayecto recién
+  // abierto no se exporta, no aporta nada analizable todavía.
+  exportTrayecto(trayecto) {
+    return exportar('trayectos', [rowTrayecto(trayecto)]);
   },
 };
