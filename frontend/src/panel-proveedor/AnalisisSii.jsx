@@ -185,11 +185,15 @@ export default function AnalisisSii() {
       {analisis && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 8 }}>
+            {/* El filtro es por proveedor de datos, no por documento: aun con
+                uno que sí puede traer detalle, el documento cuyo emisor no
+                publicó el XML vuelve a quedar sin alcance. Por eso el texto
+                dice "los que traigan el detalle" y no "los clasifica". */}
             {sinClasificar > 0 && (
               <button className="btn btn-outline btn-sm" disabled={descargando}
                 onClick={() => { setPeriodo(analisis.periodo); bajarPeriodo(analisis.periodo); }}
-                title="Los documentos sin clasificar se bajaron antes de que existiera el desglose por alcance. Al volver a bajarlos, el motor los clasifica.">
-                {descargando ? <><span className="spinner dark" /> Descargando…</> : `Clasificar ${fmtInt(sinClasificar)} documento${sinClasificar === 1 ? '' : 's'} sin alcance`}
+                title="Estos documentos se bajaron antes de que existiera el desglose por alcance. Al volver a bajarlos se clasifican los que traigan el detalle de sus ítems.">
+                {descargando ? <><span className="spinner dark" /> Descargando…</> : `Reintentar ${fmtInt(sinClasificar)} documento${sinClasificar === 1 ? '' : 's'} sin alcance`}
               </button>
             )}
             <button className="btn btn-outline btn-sm"
@@ -197,7 +201,8 @@ export default function AnalisisSii() {
               Descargar informe (PDF)
             </button>
           </div>
-          <AnalisisSiiVista a={analisis} />
+          {/* La empresa mira SU propio período: acá sí corresponde el tuteo. */}
+          <AnalisisSiiVista a={analisis} esPropio />
         </div>
       )}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}

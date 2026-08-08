@@ -370,8 +370,28 @@ test('proveedorSiiActivo: solo baseapi declara que puede traer el detalle', () =
 });
 
 test('proveedorSiiActivo: un nombre desconocido cae a baseapi, igual que el despacho', () => {
-  // Mismo comportamiento que `adaptador()`: si SII_PROVEEDOR trae basura, se
-  // usa baseapi. El nombre reportado tiene que decir lo que de verdad corre,
-  // no repetir la basura.
-  assert.deepEqual(proveedorSiiActivo({ proveedor: 'inventado' }), { nombre: 'baseapi', puede_traer_detalle: true });
+  // Mismo comportamiento que `adaptador()`: si SII_PROVEEDOR trae basura se
+  // usa baseapi, así que la capacidad reportada tiene que ser la de baseapi
+  // — la que de verdad va a correr.
+  assert.deepEqual(proveedorSiiActivo({ proveedor: 'inventado' }), { puede_traer_detalle: true });
+  assert.deepEqual(proveedorSiiActivo({ proveedor: '' }), { puede_traer_detalle: true });
+});
+
+// Contrato del payload: sin este campo el botón desaparece en silencio (falla
+// hacia el lado seguro, pero se pierde la función sin que nada avise).
+test('analizarPeriodo expone la capacidad del proveedor SII en el análisis', { skip: EN_PRODUCCION && SALTO_PROD }, async () => {
+  await runMigrations();
+  const rut = `99${Math.floor(Math.random() * 900000 + 100000)}`;
+  const { rows } = await query(
+    `INSERT INTO proveedores (nombre_empresa, rut) VALUES ('Empresa Capacidad SII', $1) RETURNING id`,
+    [rut]
+  );
+  try {
+    // Período sin documentos: el campo tiene que venir igual, porque de él
+    // depende que la interfaz decida si ofrece el reintento.
+    const a = await analizarPeriodo(query, rows[0].id, '2099-01');
+    assert.equal(typeof a.proveedor_sii?.puede_traer_detalle, 'boolean');
+  } finally {
+    await query(`DELETE FROM proveedores WHERE id = $1`, [rows[0].id]);
+  }
 });

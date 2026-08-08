@@ -28,7 +28,7 @@ export function descargarComprasVentas(args, opts = {}) {
   return adaptador(opts.proveedor).descargarComprasVentas(args, opts);
 }
 
-// Qué proveedor está activo y si PUEDE traer la glosa real de los ítems.
+// Si el proveedor de datos activo PUEDE traer la glosa real de los ítems.
 //
 // Existe para que la interfaz no ofrezca lo que este despliegue no puede
 // cumplir. El botón "Clasificar N documentos" vuelve a descargar el período
@@ -40,10 +40,11 @@ export function descargarComprasVentas(args, opts = {}) {
 // `puede`, no `trae`: con baseapi el reintento PUEDE cambiar el resultado
 // (depende de si el emisor publicó el XML), que es justo lo que hace honesto
 // ofrecer el botón.
+//
+// Devuelve SOLO la capacidad, sin el nombre del proveedor: esto viaja al
+// navegador de la empresa dentro del análisis del período, y con qué tercero
+// consultamos el SII es asunto nuestro, no información que el cliente
+// necesite. Nadie lo consumía.
 export function proveedorSiiActivo(opts = {}) {
-  const nombre = String(opts.proveedor || config.sii?.proveedor || 'baseapi').toLowerCase();
-  return {
-    nombre: ADAPTADORES[nombre] ? nombre : 'baseapi',
-    puede_traer_detalle: adaptador(opts.proveedor).PUEDE_TRAER_DETALLE === true,
-  };
+  return { puede_traer_detalle: adaptador(opts.proveedor).PUEDE_TRAER_DETALLE === true };
 }

@@ -9,8 +9,11 @@ const CLP = (n) => `$${Math.round(Number(n) || 0).toLocaleString('es-CL')}`;
 
 // `esPropio`: quién está mirando. El panel de la empresa ve su propio período
 // (tuteo, imperativo); el admin mira la empresa de otro desde /admin → SII,
-// donde decirle "vuelve a descargar" no corresponde.
-export default function AnalisisSiiVista({ a, esPropio = true }) {
+// donde decirle "vuelve a descargar" no corresponde. El default es `false`
+// —el texto que no le da órdenes a nadie— para que un llamador futuro que
+// olvide la prop se equivoque hacia el lado inocuo; los dos actuales la pasan
+// explícita.
+export default function AnalisisSiiVista({ a, esPropio = false }) {
   const c = a.resumen.compra, v = a.resumen.venta;
   const em = a.emisiones;
   return (
@@ -133,20 +136,21 @@ const DESC_ALCANCE = {
   3: 'Cadena de valor (proveedores, residuos, viajes)',
 };
 
-// Motivo → qué le pasó al documento y qué puede hacer quien lo lee. El orden
-// es el de utilidad para la empresa: primero lo que ella misma puede resolver.
+// Motivo → qué le pasó al documento y qué puede hacer quien lo lee. Cada uno
+// tiene su propia salida (ver el encabezado de services/alcanceGhg.js), y
+// ofrecer la equivocada es peor que no ofrecer ninguna.
 //
-// `descarga_antigua` es el único motivo con una salida accionable, y solo si
-// el proveedor de datos del SII activo PUEDE traer el detalle: si no puede,
-// volver a descargar da el mismo resultado y el imperativo sería mentira.
-// Esta vista además la usa el admin mirando la empresa de OTRO, donde
-// "vuelve a descargar" tampoco corresponde — por eso el texto se elige.
+// `descarga_antigua` es el único que se resuelve desde esta misma pantalla, y
+// solo si el proveedor de datos del SII activo PUEDE traer el detalle: si no
+// puede, volver a descargar da el mismo resultado y el imperativo sería
+// mentira. Esta vista además la usa el admin mirando la empresa de OTRO,
+// donde "vuelve a descargar" tampoco corresponde — por eso el texto se elige.
 function motivosSinAlcance({ puedeReintentar, esPropio }) {
   const antigua = !puedeReintentar
-    ? 'se descargaron antes de esta clasificación — el registro del SII de este servicio no trae el detalle de los ítems, así que volver a descargarlos no los clasifica'
+    ? 'se descargaron antes de esta clasificación — el servicio con el que sicr3p consulta el SII no entrega el detalle de los ítems, así que volver a descargarlos no los clasifica'
     : esPropio
-      ? 'se descargaron antes de esta clasificación — vuelve a descargar el período para clasificarlos'
-      : 'se descargaron antes de esta clasificación — se clasifican volviendo a descargar el período';
+      ? 'se descargaron antes de esta clasificación — vuelve a descargar el período: se clasifican los que traigan el detalle de sus ítems'
+      : 'se descargaron antes de esta clasificación — se clasifican volviendo a descargar el período, los que traigan el detalle de sus ítems';
   return [
     ['inferido_por_nombre', 'se clasificaron por el nombre del proveedor, no por el detalle del documento — el RCV no trae ese detalle, así que no se les atribuye alcance'],
     ['descarga_antigua', antigua],
@@ -157,10 +161,10 @@ function motivosSinAlcance({ puedeReintentar, esPropio }) {
 }
 
 function PorAlcanceTabla({ porAlcance, total, puedeReintentar, esPropio }) {
-  const MOTIVOS_SIN_ALCANCE = motivosSinAlcance({ puedeReintentar, esPropio });
   if (!porAlcance) return null; // backend anterior a esta versión
   const { alcances = [], sin_clasificar: sin } = porAlcance;
   if (!alcances.length && !sin?.n_documentos) return null;
+  const MOTIVOS_SIN_ALCANCE = motivosSinAlcance({ puedeReintentar, esPropio });
   const pct = (n) => (total > 0 ? `${fmt((n / total) * 100, 1)}%` : '—');
 
   return (
@@ -210,12 +214,12 @@ function PorAlcanceTabla({ porAlcance, total, puedeReintentar, esPropio }) {
       {alcances.length === 0 && sin?.inferido_por_nombre > 0 && (
         <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
           Ningún documento de este período trae el detalle de sus ítems, así que no hay alcances que atribuir:
-          el registro del SII entrega el monto de cada documento, no lo que se compró. El CO₂e del período sigue
-          siendo válido —se calcula por gasto— pero no se puede repartir en alcances 1/2/3 sin inventar de dónde
-          viene cada peso.
+          el registro del SII entrega el monto de cada documento, no lo que se compró. El CO₂e del período no
+          cambia —se calcula por gasto— pero no se puede repartir en alcances 1/2/3 sin inventar de dónde viene
+          cada peso.
           {puedeReintentar
             ? ' Los documentos cuyo emisor publique el XML en el SII sí se clasifican solos en la próxima descarga.'
-            : ' El servicio de datos del SII configurado en este despliegue no entrega ese detalle para ningún documento.'}
+            : ' El servicio con el que sicr3p consulta el SII no entrega ese detalle para ningún documento.'}
         </p>
       )}
       <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
