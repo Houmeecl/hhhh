@@ -225,17 +225,32 @@ router.post('/solicitar-reset', loginLimiter, async (req, res, next) => {
 // ============================================================
 
 // ---------- POST /api/auth/magic — solicita el enlace ----------
+// `codigo` (opcional): si viene y corresponde a un codigos_acceso con
+// modo_juego=true, el enlace queda marcado para crear/recuperar un
+// "jugador" al canjearse (ver /magic/verificar) — igual mecanismo que el
+// magic link de siempre, solo que esta vez con una fila persistente que
+// puede acumular puntos entre sesiones.
 router.post('/magic', loginLimiter, async (req, res, next) => {
   try {
     const email = String(req.body.email || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'Ingresa un correo válido.' });
     }
+    let codigoId = null;
+    const codigo = req.body.codigo ? String(req.body.codigo).trim() : '';
+    if (codigo) {
+      const { rows: cRows } = await query(
+        `SELECT id FROM codigos_acceso WHERE upper(codigo) = upper($1) AND activo = true AND modo_juego = true`,
+        [codigo]
+      );
+      if (!cRows[0]) return res.status(400).json({ error: 'Código de invitación inválido o inactivo.' });
+      codigoId = cRows[0].id;
+    }
     const raw = crypto.randomBytes(32).toString('hex');
     const expira = new Date(Date.now() + 15 * 60 * 1000); // 15 min, un solo uso
     await query(
-      `INSERT INTO tokens_magic (email, token_hash, expira_at) VALUES ($1,$2,$3)`,
-      [email, hashToken(raw), expira]
+      `INSERT INTO tokens_magic (email, token_hash, expira_at, codigo_id) VALUES ($1,$2,$3,$4)`,
+      [email, hashToken(raw), expira, codigoId]
     );
     const link = `${config.publicAppUrl}/acceso?token=${raw}`;
     await sendMail({ to: email, ...magicEmail({ link }) });
@@ -256,6 +271,33 @@ router.post('/magic/verificar', async (req, res, next) => {
     const tok = rows[0];
     if (!tok) return res.status(401).json({ error: 'Enlace inválido o expirado. Solicita uno nuevo.' });
     await query(`UPDATE tokens_magic SET usado = true WHERE id = $1`, [tok.id]);
+
+    // Enlace de campaña "Sube y Suma": crea/recupera la fila de jugador
+    // (UNIQUE email+codigo_id — idempotente si ya existía) y firma un JWT
+    // de rol 'jugador' en vez de 'cliente'. 30 días: es una app de uso
+    // repetido, no una consulta puntual de historial.
+    if (tok.codigo_id) {
+      const { rows: cod } = await query(`SELECT empresa FROM codigos_acceso WHERE id = $1`, [tok.codigo_id]);
+      const { rows: existente } = await query(
+        `SELECT id FROM jugadores WHERE email = $1 AND codigo_id = $2`, [tok.email, tok.codigo_id]
+      );
+      let jugadorId = existente[0]?.id;
+      if (!jugadorId) {
+        const { rows: nuevo } = await query(
+          `INSERT INTO jugadores (email, codigo_id, empresa) VALUES ($1,$2,$3) RETURNING id`,
+          [tok.email, tok.codigo_id, cod[0]?.empresa || null]
+        );
+        jugadorId = nuevo[0].id;
+      }
+      await logActividad({ accion: 'juego_login', entidad: 'jugador', entidadId: jugadorId, ip: req.ip });
+      const jugadorToken = jwt.sign(
+        { sub: `jugador:${jugadorId}`, rol: 'jugador', email: tok.email, jugadorId },
+        config.jwt.accessSecret,
+        { expiresIn: '30d' }
+      );
+      return res.json({ token: jugadorToken, email: tok.email, rol: 'jugador' });
+    }
+
     await logActividad({ accion: 'magic_login', entidad: 'cliente', entidadId: tok.email, ip: req.ip });
 
     // JWT de rol cliente (no es cuenta de usuarios; solo ve su propio historial).

@@ -46,6 +46,11 @@ export function constanciaUrl(serial) {
   return `${config.publicAppUrl}/constancia/${serial}`;
 }
 
+// URL pública de verificación de un canje de constancia de "Sube y Suma".
+export function constanciaJuegoUrl(serial) {
+  return `${config.publicAppUrl}/suma/constancia/${serial}`;
+}
+
 // URL pública de la credencial de firma del proveedor (atestación).
 export function firmaProveedorUrl(serial) {
   return `${config.publicAppUrl}/f/${serial}`;

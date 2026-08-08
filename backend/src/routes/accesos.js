@@ -460,13 +460,17 @@ router.post('/codigos', adminOnly, async (req, res, next) => {
     const n = Math.min(50, Math.max(1, Number(req.body.cantidad) || 1));
     const creditos = Math.min(100, Math.max(1, Number(req.body.creditos) || 5));
     const { empresa, email } = req.body;
+    // "Sube y Suma": un código de campaña gamificada es un codigos_acceso
+    // normal (mismo cupo/validación de créditos) con este flag en true —
+    // habilita el magic link con rol 'jugador' (ver auth.js).
+    const modoJuego = req.body.modo_juego === true;
     const creados = [];
     for (let i = 0; i < n; i++) {
       const codigo = `SICR3P-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
       const { rows } = await query(
-        `INSERT INTO codigos_acceso (codigo, creditos, empresa, email)
-         VALUES ($1,$2,$3,$4) RETURNING *`,
-        [codigo, creditos, empresa || null, email || null]
+        `INSERT INTO codigos_acceso (codigo, creditos, empresa, email, modo_juego)
+         VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [codigo, creditos, empresa || null, email || null, modoJuego]
       );
       creados.push(rows[0]);
     }
@@ -477,14 +481,16 @@ router.post('/codigos', adminOnly, async (req, res, next) => {
 
 router.put('/codigos/:id', adminOnly, async (req, res, next) => {
   try {
-    const { activo, creditos } = req.body;
+    const { activo, creditos, modo_juego: modoJuego } = req.body;
     const { rows } = await query(
       `UPDATE codigos_acceso SET
          activo = COALESCE($2, activo),
-         creditos = COALESCE($3, creditos)
+         creditos = COALESCE($3, creditos),
+         modo_juego = COALESCE($4, modo_juego)
        WHERE id = $1 RETURNING *`,
       [req.params.id, typeof activo === 'boolean' ? activo : null,
-       creditos != null ? Number(creditos) : null]
+       creditos != null ? Number(creditos) : null,
+       typeof modoJuego === 'boolean' ? modoJuego : null]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Código no encontrado' });
     res.json({ codigo: rows[0] });

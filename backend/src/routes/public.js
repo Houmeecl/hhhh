@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso } from '../services/pdf.js';
-import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from '../services/qr.js';
+import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl, constanciaJuegoUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
   filtrarPorVisibilidad, enmascararRut, balanceMasas,
@@ -31,6 +31,7 @@ import { consultarRut } from '../services/baseapi.js';
 import { siiLimiter, cargaLimiter } from '../middleware/rateLimit.js';
 import { presupuestoIA } from '../services/analisisIA.js';
 import { categoriaParaMostrar, alcanceAtribuible } from '../services/categoriaPresentacion.js';
+import { calcularPuntosPorFactura, otorgarPuntos, evaluarMisionesContador } from '../services/juego.js';
 
 const router = express.Router();
 
@@ -251,7 +252,7 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     // créditos (se valida y consume más abajo, dentro de la transacción)
     // o la sesión de un cliente con historial (magic link). El chequeo va
     // ANTES de la pre-lectura para no gastar OCR en envíos anónimos.
-    if (!codigo && !clienteOpcional(req)) {
+    if (!codigo && !clienteOpcional(req) && !jugadorOpcional(req)) {
       return res.status(403).json({
         error: 'La carga de documentos requiere un código de acceso o una sesión de cliente. '
           + 'Inscribe tu empresa en /inscripcion para obtener acceso.',
@@ -280,6 +281,11 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         });
       }
     }
+
+    // "Sube y Suma": se resuelve UNA vez, fuera de la transacción (pura
+    // lectura del JWT) y se reusa dentro del loop de facturas más abajo.
+    const jugador = jugadorOpcional(req);
+    let puntosGanados = 0;
 
     // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
     // segundos por archivo y antes corría con la fila de cadena_estado
@@ -538,6 +544,22 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
           fecha: sesion.fecha, cuentas: cuentasNaturales,
         });
 
+        // "Sube y Suma": puntúa sobre el documento que el motor propio YA
+        // calculó — nunca inventa CO2e propio, solo suma puntaje. Solo si la
+        // credencial de esta carga es un jugador (magic link con código de
+        // campaña, ver auth.js); una carga de código/cliente normal no toca
+        // estas tablas.
+        if (jugador) {
+          const puntosDoc = calcularPuntosPorFactura();
+          await otorgarPuntos(client, {
+            jugadorId: jugador.jugadorId, tipo: 'documento_escaneado', puntos: puntosDoc, facturaId: factura.id,
+          });
+          await evaluarMisionesContador(client, {
+            jugadorId: jugador.jugadorId, tipoMision: 'contar_documentos', incremento: 1,
+          });
+          puntosGanados += puntosDoc;
+        }
+
         // Valorización: los DTE traen precio real por ítem → entradas de inventario.
         // El CO2e de la factura se reparte entre ítems según su monto.
         const dte = lectura.tipo === 'xml' ? lectura.dte : null;
@@ -576,7 +598,12 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     });
 
     const facturas = await hydrateFacturas(result.id);
-    res.status(201).json({ sesion: result, facturas });
+    res.status(201).json({
+      sesion: result, facturas,
+      // Presente solo si la carga la hizo un jugador de "Sube y Suma" —
+      // el frontend normal simplemente ignora este campo.
+      ...(jugador ? { juego: { puntos_ganados: puntosGanados } } : {}),
+    });
 
     // Export al data warehouse (no bloqueante; apagado por defecto).
     bigquery.exportSesion({ sesion: result, facturas });
@@ -742,6 +769,23 @@ function clienteOpcional(req) {
   try {
     const payload = jwt.verify(token, config.jwt.accessSecret);
     return (payload.rol === 'cliente' || payload.panel) ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+// Si la petición trae un Bearer con JWT válido de rol 'jugador' ("Sube y
+// Suma"), devuelve su payload (con jugadorId); si no, null. Mismo criterio
+// opcional que clienteOpcional: nunca rechaza por token malo, solo habilita
+// puntaje cuando corresponde — el jugador sigue necesitando su propio
+// `codigo` para consumir créditos, igual que cualquier otra carga.
+function jugadorOpcional(req) {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    const payload = jwt.verify(token, config.jwt.accessSecret);
+    return payload.rol === 'jugador' ? payload : null;
   } catch {
     return null;
   }
@@ -1523,6 +1567,34 @@ router.get('/capacitacion/constancias/:serial([A-Za-z0-9-]+).pdf', async (req, r
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-constancia-${c.serial}.pdf"`);
     res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/juego/constancias/:serial — verificación pública ----------
+// "Sube y Suma": el serial ES la credencial (mismo principio que las
+// constancias de capacitación arriba), sin login. Nunca se llama
+// "certificación": es una constancia de participación interna, y su
+// descripción ya lo aclara explícitamente (ver migración 082).
+router.get('/juego/constancias/:serial([A-Za-z0-9-]+)', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.serial, c.puntos_gastados, c.created_at, r.nombre AS recompensa_nombre, r.descripcion AS recompensa_descripcion
+       FROM canjes c
+       JOIN recompensas r ON r.id = c.recompensa_id
+       WHERE c.serial = $1`,
+      [String(req.params.serial || '').trim().toUpperCase()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Constancia no encontrada' });
+    res.json({ constancia: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.get('/juego/constancias/:serial([A-Za-z0-9-]+)/qr.png', async (req, res, next) => {
+  try {
+    const serial = String(req.params.serial || '').trim().toUpperCase();
+    const { rows } = await query(`SELECT serial FROM canjes WHERE serial = $1`, [serial]);
+    if (!rows[0]) return res.status(404).json({ error: 'Constancia no encontrada' });
+    res.type('png').send(await qrBufferDe(constanciaJuegoUrl(rows[0].serial)));
   } catch (err) { next(err); }
 });
 

@@ -105,6 +105,18 @@ export const INVENTARIO = {
     cadena: CADENA.NINGUNA,
     retencion: 'Mientras el código esté activo.',
   },
+  jugadores: {
+    clasificacion: PERSONAL,
+    columnas: ['email', 'nombre'],
+    nota: '"Sube y Suma": un empleado/proveedor de una empresa cliente que se unió con un '
+      + 'código de invitación (`codigo_id`, mismo `codigos_acceso` de arriba con `modo_juego=true`). '
+      + 'Se identifica por magic link (igual que un cliente sin cuenta), pero con fila persistente '
+      + 'porque necesita acumular puntos entre sesiones — el JWT de cliente normal es efímero y no sirve.',
+    finalidad: 'Llevar el puntaje/nivel de la campaña gamificada de escaneo de documentos.',
+    base: BASE.CONSENTIMIENTO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Mientras el código de campaña esté activo.',
+  },
   solicitudes_auspicio: {
     clasificacion: PERSONAL,
     columnas: ['rut', 'contacto_nombre', 'contacto_email', 'contacto_telefono', 'ip'],
@@ -306,6 +318,19 @@ export const INVENTARIO = {
     clasificacion: NO_PERSONAL, columnas: [],
     nota: '`nombre` es el de una categoría de gasto (Combustible, Electricidad).',
     finalidad: 'Factores de emisión del motor.', base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'No contiene datos personales.',
+  },
+  misiones: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: '"Sube y Suma": `nombre` es el de una misión de la campaña ("Primeros pasos"), no de una persona.',
+    finalidad: 'Catálogo de misiones de la campaña gamificada.', base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'No contiene datos personales.',
+  },
+  recompensas: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: '"Sube y Suma": `nombre` es el de una recompensa simbólica ("Insignia Nivel 2"), no de una persona. '
+      + 'Nunca incluye dinero ni descuento real — no hay pasarela de pago conectada.',
+    finalidad: 'Catálogo de recompensas de la campaña gamificada.', base: null, cadena: CADENA.NINGUNA, retencion: null,
     motivoSinPurga: 'No contiene datos personales.',
   },
   propuestas_factores: {

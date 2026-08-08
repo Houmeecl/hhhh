@@ -30,6 +30,7 @@ import llaveArchivoRoutes from './routes/llaveArchivo.js';
 import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
 import trazadorRoutes from './routes/trazador.js';
+import juegoRoutes from './routes/juego.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 import { iniciarPurgaAutomatica } from './services/retencion.js';
 
@@ -95,6 +96,7 @@ app.use('/api/firma-proveedor', apiLimiter, firmaProveedorRouter);
 app.use('/api/panel-proveedor', apiLimiter, proveedorPanelRouter);
 app.use('/api/admin/capacitacion', capacitacionRoutes);
 app.use('/api/admin/apl', aplRoutes);
+app.use('/api/juego', apiLimiter, juegoRoutes);
 // '/api/admin' (genérico) se monta AL FINAL de los /api/admin/* — Express
 // hace match de app.use por prefijo en orden de registro, así que si fuera
 // primero, requireHomePanel('sicrep') de este router interceptaría TODAS
