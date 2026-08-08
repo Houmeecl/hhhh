@@ -106,6 +106,47 @@ que no levantan, pero no contra bugs lógicos que pasan el health check.
 **solo para ensayos locales**, nunca en el VPS). El wrapper acepta además
 `SICR3P_DIAG_DIR`.
 
+## Respaldos y restauración
+
+Dos scripts, dos frecuencias distintas:
+
+- **`deploy/respaldo.sh`** — cron diario (03:00, instalado por `instalar-vps.sh`).
+  Genera `sicr3p-AAAA-MM-DD.sql.gz` en `/root/backups` y poda lo mayor a 14 días.
+  También poda ahí mismo los `pre-deploy-*.sql.gz` que genera `actualizar.sh`
+  antes de cada deploy (uno por commit, cron cada 30 min) — antes de esto esos
+  archivos **nunca se borraban solos**, con el patrón de nombre distinto al del
+  respaldo diario, y podían llenar el disco sin que nadie lo notara. El script
+  ahora también deja una advertencia en el log si el disco supera 85% de uso.
+- **`deploy/restaurar.sh`** — manual, dos modos:
+  - **Ensayo** (default, no destructivo): restaura un `.sql.gz` en una base
+    nueva (`sicr3p_restaurado_<fecha>`) y compara conteos de tablas y de
+    `facturas` contra la base real, sin tocarla. Se borra sola al terminar
+    (`--conservar` la deja para inspección).
+  - **`--reemplazar`** (destructivo, solo para recuperación real): pide
+    escribir la palabra `REEMPLAZAR`, toma un respaldo de seguridad de lo que
+    haya en la base actual antes de tocar nada, y recién ahí la borra y la
+    reconstruye desde el archivo indicado.
+
+  **Ensayo verificado en local el 2026-08-08** contra un dump real de la BD de
+  desarrollo (`bash deploy/restaurar.sh` con y sin `--reemplazar`, este último
+  contra una base descartable): ambos modos restauran de verdad (77 tablas,
+  133 filas de `facturas` coinciden con el original) y `--reemplazar`
+  efectivamente reemplaza el contenido anterior, no lo mezcla. **Falta
+  ensayarlo en el VPS real** — mismo comando, mismo resultado esperado, pero
+  contra el Postgres de producción; requiere acceso al VPS que esta sesión no
+  tiene.
+
+- **Copia off-site**: hoy los respaldos viven en el mismo disco que la base
+  (`/root/backups`, VPS DonWeb). Si el disco muere, se pierde la base y los
+  14 días de respaldo a la vez. Pendiente (acción humana, no de código):
+  sincronizar `/root/backups` a un destino fuera del VPS —cifrado en tránsito
+  y en reposo— con algo simple como `rclone`/`restic` hacia un bucket S3
+  compatible o un segundo servidor, en un cron aparte después de las 03:05
+  (cuando `respaldo.sh` ya terminó). No se implementa aquí porque requiere
+  elegir y pagar el destino (decisión del operador), pero el script de
+  restauración ya está listo para leer un archivo bajado desde ahí igual que
+  uno local.
+
 ## Futuro (no implementado)
 
 Enviar el diagnóstico por correo al fallar (Resend o el webmail del VPS), para

@@ -96,14 +96,30 @@ terceros — ver la tabla al final de este documento); esto documenta la parte q
   la tabla, los estados del CHECK y el servicio quedan intactos para cuando haya pasarela real
   — se activa con una variable de entorno, sin migración. El copy del landing (`lib/i18n.js`)
   ya era honesto sobre que la compensación es simulada; se revisó y se dejó sin cambios.
-- **Fases 3-6 — pendientes**, en orden de riesgo: infraestructura que puede tumbar el servicio
-  o perder datos de un cliente (poda de respaldos que no encuentra sus propios archivos,
-  `/api/health` que no consulta la base, `SII_CRED_KEY` faltante en el instalador — ya resuelto
-  arriba junto con el resto de Fase 1 —, respaldo off-site sin ensayar restauración);
-  degradación silenciosa (correo apagado impide dar de alta a un cliente, el smoke post-deploy
-  no prueba login ni escritura); validación de los factores de emisión (ninguna de las 7
-  fuentes está en `validada_oficial`; los factores "por gasto", que son los que se aplican a la
-  mayoría de los documentos, son proxy interno sin cita externa); y cabos sueltos de código que
+- **Fase 3 — hecha.** Infraestructura que podía tumbar el servicio o perder datos sin que nadie
+  lo notara. `GET /api/health` respondía `ok:true` sin tocar la base: si Postgres caía después
+  del arranque, el auto-deploy (`deploy/actualizar.sh`) seguía viendo verde y no disparaba
+  rollback, y el monitoreo externo veía "sano" con el 100% de las peticiones reales en 500.
+  Ahora hace un `SELECT 1` con plazo de 2 s (`backend/src/lib/health.js`, `estaSano()`
+  inyectable para el test) y responde 503 si la BD no contesta a tiempo. `deploy/respaldo.sh`
+  podaba solo `sicr3p-*.sql.gz` (el respaldo diario, cron 03:00) pero `deploy/actualizar.sh`
+  genera además `pre-deploy-*.sql.gz` en cada deploy (uno por commit, cron cada 30 min) con un
+  patrón de nombre distinto — esos archivos nunca se borraban solos y podían llenar el disco sin
+  aviso; ahora se podan con retención de 5 días y el script deja una advertencia en el log si el
+  disco supera 85%. `SII_CRED_KEY` faltante en el instalador ya se había resuelto en Fase 1.
+  Nuevo `deploy/restaurar.sh`: modo ensayo (default, restaura en una base descartable y compara
+  conteos contra la real, sin tocarla) y modo `--reemplazar` (destructivo, para recuperación real
+  — pide escribir la palabra exacta y toma un respaldo de seguridad de lo que haya antes de
+  borrar nada). **Ensayado en local el 2026-08-08** contra un dump real (77 tablas, 133 filas de
+  `facturas` coinciden con el original en ambos modos) — el ensayo contra el Postgres del VPS
+  real sigue pendiente porque esta sesión no tiene acceso a él. La copia off-site de los
+  respaldos (hoy viven en el mismo disco que la base) también queda pendiente: requiere elegir y
+  pagar un destino, documentado en `deploy/AUTODEPLOY.md`.
+- **Fases 4-6 — pendientes**, en orden de riesgo: degradación silenciosa (correo apagado impide
+  dar de alta a un cliente, el smoke post-deploy no prueba login ni escritura); validación de los
+  factores de emisión (ninguna de las 7 fuentes está en `validada_oficial`; los factores "por
+  gasto", que son los que se aplican a la mayoría de los documentos, son proxy interno sin cita
+  externa); y cabos sueltos de código que
   ya se sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de
   admin, `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key
   de mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).

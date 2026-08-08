@@ -4,6 +4,7 @@ import cors from 'cors';
 import { config } from './config.js';
 import { runMigrations } from './lib/migrate.js';
 import { verificarConfigProduccion } from './lib/verificarProduccion.js';
+import { estaSano } from './lib/health.js';
 import { apiLimiter } from './middleware/rateLimit.js';
 import publicRoutes from './routes/public.js';
 import authRoutes from './routes/auth.js';
@@ -44,8 +45,19 @@ app.use(
 );
 app.use(express.json({ limit: '1mb' }));
 
-// Salud del servicio
-app.get('/api/health', (req, res) => res.json({ ok: true, mock: config.simple.mock, env: config.env }));
+// Salud del servicio. Antes respondía ok:true sin tocar la base: si Postgres
+// caía después del arranque, el auto-deploy (deploy/actualizar.sh) seguía
+// viendo verde, no disparaba rollback, y el monitoreo externo veía el
+// servicio sano con el 100% de las peticiones reales en 500. El SELECT 1
+// con plazo corto obliga a que "sano" signifique "puede hablar con la BD".
+app.get('/api/health', async (req, res) => {
+  try {
+    await estaSano();
+    res.json({ ok: true, mock: config.simple.mock, env: config.env });
+  } catch {
+    res.status(503).json({ ok: false, error: 'BD no disponible' });
+  }
+});
 
 // Rutas
 app.use('/api', apiLimiter, publicRoutes);
