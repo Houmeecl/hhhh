@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dropzone from '../components/Dropzone.jsx';
 import DeclaracionEmbalaje from '../components/DeclaracionEmbalaje.jsx';
 import CompensacionCobro from '../components/CompensacionCobro.jsx';
@@ -59,6 +59,14 @@ export default function CargarAv() {
   const [embComponentes, setEmbComponentes] = useState([]);
   const [embalajeGuardado, setEmbalajeGuardado] = useState(null);
   const [compensacion, setCompensacion] = useState(null);
+  // Sin pasarela conectada ni socio ambiental formalizado, el paso de cobro
+  // se oculta (default false) en vez de mostrar un pago simulado como si
+  // fuera parte del trámite real. Ver COMPENSACION_HABILITADA en config.js.
+  const [compensacionHabilitada, setCompensacionHabilitada] = useState(false);
+
+  useEffect(() => {
+    api.posConfig().then((c) => setCompensacionHabilitada(c?.compensacion_habilitada === true)).catch(() => {});
+  }, []);
 
   const rutValido = form.rut === '' || validarRut(form.rut);
   const emailValido = form.email === '' || EMAIL_RE.test(form.email);
@@ -153,10 +161,19 @@ export default function CargarAv() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 4px' }}>
           <PasoBadge n={1} label="Trámite" hecho />
-          <span className="muted">→</span>
-          <PasoBadge n={2} label="REP" hecho={!!embalajeGuardado} />
-          <span className="muted">→</span>
-          <PasoBadge n={3} label="Compensación" hecho={!!compensacion} />
+          {compensacionHabilitada ? (
+            <>
+              <span className="muted">→</span>
+              <PasoBadge n={2} label="REP" hecho={!!embalajeGuardado} />
+              <span className="muted">→</span>
+              <PasoBadge n={3} label="Compensación" hecho={!!compensacion} />
+            </>
+          ) : (
+            <>
+              <span className="muted">→</span>
+              <PasoBadge n={2} label="REP" hecho={!!embalajeGuardado} />
+            </>
+          )}
         </div>
 
         <DeclaracionEmbalaje
@@ -167,12 +184,14 @@ export default function CargarAv() {
           onModificar={() => setEmbalajeGuardado(null)}
         />
 
-        <CompensacionCobro
-          sesionId={sesion.id}
-          totalCo2e={sesion.total_co2e}
-          compensacion={compensacion}
-          onCompensacion={setCompensacion}
-        />
+        {compensacionHabilitada && (
+          <CompensacionCobro
+            sesionId={sesion.id}
+            totalCo2e={sesion.total_co2e}
+            compensacion={compensacion}
+            onCompensacion={setCompensacion}
+          />
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14, marginTop: 16 }}>
           {facturas.map((f) => (

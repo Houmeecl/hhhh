@@ -1,5 +1,7 @@
-import { test } from 'node:test';
+import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import http from 'node:http';
+import express from 'express';
 import {
   generarSerial,
   generarClave,
@@ -7,6 +9,11 @@ import {
   ALFABETO_CLAVE,
   LARGO_CLAVE,
 } from '../src/services/posTerminal.js';
+import { config } from '../src/config.js';
+import { pool } from '../src/lib/db.js';
+import { runMigrations } from '../src/lib/migrate.js';
+import posRoutes from '../src/routes/pos.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ---------- generarSerial ----------
 
@@ -86,4 +93,39 @@ test('serialValido no lanza con entradas no string', () => {
   assert.equal(serialValido(undefined), false);
   assert.equal(serialValido(1234), false);
   assert.equal(serialValido({}), false);
+});
+
+// ---------- GET /api/pos/config — flag compensacion_habilitada ----------
+// El paso de cobro es simulado (sin pasarela): el flag decide si el
+// frontend lo muestra. Por defecto (sin COMPENSACION_HABILITADA en el
+// entorno) debe llegar en false, para que un despliegue nuevo no exponga
+// el módulo por omisión.
+
+let server;
+let baseUrl;
+
+before(async () => {
+  if (EN_PRODUCCION) return;
+  await runMigrations();
+  const app = express();
+  app.use(express.json());
+  app.use('/api/pos', posRoutes);
+  server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, resolve));
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
+});
+
+after(async () => {
+  if (server) await new Promise((resolve) => server.close(resolve));
+  if (!EN_PRODUCCION) await pool.end();
+});
+
+test('GET /api/pos/config expone compensacion_habilitada', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/pos/config`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(typeof body.compensacion_habilitada, 'boolean');
+  // Sin COMPENSACION_HABILITADA en el entorno de test, config.js cae al
+  // default (false): así lo lee el flag desde config, no un valor fijo.
+  assert.equal(body.compensacion_habilitada, config.compensacionHabilitada === true);
 });

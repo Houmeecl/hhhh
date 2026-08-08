@@ -30,15 +30,23 @@ export default function Dashboard() {
   const [motor, setMotor] = useState(null);
   const [verificacion, setVerificacion] = useState(null); // null | 'cargando' | resultado
   const [compensacion, setCompensacion] = useState(null); // resumen de compensaciones POS | null
+  // Sin pasarela conectada, ocultar la tarjeta en vez de mostrar un monto
+  // simulado junto a los demás KPI del panel. Ver COMPENSACION_HABILITADA.
+  const [compensacionHabilitada, setCompensacionHabilitada] = useState(false);
   const [err, setErr] = useState('');
 
   useEffect(() => {
     api.dashboard().then(setD).catch((e) => setErr(e.message));
     api.alertasContratos().then((r) => setAlertas(r.alertas)).catch(() => {});
     api.cadenaEstado().then((r) => setCadena(r.estado)).catch(() => {});
-    api.compensacionesResumen().then(setCompensacion).catch(() => {});
+    api.posConfig().then((c) => setCompensacionHabilitada(c?.compensacion_habilitada === true)).catch(() => {});
     api.motorEstadisticas().then(setMotor).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!compensacionHabilitada) return;
+    api.compensacionesResumen().then(setCompensacion).catch(() => {});
+  }, [compensacionHabilitada]);
 
   async function verificarCadena() {
     setVerificacion('cargando');
@@ -137,40 +145,42 @@ export default function Dashboard() {
           </div>
         )}
 
-        <div className="card card-pad">
-          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Icon.Leaf size={18} /> Compensación (simulada)
-            <span className="badge badge-amber" style={{ fontSize: 11 }}>Pago simulado — sin pasarela</span>
-          </h3>
-          {compensacion ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy)' }}>
-                  ${fmtInt(compensacion.total_monto_clp)} <small style={{ fontSize: 14, fontWeight: 600 }}>CLP</small>
+        {compensacionHabilitada && (
+          <div className="card card-pad">
+            <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Icon.Leaf size={18} /> Compensación (simulada)
+              <span className="badge badge-amber" style={{ fontSize: 11 }}>Pago simulado — sin pasarela</span>
+            </h3>
+            {compensacion ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 30, fontWeight: 800, color: 'var(--navy)' }}>
+                    ${fmtInt(compensacion.total_monto_clp)} <small style={{ fontSize: 14, fontWeight: 600 }}>CLP</small>
+                  </div>
+                  <span className="muted" style={{ fontSize: 13 }}>
+                    {fmtInt(compensacion.n)} trámite{Number(compensacion.n) === 1 ? '' : 's'} ·{' '}
+                    {fmt(compensacion.total_t_co2e, 3)} t CO2e
+                  </span>
                 </div>
-                <span className="muted" style={{ fontSize: 13 }}>
-                  {fmtInt(compensacion.n)} trámite{Number(compensacion.n) === 1 ? '' : 's'} ·{' '}
-                  {fmt(compensacion.total_t_co2e, 3)} t CO2e
-                </span>
-              </div>
-              {compensacion.por_estado && Object.keys(compensacion.por_estado).length > 0 && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-                  {Object.entries(compensacion.por_estado).map(([estado, n]) => (
-                    <span key={estado} className="badge badge-gray">{estado}: {fmtInt(n)}</span>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              Aún no hay compensaciones registradas desde el panel de terreno o el flujo web.
+                {compensacion.por_estado && Object.keys(compensacion.por_estado).length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
+                    {Object.entries(compensacion.por_estado).map(([estado, n]) => (
+                      <span key={estado} className="badge badge-gray">{estado}: {fmtInt(n)}</span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                Aún no hay compensaciones registradas desde el panel de terreno o el flujo web.
+              </p>
+            )}
+            <p className="muted" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
+              Los cobros son simulados: no hay pasarela de pago ni convenio de compensación activos todavía.
+              Estos montos son registro operativo, no dinero recaudado.
             </p>
-          )}
-          <p className="muted" style={{ fontSize: 12, marginTop: 10, marginBottom: 0 }}>
-            Los cobros son simulados: no hay pasarela de pago ni convenio de compensación activos todavía.
-            Estos montos son registro operativo, no dinero recaudado.
-          </p>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="two-col-grid" style={{ marginTop: 16, alignItems: 'stretch' }}>

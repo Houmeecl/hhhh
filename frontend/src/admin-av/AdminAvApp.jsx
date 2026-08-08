@@ -10,13 +10,16 @@ import RepAv from './RepAv.jsx';
 import CompensacionAv from './CompensacionAv.jsx';
 import CapacitacionAv from './CapacitacionAv.jsx';
 
-const NAV = [
-  { to: '/panel-verde', end: true, ico: Icon.Chart, label: 'Resumen' },
-  { to: '/panel-verde/cargar', ico: Icon.Doc, label: 'Cargar documento' },
-  { to: '/panel-verde/rep', ico: Icon.Leaf, label: 'REP' },
-  { to: '/panel-verde/compensacion', ico: Icon.Coin, label: 'Compensación' },
-  { to: '/panel-verde/capacitacion', ico: Icon.Book, label: 'Capacitación' },
-];
+function navItems(compensacionHabilitada) {
+  const items = [
+    { to: '/panel-verde', end: true, ico: Icon.Chart, label: 'Resumen' },
+    { to: '/panel-verde/cargar', ico: Icon.Doc, label: 'Cargar documento' },
+    { to: '/panel-verde/rep', ico: Icon.Leaf, label: 'REP' },
+  ];
+  if (compensacionHabilitada) items.push({ to: '/panel-verde/compensacion', ico: Icon.Coin, label: 'Compensación' });
+  items.push({ to: '/panel-verde/capacitacion', ico: Icon.Book, label: 'Capacitación' });
+  return items;
+}
 
 // El panel de terreno de sicr3p es su propia "app" instalable,
 // distinta del panel núcleo (que usa /manifest-admin.webmanifest) — mismo
@@ -37,10 +40,19 @@ export default function AdminAvApp() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  // El cobro de compensación sigue simulado (sin pasarela): mientras el
+  // flag esté apagado, ni el menú ni la ruta de tarifa se muestran — igual
+  // que en ResumenAv/CargarAv/Dashboard, para no dejar una puerta suelta a
+  // un módulo que el resto del panel ya oculta.
+  const [compensacionHabilitada, setCompensacionHabilitada] = useState(false);
 
   useManifestAv();
 
   useEffect(() => { document.title = 'sicr3p — Panel de terreno'; }, []);
+
+  useEffect(() => {
+    api.posConfig().then((c) => setCompensacionHabilitada(c?.compensacion_habilitada === true)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!authAv.access) { nav('/panel-verde/login'); return; }
@@ -94,7 +106,7 @@ export default function AdminAvApp() {
           <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}>Panel de terreno</div>
         </div>
         <nav>
-          {NAV.map((n) => {
+          {navItems(compensacionHabilitada).map((n) => {
             const Ico = n.ico;
             return (
               <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
@@ -115,7 +127,7 @@ export default function AdminAvApp() {
           <Route index element={<ResumenAv />} />
           <Route path="cargar" element={<CargarAv />} />
           <Route path="rep" element={<RepAv />} />
-          <Route path="compensacion" element={<CompensacionAv />} />
+          <Route path="compensacion" element={compensacionHabilitada ? <CompensacionAv /> : <Navigate to="/panel-verde" replace />} />
           <Route path="capacitacion/*" element={<CapacitacionAv />} />
           <Route path="*" element={<Navigate to="/panel-verde" replace />} />
         </Routes>

@@ -59,6 +59,55 @@ Lo que la bandeja **no** admite: los documentos que el motor **sí** clasificó 
 en el panel de categorías, que versiona el cambio para todos y no de a uno) y los de
 procedencia no registrada (`categoria_origen` NULL), que no se reinterpretan hacia atrás.
 
+### Uso real sin placeholder (2026-08) — inventario y cierre por fases
+
+Auditoría explícita de qué bloquea usar sicr3p con un cliente que paga, **sin placeholders**.
+La mayor parte de lo que falta no es código (precio, abogado, razón social, credenciales de
+terceros — ver la tabla al final de este documento); esto documenta la parte que sí lo era.
+
+- **Fase 1 — hecha.** Un documento que el motor propio no podía leer, con `MOTOR_EXTERNO=on` y
+  `MOCK_SIMPLE=true` (los dos eran el default de fábrica, y `deploy/instalar-vps.sh` los
+  escribía así en el `.env` de producción), se enrutaba al motor externo en modo simulado:
+  `services/simpleApi.js` genera el CO2e con un PRNG (ítems de una lista fija, cantidades y
+  monto al azar, hasta un RUT emisor falso). Ese número entraba a `facturas`, **quedaba sellado
+  en la cadena de hash** y se imprimía en el informe firmado del cliente — indistinguible de un
+  cálculo real. Cerrado así: `MOCK_SIMPLE=true` pasa de advertencia a **fatal** en
+  `lib/verificarProduccion.js` (aborta el arranque en producción, junto a los secretos JWT,
+  `SII_CRED_KEY` y `SEED_DEMO`); el default de `config.js` cambia de `true` a `false`;
+  `instalar-vps.sh` genera `MOTOR_EXTERNO=off` y `SII_CRED_KEY` (esta última faltaba del todo
+  en el instalador — sin ella el arranque en producción ya era fatal por otra razón, así que
+  toda instalación limpia quedaba en crash-loop). Con el motor externo apagado, el 422 de
+  `routes/public.js` para un documento ilegible ahora sugiere subir el XML del DTE en vez de
+  ser un error seco, porque deja de ser un caso de borde y pasa a ser el camino principal para
+  lo que el motor propio no lee.
+- **Fase 2 — hecha.** El cobro de compensación es 100% simulado (sin pasarela conectada ni
+  socio ambiental formalizado — ver la fila "Cobro real VirtualPos" y "Bonos de carbono" más
+  abajo): `routes/pos.js` sumaba `monto_clp` de compensaciones en estado `'simulado'` y eso se
+  pintaba como **"Compensación acumulada (CLP)"**, un KPI de dinero recaudado que nunca entró,
+  junto a cifras reales de REP sin distinción visual en `admin-av/ResumenAv.jsx`. Cerrado así:
+  flag nuevo `COMPENSACION_HABILITADA` (default `false`, `config.compensacionHabilitada`),
+  expuesto en `GET /api/pos/config` como `compensacion_habilitada`; mientras esté en `false`,
+  el frontend **oculta** el paso de cobro y sus métricas en las tres superficies que lo
+  mostraban (`admin-av/CargarAv.jsx`: paso 3 y el componente `CompensacionCobro`;
+  `admin-av/ResumenAv.jsx`: las 3 tarjetas de estadística y "Últimas compensaciones";
+  `admin/Dashboard.jsx`: la tarjeta ya rotulada "Compensación (simulada)"; y `AdminAvApp.jsx`:
+  el ítem "Compensación" del menú lateral y su ruta, que si no también quedaban accesibles
+  para configurar la tarifa de un módulo que el resto del panel ya escondía). No se borró nada:
+  la tabla, los estados del CHECK y el servicio quedan intactos para cuando haya pasarela real
+  — se activa con una variable de entorno, sin migración. El copy del landing (`lib/i18n.js`)
+  ya era honesto sobre que la compensación es simulada; se revisó y se dejó sin cambios.
+- **Fases 3-6 — pendientes**, en orden de riesgo: infraestructura que puede tumbar el servicio
+  o perder datos de un cliente (poda de respaldos que no encuentra sus propios archivos,
+  `/api/health` que no consulta la base, `SII_CRED_KEY` faltante en el instalador — ya resuelto
+  arriba junto con el resto de Fase 1 —, respaldo off-site sin ensayar restauración);
+  degradación silenciosa (correo apagado impide dar de alta a un cliente, el smoke post-deploy
+  no prueba login ni escritura); validación de los factores de emisión (ninguna de las 7
+  fuentes está en `validada_oficial`; los factores "por gasto", que son los que se aplican a la
+  mayoría de los documentos, son proxy interno sin cita externa); y cabos sueltos de código que
+  ya se sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de
+  admin, `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key
+  de mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
+
 ## 2. Producto y datos
 
 | Ítem | Qué falta | Base ya construida |

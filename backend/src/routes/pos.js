@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../lib/db.js';
+import { config } from '../config.js';
 import { signAccess, requireAuth, requireRole, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { validarTarifa, validarTipoCambio } from '../services/compensacion.js';
 import { actualizarDolar } from '../services/tipoCambio.js';
@@ -94,6 +95,10 @@ function formatearConfig(c) {
     tipo_cambio_auto: c.tipo_cambio_auto === true,
     tipo_cambio_fuente: c.tipo_cambio_fuente ?? null,
     tipo_cambio_actualizado: c.tipo_cambio_actualizado ?? null,
+    // Con esto en false (default hoy: sin pasarela ni socio ambiental
+    // formalizado) el frontend oculta el paso de cobro y sus métricas, en vez
+    // de mostrar pagos simulados como si fueran dinero recaudado.
+    compensacion_habilitada: config.compensacionHabilitada === true,
   };
 }
 

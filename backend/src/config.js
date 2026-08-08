@@ -44,6 +44,13 @@ export const config = {
 
   databaseUrl: process.env.DATABASE_URL,
 
+  // El cobro de compensación es 100% simulado hoy: no hay pasarela conectada
+  // ni socio ambiental formalizado (VirtualPos, Kontax — ver ETAPA3.md). Con
+  // esto en false el paso se oculta del flujo de carga y sus métricas dejan
+  // de presentarse como un KPI de dinero recaudado, que es lo que eran: pagos
+  // simulados sumados y mostrados junto a cifras reales sin distinción.
+  compensacionHabilitada: bool(process.env.COMPENSACION_HABILITADA, false),
+
   simple: {
     // Default `false`: el modo simulado se pide explícitamente, no se hereda.
     // En producción además es fatal (lib/verificarProduccion.js).
