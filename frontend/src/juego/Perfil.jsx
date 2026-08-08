@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/icons.jsx';
-import { api } from '../api.js';
+import { api, fmtInt } from '../api.js';
 
 // Inicio: puntos, nivel y progreso — igual de espíritu al dashboard del
 // mockup ("Scan2Green"), sin el nombre ni la marca ajena. Nunca dice
@@ -30,13 +30,13 @@ export default function Perfil() {
       <div className="card card-pad" style={{ textAlign: 'center' }}>
         <div className="muted" style={{ fontSize: 13 }}>Nivel {nivel.nivel}</div>
         <div style={{ fontSize: 22, fontWeight: 800 }}>{nivel.nombre}</div>
-        <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--suma-accent)', margin: '6px 0' }}>{nivel.puntos} pts</div>
+        <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--suma-accent)', margin: '6px 0' }}>{fmtInt(nivel.puntos)} pts</div>
         <div className="game-level-bar" style={{ marginTop: 10 }}>
           <div style={{ width: `${pct}%` }} />
         </div>
         <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
           {nivel.umbralSiguiente
-            ? `${nivel.puntosParaSiguiente} pts para el siguiente nivel`
+            ? `${fmtInt(nivel.puntosParaSiguiente)} pts para el siguiente nivel`
             : 'Nivel máximo alcanzado'}
         </div>
       </div>

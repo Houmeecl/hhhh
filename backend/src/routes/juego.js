@@ -41,10 +41,14 @@ router.get('/perfil', async (req, res, next) => {
        WHERE m.activo = true ORDER BY m.meta_valor`,
       [jugador.id]
     );
+    // El código de campaña (no el id) — el frontend lo reenvía en cada
+    // escaneo para consumir créditos, igual que un código normal (ver
+    // POST /api/sesiones en public.js).
+    const { rows: codRows } = await query(`SELECT codigo FROM codigos_acceso WHERE id = $1`, [jugador.codigo_id]);
     res.json({
       jugador: {
         email: jugador.email, nombre: jugador.nombre, empresa: jugador.empresa,
-        puntos_totales: jugador.puntos_totales,
+        puntos_totales: jugador.puntos_totales, codigo: codRows[0]?.codigo || null,
       },
       nivel,
       misiones,

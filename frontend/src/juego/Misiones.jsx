@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../components/icons.jsx';
-import { api } from '../api.js';
+import { api, fmtInt } from '../api.js';
 
 // Misiones activas (con progreso) + ranking interno de la MISMA empresa —
 // el backend garantiza que el ranking nunca cruza códigos de campaña
@@ -58,7 +58,7 @@ export default function Misiones() {
                 <tr key={r.posicion} style={r.tu ? { fontWeight: 700, background: 'rgba(13,148,136,0.08)' } : undefined}>
                   <td style={{ width: 32 }}>{r.posicion}</td>
                   <td>{r.nombre}{r.tu && <span className="muted" style={{ fontWeight: 400 }}> (tú)</span>}</td>
-                  <td className="num">{r.puntos_totales} pts</td>
+                  <td className="num">{fmtInt(r.puntos_totales)} pts</td>
                 </tr>
               ))}
               {ranking.length === 0 && (

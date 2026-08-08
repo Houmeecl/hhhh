@@ -362,6 +362,27 @@ panel → "Accesos externos". Cada código trae **créditos** (por defecto 5; 1 
 1 factura procesada): generan **informes reales** con tope de envío, controlando el costo
 del motor. Al agotarse, el flujo pide contactarnos.
 
+### Sube y Suma (`/suma`, escaneo gamificado)
+
+App instalable propia (PWA, distinta del panel núcleo) para que el equipo de una
+empresa cliente escanee sus boletas y facturas ganando puntos. Se activa marcando
+**"Código de campaña"** al generar un código en "Accesos externos" (mismo mecanismo
+de créditos que arriba: 1 crédito = 1 factura, la campaña también tiene un cupo).
+
+- Acceso sin contraseña: `/suma/login` pide correo + código de invitación y envía un
+  enlace de un solo uso (igual que el ingreso de clientes en `/ingresar`, pero este
+  crea un **jugador persistente** — así el puntaje se acumula entre visitas).
+- Cada documento escaneado usa el mismo `POST /api/sesiones` (motor propio) que el
+  resto del sitio — el juego nunca calcula CO2e por su cuenta, solo puntúa sobre el
+  resultado real.
+- Misiones, ranking (nunca cruza de una empresa a otra) y canje de recompensas
+  **100% simbólicas** (insignias y constancias de participación — sin dinero real,
+  no hay pasarela de pago conectada). Una constancia canjeada se verifica sin login
+  por su serial en `/suma/constancia/:serial`.
+- Trayecto: el jugador puede marcar hora de salida/llegada y medio de transporte
+  usado para llegar a escanear, con puntos extra para medios de bajo carbono
+  (caminando, bicicleta, transporte público).
+
 ### API para mandantes
 
 Una empresa mandante consulta la trazabilidad de sus proveedores con su API key

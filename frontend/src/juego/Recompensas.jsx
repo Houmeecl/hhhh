@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../components/icons.jsx';
-import { api } from '../api.js';
+import { api, fmtInt } from '../api.js';
 
 // Catálogo 100% simbólico (insignias y constancias de participación) —
 // nunca dinero ni descuentos reales, no hay pasarela de pago conectada
@@ -35,7 +35,7 @@ export default function Recompensas() {
     <div>
       <h1 style={{ fontSize: 20, margin: '0 0 4px' }}>Premios</h1>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-        Insignias y constancias de participación — sin valor monetario. Tienes <b>{data.puntos_totales} pts</b>.
+        Insignias y constancias de participación — sin valor monetario. Tienes <b>{fmtInt(data.puntos_totales)} pts</b>.
       </p>
 
       <div style={{ display: 'grid', gap: 12 }}>
@@ -49,7 +49,7 @@ export default function Recompensas() {
                   <b style={{ fontSize: 14 }}>{r.nombre}</b>
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{r.descripcion}</div>
                 </div>
-                <span className="badge badge-gray" style={{ flexShrink: 0 }}><Icon.Coin size={12} /> {r.costo_puntos} pts</span>
+                <span className="badge badge-gray" style={{ flexShrink: 0 }}><Icon.Coin size={12} /> {fmtInt(r.costo_puntos)} pts</span>
               </div>
 
               {canje ? (

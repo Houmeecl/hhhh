@@ -47,6 +47,10 @@ export default function Escanear() {
       fd.append('rut', rut);
       fd.append('empresa', perfil?.empresa || '');
       fd.append('email', perfil?.email || '');
+      // El código de campaña es el mismo codigos_acceso que dio acceso al
+      // juego (ver auth.js) — sin reenviarlo aquí, POST /api/sesiones no
+      // consume créditos de la campaña (backend/src/routes/public.js).
+      if (perfil?.codigo) fd.append('codigo', perfil.codigo);
       files.forEach((f) => fd.append('archivos', f));
       const r = await api.jugadorCrearSesion(fd);
       setResultado({ puntos: r.juego?.puntos_ganados ?? 0, sesionId: r.sesion.id, nFacturas: r.facturas.length });
@@ -117,7 +121,7 @@ export default function Escanear() {
 
         <button
           className="btn btn-primary" style={{ width: '100%', marginTop: 14 }}
-          onClick={procesar} disabled={procesando || files.length === 0}
+          onClick={procesar} disabled={procesando || files.length === 0 || !perfil}
         >
           {procesando ? <span className="spinner" /> : `Procesar ${files.length > 0 ? `${files.length} documento${files.length > 1 ? 's' : ''}` : ''}`}
         </button>

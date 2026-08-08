@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Icon } from '../components/icons.jsx';
-import { api, authSuma } from '../api.js';
+import { api, authSuma, fmtInt } from '../api.js';
 import Perfil from './Perfil.jsx';
 import Escanear from './Escanear.jsx';
 import Trayecto from './Trayecto.jsx';
@@ -75,7 +75,7 @@ export default function JuegoApp() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span className="badge" style={{ background: 'rgba(255,255,255,0.15)', color: '#fff' }}>
-            {jugador?.puntos_totales ?? 0} pts
+            {fmtInt(jugador?.puntos_totales ?? 0)} pts
           </span>
           <button className="btn btn-ghost btn-sm" style={{ color: '#fff', padding: '4px 6px' }} onClick={salir} title="Salir">
             <Icon.Logout size={16} />
