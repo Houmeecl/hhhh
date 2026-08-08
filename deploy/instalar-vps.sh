@@ -62,10 +62,16 @@ PORT=4000
 CORS_ORIGIN=$ORIGEN
 PUBLIC_APP_URL=$ORIGEN
 DATABASE_URL=postgresql://sicr3p:$DB_PASS@localhost:5432/sicr3p
-# Motor externo: en mock hasta verificar la API real (ver README → Modo producción)
-MOCK_SIMPLE=true
+# Motor externo APAGADO. Su modo simulado fabrica el CO2e con un PRNG y ese
+# número queda sellado en la cadena de hash: no puede llegar a un cliente.
+# Con esto, un documento que el motor propio no puede leer se rechaza con 422
+# en vez de recibir una cifra inventada.
+MOTOR_EXTERNO=off
 SIMPLE_API_BASE=https://app.itssimple.com/public/v1
 SIMPLE_API_KEY=
+# Cifrado de las claves tributarias guardadas (AES-256-GCM). Es FATAL al
+# arrancar en producción si falta: sin esto el backend no levanta.
+SII_CRED_KEY=$(openssl rand -hex 32)
 JWT_ACCESS_SECRET=$(openssl rand -hex 48)
 JWT_REFRESH_SECRET=$(openssl rand -hex 48)
 JWT_ACCESS_TTL=15m
@@ -200,8 +206,9 @@ Panel admin:    $ORIGEN/admin
 Admin email:    admin@sicrep.cl
 Admin clave:    $ADMIN_PASS
 BD:             postgresql://sicr3p:$DB_PASS@localhost:5432/sicr3p
-Motor:          MOCK (para pasar a producción: MOCK_SIMPLE=false + SIMPLE_API_KEY
-                en backend/.env, y antes correr: node backend/scripts/verificar-simple.js)
+Motor:          PROPIO (XML del DTE, PDF con texto y OCR local).
+                El motor externo queda APAGADO (MOTOR_EXTERNO=off): un documento
+                que el motor propio no puede leer se rechaza, no se estima.
 CRED
 chmod 600 /root/sicr3p-credenciales.txt
 

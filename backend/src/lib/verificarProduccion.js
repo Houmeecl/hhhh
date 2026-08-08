@@ -47,8 +47,14 @@ export function verificarConfigProduccion(cfg) {
   if (!cfg.baseapi?.enabled) {
     advertencias.push('BASEAPI_API_KEY vacía — el autocompletado SII por RUT queda deshabilitado');
   }
+  // FATAL, no advertencia. En modo mock, `simpleApi.mockAnalyzeInvoice` genera
+  // el CO2e con un PRNG: ítems de una lista fija, cantidades aleatorias, hasta
+  // un RUT emisor falso. Ese número entra a `facturas`, SE SELLA EN LA CADENA
+  // DE HASH y se imprime en el informe firmado que recibe el cliente. Un
+  // número inventado no puede llegar a producción por descuido de una variable
+  // de entorno.
   if (cfg.simple.mock) {
-    advertencias.push('MOCK_SIMPLE=true — los documentos sin XML ni texto extraíble se analizan con datos simulados');
+    fatales.push('MOCK_SIMPLE=true — el motor externo fabricaría el CO2e con datos simulados y quedaría sellado en la cadena');
   }
 
   return { fatales, advertencias };

@@ -333,7 +333,11 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         ? `${plural ? `Estos documentos son de tipo: ${tipos}` : `"${nombres[0]}" es de tipo: ${tipos || 'no calculable'}`} — hoy sicr3p calcula CO2e solo desde facturas y boletas de compra. Sube el documento original o contacta soporte.`
         : iaEnPausa
           ? `No pudimos leer automáticamente ${plural ? `estos documentos: ${nombres.map((n) => `"${n}"`).join(', ')}` : `"${nombres[0]}"`}. Hoy la lectura avanzada está en pausa por límite de uso del servicio, así que puede no ser tu documento: vuelve a intentarlo mañana o escríbenos y lo procesamos nosotros.`
-          : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
+          // Con el motor externo apagado este es el camino PRINCIPAL de un
+          // documento ilegible, no un caso raro: conviene ofrecer la salida
+          // que de verdad funciona (el XML del DTE trae el detalle real y
+          // habilita el método físico) antes que solo pedir otro escaneo.
+          : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Si tienes el XML del documento tributario, súbelo: trae el detalle exacto. Si no, vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
       return res.status(422).json({ error, rechazados: nombres });
     }
 

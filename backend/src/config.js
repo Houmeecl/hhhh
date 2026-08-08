@@ -45,7 +45,9 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL,
 
   simple: {
-    mock: bool(process.env.MOCK_SIMPLE, true),
+    // Default `false`: el modo simulado se pide explícitamente, no se hereda.
+    // En producción además es fatal (lib/verificarProduccion.js).
+    mock: bool(process.env.MOCK_SIMPLE, false),
     base: process.env.SIMPLE_API_BASE || 'https://app.itssimple.com/public/v1',
     key: process.env.SIMPLE_API_KEY || '',
   },

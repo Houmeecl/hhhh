@@ -53,13 +53,28 @@ test('SEED_DEMO=true es fatal', () => {
   assert.match(fatales[0], /SEED_DEMO/);
 });
 
-test('sin RESEND_API_KEY y con MOCK_SIMPLE solo advierte, no es fatal', () => {
+test('sin RESEND_API_KEY solo advierte: degrada, no miente', () => {
+  // Sin correo el sistema sigue calculando bien; lo que se rompe es la
+  // activación de cuentas. Grave, pero no produce un número falso.
   const cfg = base();
   cfg.resend.apiKey = '';
-  cfg.simple.mock = true;
   const { fatales, advertencias } = verificarConfigProduccion(cfg);
   assert.deepEqual(fatales, []);
-  assert.equal(advertencias.length, 2);
+  assert.equal(advertencias.length, 1);
+  assert.match(advertencias[0], /correos NO se envían/);
+});
+
+// En modo mock, `simpleApi.mockAnalyzeInvoice` genera el CO2e con un PRNG y
+// ese número se sella en la cadena de hash y se firma en el informe del
+// cliente. Un número inventado no puede llegar a producción porque alguien
+// olvidó una variable de entorno: el backend no levanta.
+test('MOCK_SIMPLE=true es FATAL en producción, no una advertencia', () => {
+  const cfg = base();
+  cfg.simple.mock = true;
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /MOCK_SIMPLE/);
+  assert.match(fatales[0], /sellad/, 'el mensaje dice por qué importa, no solo qué falta');
 });
 
 test('sin BASEAPI_API_KEY solo advierte que el autocompletado SII queda apagado', () => {
