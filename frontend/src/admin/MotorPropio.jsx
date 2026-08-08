@@ -464,8 +464,8 @@ export default function MotorPropio() {
         </div>
         <p className="muted" style={{ fontSize: 13, marginTop: -4 }}>
           Documentos donde ninguna palabra clave calzó con la glosa de sus ítems, o donde no
-          quedó ítem que clasificar. Su CO2e está calculado por gasto y cuenta en los totales,
-          pero no reciben alcance GHG hasta que alguien diga qué son.{' '}
+          quedó ítem que clasificar. Su CO2e cuenta en los totales, pero no reciben alcance
+          GHG hasta que alguien diga qué son.{' '}
           <strong>Reclasificar no modifica el documento sellado</strong>: queda un asiento aparte,
           firmado, con su propia cadena de verificación.
         </p>
@@ -522,8 +522,9 @@ export default function MotorPropio() {
               «{reclasificando.doc.categoria || 'sin categoría'}».
             </p>
             <p className="muted" style={{ fontSize: 12 }}>
-              El CO2e se recalcula con el factor de la categoría que elijas, por el mismo método
-              de gasto. El documento original y su sello no se tocan.
+              Se recalculan solo los ítems que el motor calculó por gasto con el factor de la
+              categoría actual; los que sí calzaron una palabra clave —o se midieron por
+              método físico— quedan como están. El documento original y su sello no se tocan.
             </p>
             <label>Categoría</label>
             <select

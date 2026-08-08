@@ -112,6 +112,18 @@ export default function Pasaporte() {
                   )}
                 </div>
                 <div><span className="pas-lbl">{t('ver.estado')}</span><span className="badge badge-green">{data.producto.status}</span></div>
+                {/* Público y sin autenticación: si una persona clasificó
+                    este documento, se dice acá y no solo en el JSON. */}
+                {data.producto.reclasificacion && (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <span className="pas-lbl">{t('cat.reclasificado')}</span>
+                    <b>
+                      {t('cat.reclasificado_det')
+                        .replace('{orig}', data.producto.reclasificacion.categoria_original || '—')
+                        .replace('{co2e}', fmt(data.producto.reclasificacion.total_co2e_original, 3))}
+                    </b>
+                  </div>
+                )}
                 {data.producto.clasificacion_ghg && (
                   <div style={{ gridColumn: '1 / -1' }}>
                     <span className="pas-lbl">{t('pas.clasificacion')}</span><b>{data.producto.clasificacion_ghg}</b>

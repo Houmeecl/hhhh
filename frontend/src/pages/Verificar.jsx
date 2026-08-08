@@ -84,6 +84,20 @@ export default function Verificar() {
                   <div className="big">{data.items.length}</div>
                   <div className="lbl">{t('ver.items')}</div>
                 </div>
+              {/* El sello de abajo cubre el cálculo ORIGINAL. Mostrar la
+                  categoría del operador junto a «cadena íntegra», sin decir
+                  que cambió, deja un rótulo que no corresponde al hash que
+                  esta misma página exhibe. */}
+              {data.reclasificacion && (
+                <div className="aviso" style={{ marginTop: 12 }}>
+                  <strong>{t('cat.reclasificado')}</strong>
+                  <p style={{ margin: '4px 0 0', fontSize: 13 }}>
+                    {t('cat.reclasificado_det')
+                      .replace('{orig}', data.reclasificacion.categoria_original || '—')
+                      .replace('{co2e}', fmt(data.reclasificacion.total_co2e_original, 3))}
+                  </p>
+                </div>
+              )}
               </div>
             </div>
 

@@ -44,9 +44,16 @@ Tres cosas que lo mantienen defendible:
    motor** con que se calculó el documento. Si no consta el factor original no se recalcula:
    se rechaza, antes que deducir un monto inventado.
 3. **Se declara.** El origen queda como `'operador'` —atribuible, o sea gana alcance GHG— pero
-   el informe consolidado dice cuántos documentos clasificó una persona y no el motor, y la
-   verificación pública por QR muestra la categoría y el CO2e originales junto al motivo del
-   ajuste. Una categoría asignada a mano no puede leerse como una que dedujo el motor.
+   el informe consolidado dice cuántos documentos clasificó una persona y no el motor, en una
+   nota aparte de la de los no atribuibles; y la verificación pública por QR y el pasaporte
+   —ambos sin autenticación— muestran la categoría y el CO2e ORIGINALES junto al motivo del
+   ajuste, porque el sello que exhiben cubre ese cálculo original. Una categoría asignada a
+   mano no puede leerse como una que dedujo el motor.
+
+**Pendiente**: la verificación de la cadena de ajustes (`GET /admin/motor-propio/revision/
+cadena/verificar`) está tras autenticación de admin, así que hoy el cliente ve declarado el
+ajuste pero no puede verificar esa cadena por su cuenta. Falta el equivalente público de
+`/api/cadena`.
 
 Lo que la bandeja **no** admite: los documentos que el motor **sí** clasificó (eso se arregla
 en el panel de categorías, que versiona el cambio para todos y no de a uno) y los de

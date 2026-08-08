@@ -517,9 +517,12 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
 
         for (const it of analysis.items) {
           await client.query(
-            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo)
-             VALUES ($1,$2,$3,$4,$5,$6)`,
-            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null]
+            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo, categoria_codigo)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            // `categoria_codigo` por ítem (migración 080): sin él, reclasificar
+            // una factura mixta reescala también los ítems que sí calzaron.
+            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null,
+             it.categoria_codigo || null]
           );
         }
         // Capital Natural: cargos automáticos en las cuentas ambientales activas.
@@ -1227,6 +1230,17 @@ router.get('/pasaporte/:id', async (req, res, next) => {
         categoria_estado: categoriaParaMostrar(factura).estado,
         categoria_confirmada: categoriaParaMostrar(factura).confirmada,
         clasificacion_ghg: alcanceAtribuible(factura, aRows[0]?.alcance_ghg),
+        // Igual que en la verificación por QR: si una persona clasificó este
+        // documento, el pasaporte lo dice. Es público y sin autenticación, y
+        // publica un alcance GHG junto a un sello de integridad — presentar
+        // una categoría asignada a mano como atribución calculada es
+        // exactamente lo que este proyecto no hace.
+        reclasificacion: factura.ajuste_id ? {
+          categoria_original: factura.categoria_original,
+          total_co2e_original: Number(factura.total_co2e_original),
+          motivo: factura.ajuste_motivo,
+          fecha: factura.ajuste_fecha,
+        } : null,
         motor: factura.motor,
         status: factura.status,
         fecha: sRows[0]?.fecha || null,

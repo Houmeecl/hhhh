@@ -67,6 +67,7 @@ const MATERIALES_EMBALAJE = {
   otros: 'Otros',
 };
 
+const round4 = (n) => Math.round(n * 10000) / 10000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Trae la declaración de embalaje de una sesión (una fila por sesión) o null.
@@ -322,16 +323,26 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
         );
       y += 11;
     }
+    // Un documento reclasificado por un operador tiene su CO2e recalculado en
+    // la factura, pero sus `line_items` conservan el cálculo ORIGINAL: son lo
+    // que el motor leyó del documento y no se reescriben. Si el libro sumara
+    // los ítems, el saldo del período contradiría al total de la portada
+    // dentro del MISMO PDF. Se reparte el total vigente entre los ítems, en
+    // proporción a lo que cada uno pesaba.
+    const sumaItems = (f.items || []).reduce((a, it) => a + Number(it.co2e || 0), 0);
+    const ajustado = f.ajuste_id != null && sumaItems > 0;
+    const escala = ajustado ? Number(f.total_co2e || 0) / sumaItems : 1;
     for (const it of f.items || []) {
       if (y > 760) { doc.addPage(); y = 48; }
-      saldo += Number(it.co2e || 0);
+      const co2eItem = round4(Number(it.co2e || 0) * escala);
+      saldo += co2eItem;
       if (zebra) { doc.rect(48, y, 499, 16).fill(LIGHT); doc.fillColor(NAVY); }
       zebra = !zebra;
       doc.font('Courier').fontSize(8.5).fillColor(NAVY);
       doc.text(fechaCorta(f.fecha || sesion.fecha), cols.fecha + 6, y + 4, { lineBreak: false });
       doc.text(String(f.numero_venta || '—').slice(0, 16), cols.doc, y + 4, { lineBreak: false });
       doc.text(String(it.descripcion || '').slice(0, 34), cols.glosa, y + 4, { lineBreak: false });
-      doc.text(nf(it.co2e, 4), cols.cargo - 20, y + 4, { width: 97, align: 'right' });
+      doc.text(nf(co2eItem, 4), cols.cargo - 20, y + 4, { width: 97, align: 'right' });
       y += 16;
     }
   }
@@ -400,18 +411,26 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
       + 'de qué fuente salió su categoría.'
     );
   }
-  if (nReclasificados > 0) {
-    notas.push(
-      `${nReclasificados} ${nReclasificados === 1 ? 'documento fue clasificado' : 'documentos fueron clasificados'} `
-      + 'por un operador, no por el motor; el ajuste queda registrado y verificable aparte, '
-      + 'sin alterar el documento original ni su sello.'
-    );
-  }
   if (notas.length) {
     if (y > 760) { doc.addPage(); y = 48; }
     doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
       .text(
         `${notas.join(' ')} Su CO2e está incluido en el total, pero no se les atribuye alcance GHG.`,
+        48, y, { width: 499 }
+      );
+    y = doc.y + 10;
+  }
+  // Los reclasificados van en nota APARTE, no en la de arriba: esa termina en
+  // "no se les atribuye alcance GHG", y estos SÍ lo reciben —'operador' es
+  // atribuible—. Meterlos ahí decía lo contrario de lo que hace el código.
+  if (nReclasificados > 0) {
+    if (y > 760) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
+      .text(
+        `${nReclasificados} ${nReclasificados === 1 ? 'documento fue clasificado' : 'documentos fueron clasificados'} `
+        + 'por un operador y no por el motor, porque su detalle no permitía deducir la categoría. '
+        + 'Sí reciben alcance GHG. El ajuste queda registrado aparte, sin alterar el documento '
+        + 'original ni su sello.',
         48, y, { width: 499 }
       );
     y = doc.y + 10;

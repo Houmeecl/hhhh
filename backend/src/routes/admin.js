@@ -413,9 +413,12 @@ router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => 
         estado = { ...estado, ultimo_hash: hCad, n_eslabones: eslabon };
         for (const it of calc.items) {
           await client.query(
-            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo)
-             VALUES ($1,$2,$3,$4,$5,$6)`,
-            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null]
+            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo, categoria_codigo)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            // `categoria_codigo` por ítem (migración 080): sin él, reclasificar
+            // una factura mixta reescala también los ítems que sí calzaron.
+            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null,
+             it.categoria_codigo || null]
           );
         }
         // Ídem public.js: los ítems viajan en memoria para que la cuenta

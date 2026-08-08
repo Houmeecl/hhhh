@@ -139,3 +139,12 @@ BEGIN
       FOREIGN KEY (factura_id) REFERENCES facturas(id) ON DELETE SET NULL;
   END IF;
 END $$;
+
+-- `factura_id` se pone en NULL cuando el documento se purga por retención, y
+-- el hash del asiento se calcula sobre el id que se firmó. Sin una copia
+-- inmutable, la verificación de contenido denunciaría como alteración lo que
+-- fue una purga legítima. Esta columna guarda el id como TEXTO, sin FK: es
+-- parte de lo firmado, no una referencia viva.
+ALTER TABLE ajustes_clasificacion ADD COLUMN IF NOT EXISTS factura_id_firmada TEXT;
+UPDATE ajustes_clasificacion SET factura_id_firmada = factura_id::text
+ WHERE factura_id_firmada IS NULL AND factura_id IS NOT NULL;

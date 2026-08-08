@@ -1,0 +1,32 @@
+-- ============================================================
+-- 080 — La categoría de cada ítem, persistida.
+--
+-- POR QUÉ. La reclasificación de un operador (migración 079) recalcula el
+-- CO2e aplicando la razón entre el factor nuevo y el original. Eso es exacto
+-- SOLO para los ítems que se calcularon por gasto con el factor de la
+-- categoría del documento.
+--
+-- Y la categoría del documento es la del ítem DOMINANTE, no la de todos:
+-- `motorPropio.calcularFactura` toma la de mayor CO2e. Una factura mixta
+-- puede tener el dominante en el catch-all —así que el documento queda
+-- `sin_coincidencia` y entra a la bandeja— y OTRO ítem que sí calzó una
+-- palabra clave, calculado por método físico con su propio factor. Escalar
+-- el total entero reescala también ese ítem, que no tiene nada que ver.
+--
+-- Medido: "Fuga refrigerante R-410A, 4 KG" (9,024 tCO2e, físico) + un ítem
+-- sin coincidencia (10 tCO2e, gasto) daba 91,3 tCO2e reclasificado a
+-- combustible, cuando lo correcto son 57,0. Un 60% inventado, en un número
+-- que se pega en una memoria anual.
+--
+-- `line_items.metodo` (migración 035) ya distingue físico de gasto, pero no
+-- alcanza: dos ítems por gasto pueden haber usado factores de categorías
+-- distintas. Hace falta el código de la categoría de cada ítem.
+--
+-- SIN BACKFILL: no consta con qué categoría se calculó cada ítem histórico.
+-- Las filas viejas quedan en NULL y `ajustesClasificacion` RECHAZA
+-- reclasificar esos documentos, en vez de recalcular sobre una suposición.
+--
+-- Idempotente: ADD COLUMN IF NOT EXISTS.
+-- ============================================================
+
+ALTER TABLE line_items ADD COLUMN IF NOT EXISTS categoria_codigo TEXT;

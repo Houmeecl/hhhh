@@ -17,32 +17,72 @@ import {
 
 // ---------- El recálculo, sin base ----------
 
+const it = (co2e, metodo, codigo) => ({ co2e, metodo, categoria_codigo: codigo });
+
 test('recalcularPorGasto: cambiar de categoría es cambiar de factor', () => {
   // 3 tCO2e con factor 30 → el mismo gasto con factor 10 son 1 tCO2e.
-  assert.equal(recalcularPorGasto({ co2eOriginal: 3, factorOriginal: 30, factorNuevo: 10 }).co2e, 1);
-  assert.equal(recalcularPorGasto({ co2eOriginal: 3, factorOriginal: 10, factorNuevo: 30 }).co2e, 9);
+  const uno = [it(3, 'gasto', 'servicios')];
+  assert.equal(recalcularPorGasto({ items: uno, categoriaOriginal: 'servicios', factorOriginal: 30, factorNuevo: 10 }).co2e, 1);
+  assert.equal(recalcularPorGasto({ items: uno, categoriaOriginal: 'servicios', factorOriginal: 10, factorNuevo: 30 }).co2e, 9);
+});
+
+// El caso que la auditoría demostró ejecutando el motor: la categoría de una
+// factura es la del ítem DOMINANTE, no la de todos. Escalar el total entero
+// reescalaba también un ítem calculado por método físico con otro factor.
+test('factura mixta: NO se reescala el ítem físico de otra categoría', () => {
+  const items = [
+    it(9.024, 'fisico', 'refrigerante_r410a'), // 4 kg de fuga de R-410A: medido
+    it(10, 'gasto', 'servicios'),              // el que cayó al catch-all
+  ];
+  const r = recalcularPorGasto({ items, categoriaOriginal: 'servicios', factorOriginal: 10, factorNuevo: 48 });
+  assert.equal(r.co2e, 57.024, '10 × 4,8 + 9,024 intactos — no 91,3152');
+  assert.equal(r.reescalado, 1);
+  assert.equal(r.intacto, 1, 'la fuga de refrigerante no depende de esta reclasificación');
+});
+
+test('factura mixta: tampoco se reescala un ítem por gasto de OTRA categoría', () => {
+  const items = [it(4, 'gasto', 'servicios'), it(6, 'gasto', 'electricidad')];
+  const r = recalcularPorGasto({ items, categoriaOriginal: 'servicios', factorOriginal: 10, factorNuevo: 20 });
+  assert.equal(r.co2e, 14, '4×2 + 6 sin tocar');
 });
 
 test('recalcularPorGasto: una nota de crédito vale 0 en cualquier categoría', () => {
-  // co2e 0 y sin factor original: no hay proporción que aplicar, y tampoco falta.
-  assert.equal(recalcularPorGasto({ co2eOriginal: 0, factorOriginal: null, factorNuevo: 12 }).co2e, 0);
+  // Sin ítems: no hay proporción que aplicar, y tampoco falta.
+  assert.equal(recalcularPorGasto({ items: [], categoriaOriginal: null, factorOriginal: null, factorNuevo: 12 }).co2e, 0);
+});
+
+test('recalcularPorGasto: sin categoría por ítem NO recalcula sobre una suposición', () => {
+  // Documentos anteriores a la migración 080: no consta con qué factor se
+  // calculó cada ítem.
+  assert.throws(
+    () => recalcularPorGasto({
+      items: [{ co2e: 5, metodo: 'gasto', categoria_codigo: null }],
+      categoriaOriginal: 'servicios', factorOriginal: 10, factorNuevo: 12,
+    }),
+    /sin suponer/
+  );
 });
 
 test('recalcularPorGasto: sin el factor original NO inventa un número', () => {
   assert.throws(
-    () => recalcularPorGasto({ co2eOriginal: 5, factorOriginal: 0, factorNuevo: 12 }),
-    /no se puede recalcular/,
-    'sin el factor con que se calculó no se puede deducir el monto'
+    () => recalcularPorGasto({
+      items: [it(5, 'gasto', 'servicios')], categoriaOriginal: 'servicios',
+      factorOriginal: 0, factorNuevo: 12,
+    }),
+    /no se puede recalcular/
   );
 });
 
 test('recalcularPorGasto: una categoría sin factor de gasto se rechaza', () => {
-  assert.throws(() => recalcularPorGasto({ co2eOriginal: 5, factorOriginal: 10, factorNuevo: 0 }), /factor de gasto/);
+  assert.throws(() => recalcularPorGasto({
+    items: [it(5, 'gasto', 'servicios')], categoriaOriginal: 'servicios',
+    factorOriginal: 10, factorNuevo: 0,
+  }), /factor de gasto/);
 });
 
 test('hashAjuste es determinista y sensible a cada campo firmado', () => {
   const base = {
-    factura_id: 'f1', categoria_codigo: 'electricidad', categoria: 'Energía eléctrica',
+    factura_id_firmada: 'f1', categoria_codigo: 'electricidad', categoria: 'Energía eléctrica',
     co2e_ajustado: 1.5, co2e_original: 3, usuario_id: 'u1', motivo: 'La glosa dice consumo eléctrico',
   };
   assert.equal(hashAjuste(base), hashAjuste({ ...base }));
@@ -224,4 +264,24 @@ test('alterar un ajuste rompe SU cadena, no la de las facturas', async () => {
   } finally {
     await query(`UPDATE ajustes_clasificacion SET hash_documento = $2 WHERE id = $1`, [rows[0].id, original]);
   }
+});
+
+test('reescribir el contenido firmado sin tocar los hash SÍ se detecta', async () => {
+  // La verificación anterior solo comprobaba el enlace, así que un UPDATE de
+  // co2e_ajustado a 999 pasaba con `valido: true`. El asiento es precisamente
+  // lo que una persona firmó: tiene que verificarse su contenido.
+  const { rows } = await query(
+    `SELECT id, co2e_ajustado FROM ajustes_clasificacion ORDER BY eslabon DESC LIMIT 1`
+  );
+  const original = rows[0].co2e_ajustado;
+  try {
+    await query(`UPDATE ajustes_clasificacion SET co2e_ajustado = 999 WHERE id = $1`, [rows[0].id]);
+    const r = await verificarCadenaAjustes((sql) => query(sql));
+    assert.equal(r.valido, false);
+    assert.match(r.motivo, /contenido/);
+    assert.equal(r.rompe_en, rows[0].id);
+  } finally {
+    await query(`UPDATE ajustes_clasificacion SET co2e_ajustado = $2 WHERE id = $1`, [rows[0].id, original]);
+  }
+  assert.equal((await verificarCadenaAjustes((sql) => query(sql))).valido, true, 'restaurado, vuelve a cuadrar');
 });

@@ -6,7 +6,7 @@ import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
 import { agregarAlcance3, parsearAlcanceGHG, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
-import { categoriaParaMostrar, SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
+import { categoriaParaMostrar, esAtribuible, SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
 import { filasACsv } from '../services/csv.js';
 import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
 import { citaFuente, generateReporteCbam } from '../services/pdf.js';
@@ -251,14 +251,22 @@ router.get('/export/alcance3', async (req, res, next) => {
     //     "me falta clasificar esto".
     //   · el resto → `no_atribuido`, con su causa.
     const alcanceDe = (r) => parsearAlcanceGHG(r.alcance_ghg).alcance;
-    const atribuibles = rows.filter((r) => r.categoria_origen === 'glosa' && alcanceDe(r) !== null);
+    // `esAtribuible`, no `=== 'glosa'` a mano: desde la migración 079 la vista
+    // devuelve 'operador' para los reclasificados, que SÍ son atribuibles.
+    // Compararlo contra 'glosa' los mandaba a `sinClasificar` sin que calzara
+    // ninguno de los cuatro motivos, y el pie del CSV declaraba un saldo con
+    // las cuatro causas en cero. Los montones dejaban de sumar.
+    const atribuibles = rows.filter((r) => esAtribuible(r.categoria_origen) && alcanceDe(r) !== null);
     const filas = agregarAlcance3(atribuibles.filter((r) => alcanceDe(r) === 3));
     const otros = atribuibles.filter((r) => alcanceDe(r) !== 3);
     // No se esconde lo excluido: se informa aparte, con su CO2e, para que el
     // mandante sepa qué parte de su gasto quedó sin clasificar en vez de
     // creer que el export lo cubre todo.
-    const esAtribuible = new Set(atribuibles);
-    const sinClasificar = rows.filter((r) => !esAtribuible.has(r));
+    // `enAtribuibles`, no `esAtribuible`: ese nombre lo ocupa la función
+    // importada de categoriaPresentacion.js, y la constante local la
+    // ensombrecía dentro de este mismo bloque.
+    const enAtribuibles = new Set(atribuibles);
+    const sinClasificar = rows.filter((r) => !enAtribuibles.has(r));
     const suma = (lista) => Math.round(lista.reduce((a, r) => a + Number(r.total_co2e || 0), 0) * 10000) / 10000;
     const noAtribuido = {
       n_documentos: sinClasificar.length,
@@ -275,7 +283,7 @@ router.get('/export/alcance3', async (req, res, next) => {
       // texto libre `alcance_ghg` no calza el patrón, o el código ya no está
       // en el catálogo. Lo arregla un admin en el panel del motor, no el
       // mandante — por eso va contado aparte de los otros dos.
-      alcance_no_legible: sinClasificar.filter((r) => r.categoria_origen === 'glosa').length,
+      alcance_no_legible: sinClasificar.filter((r) => esAtribuible(r.categoria_origen)).length,
     };
     const otrosAlcances = { n_documentos: otros.length, total_tco2e: suma(otros) };
     const anio = req.query.anio || 'todos';

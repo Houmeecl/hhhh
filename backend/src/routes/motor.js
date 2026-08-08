@@ -451,13 +451,18 @@ export default router;
 // que versiona el cambio para todos—, y un documento sin procedencia
 // registrada no se reinterpreta hacia atrás.
 //
+// `adminOnly` en los TRES verbos, no solo en el POST: esta bandeja cruza
+// clientes —devuelve nombre, RUT y glosas de documentos de cualquier
+// empresa— y `requireHomePanel('sicrep')` no alcanza, porque las cuentas
+// rol 'cliente' que crea admin.js nacen justamente con ese panel.
+//
 // NO se muestra ni se guarda el archivo original. La tabla
 // `facturas_revision` de la migración 019 existe en el esquema y no tiene un
 // solo llamador; revivirla reintroduciría la retención de documentos del
 // cliente que este proyecto ya decidió no hacer. El operador clasifica con lo
 // que el motor ya extrajo: la glosa de los ítems.
 // ============================================================
-router.get('/revision', async (req, res, next) => {
+router.get('/revision', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT f.id, f.numero_venta, f.archivo_original, f.categoria, f.categoria_codigo,
@@ -487,7 +492,7 @@ router.get('/revision', async (req, res, next) => {
 
 // Historial de ajustes de UNA factura, del más nuevo al más viejo. Append-only:
 // los ajustes superados no se borran, se leen.
-router.get('/revision/:facturaId/ajustes', async (req, res, next) => {
+router.get('/revision/:facturaId/ajustes', adminOnly, async (req, res, next) => {
   try {
     if (!UUID_RE.test(String(req.params.facturaId))) return res.status(404).json({ error: 'Documento no encontrado' });
     const { rows } = await query(
@@ -560,8 +565,16 @@ router.post('/revision/:facturaId', adminOnly, async (req, res, next) => {
       }
       const original = cats.find((c) => c.codigo === factura.categoria_codigo);
 
+      // Los ítems, con su método y su categoría (migraciones 035 y 080): el
+      // recálculo reescala SOLO los que se calcularon por gasto con el factor
+      // de la categoría original. Ver recalcularPorGasto().
+      const { rows: items } = await client.query(
+        `SELECT co2e::float AS co2e, metodo, categoria_codigo FROM line_items WHERE factura_id = $1`,
+        [factura.id]
+      );
       const { co2e } = recalcularPorGasto({
-        co2eOriginal: factura.total_co2e,
+        items,
+        categoriaOriginal: factura.categoria_codigo,
         factorOriginal: original?.factor_gasto_kgco2e_clp1000,
         factorNuevo: nueva.factor_gasto_kgco2e_clp1000,
       });
@@ -595,7 +608,7 @@ router.post('/revision/:facturaId', adminOnly, async (req, res, next) => {
 
 // La cadena de ajustes verifica APARTE de la de facturas: reclasificar no
 // puede alterar lo que la cadena original dice del documento sellado.
-router.get('/revision/cadena/verificar', async (req, res, next) => {
+router.get('/revision/cadena/verificar', adminOnly, async (req, res, next) => {
   try {
     res.json(await verificarCadenaAjustes((sql) => query(sql)));
   } catch (err) { next(err); }

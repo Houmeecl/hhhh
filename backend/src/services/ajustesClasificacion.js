@@ -31,49 +31,78 @@ export const ESTADOS_REVISABLES = ['sin_coincidencia', 'sin_categoria'];
 /**
  * CO2e de la factura bajo otra categoría.
  *
- * Los documentos de la bandeja se calcularon SIEMPRE por método de gasto:
- * `motorPropio.calcularItem` lo fuerza cuando no hubo coincidencia, justamente
- * para que el factor físico de una categoría no se le aplique a un ítem que no
- * fue clasificado en ella. El método de gasto es lineal en el monto
- * (co2e = monto/1e6 × factor), así que cambiar de categoría es cambiar de
- * factor: co2e_nuevo = co2e_original × (factor_nuevo / factor_original).
+ * NO se escala el total del documento. La categoría de una factura es la del
+ * ítem DOMINANTE (`motorPropio.calcularFactura`), no la de todos sus ítems:
+ * una factura mixta puede tener el dominante en el catch-all —y por eso entra
+ * a la bandeja— y otro ítem que sí calzó una palabra clave, calculado por
+ * método FÍSICO con su propio factor. Escalar el total reescalaba también ese
+ * ítem. Medido: 19,024 tCO2e (9,024 físicos de una fuga de refrigerante +
+ * 10 por gasto) daban 91,3 al reclasificar, cuando lo correcto son 57,0. Un
+ * 60% inventado.
  *
- * NO se recalcula desde el monto porque `line_items` no lo guarda (solo
- * descripción, cantidad y CO2e), y NO se aplica método físico: el operador
- * está clasificando por la glosa, no midiendo el consumo.
+ * Entonces: se reescalan SOLO los ítems que se calcularon por gasto CON EL
+ * FACTOR DE LA CATEGORÍA ORIGINAL del documento. El resto queda como está,
+ * porque su número no depende de la categoría que el operador está corrigiendo.
  *
- * @returns {{co2e: number}} o lanza si no hay con qué calcular.
+ * `items` viene de `line_items` con `metodo` (migración 035) y
+ * `categoria_codigo` (migración 080).
+ *
+ * @returns {{co2e: number, reescalado: number, intacto: number}}
  */
-export function recalcularPorGasto({ co2eOriginal, factorOriginal, factorNuevo }) {
-  const co2e0 = Number(co2eOriginal || 0);
+export function recalcularPorGasto({ items, categoriaOriginal, factorOriginal, factorNuevo }) {
   const fNuevo = Number(factorNuevo);
   if (!(fNuevo > 0)) {
     throw Object.assign(new Error('La categoría elegida no tiene factor de gasto vigente.'), { entrada: true });
   }
-  // Una nota de crédito (todos los ítems descartados) vale 0 en cualquier
-  // categoría: no hay proporción que aplicar y tampoco hace falta.
-  if (co2e0 === 0) return { co2e: 0 };
+  const lista = Array.isArray(items) ? items : [];
+
+  // Una nota de crédito (todos los ítems descartados) no tiene ítems y vale 0
+  // en cualquier categoría: no hay proporción que aplicar y tampoco falta.
+  if (lista.length === 0) return { co2e: 0, reescalado: 0, intacto: 0 };
+
+  // Sin `categoria_codigo` no consta con qué factor se calculó cada ítem, y
+  // reescalar sobre esa suposición es exactamente el número inventado que
+  // este proyecto viene cerrando. Se rechaza. Afecta a los documentos
+  // anteriores a la migración 080, que no se reinterpretan hacia atrás.
+  if (lista.some((it) => it.categoria_codigo == null)) {
+    throw Object.assign(
+      new Error('Este documento no registra la categoría de cada ítem (anterior a la migración 080): no se puede recalcular sin suponer.'),
+      { entrada: true }
+    );
+  }
+
+  const reescalables = lista.filter((it) => it.metodo !== 'fisico' && it.categoria_codigo === categoriaOriginal);
+  const resto = lista.filter((it) => !reescalables.includes(it));
+  const sumaReescalable = reescalables.reduce((a, it) => a + Number(it.co2e || 0), 0);
+  const sumaResto = resto.reduce((a, it) => a + Number(it.co2e || 0), 0);
+
+  if (sumaReescalable === 0) return { co2e: round4(sumaResto), reescalado: 0, intacto: resto.length };
 
   const f0 = Number(factorOriginal);
   if (!(f0 > 0)) {
     // Sin el factor con que se calculó el número original no se puede deducir
-    // el monto, y sin monto no hay recálculo posible. Antes que inventar una
-    // cifra, se rechaza: es exactamente el defecto que esta ronda vino a
-    // cerrar.
+    // el monto, y sin monto no hay recálculo posible.
     throw Object.assign(
       new Error('No consta el factor con que se calculó este documento: no se puede recalcular sin inventar el monto.'),
       { entrada: true }
     );
   }
-  return { co2e: round4(co2e0 * (fNuevo / f0)) };
+  return {
+    co2e: round4(sumaReescalable * (fNuevo / f0) + sumaResto),
+    reescalado: reescalables.length,
+    intacto: resto.length,
+  };
 }
 
 // Hash canónico de UN ajuste. Determinista: mismo orden de campos siempre, sin
 // depender de JSON.stringify. No incluye ids autogenerados ni el instante de
 // inserción — solo el contenido que se firma.
-export function hashAjuste({ factura_id, categoria_codigo, categoria, co2e_ajustado, co2e_original, usuario_id, motivo }) {
+export function hashAjuste({ factura_id, factura_id_firmada, categoria_codigo, categoria, co2e_ajustado, co2e_original, usuario_id, motivo }) {
   const canonico = [
-    factura_id || '', categoria_codigo || '', categoria || '',
+    // `factura_id_firmada` y no `factura_id`: el segundo pasa a NULL cuando el
+    // documento se purga por retención, y entonces el hash dejaría de cuadrar
+    // por una purga legítima. Se firma la copia inmutable.
+    factura_id_firmada || factura_id || '', categoria_codigo || '', categoria || '',
     Number(co2e_ajustado || 0).toFixed(4), Number(co2e_original || 0).toFixed(4),
     usuario_id || '', motivo || '',
   ].join('|');
@@ -90,14 +119,18 @@ export async function anexarAjuste(client, ajuste) {
     `SELECT ultimo_hash, n_eslabones FROM cadena_ajustes_estado WHERE id = 1 FOR UPDATE`
   );
   const estado = eRows[0];
-  const hDoc = hashAjuste(ajuste);
+  // Se firma el id como texto, congelado: ver hashAjuste().
+  const conFirma = { ...ajuste, factura_id_firmada: String(ajuste.factura_id || '') };
+  const hDoc = hashAjuste(conFirma);
   const { hash_cadena: hCad, eslabon } = siguienteEslabon(estado, hDoc);
   const { rows } = await client.query(
     `INSERT INTO ajustes_clasificacion
-       (factura_id, categoria_codigo, categoria, co2e_ajustado, co2e_original,
+       (factura_id, factura_id_firmada, categoria_codigo, categoria, co2e_ajustado, co2e_original,
         usuario_id, motivo, hash_documento, hash_anterior, hash_cadena, eslabon)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [ajuste.factura_id, ajuste.categoria_codigo, ajuste.categoria,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    // El id va dos veces por separado (uuid y texto): reusar el mismo
+    // parámetro para ambas columnas deja a Postgres sin poder deducir el tipo.
+    [ajuste.factura_id, conFirma.factura_id_firmada, ajuste.categoria_codigo, ajuste.categoria,
      ajuste.co2e_ajustado, ajuste.co2e_original, ajuste.usuario_id, ajuste.motivo,
      hDoc, estado.ultimo_hash, hCad, eslabon]
   );
@@ -108,13 +141,38 @@ export async function anexarAjuste(client, ajuste) {
   return rows[0];
 }
 
-/** Verifica la cadena de ajustes completa, aparte de la cadena de facturas. */
+/**
+ * Verifica la cadena de ajustes completa, aparte de la de facturas.
+ *
+ * DOS comprobaciones, no una:
+ *  1. El ENLACE — que cada `hash_cadena` salga de su `hash_anterior` más su
+ *     `hash_documento` (`verificarCadenaCompleta`).
+ *  2. El CONTENIDO — que `hash_documento` siga siendo el hash de los campos
+ *     que se firmaron. Sin esto, un UPDATE que cambie la categoría, el CO2e o
+ *     el motivo sin tocar ninguna columna de hash pasa la verificación: el
+ *     enlace sigue cuadrando porque nadie recomputó qué encadena. Probado —
+ *     reescribir co2e_ajustado a 999 daba `valido: true`.
+ *
+ * Esto importa más acá que en la cadena de facturas: el asiento es
+ * precisamente "lo que una persona firmó".
+ */
 export async function verificarCadenaAjustes(run) {
   const { rows } = await run(
-    `SELECT id, hash_documento, hash_anterior, hash_cadena, eslabon
+    `SELECT id, factura_id, factura_id_firmada, categoria_codigo, categoria,
+            co2e_ajustado, co2e_original, usuario_id, motivo,
+            hash_documento, hash_anterior, hash_cadena, eslabon
        FROM ajustes_clasificacion ORDER BY eslabon ASC`
   );
   const estructural = verificarCadenaCompleta(rows);
   if (!estructural.valido) return { ...estructural, total_eslabones: rows.length };
+
+  for (const a of rows) {
+    if (hashAjuste(a) !== a.hash_documento) {
+      return {
+        valido: false, rompe_en: a.id, total_eslabones: rows.length,
+        motivo: 'el contenido del asiento no coincide con su hash_documento',
+      };
+    }
+  }
   return { valido: true, total_eslabones: rows.length };
 }
