@@ -14,6 +14,10 @@ export const pool = new pg.Pool({
   connectionString: config.databaseUrl,
   ssl: needsSsl ? { rejectUnauthorized: false } : false,
   max: 10,
+  // Sin esto, con las 10 conexiones del pool ocupadas (pico de tráfico o
+  // Postgres caído), una petición nueva esperaba un cliente libre para
+  // siempre en vez de fallar rápido con un error claro.
+  connectionTimeoutMillis: 5_000,
 });
 
 export const query = (text, params) => pool.query(text, params);

@@ -189,20 +189,41 @@ cualquier tropiezo).
 Después de cada deploy exitoso (health OK), `actualizar.sh` corre
 `deploy/smoke-e2e.mjs`: un recorrido REAL contra producción que exige
 backend sano, calculadora con tarifa y categorías vivas, **cadena de
-integridad intacta**, frontend sirviendo la portada y la verificación
-pública del último documento respondiendo. Si cualquiera falla, el
-deploy **se revierte** con el rollback normal (el rollback en sí solo se
-evalúa con el health, para no entrar en bucles).
+integridad intacta**, frontend sirviendo la portada, **el login rechazando
+credenciales inválidas con 401 (no 500)** y la verificación pública del
+último documento respondiendo. Si cualquiera falla, el deploy **se
+revierte** con el rollback normal (el rollback en sí solo se evalúa con el
+health, para no entrar en bucles).
 
 - El detalle de cada check queda en el log (`/var/log/sicr3p-actualizar.log`),
   una línea ✓/✗ por check.
 - `SICR3P_SKIP_SMOKE=1` lo omite (solo para ensayos).
-- **Nivel de escritura (opcional)**: con `SICR3P_SMOKE_ESCRITURA=1` el smoke
-  además sube una factura de prueba por el flujo público real y exige
-  motor propio + QR + sello. Costo honesto: cada corrida deja una sesión
-  real marcada "SMOKE TEST — sicr3p" **encadenada para siempre** (la cadena
-  de hash no permite borrar sin romperse). Por eso viene apagado; actívalo
-  solo si aceptas ese registro por deploy.
+- **Check de login**: no necesita ninguna cuenta real ni credencial guardada
+  en el VPS — manda un email/clave que no existe y solo exige que la ruta
+  responda 401 (o 429 si el limitador ya está activo por tráfico real), en
+  vez de un 500. Detecta el caso real que preocupaba: un deploy que deja el
+  login roto (`JWT_ACCESS_SECRET` mal generado, tabla `usuarios` inaccesible)
+  y que antes solo se notaba cuando un cliente intentaba entrar.
+- **Nivel de escritura (opcional, requiere un paso manual una sola vez)**:
+  con `SICR3P_SMOKE_ESCRITURA=1` el smoke además sube una factura de prueba
+  por el flujo público real y exige motor propio + QR + sello. Para
+  activarlo:
+  1. En el panel admin, **Accesos → Códigos**, crear un código de acceso
+     permanente con créditos (ej. "SMOKE — no borrar", créditos altos para
+     que no se agote) — este código es justamente lo que exige el flujo
+     público real, no un atajo.
+  2. En el VPS, agregar `SICR3P_SMOKE_ESCRITURA=1` y
+     `SICR3P_SMOKE_CODIGO=<el código creado>` al entorno del cron de
+     `agente-deploy.sh` (por ejemplo en `/etc/environment`, o exportadas
+     antes de la línea del crontab).
+  3. Confirmar corriendo el smoke a mano una vez (ver abajo) antes de dejarlo
+     en automático.
+  Costo honesto: cada corrida deja una sesión real marcada
+  "SMOKE TEST — sicr3p" **encadenada para siempre** (la cadena de hash no
+  permite borrar sin romperse). Por eso viene apagado por defecto; actívalo
+  solo si aceptas ese registro por deploy. **Pendiente**: sin el paso 1
+  (creación manual del código), este nivel sigue sin poder activarse — no es
+  resoluble solo con código.
 - Correrlo a mano en cualquier momento:
   `node /opt/sicr3p/deploy/smoke-e2e.mjs`
 

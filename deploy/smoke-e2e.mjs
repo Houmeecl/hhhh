@@ -93,6 +93,26 @@ try {
   check('frontend sirve la portada', false, String(e.message));
 }
 
+// Login con credenciales inválidas a propósito: sin exigir una cuenta real
+// (nada que provisionar ni ninguna clave que guardar en el VPS), confirma
+// que la ruta de login toca la base de datos y responde 401 en vez de
+// reventar con 500 — el caso real visto antes: un deploy que dejaba el
+// login roto (JWT_ACCESS_SECRET mal generado, BD sin la tabla `usuarios`,
+// etc.) solo se detectaba cuando un cliente intentaba entrar. 429 también
+// cuenta como vivo: significa que loginLimiter ya está limitando otro
+// tráfico real, no que la ruta esté caída.
+try {
+  const r = await pedir(`${API}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'smoke-test-no-existe@sicrep.cl', password: 'no-es-la-clave' }),
+  });
+  check('login: credenciales inválidas responde 401 (no 500)', r.status === 401 || r.status === 429,
+    `status=${r.status}`);
+} catch (e) {
+  check('login: credenciales inválidas responde 401 (no 500)', false, String(e.message));
+}
+
 if (ultimoEslabon?.factura_id) {
   try {
     const r = await pedir(`${API}/verificar/${ultimoEslabon.factura_id}`);

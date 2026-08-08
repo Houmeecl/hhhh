@@ -53,15 +53,27 @@ test('SEED_DEMO=true es fatal', () => {
   assert.match(fatales[0], /SEED_DEMO/);
 });
 
-test('sin RESEND_API_KEY solo advierte: degrada, no miente', () => {
-  // Sin correo el sistema sigue calculando bien; lo que se rompe es la
-  // activación de cuentas. Grave, pero no produce un número falso.
+// Sin correo no se puede dar de alta un cliente: se caen la activación de
+// cuenta, el magic link y "¿olvidaste tu contraseña?". Antes solo advertía;
+// ahora es fatal, igual que MOCK_SIMPLE — no basta con "degradar en silencio"
+// cuando lo que se rompe es el alta del cliente real.
+test('sin SMTP propio ni RESEND_API_KEY es fatal', () => {
   const cfg = base();
   cfg.resend.apiKey = '';
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /correos NO se envían/);
+});
+
+test('con SMTP propio configurado, sin RESEND_API_KEY no es fatal', () => {
+  // mailer.js prioriza SMTP propio (Poste.io) sobre Resend — basta con uno
+  // de los dos transportes, no hace falta ambos.
+  const cfg = base();
+  cfg.resend.apiKey = '';
+  cfg.smtp = { host: 'mail.sicr3p.cl', user: 'no-responder@sicr3p.cl', pass: 'algo' };
   const { fatales, advertencias } = verificarConfigProduccion(cfg);
   assert.deepEqual(fatales, []);
-  assert.equal(advertencias.length, 1);
-  assert.match(advertencias[0], /correos NO se envían/);
+  assert.deepEqual(advertencias, []);
 });
 
 // En modo mock, `simpleApi.mockAnalyzeInvoice` genera el CO2e con un PRNG y

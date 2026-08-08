@@ -115,14 +115,33 @@ terceros — ver la tabla al final de este documento); esto documenta la parte q
   real sigue pendiente porque esta sesión no tiene acceso a él. La copia off-site de los
   respaldos (hoy viven en el mismo disco que la base) también queda pendiente: requiere elegir y
   pagar un destino, documentado en `deploy/AUTODEPLOY.md`.
-- **Fases 4-6 — pendientes**, en orden de riesgo: degradación silenciosa (correo apagado impide
-  dar de alta a un cliente, el smoke post-deploy no prueba login ni escritura); validación de los
-  factores de emisión (ninguna de las 7 fuentes está en `validada_oficial`; los factores "por
-  gasto", que son los que se aplican a la mayoría de los documentos, son proxy interno sin cita
-  externa); y cabos sueltos de código que
-  ya se sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de
-  admin, `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key
-  de mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
+- **Fase 4 — hecha.** Degradación silenciosa. Sin SMTP propio ni `RESEND_API_KEY` los correos
+  solo se escribían en el log — se caen la activación de cuenta, el magic link y "¿olvidaste tu
+  contraseña?", así que no se puede dar de alta un cliente real; era advertencia, ahora es
+  **fatal** en producción (`lib/verificarProduccion.js`), igual que `MOCK_SIMPLE` en Fase 1.
+  Confirmado con el usuario que el VPS ya usa el SMTP propio (Poste.io), así que esto no
+  interrumpe el servicio en marcha. `deploy/smoke-e2e.mjs` no probaba ningún login: se agregó un
+  check de nivel lectura (siempre activo, sin credenciales que guardar en el VPS) que manda un
+  login con credenciales inexistentes y exige 401/429 en vez de 500 — detecta un login roto por
+  secretos mal generados o la tabla `usuarios` inaccesible, que antes solo se notaba cuando un
+  cliente real intentaba entrar. El nivel de **escritura** del smoke (sube una factura de prueba
+  real) ya existía y estaba bien resuelto en código, pero seguía sin poder activarse porque
+  `SICR3P_SMOKE_CODIGO` no tenía ningún código creado — se documentaron en
+  `deploy/AUTODEPLOY.md` los 3 pasos manuales para activarlo (crear el código permanente en
+  Accesos → Códigos, exportar las dos variables de entorno en el cron del VPS, confirmar
+  corriendo el smoke a mano una vez). El manejador de errores central logueaba solo
+  `err.message`: ahora agrega el stack completo y `método + ruta` (el cliente sigue recibiendo el
+  mismo mensaje genérico). Se agregaron los timeouts que faltaban: `headersTimeout`/
+  `requestTimeout` en el servidor HTTP (mitiga slowloris sin cortar uploads reales de hasta
+  5 documentos de 15 MB) y `connectionTimeoutMillis` en el pool de Postgres (antes, con las 10
+  conexiones del pool ocupadas, una petición nueva esperaba para siempre en vez de fallar rápido
+  con un error claro).
+- **Fases 5-6 — pendientes**: validación de los factores de emisión (ninguna de las 7 fuentes
+  está en `validada_oficial`; los factores "por gasto", que son los que se aplican a la mayoría
+  de los documentos, son proxy interno sin cita externa); y cabos sueltos de código que ya se
+  sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de admin,
+  `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key de
+  mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
 
 ## 2. Producto y datos
 

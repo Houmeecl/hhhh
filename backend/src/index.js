@@ -105,10 +105,13 @@ app.use('/api/admin', adminRoutes);
 // 404
 app.use('/api', (req, res) => res.status(404).json({ error: 'Recurso no encontrado' }));
 
-// Manejador de errores centralizado
+// Manejador de errores centralizado. Antes solo logueaba err.message: sin
+// stack ni ruta, un 500 en producción no daba pistas de dónde investigar —
+// había que reproducirlo a mano. El cliente sigue recibiendo el mismo
+// mensaje genérico (nunca el stack ni el detalle interno).
 app.use((err, req, res, next) => {
-  console.error('[error]', err.message);
   const status = err.status || 500;
+  console.error(`[error] ${req.method} ${req.originalUrl} → ${status}:`, err.stack || err.message);
   res.status(status).json({ error: status === 500 ? 'Error interno del servidor' : err.message });
 });
 
@@ -130,11 +133,21 @@ async function start() {
     // Purga de datos personales vencidos (Ley 21.719). Ver
     // services/retencion.js: no toca nada encadenado por hash.
     if (config.env !== 'test') iniciarPurgaAutomatica();
-    app.listen(config.port, () => {
+    const server = app.listen(config.port, () => {
       console.log(`\n  sicr3p backend escuchando en http://localhost:${config.port}`);
       console.log(`  Modo motor: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);
       console.log(`  CORS origin: ${config.corsOrigin}\n`);
     });
+    // Sin esto, un cliente que envía los headers HTTP byte a byte (slowloris)
+    // puede sostener una conexión indefinidamente y agotar el pool de
+    // conexiones del servidor. 65 s es amplio para cualquier cliente real —
+    // los headers llegan de un tirón sin importar qué tan lento sea el
+    // upload del cuerpo (documentos de hasta 15 MB × 5 archivos).
+    server.headersTimeout = 65_000;
+    // Plazo total para recibir la petición completa (headers + cuerpo).
+    // Generoso a propósito: cubre subir 5 documentos de 15 MB cada uno desde
+    // una conexión móvil lenta sin cortar un upload real a mitad de camino.
+    server.requestTimeout = 300_000;
   } catch (err) {
     console.error('[fatal] no se pudo iniciar el servidor:', err.message);
     process.exit(1);

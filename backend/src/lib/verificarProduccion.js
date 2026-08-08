@@ -40,9 +40,15 @@ export function verificarConfigProduccion(cfg) {
     fatales.push(`SII_CRED_KEY tiene menos de ${LARGO_MINIMO_SECRETO} caracteres — demasiado corta para cifrar credenciales`);
   }
 
+  // FATAL, no advertencia. Sin correo no se puede dar de alta un cliente:
+  // se caen la activación de cuenta, el magic link y "¿olvidaste tu
+  // contraseña?" — el correo queda solo escrito en el log del servidor,
+  // invisible para el cliente real. Cualquiera de los dos transportes basta
+  // (mailer.js prioriza SMTP propio sobre Resend); solo es fatal si NINGUNO
+  // de los dos está configurado.
   const smtpOk = cfg.smtp?.host && cfg.smtp?.user && cfg.smtp?.pass;
   if (!smtpOk && !cfg.resend.apiKey) {
-    advertencias.push('Sin SMTP propio ni RESEND_API_KEY — los correos NO se envían, solo se escriben en el log');
+    fatales.push('Sin SMTP propio ni RESEND_API_KEY — los correos NO se envían, solo se escriben en el log; no se puede dar de alta un cliente');
   }
   if (!cfg.baseapi?.enabled) {
     advertencias.push('BASEAPI_API_KEY vacía — el autocompletado SII por RUT queda deshabilitado');
