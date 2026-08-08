@@ -20,6 +20,38 @@ en `docs/IDEAS-INTERNACIONAL.md`; aquí solo se registran las filas accionables.
 | Expediente HuellaChile (MMA) | Export "expediente" con el formato del programa para que un CLIENTE postule al reconocimiento de cuantificación — el MMA reconoce al cliente, nunca a sicr3p ni a través de sicr3p. La base metodológica ya está citada en el repo: fuentes `mma_huellachile` y `cen_sen` en `fuentes_metodologicas` (migración 018) y el factor SEN vinculado a la categoría de electricidad. | Cliente real que quiera postular + registro en la plataforma del programa (vía Ventanilla Única RETC) + instructivo vigente descargado (incluida la eventual verificación que el programa exija — validar requisitos). |
 | Mostrador presencial sicr3p (oficinas físicas, distinto de la fila anterior) | **Hecho v1: landing pública (`/aduana-verde`) + terminal POS (`/pos`) + gestión de terminales en el admin.** Modelo tomado de los repos de referencia del usuario: patrón VecinoXpress/NotaryPro (el terminal es un dispositivo que se conecta con serial+clave — tabla `pos_terminales`, `POST /api/pos/auth` — captura y cobra; la plataforma reconoce y calcula) y lógica REP de SICREP Ley 20.920 (declaración de embalajes por componentes → % reciclabilidad Alto/Medio/Bajo, verificación pública en recepción vía `GET /api/verificar/:id`). Modelo de cobro definido por el usuario: **lo que se paga en el terminal es la compensación del CO2 calculado** (t CO2e × tarifa referencial CLP 5.000/t, ancla impuesto verde US$5/t, editable y marcada "referencial — validar"). El cálculo es real (flujo público + motor propio para DTE); **el pago sigue simulado** hasta tener credenciales VirtualPos. No requiere ni incluye la integración en línea con aduanas de la fila anterior (sigue excluida). **[ACTUALIZACIÓN 2026-07-27: terminal físico `/pos` descontinuado — el mostrador opera vía `/panel-verde` con operador logueado; REP y compensación de esta fila ahora viven en `CargarAv.jsx`]** **[ACTUALIZACIÓN 2026-07-28: la landing `/aduana-verde` se eliminó y la ruta redirige a `/` — su contenido útil se plegó en la portada; el canal se llama **terreno** en todo el copy visible]** | Para pasar de v1 a operación real: credenciales VirtualPos (cobro efectivo), definición de tarifa comercial de compensación, y direcciones/franquicia de las oficinas. |
 
+### Revisión manual de clasificación — por qué no contradice "sin corrección manual"
+
+Este proyecto decidió que **no existe corrección manual de datos de factura**: nadie edita
+un monto, un RUT, un folio ni una glosa leída del documento. Esa decisión sigue en pie.
+
+La bandeja de revisión (migraciones 078 y 079, `services/ajustesClasificacion.js`) hace algo
+distinto: asigna una **categoría** que el motor no pudo inferir, cuando ninguna palabra clave
+calzó con la glosa (`sin_coincidencia`) o cuando no quedó ítem que clasificar
+(`sin_categoria`). No lee el documento de nuevo — el archivo original **no se guarda ni se
+muestra**; el operador clasifica con la glosa de los ítems que el motor ya extrajo.
+
+Tres cosas que lo mantienen defendible:
+
+1. **El documento sellado no se toca.** `facturas.hash_documento` incluye la categoría y el
+   CO2e, así que editar la fila rompería la cadena que verifica el QR público. La
+   reclasificación es un asiento nuevo, append-only, con **su propia cadena de hash** — mismo
+   patrón que Capital Natural (029) y las declaraciones de embalaje (028). La factura original
+   verifica exactamente igual que antes, y hay un test que lo prueba.
+2. **El CO2e se recalcula, y por el mismo método.** Dejar el número del catch-all bajo una
+   etiqueta nueva sería peor que no clasificar: el número y su rótulo dirían cosas distintas.
+   Se aplica el factor de gasto de la categoría elegida, tomado de la **misma versión del
+   motor** con que se calculó el documento. Si no consta el factor original no se recalcula:
+   se rechaza, antes que deducir un monto inventado.
+3. **Se declara.** El origen queda como `'operador'` —atribuible, o sea gana alcance GHG— pero
+   el informe consolidado dice cuántos documentos clasificó una persona y no el motor, y la
+   verificación pública por QR muestra la categoría y el CO2e originales junto al motivo del
+   ajuste. Una categoría asignada a mano no puede leerse como una que dedujo el motor.
+
+Lo que la bandeja **no** admite: los documentos que el motor **sí** clasificó (eso se arregla
+en el panel de categorías, que versiona el cambio para todos y no de a uno) y los de
+procedencia no registrada (`categoria_origen` NULL), que no se reinterpretan hacia atrás.
+
 ## 2. Producto y datos
 
 | Ítem | Qué falta | Base ya construida |

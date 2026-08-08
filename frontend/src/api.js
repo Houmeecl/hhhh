@@ -444,6 +444,12 @@ export const api = {
   // Historia de factores. Solo lectura a propósito: una versión emitida no
   // se edita ni se borra, porque es lo que cita cada informe ya entregado.
   motorVersiones: () => request('/admin/motor-propio/versiones', { authed: true }),
+  // Bandeja de revisión: los documentos que el motor no supo clasificar.
+  // Reclasificar NO edita el documento sellado: anexa un asiento de ajuste a
+  // su propia cadena (migración 079).
+  motorRevision: () => request('/admin/motor-propio/revision', { authed: true }),
+  motorAjustesDe: (facturaId) => request(`/admin/motor-propio/revision/${facturaId}/ajustes`, { authed: true }),
+  reclasificarDocumento: (facturaId, b) => request(`/admin/motor-propio/revision/${facturaId}`, { method: 'POST', body: b, authed: true }),
   // «Actualizar»: la IA busca y propone; el motor no cambia hasta que una
   // persona aprueba, y aprobar es lo que congela una versión nueva.
   buscarFactoresActuales: () => request('/admin/motor-propio/actualizar', { method: 'POST', authed: true }),

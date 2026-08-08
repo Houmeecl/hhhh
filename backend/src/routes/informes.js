@@ -24,7 +24,7 @@ const rutNorm = (r) => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
 async function facturasDelMes(rut, anio, mes) {
   const { rows: facturas } = await query(
     `SELECT f.*, s.fecha AS fecha, s.nombre_cliente, s.rut_cliente
-     FROM facturas f JOIN sesiones s ON s.id = f.sesion_id
+     FROM facturas_vigentes f JOIN sesiones s ON s.id = f.sesion_id
      WHERE regexp_replace(s.rut_cliente, '[^0-9kK]', '', 'g') ILIKE $1
        AND EXTRACT(YEAR FROM f.created_at) = $2
        AND EXTRACT(MONTH FROM f.created_at) = $3

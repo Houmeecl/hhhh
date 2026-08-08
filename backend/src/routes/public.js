@@ -54,7 +54,7 @@ const upload = multer({
 // Carga completa de una tabla de ítems para una lista de facturas.
 async function hydrateFacturas(sesionId) {
   const { rows: facturas } = await query(
-    `SELECT * FROM facturas WHERE sesion_id = $1 ORDER BY created_at`,
+    `SELECT * FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at`,
     [sesionId]
   );
   for (const f of facturas) {
@@ -1013,7 +1013,7 @@ router.get('/sesiones/:id/sello.svg', async (req, res, next) => {
 
     // Primera factura: ancla del enlace de verificación y de la cadena.
     const { rows: fRows } = await query(
-      `SELECT * FROM facturas WHERE sesion_id = $1 ORDER BY created_at LIMIT 1`,
+      `SELECT * FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at LIMIT 1`,
       [req.params.id]
     );
     const factura = fRows[0] || null;
@@ -1046,7 +1046,7 @@ router.get('/sesiones/:id/sello.svg', async (req, res, next) => {
 // ---------- GET /api/facturas/:id/etiqueta.pdf ----------
 router.get('/facturas/:id/etiqueta.pdf', async (req, res, next) => {
   try {
-    const { rows } = await query(`SELECT * FROM facturas WHERE id = $1`, [req.params.id]);
+    const { rows } = await query(`SELECT * FROM facturas_vigentes WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Factura no encontrada' });
     const factura = rows[0];
     const { rows: items } = await query(
@@ -1081,7 +1081,7 @@ router.get('/facturas/:id/qr.png', async (req, res, next) => {
 // ---------- GET /api/verificar/:id — verificación pública de trazabilidad ----------
 router.get('/verificar/:id', async (req, res, next) => {
   try {
-    const { rows } = await query(`SELECT * FROM facturas WHERE id = $1`, [req.params.id]);
+    const { rows } = await query(`SELECT * FROM facturas_vigentes WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Documento no encontrado' });
     const factura = rows[0];
     const { rows: items } = await query(
@@ -1117,6 +1117,18 @@ router.get('/verificar/:id', async (req, res, next) => {
         status: factura.status,
         fecha: sRows[0]?.fecha,
       },
+      // Si un operador reclasificó el documento, ESTA PÁGINA LO DICE. Es la
+      // página del QR: quien la abre está comprobando que el documento no fue
+      // alterado, y el sello de abajo cubre lo que se calculó ORIGINALMENTE.
+      // Mostrar la categoría vigente sin declarar que cambió dejaría un
+      // rótulo que no corresponde al hash que la misma página exhibe.
+      // El ajuste tiene su propia cadena (migración 079) y no toca esta.
+      reclasificacion: factura.ajuste_id ? {
+        categoria_original: factura.categoria_original,
+        total_co2e_original: Number(factura.total_co2e_original),
+        motivo: factura.ajuste_motivo,
+        fecha: factura.ajuste_fecha,
+      } : null,
       cliente: {
         nombre: sRows[0]?.nombre_cliente,
         rut: sRows[0]?.rut_cliente,
@@ -1151,7 +1163,7 @@ router.get('/verificar/:id', async (req, res, next) => {
 // expongan ya.
 router.get('/pasaporte/:id', async (req, res, next) => {
   try {
-    const { rows } = await query(`SELECT * FROM facturas WHERE id = $1`, [req.params.id]);
+    const { rows } = await query(`SELECT * FROM facturas_vigentes WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Pasaporte no encontrado' });
     const factura = rows[0];
 

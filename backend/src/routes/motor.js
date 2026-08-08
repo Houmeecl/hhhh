@@ -4,6 +4,13 @@ import { crearVersion } from '../services/motorVersiones.js';
 import { actualizarFactores } from '../services/actualizarFactores.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
 import { config } from '../config.js';
+import {
+  ESTADOS_REVISABLES, recalcularPorGasto, anexarAjuste, verificarCadenaAjustes,
+} from '../services/ajustesClasificacion.js';
+
+// Un id que no es UUID hace fallar la consulta con un error de Postgres y un
+// 500; se responde 404, que es lo que realmente pasa.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ============================================================
 // Motor propio de cálculo — administración de categorías
@@ -433,3 +440,163 @@ router.get('/estadisticas', async (req, res, next) => {
 });
 
 export default router;
+
+// ============================================================
+// BANDEJA DE REVISIÓN — los documentos que el motor no supo clasificar.
+//
+// Lista solo lo que un operador PUEDE resolver: 'sin_coincidencia' (había
+// ítems y ninguna palabra clave calzó) y 'sin_categoria' (no quedó ítem que
+// clasificar). Lo demás no entra: una categoría deducida de la glosa no se
+// "corrige" documento por documento —para eso está el panel de categorías,
+// que versiona el cambio para todos—, y un documento sin procedencia
+// registrada no se reinterpreta hacia atrás.
+//
+// NO se muestra ni se guarda el archivo original. La tabla
+// `facturas_revision` de la migración 019 existe en el esquema y no tiene un
+// solo llamador; revivirla reintroduciría la retención de documentos del
+// cliente que este proyecto ya decidió no hacer. El operador clasifica con lo
+// que el motor ya extrajo: la glosa de los ítems.
+// ============================================================
+router.get('/revision', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT f.id, f.numero_venta, f.archivo_original, f.categoria, f.categoria_codigo,
+              f.categoria_origen, f.total_co2e::float AS total_co2e, f.motor,
+              f.motor_version_id, f.created_at,
+              s.nombre_cliente, s.rut_cliente,
+              COALESCE(
+                json_agg(json_build_object('descripcion', li.descripcion, 'cantidad', li.cantidad,
+                                           'co2e', li.co2e, 'metodo', li.metodo)
+                         ORDER BY li.co2e DESC) FILTER (WHERE li.id IS NOT NULL),
+                '[]'
+              ) AS items
+         FROM facturas f
+         JOIN sesiones s ON s.id = f.sesion_id
+         LEFT JOIN line_items li ON li.factura_id = f.id
+         -- Ya reclasificado = fuera de la bandeja, sin borrar nada.
+         LEFT JOIN ajustes_clasificacion a ON a.factura_id = f.id
+        WHERE f.categoria_origen = ANY($1) AND a.id IS NULL
+        GROUP BY f.id, s.nombre_cliente, s.rut_cliente
+        ORDER BY f.total_co2e DESC NULLS LAST
+        LIMIT 200`,
+      [ESTADOS_REVISABLES]
+    );
+    res.json({ documentos: rows, n: rows.length });
+  } catch (err) { next(err); }
+});
+
+// Historial de ajustes de UNA factura, del más nuevo al más viejo. Append-only:
+// los ajustes superados no se borran, se leen.
+router.get('/revision/:facturaId/ajustes', async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(String(req.params.facturaId))) return res.status(404).json({ error: 'Documento no encontrado' });
+    const { rows } = await query(
+      `SELECT a.id, a.categoria, a.categoria_codigo, a.co2e_ajustado::float AS co2e_ajustado,
+              a.co2e_original::float AS co2e_original, a.motivo, a.eslabon,
+              a.hash_cadena, a.created_at, u.email AS usuario_email
+         FROM ajustes_clasificacion a
+         JOIN usuarios u ON u.id = a.usuario_id
+        WHERE a.factura_id = $1 ORDER BY a.eslabon DESC`,
+      [req.params.facturaId]
+    );
+    res.json({ ajustes: rows });
+  } catch (err) { next(err); }
+});
+
+// Reclasificar. No toca la factura sellada: anexa un asiento a su propia
+// cadena. El CO2e se recalcula por método de gasto con el factor de la
+// categoría elegida, tomado de la MISMA versión del motor con que se calculó
+// el documento — para que el informe siga citando la metodología que produjo
+// sus números y no la vigente al momento de reclasificar.
+router.post('/revision/:facturaId', adminOnly, async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(String(req.params.facturaId))) return res.status(404).json({ error: 'Documento no encontrado' });
+    const { categoria_codigo, motivo } = req.body || {};
+    if (!categoria_codigo || !String(categoria_codigo).trim()) {
+      return res.status(400).json({ error: 'Falta la categoría.' });
+    }
+    // El motivo es obligatorio a propósito: el asiento queda firmado con el
+    // nombre de una persona, y "por qué" es la mitad de lo que hace auditable
+    // una decisión humana.
+    if (!motivo || String(motivo).trim().length < 5) {
+      return res.status(400).json({ error: 'Explica en una frase por qué corresponde esta categoría.' });
+    }
+
+    const ajuste = await withTx(async (client) => {
+      const { rows: fRows } = await client.query(
+        `SELECT id, categoria, categoria_codigo, categoria_origen,
+                total_co2e::float AS total_co2e, motor_version_id
+           FROM facturas WHERE id = $1 FOR UPDATE`,
+        [req.params.facturaId]
+      );
+      const factura = fRows[0];
+      if (!factura) {
+        throw Object.assign(new Error('Documento no encontrado'), { status: 404 });
+      }
+      if (!ESTADOS_REVISABLES.includes(factura.categoria_origen)) {
+        throw Object.assign(
+          new Error('Este documento sí fue clasificado por el motor: se corrige en el panel de categorías, no de a uno.'),
+          { status: 409 }
+        );
+      }
+
+      // Factores CONGELADOS de la versión con que se calculó el documento. Si
+      // no tiene versión estampada (documentos anteriores a la migración 051),
+      // se cae al catálogo vigente, que es lo único que hay.
+      const fuente = factura.motor_version_id
+        ? { sql: `SELECT codigo, nombre, factor_gasto_kgco2e_clp1000, activo
+                    FROM motor_categorias_version WHERE version_id = $1 AND codigo = ANY($2)`,
+            params: [factura.motor_version_id, [categoria_codigo, factura.categoria_codigo].filter(Boolean)] }
+        : { sql: `SELECT codigo, nombre, factor_gasto_kgco2e_clp1000, activo
+                    FROM motor_categorias WHERE codigo = ANY($1)`,
+            params: [[categoria_codigo, factura.categoria_codigo].filter(Boolean)] };
+      const { rows: cats } = await client.query(fuente.sql, fuente.params);
+      const nueva = cats.find((c) => c.codigo === categoria_codigo);
+      if (!nueva) {
+        throw Object.assign(new Error('Esa categoría no existe en la versión del motor con que se calculó el documento.'), { status: 400 });
+      }
+      if (nueva.activo === false) {
+        throw Object.assign(new Error('Esa categoría está desactivada en el motor.'), { status: 400 });
+      }
+      const original = cats.find((c) => c.codigo === factura.categoria_codigo);
+
+      const { co2e } = recalcularPorGasto({
+        co2eOriginal: factura.total_co2e,
+        factorOriginal: original?.factor_gasto_kgco2e_clp1000,
+        factorNuevo: nueva.factor_gasto_kgco2e_clp1000,
+      });
+
+      return anexarAjuste(client, {
+        factura_id: factura.id,
+        categoria_codigo,
+        // El NOMBRE se congela en el asiento: renombrar la categoría desde el
+        // panel no puede reescribir lo que una persona firmó.
+        categoria: nueva.nombre,
+        co2e_ajustado: co2e,
+        co2e_original: factura.total_co2e,
+        usuario_id: req.user.sub,
+        motivo: String(motivo).trim(),
+      });
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'reclasificar_documento', entidad: 'factura',
+      entidadId: req.params.facturaId,
+      detalle: { categoria_codigo, eslabon: ajuste.eslabon, co2e_original: ajuste.co2e_original, co2e_ajustado: ajuste.co2e_ajustado },
+      ip: req.ip,
+    });
+    res.status(201).json({ ajuste });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.entrada) return res.status(400).json({ error: err.message });
+    next(err);
+  }
+});
+
+// La cadena de ajustes verifica APARTE de la de facturas: reclasificar no
+// puede alterar lo que la cadena original dice del documento sellado.
+router.get('/revision/cadena/verificar', async (req, res, next) => {
+  try {
+    res.json(await verificarCadenaAjustes((sql) => query(sql)));
+  } catch (err) { next(err); }
+});

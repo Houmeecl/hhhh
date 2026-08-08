@@ -14,16 +14,33 @@ export default function MotorPropio() {
   const [editFuente, setEditFuente] = useState(null);
   const [buscando, setBuscando] = useState(false);
   const [edit, setEdit] = useState(null);
+  const [revision, setRevision] = useState([]);
+  const [reclasificando, setReclasificando] = useState(null); // { doc, categoria_codigo, motivo }
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
+  const reclasificar = async () => {
+    const { doc, categoria_codigo, motivo } = reclasificando;
+    try {
+      const { ajuste } = await api.reclasificarDocumento(doc.id, { categoria_codigo, motivo });
+      setReclasificando(null);
+      // Se recarga la bandeja entera: el documento sale de la lista porque ya
+      // tiene ajuste, sin que esta pantalla tenga que adivinarlo.
+      api.motorRevision().then((r) => setRevision(r.documentos || [])).catch(() => {});
+      flash(`Ajuste registrado (eslabón ${ajuste.eslabon}): ${fmt(ajuste.co2e_original, 4)} → ${fmt(ajuste.co2e_ajustado, 4)} t CO2e`);
+    } catch (e) {
+      flash(e.message || 'No se pudo registrar el ajuste', true);
+    }
+  };
+
   const cargar = () => Promise.all([
-    api.motorCategorias(), api.motorEstadisticas(), api.motorVersiones(), api.motorPropuestas(), api.motorFuentes(),
+    api.motorCategorias(), api.motorEstadisticas(), api.motorVersiones(), api.motorPropuestas(),
+    api.motorFuentes(), api.motorRevision(),
   ])
-    .then(([c, s, v, p, f]) => {
+    .then(([c, s, v, p, f, r]) => {
       setCategorias(c.categorias); setStats(s);
       setVersiones(v.versiones || []); setPropuestas(p.propuestas || []);
-      setFuentes(f.fuentes || []);
+      setFuentes(f.fuentes || []); setRevision(r.documentos || []);
     })
     .catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -428,6 +445,105 @@ export default function MotorPropio() {
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline" onClick={() => setEdit(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={guardar}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ============================================================
+          BANDEJA DE REVISIÓN — lo que el motor no supo clasificar.
+
+          El operador clasifica con la GLOSA DE LOS ÍTEMS, que es lo que el
+          motor ya extrajo. El archivo original no se guarda ni se muestra:
+          esa decisión de no retener documentos del cliente es anterior a esta
+          pantalla y no se revierte por comodidad.
+          ============================================================ */}
+      <div className="card" style={{ marginTop: 22 }}>
+        <div className="sec-head">
+          <h3><Icon.Search size={17} /> Revisión manual</h3>
+          <span className="muted">{fmt(revision.length, 0)} sin clasificar</span>
+        </div>
+        <p className="muted" style={{ fontSize: 13, marginTop: -4 }}>
+          Documentos donde ninguna palabra clave calzó con la glosa de sus ítems, o donde no
+          quedó ítem que clasificar. Su CO2e está calculado por gasto y cuenta en los totales,
+          pero no reciben alcance GHG hasta que alguien diga qué son.{' '}
+          <strong>Reclasificar no modifica el documento sellado</strong>: queda un asiento aparte,
+          firmado, con su propia cadena de verificación.
+        </p>
+        {revision.length === 0 ? (
+          <p className="muted" style={{ fontSize: 13 }}>Nada pendiente.</p>
+        ) : (
+          <div className="table-scroll">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Documento</th><th>Cliente</th><th>Glosa de los ítems</th>
+                  <th>t CO2e</th><th>Motivo</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {revision.map((d) => (
+                  <tr key={d.id}>
+                    <td>{d.numero_venta || d.archivo_original || '—'}</td>
+                    <td>{d.nombre_cliente}</td>
+                    <td style={{ maxWidth: 320 }}>
+                      {(d.items || []).length
+                        ? (d.items || []).map((it) => it.descripcion).join(' · ')
+                        : <span className="muted">sin ítems</span>}
+                    </td>
+                    <td>{fmt(d.total_co2e, 4)}</td>
+                    <td>
+                      <span className="badge">
+                        {d.categoria_origen === 'sin_categoria'
+                          ? 'sin ítems que clasificar'
+                          : 'sin coincidencia'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        className="btn btn-sm btn-outline"
+                        onClick={() => setReclasificando({ doc: d, categoria_codigo: '', motivo: '' })}
+                      >Clasificar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {reclasificando && (
+        <div className="modal-bg" onClick={() => setReclasificando(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Clasificar documento</h3>
+            <p className="muted" style={{ fontSize: 13 }}>
+              {reclasificando.doc.numero_venta || reclasificando.doc.archivo_original} ·{' '}
+              {fmt(reclasificando.doc.total_co2e, 4)} t CO2e calculadas como{' '}
+              «{reclasificando.doc.categoria || 'sin categoría'}».
+            </p>
+            <p className="muted" style={{ fontSize: 12 }}>
+              El CO2e se recalcula con el factor de la categoría que elijas, por el mismo método
+              de gasto. El documento original y su sello no se tocan.
+            </p>
+            <label>Categoría</label>
+            <select
+              value={reclasificando.categoria_codigo}
+              onChange={(e) => setReclasificando({ ...reclasificando, categoria_codigo: e.target.value })}
+            >
+              <option value="">Elegir…</option>
+              {categorias.filter((c) => c.activo).map((c) => (
+                <option key={c.codigo} value={c.codigo}>{c.nombre}</option>
+              ))}
+            </select>
+            <label>Por qué corresponde</label>
+            <input
+              value={reclasificando.motivo}
+              placeholder="Ej: la glosa dice suministro eléctrico"
+              onChange={(e) => setReclasificando({ ...reclasificando, motivo: e.target.value })}
+            />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="btn btn-outline" onClick={() => setReclasificando(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={reclasificar}>Registrar ajuste</button>
             </div>
           </div>
         </div>

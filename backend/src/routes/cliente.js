@@ -26,7 +26,7 @@ router.get('/mis-sesiones', soloCliente, async (req, res, next) => {
     for (const s of sesiones) {
       const { rows: facturas } = await query(
         `SELECT id, numero_venta, archivo_original, categoria, categoria_origen, total_co2e
-         FROM facturas WHERE sesion_id = $1 ORDER BY created_at`,
+         FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at`,
         [s.id]
       );
       // La categoría se entrega ya rotulada: el cliente ve el nombre que el

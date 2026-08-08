@@ -25,7 +25,7 @@ export async function contrapartesDeRut(rut) {
             COALESCE(array_agg(DISTINCT f.categoria)
               FILTER (WHERE ${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')}), '{}')
               AS categorias
-     FROM facturas f
+     FROM facturas_vigentes f
      WHERE regexp_replace(COALESCE(f.rut_receptor,''), '[^0-9kK]', '', 'g') ILIKE $1
        AND f.rut_emisor IS NOT NULL
      GROUP BY f.rut_emisor ORDER BY total_co2e DESC NULLS LAST LIMIT 100`,
@@ -43,7 +43,7 @@ export async function contrapartesDeRut(rut) {
             COALESCE(array_agg(DISTINCT f.categoria)
               FILTER (WHERE ${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')}), '{}')
               AS categorias
-     FROM facturas f
+     FROM facturas_vigentes f
      WHERE regexp_replace(COALESCE(f.rut_emisor,''), '[^0-9kK]', '', 'g') ILIKE $1
        AND f.rut_receptor IS NOT NULL
      GROUP BY f.rut_receptor ORDER BY total_co2e DESC NULLS LAST LIMIT 100`,

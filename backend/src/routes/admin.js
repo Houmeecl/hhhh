@@ -873,7 +873,7 @@ router.get('/sesiones/:id', async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
-    const { rows: facturas } = await query(`SELECT * FROM facturas WHERE sesion_id = $1 ORDER BY created_at`, [req.params.id]);
+    const { rows: facturas } = await query(`SELECT * FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at`, [req.params.id]);
     for (const f of facturas) {
       const { rows: items } = await query(`SELECT * FROM line_items WHERE factura_id = $1`, [f.id]);
       f.items = items;
@@ -894,7 +894,7 @@ router.get('/metricas', async (req, res, next) => {
       query(`SELECT to_char(date_trunc('month', created_at),'YYYY-MM') AS mes,
                     count(*)::int AS facturas,
                     COALESCE(sum(total_co2e),0)::float AS co2e
-             FROM facturas GROUP BY 1 ORDER BY 1`),
+             FROM facturas_vigentes GROUP BY 1 ORDER BY 1`),
       // El donut agrupa bajo "Sin clasificar" todo lo que no salió de la glosa
       // real: si el catch-all del motor sumara bajo su propio nombre, el
       // gráfico mostraría "Servicios" como la mayor fuente de emisiones de la
@@ -902,7 +902,7 @@ router.get('/metricas', async (req, res, next) => {
       query(`SELECT CASE WHEN ${SQL_CATEGORIA_ATRIBUIBLE} AND categoria IS NOT NULL
                          THEN categoria ELSE 'Sin clasificar' END AS categoria,
                     count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
-             FROM facturas GROUP BY 1 ORDER BY co2e DESC`),
+             FROM facturas_vigentes GROUP BY 1 ORDER BY co2e DESC`),
     ]);
     res.json({
       co2e_por_cliente: porCliente.rows,

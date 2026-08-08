@@ -109,7 +109,7 @@ router.get('/buscar', async (req, res, next) => {
       query(
         `SELECT ${NORM('f.rut_emisor')} AS rut_emisor,
                 COUNT(*)::int AS n_documentos, SUM(f.total_co2e)::float AS total_co2e
-         FROM facturas f WHERE ${NORM('f.rut_receptor')} = $1
+         FROM facturas_vigentes f WHERE ${NORM('f.rut_receptor')} = $1
          GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 20`, [rn]
       ),
       // El RUT como proveedor: a qué clientes les emite documentos.
@@ -117,7 +117,7 @@ router.get('/buscar', async (req, res, next) => {
         `SELECT ${NORM('f.rut_receptor')} AS rut_receptor,
                 MAX(s.nombre_cliente) AS empresa,
                 COUNT(*)::int AS n_documentos, SUM(f.total_co2e)::float AS total_co2e
-         FROM facturas f LEFT JOIN sesiones s
+         FROM facturas_vigentes f LEFT JOIN sesiones s
            ON s.id = f.sesion_id AND ${NORM('s.rut_cliente')} = ${NORM('f.rut_receptor')}
          WHERE ${NORM('f.rut_emisor')} = $1
          GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 20`, [rn]

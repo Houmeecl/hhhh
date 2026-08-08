@@ -228,6 +228,10 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   const estados = facturas.map((f) => categoriaParaMostrar(f).estado);
   const nSinConfirmar = estados.filter((e) => e === 'sin_confirmar' || e === 'sin_categoria').length;
   const nSinProcedencia = estados.filter((e) => e === 'sin_procedencia').length;
+  // Reclasificados a mano por un operador (migración 079). SÍ reciben alcance
+  // —'operador' es atribuible—, pero el informe lo declara: una categoría que
+  // asignó una persona no puede leerse como una que dedujo el motor.
+  const nReclasificados = facturas.filter((f) => f.ajuste_id).length;
 
   // --- Encabezado ---
   drawLogo(doc, 48, 44);
@@ -394,6 +398,13 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     notas.push(
       `${nSinProcedencia} ${nSinProcedencia === 1 ? 'documento no registra' : 'documentos no registran'} `
       + 'de qué fuente salió su categoría.'
+    );
+  }
+  if (nReclasificados > 0) {
+    notas.push(
+      `${nReclasificados} ${nReclasificados === 1 ? 'documento fue clasificado' : 'documentos fueron clasificados'} `
+      + 'por un operador, no por el motor; el ajuste queda registrado y verificable aparte, '
+      + 'sin alterar el documento original ni su sello.'
     );
   }
   if (notas.length) {

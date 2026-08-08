@@ -99,7 +99,7 @@ router.get('/proveedores', async (req, res, next) => {
               -- decir la verdad.
               COUNT(*) FILTER (WHERE NOT (${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')})
                                   OR f.categoria_origen IS NULL)::int AS n_sin_clasificar
-       FROM facturas f
+       FROM facturas_vigentes f
        WHERE ${NORM('f.rut_receptor')} = $1 AND f.rut_emisor IS NOT NULL${filtroPermitidos}
        GROUP BY 1 ORDER BY total_co2e DESC NULLS LAST LIMIT 200`, params
     );
@@ -133,7 +133,7 @@ router.get('/proveedor/:rut/resumen', async (req, res, next) => {
 
     const { rows: docs } = await query(
       `SELECT f.numero_venta, f.categoria, f.categoria_origen, f.total_co2e, f.created_at
-       FROM facturas f WHERE ${cond.join(' AND ')} ORDER BY f.created_at DESC LIMIT 200`, params
+       FROM facturas_vigentes f WHERE ${cond.join(' AND ')} ORDER BY f.created_at DESC LIMIT 200`, params
     );
     // El agregado por categoría junta bajo "Sin clasificar" todo lo que no
     // salió de la glosa real del documento: acumularlo bajo el nombre del
@@ -221,7 +221,7 @@ router.get('/export/alcance3', async (req, res, next) => {
       `SELECT ${NORM('f.rut_emisor')} AS rut_proveedor,
               mc.alcance_ghg, f.total_co2e, f.categoria_origen,
               fm.organismo, fm.documento, fm.version_anio
-         FROM facturas f
+         FROM facturas_vigentes f
          LEFT JOIN LATERAL (
            SELECT c.alcance_ghg, c.fuente_metodologica_id
              FROM motor_categorias c
