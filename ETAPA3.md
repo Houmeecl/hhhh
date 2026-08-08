@@ -136,9 +136,24 @@ terceros — ver la tabla al final de este documento); esto documenta la parte q
   5 documentos de 15 MB) y `connectionTimeoutMillis` en el pool de Postgres (antes, con las 10
   conexiones del pool ocupadas, una petición nueva esperaba para siempre en vez de fallar rápido
   con un error claro).
-- **Fases 5-6 — pendientes**: validación de los factores de emisión (ninguna de las 7 fuentes
-  está en `validada_oficial`; los factores "por gasto", que son los que se aplican a la mayoría
-  de los documentos, son proxy interno sin cita externa); y cabos sueltos de código que ya se
+- **Fase 5 — hecha (segunda ronda de diligencia, migración 081).** Retoma exactamente donde
+  quedó la migración 075: de las 4 fuentes que seguían con nota "hay edición más nueva, falta
+  confirmar" (`defra_2024`, `mma_huellachile`, `cen_sen`, `glec_v3`), **ninguna se promovió** —
+  el entorno de investigación de esta sesión no tiene acceso a la mayoría de los dominios
+  primarios (gov.uk, ipcc.ch, los `.gob.cl` de HuellaChile/CEN), así que las cifras nuevas
+  encontradas son de fuentes secundarias sin verificar y quedan documentadas como tales en cada
+  fuente, no usadas para nada. Único hallazgo verificado de primera mano (GLEC v3.1/v3.2,
+  descargados sin paywall): el factor de contenedores ya no se publica en kg/t-km sino en
+  g CO2e/TEU-km — un problema de unidad, no solo de vigencia, anotado en la categoría
+  `maritimo_contenedor` para que la próxima actualización no compare peras con manzanas. También
+  se investigó si existe una base de factores por gasto (spend-based/EEIO) citable para Chile:
+  EXIOBASE no cubre Chile como país individual (queda en "Rest of Americas") y el único estudio
+  chileno encontrado (Banco Central, Estudio Nº 135, base 2017) es agregado por sector y no está
+  mapeado a las categorías del motor — se generalizó la declaración de "proxy interno sin cita
+  externa" a la única categoría que no la tenía (`materiales`; el resto ya la traía desde
+  `031_higiene_metodologica.sql`). Sigue pendiente que un admin con acceso directo a esos
+  dominios descargue y confirme las 4 ediciones nuevas antes de promoverlas.
+- **Fase 6 — pendiente**: cabos sueltos de código que ya se
   sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de admin,
   `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key de
   mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
