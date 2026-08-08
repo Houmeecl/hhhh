@@ -232,7 +232,8 @@ async function registrarRechazos(filas) {
 // 5 × 15 MB por envío.
 router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) => {
   try {
-    const { rut, empresa, email, codigo } = req.body;
+    const { rut, empresa, email } = req.body;
+    let codigo = req.body.codigo ? String(req.body.codigo).trim() : null;
     const files = req.files || [];
 
     if (!rut || !empresa || !email) {
@@ -248,11 +249,28 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
       });
     }
 
+    // "Sube y Suma": se resuelve UNA vez, fuera de la transacción (pura
+    // lectura del JWT) y se reusa dentro del loop de facturas más abajo.
+    const jugador = jugadorOpcional(req);
+    // Un jugador SIEMPRE consume créditos de SU PROPIO código de campaña —
+    // el servidor lo deriva de `jugadores.codigo_id`, nunca del campo
+    // `codigo` que mandó el cliente. Si no se hiciera así, el formulario
+    // sería la única barrera real y un jugador podría golpear este
+    // endpoint directo (sin pasar por Escanear.jsx) y cargar documentos
+    // sin que su código de campaña gastara ni un crédito.
+    if (jugador) {
+      const { rows: jCodRows } = await query(
+        `SELECT ca.codigo FROM jugadores j JOIN codigos_acceso ca ON ca.id = j.codigo_id WHERE j.id = $1`,
+        [jugador.jugadorId]
+      );
+      codigo = jCodRows[0]?.codigo || null;
+    }
+
     // Uso real: la carga exige una credencial — un código de acceso con
     // créditos (se valida y consume más abajo, dentro de la transacción)
     // o la sesión de un cliente con historial (magic link). El chequeo va
     // ANTES de la pre-lectura para no gastar OCR en envíos anónimos.
-    if (!codigo && !clienteOpcional(req) && !jugadorOpcional(req)) {
+    if (!codigo && !clienteOpcional(req) && !jugador) {
       return res.status(403).json({
         error: 'La carga de documentos requiere un código de acceso o una sesión de cliente. '
           + 'Inscribe tu empresa en /inscripcion para obtener acceso.',
@@ -282,9 +300,6 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
       }
     }
 
-    // "Sube y Suma": se resuelve UNA vez, fuera de la transacción (pura
-    // lectura del JWT) y se reusa dentro del loop de facturas más abajo.
-    const jugador = jugadorOpcional(req);
     let puntosGanados = 0;
 
     // Pre-lectura FUERA de la transacción: el OCR puede tardar decenas de
