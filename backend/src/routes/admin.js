@@ -24,6 +24,7 @@ import {
 } from '../services/clayCarbono.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
+import { SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
 import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
 import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
 import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
@@ -400,9 +401,10 @@ router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => 
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'procesada',$10,$11,$12,$13,$14,$15) RETURNING *`,
             [sesion.id, d.numero_venta, `clay:${d.clay_id}`, d.rut_emisor, d.rut_receptor,
              calc.total_co2e, calc.categoria, calc.categoria_codigo,
-             // Ver migración 077: sin coincidencia de palabra clave, la
-             // categoría es el default del motor y no una clasificación.
-             calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
+             // Ver migraciones 077 y 078: sin coincidencia de palabra clave la
+             // categoría es el default del motor y no una clasificación; y sin
+             // ítems que clasificar no es lo mismo que sin coincidencia.
+             calc.categoria_origen,
              MOTOR_CLAY, d.clay_id,
              hDoc, estado.ultimo_hash, hCad, eslabon]
         );
@@ -416,7 +418,12 @@ router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => 
             [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null]
           );
         }
-        await registrarMovimientos({ client, factura, fecha: sesion.fecha, cuentas: cuentasNaturales });
+        // Ídem public.js: los ítems viajan en memoria para que la cuenta
+        // física se derive solo del CO2e de esta categoría.
+        await registrarMovimientos({
+          client, factura: { ...factura, items: calc.items },
+          fecha: sesion.fecha, cuentas: cuentasNaturales,
+        });
         total += Number(calc.total_co2e || 0);
         importadas += 1;
       }
@@ -892,7 +899,7 @@ router.get('/metricas', async (req, res, next) => {
       // real: si el catch-all del motor sumara bajo su propio nombre, el
       // gráfico mostraría "Servicios" como la mayor fuente de emisiones de la
       // plataforma sin que nadie lo haya calculado.
-      query(`SELECT CASE WHEN categoria_origen IN ('glosa','operador') AND categoria IS NOT NULL
+      query(`SELECT CASE WHEN ${SQL_CATEGORIA_ATRIBUIBLE} AND categoria IS NOT NULL
                          THEN categoria ELSE 'Sin clasificar' END AS categoria,
                     count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
              FROM facturas GROUP BY 1 ORDER BY co2e DESC`),

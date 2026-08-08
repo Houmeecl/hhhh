@@ -6,7 +6,7 @@ import { hashApiKey, normalizarRut } from '../services/mandante.js';
 import { logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
 import { agregarAlcance3, parsearAlcanceGHG, CITA_CATEGORIAS_ALCANCE3 } from '../services/alcanceGhg.js';
-import { categoriaParaMostrar } from '../services/categoriaPresentacion.js';
+import { categoriaParaMostrar, SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
 import { filasACsv } from '../services/csv.js';
 import { resumenNormativo, filaCbamCsv } from '../services/pasaporteOrigen.js';
 import { citaFuente, generateReporteCbam } from '../services/pdf.js';
@@ -87,11 +87,17 @@ router.get('/proveedores', async (req, res, next) => {
               SUM(f.total_co2e)::float AS total_co2e,
               MAX(f.created_at) AS ultimo_documento,
               -- Solo las categorías atribuibles: el catch-all del motor no es
-              -- una clasificación del documento, y esta lista alimenta la
-              -- pantalla que hoy contradecía a su propio CSV de Alcance 3.
-              array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+              -- una clasificación del documento. COALESCE porque un FILTER que
+              -- no calza ninguna fila devuelve NULL, no un arreglo vacío — y
+              -- hoy no calza ninguna, así que sin esto la pantalla recibe null
+              -- para todos los proveedores.
+              COALESCE(array_agg(DISTINCT f.categoria)
+                FILTER (WHERE ${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')}), '{}')
                 AS categorias,
-              COUNT(*) FILTER (WHERE f.categoria_origen NOT IN ('glosa','operador')
+              -- Su contrapeso: sin este contador la pantalla pasaría de
+              -- contradecir al CSV a no decir nada, que no es lo mismo que
+              -- decir la verdad.
+              COUNT(*) FILTER (WHERE NOT (${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')})
                                   OR f.categoria_origen IS NULL)::int AS n_sin_clasificar
        FROM facturas f
        WHERE ${NORM('f.rut_receptor')} = $1 AND f.rut_emisor IS NOT NULL${filtroPermitidos}
@@ -258,6 +264,12 @@ router.get('/export/alcance3', async (req, res, next) => {
       n_documentos: sinClasificar.length,
       total_tco2e: suma(sinClasificar),
       sin_coincidencia: sinClasificar.filter((r) => r.categoria_origen === 'sin_coincidencia').length,
+      // Cuarto balde, y no un detalle: el remedio de `sin_coincidencia` que el
+      // panel le ofrece al mandante es "falta una palabra clave en el motor".
+      // Para un documento SIN ítems que clasificar (nota de crédito, todo
+      // descartado) ese consejo es falso — ninguna palabra clave lo cambia.
+      // Ver migración 078.
+      sin_categoria: sinClasificar.filter((r) => r.categoria_origen === 'sin_categoria').length,
       procedencia_no_registrada: sinClasificar.filter((r) => r.categoria_origen == null).length,
       // Clasificado de verdad, pero su categoría no resuelve a un alcance: el
       // texto libre `alcance_ghg` no calza el patrón, o el código ya no está
@@ -290,6 +302,7 @@ router.get('/export/alcance3', async (req, res, next) => {
       const pieNoAtribuido = noAtribuido.n_documentos > 0
         ? `\n# ${noAtribuido.n_documentos} documento(s) por ${noAtribuido.total_tco2e.toFixed(4)} tCO2e sin categoría GHG atribuible`
           + ` (${noAtribuido.sin_coincidencia} sin coincidencia en el motor,`
+          + ` ${noAtribuido.sin_categoria} sin items que clasificar,`
           + ` ${noAtribuido.procedencia_no_registrada} sin procedencia registrada,`
           + ` ${noAtribuido.alcance_no_legible} con categoría sin alcance legible): no incluidos arriba.`
         : '';

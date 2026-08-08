@@ -222,7 +222,12 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   // conclusión. Ver services/categoriaPresentacion.js.
   const atribuibles = facturas.filter((f) => esAtribuible(f.categoria_origen));
   const categorias = [...new Set(atribuibles.map((f) => f.categoria).filter(Boolean))];
-  const nSinConfirmar = facturas.length - atribuibles.length;
+  // Los dos motivos NO son el mismo hecho y no se pueden sumar en una frase:
+  // de un `sin_coincidencia` consta que el motor intentó y falló; de un NULL
+  // solo consta que no se registró la procedencia. Ver categoriaParaMostrar().
+  const estados = facturas.map((f) => categoriaParaMostrar(f).estado);
+  const nSinConfirmar = estados.filter((e) => e === 'sin_confirmar' || e === 'sin_categoria').length;
+  const nSinProcedencia = estados.filter((e) => e === 'sin_procedencia').length;
 
   // --- Encabezado ---
   drawLogo(doc, 48, 44);
@@ -258,10 +263,16 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
     { label: 'Total incorporado', value: `${nf(totalCo2e, 4)}`, unit: 't CO2e' },
     { label: 'Facturas', value: String(facturas.length), unit: 'documentos' },
     { label: 'Ítems', value: String(totalItems), unit: 'analizados' },
-    // "|| 1" no: si no hay ninguna categoría atribuible, el número honesto es
-    // cero. Redondear hacia arriba para que la tarjeta no se vea vacía era
+    // "|| 1" no: si el motor no identificó ninguna categoría, el número honesto
+    // es cero. Redondear hacia arriba para que la tarjeta no se vea vacía era
     // afirmar una categoría identificada que no existe.
-    { label: 'Categorías', value: String(categorias.length), unit: 'identificadas' },
+    //
+    // Pero cero tampoco sirve cuando lo único que hay son documentos SIN
+    // PROCEDENCIA REGISTRADA: de esos no consta que no se hayan identificado,
+    // consta que no se anotó quién lo hizo. El número honesto ahí es ninguno.
+    (categorias.length === 0 && nSinProcedencia > 0)
+      ? { label: 'Categorías', value: '—', unit: 'sin registrar' }
+      : { label: 'Categorías', value: String(categorias.length), unit: 'identificadas' },
   ];
   const cw = 118, gap = 9;
   cards.forEach((c, i) => {
@@ -372,12 +383,24 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   }
   // Lo que quedó fuera no se esconde: su CO2e está dentro del total de arriba,
   // así que omitirlo dejaría un informe que no cuadra consigo mismo.
+  const notas = [];
   if (nSinConfirmar > 0) {
+    notas.push(
+      `${nSinConfirmar} ${nSinConfirmar === 1 ? 'documento no pudo clasificarse' : 'documentos no pudieron clasificarse'} `
+      + 'a partir del detalle de sus ítems.'
+    );
+  }
+  if (nSinProcedencia > 0) {
+    notas.push(
+      `${nSinProcedencia} ${nSinProcedencia === 1 ? 'documento no registra' : 'documentos no registran'} `
+      + 'de qué fuente salió su categoría.'
+    );
+  }
+  if (notas.length) {
     if (y > 760) { doc.addPage(); y = 48; }
     doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
       .text(
-        `${nSinConfirmar} ${nSinConfirmar === 1 ? 'documento no pudo clasificarse' : 'documentos no pudieron clasificarse'} `
-        + 'a partir del detalle de sus ítems: su CO2e está incluido en el total, pero no se les atribuye alcance GHG.',
+        `${notas.join(' ')} Su CO2e está incluido en el total, pero no se les atribuye alcance GHG.`,
         48, y, { width: 499 }
       );
     y = doc.y + 10;

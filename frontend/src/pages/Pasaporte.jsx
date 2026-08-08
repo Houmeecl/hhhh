@@ -99,7 +99,18 @@ export default function Pasaporte() {
                 <div><span className="pas-lbl">{t('pas.fecha_doc')}</span><b>{data.producto.fecha ? fmtFecha(data.producto.fecha) : '—'}</b></div>
                 <div><span className="pas-lbl">{t('pas.titular')}</span><b>{data.titular.nombre || '—'}</b></div>
                 <div><span className="pas-lbl">{t('pas.rut')}</span><b>{data.titular.rut || '—'}</b></div>
-                <div><span className="pas-lbl">{t('pas.categoria')}</span><b>{data.producto.categoria}</b></div>
+                {/* Nombre y marca por separado: la marca se traduce, el
+                    nombre de la categoría no. Ver Verificar.jsx. */}
+                <div>
+                  <span className="pas-lbl">{t('pas.categoria')}</span>
+                  <b>{data.producto.categoria_nombre || t('cat.sin_clasificar')}</b>
+                  {data.producto.categoria_estado === 'sin_confirmar' && (
+                    <span className="badge" style={{ marginLeft: 6 }}>{t('cat.sin_confirmar')}</span>
+                  )}
+                  {data.producto.categoria_estado === 'sin_procedencia' && (
+                    <span className="badge" style={{ marginLeft: 6 }}>{t('cat.sin_procedencia')}</span>
+                  )}
+                </div>
                 <div><span className="pas-lbl">{t('ver.estado')}</span><span className="badge badge-green">{data.producto.status}</span></div>
                 {data.producto.clasificacion_ghg && (
                   <div style={{ gridColumn: '1 / -1' }}>

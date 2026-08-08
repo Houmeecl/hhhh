@@ -311,6 +311,33 @@ test('calcularFactura vacía o toda descartada devuelve total 0 y Sin categoría
   assert.equal(g.items_descartados, 1);
 });
 
+// Sin ítems que clasificar NO es lo mismo que sin coincidencia, y la
+// diferencia llega hasta el cliente: el panel del mandante ofrece como remedio
+// de 'sin_coincidencia' "agregar la palabra clave que falta al motor", que
+// para una nota de crédito es un consejo falso. Ver migración 078.
+test('sin ítems que clasificar el origen es sin_categoria, no sin_coincidencia', () => {
+  const cats = categoriasEjemplo();
+  assert.equal(calcularFactura([], cats).categoria_origen, 'sin_categoria');
+  assert.equal(
+    calcularFactura([{ nombre: 'solo descuento', monto: -1 }], cats).categoria_origen,
+    'sin_categoria',
+    'una nota de crédito no tiene palabra clave que agregar'
+  );
+});
+
+test('con ítems que no calzan ninguna palabra clave sí es sin_coincidencia (accionable)', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([{ nombre: 'Qwerty zzxx plop', monto: 1000000 }], cats);
+  assert.equal(f.categoria_origen, 'sin_coincidencia', 'acá sí falta una palabra clave');
+  assert.ok(f.total_co2e > 0, 'y se calculó por gasto igual');
+});
+
+test('cuando calza una palabra clave el origen es glosa', () => {
+  const cats = categoriasEjemplo();
+  const f = calcularFactura([{ nombre: 'Consumo electrico mensual', monto: 1000000 }], cats);
+  assert.equal(f.categoria_origen, 'glosa');
+});
+
 test('t-km nunca entra al método físico, ni siquiera desde XML (gasto-only por diseño)', () => {
   const cats = categoriasConNuevas();
   const item = { nombre: 'Flete marítimo contenedor', cantidad: 1200, unidad: 't-km', monto: 800000 };

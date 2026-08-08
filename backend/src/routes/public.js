@@ -415,7 +415,9 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
             // el export de Alcance 3 del mandante NO puede presentarlo como
             // una atribución a Cat. 1.
             categoria_codigo: calc.categoria_codigo,
-            categoria_origen: calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
+            // Los tres casos los distingue el motor (ver calcularFactura):
+            // sin ítems que clasificar NO es lo mismo que sin coincidencia.
+            categoria_origen: calc.categoria_origen,
             items: calc.items,
           };
           motor = 'propio';
@@ -440,7 +442,9 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
             total_co2e: calc.total_co2e,
             categoria: calc.categoria,
             categoria_codigo: calc.categoria_codigo,
-            categoria_origen: calc.categoria_coincidencia ? 'glosa' : 'sin_coincidencia',
+            // Los tres casos los distingue el motor (ver calcularFactura):
+            // sin ítems que clasificar NO es lo mismo que sin coincidencia.
+            categoria_origen: calc.categoria_origen,
             items: calc.items,
           };
           motor = lectura.motor;
@@ -519,7 +523,13 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
           );
         }
         // Capital Natural: cargos automáticos en las cuentas ambientales activas.
-        await registrarMovimientos({ client, factura, fecha: sesion.fecha, cuentas: cuentasNaturales });
+        // Los ítems van en memoria (no están en la fila `facturas`): Capital
+        // Natural deriva la cantidad física del CO2e de la categoría del
+        // documento, no del total. Ver capitalNatural.derivarMovimientos().
+        await registrarMovimientos({
+          client, factura: { ...factura, items: analysis.items },
+          fecha: sesion.fecha, cuentas: cuentasNaturales,
+        });
 
         // Valorización: los DTE traen precio real por ítem → entradas de inventario.
         // El CO2e de la factura se reparte entre ítems según su monto.
@@ -1096,7 +1106,12 @@ router.get('/verificar/:id', async (req, res, next) => {
         sesion_id: factura.sesion_id,
         numero_venta: factura.numero_venta,
         // Esta es la página del QR: la abre cualquiera que reciba el documento.
+        // `categoria` va rotulada en es-CL para quien consuma el JSON directo;
+        // la pantalla está traducida (en/pt) y arma su etiqueta con
+        // `categoria_nombre` + `categoria_estado`, que no llevan texto.
         categoria: categoriaParaMostrar(factura).detalle,
+        categoria_nombre: categoriaParaMostrar(factura).nombre,
+        categoria_estado: categoriaParaMostrar(factura).estado,
         categoria_confirmada: categoriaParaMostrar(factura).confirmada,
         total_co2e: factura.total_co2e,
         status: factura.status,
@@ -1193,7 +1208,11 @@ router.get('/pasaporte/:id', async (req, res, next) => {
         // El pasaporte es público y sin autenticación: es la cara que el
         // titular le muestra a un tercero. La categoría va con su marca de
         // confianza y el alcance GHG solo si es atribuible.
+        // Ídem verificación por QR: el texto en español es para el JSON, la
+        // pantalla traducida usa nombre + estado.
         categoria: categoriaParaMostrar(factura).detalle,
+        categoria_nombre: categoriaParaMostrar(factura).nombre,
+        categoria_estado: categoriaParaMostrar(factura).estado,
         categoria_confirmada: categoriaParaMostrar(factura).confirmada,
         clasificacion_ghg: alcanceAtribuible(factura, aRows[0]?.alcance_ghg),
         motor: factura.motor,

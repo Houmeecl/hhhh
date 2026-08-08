@@ -4,7 +4,7 @@ import zlib from 'node:zlib';
 import {
   esAtribuible, categoriaParaMostrar, alcanceAtribuible, SIN_CLASIFICAR,
 } from '../src/services/categoriaPresentacion.js';
-import { generateReport, generateLabel } from '../src/services/pdf.js';
+import { generateReport, generateLabel, generateCarpetaMandante } from '../src/services/pdf.js';
 
 // ============================================================
 // La regla de atribución de categoría y su efecto en los PDF.
@@ -163,6 +163,82 @@ test('generateLabel marca la categoría no confirmada', async () => {
   const pdf = await generateLabel({
     factura: factura({ categoria: 'Servicios', categoria_origen: 'sin_coincidencia' }),
     sesion: SESION,
+  });
+  assert.match(textoDelPdf(pdf), /sin confirmar/);
+});
+
+// ---------- El tercer estado: procedencia no registrada ----------
+//
+// Hoy es el 100% de las facturas de producción (129/129 con categoria_origen
+// NULL): los documentos anteriores a la migración 077 y los del motor externo,
+// que no informa procedencia. De ellos NO consta que haya fallado una
+// clasificación — decir "no pudo clasificarse" es afirmar un hecho que no
+// ocurrió, y el mismo PDF imprime más arriba la glosa del ítem.
+
+test('NULL no es lo mismo que catch-all: son dos estados distintos', () => {
+  const nulo = categoriaParaMostrar({ categoria: 'Energía eléctrica', categoria_origen: null });
+  assert.equal(nulo.estado, 'sin_procedencia');
+  assert.match(nulo.detalle, /procedencia no registrada/);
+  assert.ok(!nulo.detalle.includes('sin confirmar'), 'no consta que el motor haya intentado y fallado');
+
+  const catchAll = categoriaParaMostrar({ categoria: 'Servicios', categoria_origen: 'sin_coincidencia' });
+  assert.equal(catchAll.estado, 'sin_confirmar');
+
+  // Ninguno de los dos gana alcance ni engorda el donut.
+  for (const c of [nulo, catchAll]) assert.equal(c.agregado, SIN_CLASIFICAR);
+});
+
+test('el informe NO dice "no pudo clasificarse" de un documento sin procedencia', async () => {
+  const pdf = await generateReport({
+    sesion: SESION,
+    facturas: [factura({ categoria: 'Energía eléctrica', categoria_codigo: 'electricidad', categoria_origen: null })],
+    declaracion: null,
+    alcances: ALCANCES,
+  });
+  const texto = textoDelPdf(pdf);
+  assert.ok(!texto.includes('no pudo clasificarse'), 'el motor externo sí clasificó; lo que falta es de dónde salió');
+  assert.match(texto, /no registra/, 'y se declara, con su causa real');
+  assert.ok(!texto.includes('Alcances del período'), 'sigue sin afirmarse un alcance');
+});
+
+test('la tarjeta de categorías dice "—", no cero, cuando lo único que hay es procedencia sin registrar', async () => {
+  const pdf = await generateReport({
+    sesion: SESION,
+    facturas: [factura({ categoria: 'Energía eléctrica', categoria_codigo: 'electricidad', categoria_origen: null })],
+    declaracion: null,
+    alcances: ALCANCES,
+  });
+  const texto = textoDelPdf(pdf);
+  const i = texto.indexOf('CATEGOR');
+  assert.ok(i >= 0);
+  const tarjeta = texto.slice(i, i + 40);
+  assert.ok(!/\b0\b/.test(tarjeta), 'cero afirmaría que no se identificó ninguna, y eso no consta');
+  assert.match(texto, /SIN REGISTRAR/i);
+});
+
+test('las dos causas se cuentan por separado en la misma nota', async () => {
+  const pdf = await generateReport({
+    sesion: SESION,
+    facturas: [
+      factura({ id: 'a', categoria: 'Servicios', categoria_codigo: 'servicios', categoria_origen: 'sin_coincidencia' }),
+      factura({ id: 'b', categoria: 'Energía eléctrica', categoria_codigo: 'electricidad', categoria_origen: null }),
+    ],
+    declaracion: null,
+    alcances: ALCANCES,
+  });
+  const texto = textoDelPdf(pdf);
+  assert.match(texto, /1 documento no pudo clasificarse/);
+  assert.match(texto, /1 documento no registra/);
+});
+
+// ---------- La carpeta que se entrega en papel al mandante ----------
+
+test('generateCarpetaMandante marca la categoría no confirmada', async () => {
+  const pdf = await generateCarpetaMandante({
+    sesion: SESION,
+    facturas: [factura({ categoria: 'Servicios', categoria_origen: 'sin_coincidencia' })],
+    declaracion: null,
+    contrapartes: null,
   });
   assert.match(textoDelPdf(pdf), /sin confirmar/);
 });

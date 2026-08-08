@@ -1,4 +1,5 @@
 import { query } from '../lib/db.js';
+import { SQL_CATEGORIA_ATRIBUIBLE } from './categoriaPresentacion.js';
 
 // ============================================================
 // Cadena comprador-vendedor de un RUT: quién le emitió documentos
@@ -19,7 +20,10 @@ export async function contrapartesDeRut(rut) {
             MAX(f.created_at) AS ultimo_documento,
             -- Solo las categorías atribuibles: el catch-all del motor no es una
             -- clasificación del documento (services/categoriaPresentacion.js).
-            array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+            -- COALESCE: un FILTER que no calza ninguna fila devuelve NULL, no
+            -- un arreglo vacío, y la Carpeta del mandante lo itera sin guarda.
+            COALESCE(array_agg(DISTINCT f.categoria)
+              FILTER (WHERE ${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')}), '{}')
               AS categorias
      FROM facturas f
      WHERE regexp_replace(COALESCE(f.rut_receptor,''), '[^0-9kK]', '', 'g') ILIKE $1
@@ -34,7 +38,10 @@ export async function contrapartesDeRut(rut) {
             MAX(f.created_at) AS ultimo_documento,
             -- Solo las categorías atribuibles: el catch-all del motor no es una
             -- clasificación del documento (services/categoriaPresentacion.js).
-            array_agg(DISTINCT f.categoria) FILTER (WHERE f.categoria_origen IN ('glosa','operador'))
+            -- COALESCE: un FILTER que no calza ninguna fila devuelve NULL, no
+            -- un arreglo vacío, y la Carpeta del mandante lo itera sin guarda.
+            COALESCE(array_agg(DISTINCT f.categoria)
+              FILTER (WHERE ${SQL_CATEGORIA_ATRIBUIBLE.replace('categoria_origen', 'f.categoria_origen')}), '{}')
               AS categorias
      FROM facturas f
      WHERE regexp_replace(COALESCE(f.rut_emisor,''), '[^0-9kK]', '', 'g') ILIKE $1

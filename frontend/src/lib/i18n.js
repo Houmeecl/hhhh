@@ -170,6 +170,13 @@ const DICCIONARIOS = {
     'ver.subtitulo': 'Verificación pública de trazabilidad · sicr3p',
     'ver.resultado_incorporado': 'Resultado incorporado',
     'ver.categoria': 'Categoría',
+    // Marcas de confianza de la categoría — ver lib/categoria.js. Sin
+    // confirmar: el motor no calzó ninguna palabra clave. Sin procedencia:
+    // no quedó registrado de qué fuente salió (documentos anteriores a la
+    // migración 077 y los del motor externo).
+    'cat.sin_confirmar': 'sin confirmar',
+    'cat.sin_procedencia': 'procedencia no registrada',
+    'cat.sin_clasificar': 'Sin clasificar',
     'ver.items': 'Ítems',
     'ver.cliente': 'Cliente',
     'ver.rut': 'RUT',
@@ -685,6 +692,9 @@ const DICCIONARIOS = {
     'ver.subtitulo': 'Public traceability verification · sicr3p',
     'ver.resultado_incorporado': 'Embedded result',
     'ver.categoria': 'Category',
+    'cat.sin_confirmar': 'unconfirmed',
+    'cat.sin_procedencia': 'source not recorded',
+    'cat.sin_clasificar': 'Unclassified',
     'ver.items': 'Line items',
     'ver.cliente': 'Client',
     'ver.rut': 'RUT (Chilean tax ID)',
@@ -1195,6 +1205,9 @@ const DICCIONARIOS = {
     'ver.subtitulo': 'Verificação pública de rastreabilidade · sicr3p',
     'ver.resultado_incorporado': 'Resultado incorporado',
     'ver.categoria': 'Categoria',
+    'cat.sin_confirmar': 'sem confirmação',
+    'cat.sin_procedencia': 'origem não registrada',
+    'cat.sin_clasificar': 'Sem classificação',
     'ver.items': 'Itens',
     'ver.cliente': 'Cliente',
     'ver.rut': 'RUT (ID fiscal chileno)',

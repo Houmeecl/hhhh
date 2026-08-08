@@ -141,11 +141,14 @@ export function calcularItem({ nombre, descripcion, cantidad, unidad, monto }, c
   // El método FÍSICO exige que la categoría sea una clasificación real del
   // ítem, no el catch-all. El factor físico de una categoría no se le puede
   // aplicar a un ítem que no fue clasificado en ella: con `servicios`
-  // desactivada el catch-all pasa a ser `agua` (primera activa por código),
-  // que tiene unidad m3 y factor físico — y entonces "Hormigón premezclado
-  // H30, 120 M3" se calculaba como 120 m³ de AGUA: 0,04 tCO2e en vez de 2,7
-  // por gasto, 65 veces menos. Sin coincidencia se calcula por gasto, que es
-  // el piso metodológico honesto cuando no se sabe qué se compró.
+  // desactivada el catch-all pasa a ser la primera categoría activa por orden
+  // de código, y cualquiera con `unidad_fisica` en m3 convierte "Hormigón
+  // premezclado H30, 120 M3" en 120 m³ de agua — 0,04 tCO2e en vez de 2,7 por
+  // gasto, 65 veces menos. Cuál sea esa primera categoría depende del catálogo
+  // del día (hoy `agua_potable`, porque `agua` está desactivada), y por eso el
+  // guard no puede depender de qué código salga. Sin coincidencia se calcula
+  // por gasto, que es el piso metodológico honesto cuando no se sabe qué se
+  // compró.
   let co2e, metodo;
   if (coincidencia && unidadCanonica && cat.unidad_fisica === unidadCanonica && Number(cat.factor_fisico_kgco2e) > 0) {
     co2e = round4((Number(cantidad) * Number(cat.factor_fisico_kgco2e)) / 1000);
@@ -202,7 +205,23 @@ export function calcularFactura(dteItems, categorias, { origen = 'texto' } = {})
     // Si el ítem dominante cayó al catch-all, la categoría del documento es un
     // default de cálculo y no se le puede atribuir un alcance GHG.
     categoria_coincidencia: dominante ? dominante.categoria_coincidencia === true : false,
-    items: items.map(({ descripcion, cantidad, co2e, porcentaje_total, metodo }) => ({ descripcion, cantidad, co2e, porcentaje_total, metodo })),
+    // Los tres casos son distintos y quien persiste no tiene que deducirlos:
+    //  · 'glosa'           — calzó una palabra clave.
+    //  · 'sin_coincidencia'— había ítems y ninguno calzó (accionable: falta
+    //                        una palabra clave en el motor).
+    //  · 'sin_categoria'   — no quedó NINGÚN ítem que clasificar (nota de
+    //                        crédito, todo descartado). NO es accionable, y
+    //                        decirle al cliente "agregá la palabra clave que
+    //                        falta" es un consejo falso. Ver migración 078.
+    categoria_origen: !dominante ? 'sin_categoria'
+      : dominante.categoria_coincidencia === true ? 'glosa' : 'sin_coincidencia',
+    // `categoria_codigo` viaja con cada ítem aunque `line_items` no tenga esa
+    // columna: Capital Natural lo necesita en memoria para derivar la cantidad
+    // física SOLO del CO2e de la categoría del documento, y no del total, que
+    // en una factura mixta pertenece a varias (ver capitalNatural.js). Aditivo
+    // sobre el shape drop-in de analyzeInvoice, igual que `items_descartados`;
+    // las inserciones nombran sus columnas, así que nada más se entera.
+    items: items.map(({ descripcion, cantidad, co2e, porcentaje_total, metodo, categoria_codigo }) => ({ descripcion, cantidad, co2e, porcentaje_total, metodo, categoria_codigo })),
     items_descartados: descartados,
   };
 }

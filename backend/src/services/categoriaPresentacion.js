@@ -30,9 +30,12 @@
 // Los tres orígenes que SÍ son una clasificación del documento:
 //  · 'glosa'    — una palabra clave calzó con la glosa de los ítems.
 //  · 'xml'      — ídem, sobre el detalle real que vino en el XML del DTE.
-//  · 'operador' — un operador la asignó a mano, y ese acto quedó sellado en su
-//                 propia cadena (ver migración 078). Es humana, no automática:
-//                 los informes lo declaran en vez de pasarla por cálculo.
+//  · 'operador' — un operador la asignó a mano. Es humana, no automática: los
+//                 informes la declaran en vez de pasarla por cálculo.
+//                 OJO: hoy NADIE escribe este valor. La migración 078 lo admite
+//                 en el CHECK para que la bandeja de revisión manual (Fase C)
+//                 pueda escribirlo junto con su asiento de ajuste encadenado.
+//                 Mientras esa cadena no exista, ninguna ruta lo produce.
 const ATRIBUIBLES = new Set(['glosa', 'xml', 'operador']);
 
 export const SIN_CLASIFICAR = 'Sin clasificar';
@@ -41,11 +44,34 @@ export function esAtribuible(origen) {
   return ATRIBUIBLES.has(origen);
 }
 
+// La misma regla, en SQL, para las consultas que agregan en la base en vez de
+// en JavaScript. Se exporta como constante y no se reescribe a mano en cada
+// ruta: la auditoría encontró SEIS variantes de esta regla, tres de ellas SQL
+// literal y sin ningún test, ya divergiendo entre sí.
+//
+// Solo los valores del vocabulario de `facturas` — 'xml' es de `dte_proveedor`,
+// que no se agrega con estas consultas.
+export const SQL_CATEGORIA_ATRIBUIBLE = "categoria_origen IN ('glosa','operador')";
+
 // Cómo mostrar la categoría de un documento. Recibe cualquier objeto con
 // `categoria` (el NOMBRE — así lo guarda la columna) y `categoria_origen`.
 //
+// Son CUATRO estados, no dos, y la diferencia entre los dos últimos es lo que
+// separa un informe honesto de uno falso:
+//
+//  · 'atribuida'      — el motor la dedujo de la glosa real.
+//  · 'sin_confirmar'  — consta que el motor INTENTÓ clasificar y NO calzó
+//                       ninguna palabra clave: el nombre es su catch-all.
+//  · 'sin_procedencia'— `categoria_origen` es NULL. Son los documentos
+//                       anteriores a la migración 077 y los del motor externo
+//                       (que no informa procedencia). NO consta que haya
+//                       fallado una clasificación: decir "no pudo clasificarse"
+//                       de estos es afirmar un hecho que no ocurrió. Hoy es el
+//                       100% de las facturas de producción.
+//  · 'sin_categoria'  — no hay ni nombre que mostrar.
+//
 // Dos etiquetas distintas a propósito:
-//  · `detalle`  — el documento conserva su nombre, marcado como no confirmado.
+//  · `detalle`  — el documento conserva su nombre, marcado según su estado.
 //    Esconderlo del todo dejaría el CO2e sin explicación: ese número se calculó
 //    con el factor de esa categoría, y el cliente tiene derecho a saber cuál.
 //  · `agregado` — en donuts y totales la porción se rotula "Sin clasificar".
@@ -53,13 +79,38 @@ export function esAtribuible(origen) {
 //    ("Servicios: 40% de tus emisiones") que nadie calculó.
 export function categoriaParaMostrar(f) {
   const nombre = f?.categoria || null;
-  const confirmada = esAtribuible(f?.categoria_origen);
+  const origen = f?.categoria_origen ?? null;
+  const confirmada = esAtribuible(origen);
+  const estado = confirmada ? 'atribuida'
+    : !nombre ? 'sin_categoria'
+      : origen === null ? 'sin_procedencia'
+        : 'sin_confirmar';
+  const sufijo = { sin_confirmar: ' · sin confirmar', sin_procedencia: ' · procedencia no registrada' };
   return {
     nombre,
     confirmada,
+    estado,
     agregado: confirmada && nombre ? nombre : SIN_CLASIFICAR,
-    detalle: !nombre ? SIN_CLASIFICAR : confirmada ? nombre : `${nombre} · sin confirmar`,
+    detalle: estado === 'sin_categoria' ? SIN_CLASIFICAR : `${nombre}${sufijo[estado] || ''}`,
   };
+}
+
+// Para el LIBRO de Capital Natural la pregunta NO es la misma, y la divergencia
+// vive acá y no escondida en un `if` de otro archivo (la auditoría encontró que
+// capitalNatural.js y esAtribuible() se contradecían sobre NULL, y que por eso
+// dos PDF del mismo documento decían cosas distintas).
+//
+// Un informe AFIRMA ("este documento es Alcance 2"), y de un NULL no consta de
+// dónde salió la categoría: no se afirma. El libro de Capital Natural REGISTRA
+// un flujo físico ya ocurrido, sus asientos están sellados por hash desde antes
+// de la migración 077, y el motor externo —el otro productor de NULL— devuelve
+// 'Sin categoría' cuando no sabe, no un catch-all con factor físico. Frenar los
+// NULL acá no arreglaría el histórico (es inmutable) y además cortaría un libro
+// que hoy cuadra.
+//
+// Lo que SÍ se frena es el catch-all, que es donde nace el dato inventado.
+export function clasificaParaCuentasFisicas(origen) {
+  return origen == null || esAtribuible(origen);
 }
 
 // El alcance GHG de un documento, o null si su categoría no es atribuible.

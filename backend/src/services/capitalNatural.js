@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { siguienteEslabon } from './cadenaHash.js';
+import { clasificaParaCuentasFisicas } from './categoriaPresentacion.js';
 
 const round4 = (n) => Math.round(n * 10000) / 10000;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
@@ -45,19 +46,10 @@ export function derivarMovimientos(factura, cuentas) {
   const glosa = (detalle) => `${detalle} — ${refDoc}`;
 
   // ¿La categoría de este documento es una clasificación real, o el catch-all
-  // del motor? Lista BLANCA a propósito: un valor nuevo de `categoria_origen`
-  // (la migración 078 agrega 'sin_categoria' y 'operador') tiene que decidirse
-  // acá explícitamente, no colarse por omisión. Una lista negra falla abierta,
-  // que es justo lo contrario de lo que este libro necesita.
-  //
-  // NULL es el caso histórico y el del motor externo (routes/public.js escribe
-  // NULL cuando calcula el adaptador de terceros): de esos no consta de dónde
-  // salió la categoría y se dejan como estaban, porque no hay forma de saberlo
-  // hacia atrás y porque ese adaptador devuelve 'Sin categoría' cuando no sabe,
-  // no un catch-all con factor físico.
-  const ORIGEN_CLASIFICA = new Set(['glosa', 'xml', 'operador']);
-  const clasificado = factura.categoria_origen == null
-    || ORIGEN_CLASIFICA.has(factura.categoria_origen);
+  // del motor? La regla vive en services/categoriaPresentacion.js —incluida la
+  // razón por la que acá NULL se trata distinto que en un informe— y no
+  // reimplementada en este archivo, que es como llegó a contradecirla.
+  const clasificado = clasificaParaCuentasFisicas(factura.categoria_origen);
 
   // Toda emisión calculada carga la cuenta de carbono. La glosa NO puede
   // nombrar la categoría cuando el motor no la dedujo: quedaría sellada por
@@ -79,10 +71,12 @@ export function derivarMovimientos(factura, cuentas) {
   // 'servicios' — que no toca cuentas físicas, así que hoy no pasa nada. Pero
   // si un admin desactiva 'servicios' desde el panel (lo que ya se hizo con
   // 'transporte' en la migración 075), el catch-all pasa a ser la primera
-  // categoría activa por orden de código: hoy, `agua`. Desde ese momento cada
-  // documento que el motor no supo clasificar registraría METROS CÚBICOS DE
-  // AGUA QUE NADIE CONSUMIÓ, en un libro sellado por cadena de hash — o sea,
-  // un dato inventado y además inmutable, que es lo peor de las dos cosas.
+  // categoría activa por orden de código, que depende del catálogo del día.
+  // Si le toca a una con cuenta física, cada documento que el motor no supo
+  // clasificar registraría CONSUMO QUE NADIE TUVO, en un libro sellado por
+  // cadena de hash — un dato inventado y además inmutable, que es lo peor de
+  // las dos cosas. Que hoy el sorteo caiga en `agua_potable`, cuyo nombre no
+  // calza ningún `case` de abajo, es suerte del catálogo, no una defensa.
   //
   // El CO2E de arriba sí se carga: ese número se calcula por gasto cuando no
   // hubo coincidencia (lo fuerza motorPropio.calcularItem, justamente para que
@@ -90,27 +84,48 @@ export function derivarMovimientos(factura, cuentas) {
   // clasificado en ella).
   if (!clasificado) return movs;
 
+  // La cantidad física se deriva del CO2e, así que hay que derivarla SOLO del
+  // CO2e que es de esta categoría — no del total del documento.
+  //
+  // La categoría de una factura es la del ítem DOMINANTE (el de mayor CO2e,
+  // ver motorPropio.calcularFactura), no la de todos sus ítems. En una factura
+  // mixta "50.000 kWh de electricidad + honorarios legales", usar el total
+  // convertía el CO2e de los honorarios en kilowatt-hora: 70.652 kWh en un
+  // documento que declara 50.000, un 41% inventado y sellado por hash. Es el
+  // mismo defecto que el catch-all, entrando por la puerta de al lado.
+  //
+  // Cuando los ítems traen su categoría (motor propio) se usa la porción real.
+  // Cuando no (motor externo, histórico), ese adaptador ya entrega UNA
+  // categoría para el documento entero y el total sí le corresponde.
+  const items = Array.isArray(factura.items) ? factura.items : [];
+  const conCategoria = items.filter((it) => it?.categoria_codigo != null);
+  const fisico = conCategoria.length
+    ? round4(conCategoria
+      .filter((it) => it.categoria_codigo === factura.categoria_codigo)
+      .reduce((a, it) => a + Number(it.co2e || 0), 0))
+    : total;
+
   // Cuentas físicas según la categoría del documento (cantidad estimada
-  // a partir del CO2e y el factor de conversión de la cuenta).
+  // a partir del CO2e de esa categoría y el factor de conversión de la cuenta).
   switch (factura.categoria) {
     case 'Energía eléctrica': {
-      if (activa('ENER') && total > 0) {
-        const kwh = (total * 1000) / factor('ENER', 'electricidad_kgco2e_kwh');
+      if (activa('ENER') && fisico > 0) {
+        const kwh = (fisico * 1000) / factor('ENER', 'electricidad_kgco2e_kwh');
         movs.push({ cuenta_codigo: 'ENER', cantidad: round4(kwh), unidad: 'kWh', glosa: glosa('Consumo eléctrico') });
       }
       break;
     }
     case 'Agua': {
-      if (activa('AGUA') && total > 0) {
-        const m3 = (total * 1000) / factor('AGUA', 'agua_kgco2e_m3');
+      if (activa('AGUA') && fisico > 0) {
+        const m3 = (fisico * 1000) / factor('AGUA', 'agua_kgco2e_m3');
         movs.push({ cuenta_codigo: 'AGUA', cantidad: round4(m3), unidad: 'm3', glosa: glosa('Consumo de agua') });
       }
       break;
     }
     case 'Insumos y materiales': {
-      if (activa('MATR') && total > 0) {
+      if (activa('MATR') && fisico > 0) {
         // kgCO2e/kg equivale a tCO2e/t → toneladas de material.
-        const t = total / factor('MATR', 'materiales_kgco2e_kg');
+        const t = fisico / factor('MATR', 'materiales_kgco2e_kg');
         movs.push({ cuenta_codigo: 'MATR', cantidad: round4(t), unidad: 't', glosa: glosa('Materiales e insumos') });
       }
       break;

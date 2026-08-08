@@ -88,13 +88,27 @@ export default function Proveedores() {
           ) : (
             <div className="table-scroll">
               <table className="data">
-                <thead><tr><th>RUT proveedor</th><th>Documentos</th><th>t CO2e</th><th>Último</th><th></th></tr></thead>
+                <thead><tr><th>RUT proveedor</th><th>Documentos</th><th>t CO2e</th><th>Categorías</th><th>Último</th><th></th></tr></thead>
                 <tbody>
                   {data.proveedores.map((p) => (
                     <tr key={p.rut_proveedor} className={seleccionado === p.rut_proveedor ? 'active' : ''}>
                       <td style={{ fontFamily: 'monospace' }}>{p.rut_proveedor}</td>
                       <td>{fmtInt(p.n_documentos)}</td>
                       <td>{fmt(p.total_co2e, 2)}</td>
+                      {/* Las categorías que el motor SÍ dedujo de la glosa, y
+                          al lado cuántos documentos quedaron sin clasificar.
+                          Sin el contador la pantalla no contradiría al CSV de
+                          Alcance 3, pero tampoco diría la verdad: se leería
+                          como si esas fueran todas las categorías del
+                          proveedor. */}
+                      <td>
+                        {p.categorias?.length ? p.categorias.join(', ') : <span className="muted">—</span>}
+                        {p.n_sin_clasificar > 0 && (
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {fmtInt(p.n_sin_clasificar)} sin clasificar
+                          </div>
+                        )}
+                      </td>
                       <td>{fmtFecha(p.ultimo_documento)}</td>
                       <td><button className="btn btn-sm btn-outline" onClick={() => abrir(p.rut_proveedor)}>Ver</button></td>
                     </tr>

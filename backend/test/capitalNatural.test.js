@@ -154,9 +154,10 @@ test('hashMovimientoNatural no depende de la hora del día, solo de la fecha', (
 // toca cuentas físicas — así que hoy el riesgo está dormido. Pero si un admin
 // desactiva 'servicios' desde el panel (lo que ya se hizo con 'transporte' en
 // la migración 075), el catch-all pasa a la primera categoría activa por
-// orden de código: `agua`. Desde ahí, cada documento que el motor no supo
-// clasificar registraría metros cúbicos de agua que nadie consumió, en un
-// libro sellado por cadena de hash: dato inventado y además inmutable.
+// orden de código, que depende del catálogo del día. Desde ahí, cada
+// documento que el motor no supo
+// clasificar registraría consumo que nadie tuvo, en un libro sellado por
+// cadena de hash: dato inventado y además inmutable.
 //
 // La señal es `categoria_origen = 'sin_coincidencia'` (migración 077).
 // ============================================================
@@ -194,4 +195,61 @@ test('documento anterior a la migración 077 (sin procedencia): se comporta como
   // hacia atrás. Cambiarles el comportamiento reescribiría el histórico.
   const movs = derivarMovimientos({ categoria: 'Agua', total_co2e: 0.344, numero_venta: 'V-VIEJA' }, cuentas());
   assert.ok(movs.some((m) => m.cuenta_codigo === 'AGUA'));
+});
+
+// ============================================================
+// La glosa sellada no puede nombrar una categoría que este mismo código acaba
+// de declarar sin clasificar: queda inmutable en el libro por cuenta.
+// ============================================================
+test('la glosa del cargo CO2E no nombra la categoría cuando el motor no la dedujo', () => {
+  const movs = derivarMovimientos(
+    { categoria: 'Agua', categoria_origen: 'sin_coincidencia', total_co2e: 1, numero_venta: 'V-CATCH' },
+    cuentas()
+  );
+  const co2e = movs.find((m) => m.cuenta_codigo === 'CO2E');
+  assert.ok(!co2e.glosa.includes('Agua'), 'sellar "Agua" acá sería inmutable y falso');
+  assert.match(co2e.glosa, /sin clasificar/);
+  assert.match(co2e.glosa, /V-CATCH/, 'sigue trazando al documento');
+});
+
+test('clasificado: la glosa sí nombra la categoría', () => {
+  const movs = derivarMovimientos(
+    { categoria: 'Agua', categoria_origen: 'glosa', total_co2e: 1, numero_venta: 'V-OK' },
+    cuentas()
+  );
+  assert.match(movs.find((m) => m.cuenta_codigo === 'CO2E').glosa, /^Agua — V-OK$/);
+});
+
+// ============================================================
+// La cantidad física se deriva del CO2e, así que hay que derivarla SOLO del
+// CO2e de esta categoría. La categoría de la factura es la del ítem DOMINANTE
+// (motorPropio.calcularFactura), no la de todos sus ítems: en una factura
+// mixta, usar el total convierte el CO2e de los otros ítems en kilowatt-hora.
+// ============================================================
+test('factura mixta: los kWh salen del ítem eléctrico, no del total del documento', () => {
+  const movs = derivarMovimientos(
+    {
+      categoria: 'Energía eléctrica', categoria_codigo: 'electricidad',
+      total_co2e: 17.1067, numero_venta: 'V-MIXTA',
+      items: [
+        { descripcion: 'Suministro eléctrico 50.000 kWh', co2e: 12.105, categoria_codigo: 'electricidad' },
+        { descripcion: 'Honorarios estudio jurídico', co2e: 5.0017, categoria_codigo: 'servicios' },
+      ],
+    },
+    cuentas()
+  );
+  const ener = movs.find((m) => m.cuenta_codigo === 'ENER');
+  assert.equal(ener.cantidad, 50000, 'los honorarios no son electricidad');
+
+  const co2e = movs.find((m) => m.cuenta_codigo === 'CO2E');
+  assert.equal(co2e.cantidad, 17.1067, 'la cuenta de carbono sí lleva el documento entero');
+});
+
+test('sin ítems con categoría (motor externo, histórico): se usa el total, que ahí sí corresponde', () => {
+  // El adaptador externo entrega UNA categoría para el documento completo.
+  const movs = derivarMovimientos(
+    { categoria: 'Energía eléctrica', total_co2e: 2.421, numero_venta: 'V-EXT' },
+    cuentas()
+  );
+  assert.equal(movs.find((m) => m.cuenta_codigo === 'ENER').cantidad, 10000);
 });

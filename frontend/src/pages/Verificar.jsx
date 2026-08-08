@@ -65,7 +65,19 @@ export default function Verificar() {
                   <div className="lbl">{t('ver.resultado_incorporado')}</div>
                 </div>
                 <div className="result-card">
-                  <div className="big" style={{ fontSize: 18 }}>{data.factura.categoria}</div>
+                  {/* La marca de confianza va aparte y traducida: el backend
+                      manda el nombre y el estado sin texto, porque esta
+                      pantalla se lee en es/en/pt y "· sin confirmar" pegado
+                      al nombre salía en español para todos. */}
+                  <div className="big" style={{ fontSize: 18 }}>
+                    {data.factura.categoria_nombre || t('cat.sin_clasificar')}
+                  </div>
+                  {data.factura.categoria_estado === 'sin_confirmar' && (
+                    <div className="badge" style={{ marginTop: 4 }}>{t('cat.sin_confirmar')}</div>
+                  )}
+                  {data.factura.categoria_estado === 'sin_procedencia' && (
+                    <div className="badge" style={{ marginTop: 4 }}>{t('cat.sin_procedencia')}</div>
+                  )}
                   <div className="lbl">{t('ver.categoria')}</div>
                 </div>
                 <div className="result-card">
