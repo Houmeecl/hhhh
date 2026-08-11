@@ -14,6 +14,7 @@ import { generateContrato, generateInformeCarbono } from '../services/pdf.js';
 import { sendMail } from '../services/mailer.js';
 import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
 import { validarCredencialesSii } from '../services/siiProveedor.js';
+import { inventarioCsv, inventarioJson } from '../services/exportInventarioSii.js';
 import { rutValido } from '../services/dte.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
@@ -1821,6 +1822,33 @@ router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="carbono-${empresa.rut}-${req.params.periodo}.pdf"`);
     res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/inventario/:periodo?formato=csv|json —
+// export entregable del inventario por Alcance GHG y categoría (hermano
+// del informe.pdf, patrón export/alcance3): el archivo que la empresa
+// presenta a procesos externos. Sin costo, sin clave: lee lo descargado.
+router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const empresa = rows[0];
+    if (!empresa) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const analisis = await analizarPeriodo(query, empresa.id, req.params.periodo);
+    if (!analisis.emisiones) {
+      return res.status(404).json({ error: 'Este período no tiene emisiones calculadas: descarga el período primero (o configura el motor).' });
+    }
+    if (req.query.formato === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="inventario-${empresa.rut}-${req.params.periodo}.csv"`);
+      res.send('\uFEFF' + inventarioCsv({ analisis })); // BOM: Excel abre con tildes/ñ correctas
+    } else {
+      res.json(inventarioJson({ empresa, periodo: req.params.periodo, analisis }));
+    }
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'admin_export_inventario_sii', entidad: 'dte_proveedor',
+      entidadId: empresa.id, detalle: { periodo: req.params.periodo, formato: req.query.formato === 'csv' ? 'csv' : 'json' }, ip: req.ip,
+    });
   } catch (err) { next(err); }
 });
 

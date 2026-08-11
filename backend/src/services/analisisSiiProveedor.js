@@ -209,11 +209,15 @@ export async function analizarPeriodo(query, proveedorId, periodo) {
             d.neto, d.iva, d.total, d.fecha, d.co2e, d.metodo,
             d.categoria, d.categoria_origen, d.motor_version_id,
             COALESCE(mcv.alcance_ghg, mc.alcance_ghg) AS alcance_ghg,
-            COALESCE(mcv.nombre, mc.nombre)           AS categoria_nombre
+            COALESCE(mcv.nombre, mc.nombre)           AS categoria_nombre,
+            COALESCE(mcv.fuente_organismo, fm.organismo)       AS fuente_organismo,
+            COALESCE(mcv.fuente_documento, fm.documento)       AS fuente_documento,
+            COALESCE(mcv.fuente_version_anio, fm.version_anio) AS fuente_version_anio
        FROM dte_proveedor d
        LEFT JOIN motor_categorias_version mcv
               ON mcv.version_id = d.motor_version_id AND mcv.codigo = d.categoria
        LEFT JOIN motor_categorias mc ON mc.codigo = d.categoria
+       LEFT JOIN fuentes_metodologicas fm ON fm.id = mc.fuente_metodologica_id
       WHERE d.proveedor_id = $1 AND d.periodo = $2
       ORDER BY d.tipo, d.fecha NULLS LAST, d.folio`,
     [proveedorId, periodo]

@@ -1,4 +1,5 @@
 import { citaFuente } from './pdf.js';
+import { esAtribuible } from './categoriaPresentacion.js';
 
 // ============================================================
 // Parseo de motor_categorias.alcance_ghg ("Alcance N · Cat. M — desc")
@@ -88,12 +89,21 @@ const r4 = (n) => Math.round(n * 10000) / 10000;
 //   · `alcance_no_legible`   → la categoría no resuelve a un alcance: su
 //     `alcance_ghg` (texto libre editable) no calza el patrón, o el código ya
 //     no está en el catálogo. Lo arregla un admin en el panel del motor.
+//   · `procedencia_no_registrada` → la fila declara explícitamente (marcador
+//     'sin_procedencia' de filasDesdeFacturas) que su origen es NULL en el
+//     vocabulario de `facturas`: no consta de dónde salió la categoría, que
+//     NO es lo mismo que "descargada antes de la clasificación" — el flujo
+//     público no descarga nada.
+//
+// La atribuibilidad se decide con esAtribuible() (categoriaPresentacion.js):
+// cubre los DOS vocabularios — 'xml' del flujo SII y 'glosa'/'operador' del
+// flujo público de facturas — así que esta función sirve para ambos.
 export function agregarPorAlcance(filas = []) {
   const porAlcance = new Map(); // 1|2|3 → { tco2e, n_documentos, categorias: Map }
   const sinClasificar = {
     tco2e: 0, n_documentos: 0,
     descarga_antigua: 0, inferido_por_nombre: 0, sin_coincidencia: 0,
-    motor_sin_categoria: 0, alcance_no_legible: 0,
+    motor_sin_categoria: 0, alcance_no_legible: 0, procedencia_no_registrada: 0,
   };
   // Se acumula CRUDO y se redondea una sola vez al final, igual que
   // `total_co2e_tref`. Redondear en cada suma haría que los baldes se
@@ -117,9 +127,10 @@ export function agregarPorAlcance(filas = []) {
       ? 'motor_sin_categoria'
       : f.categoria_origen === 'razon_social' ? 'inferido_por_nombre'
         : f.categoria_origen === 'sin_coincidencia' ? 'sin_coincidencia'
-          : f.categoria_origen !== 'xml' ? 'descarga_antigua'
-            : alcance === null ? 'alcance_no_legible'
-              : null;
+          : f.categoria_origen === 'sin_procedencia' ? 'procedencia_no_registrada'
+            : !esAtribuible(f.categoria_origen) ? 'descarga_antigua'
+              : alcance === null ? 'alcance_no_legible'
+                : null;
     if (motivo) {
       sumar(sinClasificar, co2e);
       sinClasificar[motivo] += 1;
@@ -136,9 +147,21 @@ export function agregarPorAlcance(filas = []) {
         categoria_ghg_nombre: catGhg ? (CATEGORIAS_ALCANCE3_GHG_PROTOCOL[catGhg] || null) : null,
         tco2e: 0,
         n_documentos: 0,
+        // Para el export entregable: cuántos documentos de esta categoría
+        // se calcularon por unidades físicas (el resto fue por gasto) y
+        // la(s) cita(s) de la fuente del factor — del snapshot congelado
+        // de la versión con que se calculó cada documento, cuando las
+        // filas la traen. Un Set: dos versiones del motor pueden citar
+        // fuentes distintas para la misma categoría y ninguna se pierde.
+        n_fisico: 0,
+        fuentes: new Set(),
       });
     }
-    sumar(a.categorias.get(f.categoria), co2e);
+    const cat = a.categorias.get(f.categoria);
+    sumar(cat, co2e);
+    if (f.metodo === 'fisico') cat.n_fisico += 1;
+    const cita = citaFuente({ organismo: f.fuente_organismo, documento: f.fuente_documento, version_anio: f.fuente_version_anio });
+    if (cita) cat.fuentes.add(cita);
   }
 
   return {
@@ -150,10 +173,33 @@ export function agregarPorAlcance(filas = []) {
         n_documentos: v.n_documentos,
         categorias: [...v.categorias.values()]
           .sort((x, y) => y.tco2e - x.tco2e)
-          .map((c) => ({ ...c, tco2e: r4(c.tco2e) })),
+          .map(({ fuentes, ...c }) => ({ ...c, tco2e: r4(c.tco2e), fuente_factor: [...fuentes].join('; ') || null })),
       })),
     sin_clasificar: { ...sinClasificar, tco2e: r4(sinClasificar.tco2e) },
   };
+}
+
+// Adaptador del flujo público de facturas hacia agregarPorAlcance: traduce
+// el vocabulario de `facturas` (categoria = NOMBRE, categoria_codigo aparte,
+// origen 'glosa'/'operador'/'sin_coincidencia'/NULL) a la forma que consume
+// la agregación. El alcance se resuelve contra el catálogo que le pasa el
+// llamador (generateReport ya lo trae congelado por versión del motor
+// cuando existe — metodologiaDeVersiones), por código con respaldo por
+// nombre, igual que la nota que esta tabla reemplaza.
+export function filasDesdeFacturas(facturas = [], alcancesGhg = []) {
+  const porCodigo = new Map(alcancesGhg.map((a) => [a.codigo, a.alcance_ghg]));
+  const porNombre = new Map(alcancesGhg.map((a) => [a.nombre, a.alcance_ghg]));
+  return facturas.map((f) => ({
+    categoria: f.categoria_codigo || f.categoria || null,
+    categoria_nombre: f.categoria || null,
+    alcance_ghg: porCodigo.get(f.categoria_codigo) || porNombre.get(f.categoria) || null,
+    co2e: f.total_co2e == null ? null : Number(f.total_co2e),
+    // NULL con categoría presente significa "procedencia no registrada"
+    // (documentos anteriores a la migración 077 o del motor externo) — se
+    // marca explícito para que la agregación no lo rotule con la causa del
+    // flujo SII ("descargado antes de la clasificación"), que acá es falsa.
+    categoria_origen: (f.categoria_origen == null && f.categoria) ? 'sin_procedencia' : f.categoria_origen,
+  }));
 }
 
 // Agrega filas crudas (rut_proveedor, alcance_ghg, total_co2e, organismo,

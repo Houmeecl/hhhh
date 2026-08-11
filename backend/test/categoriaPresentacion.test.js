@@ -111,7 +111,11 @@ test('generateReport NO imprime alcance del catch-all, y declara lo que quedó f
     alcances: ALCANCES,
   });
   const texto = textoDelPdf(pdf);
-  assert.ok(!texto.includes('Alcances del período'), 'un catch-all no aporta alcance al período');
+  // La tabla existe pero el catch-all NO figura como Alcance: su CO2e cae
+  // completo a "Sin alcance atribuido" con su causa impresa.
+  assert.ok(!/Alcance [123]\b/.test(texto.replace(/Alcance 3 . Cat/g, '')), 'un catch-all no aporta alcance al período');
+  assert.match(texto, /Sin alcance atribuido/);
+  assert.match(texto, /sin coincidencia con ninguna categor/);
   assert.match(texto, /no pudo clasificarse/, 'y no se esconde: su CO2e sí está en el total');
 });
 
@@ -123,8 +127,11 @@ test('generateReport SÍ imprime el alcance de una categoría deducida de la glo
     alcances: ALCANCES,
   });
   const texto = textoDelPdf(pdf);
-  assert.match(texto, /Alcances del período/);
+  // La línea suelta "Alcances del período" fue reemplazada por la tabla
+  // completa (GHG Protocol) con el desglose por categoría dentro del alcance.
+  assert.match(texto, /Emisiones por alcance/);
   assert.match(texto, /Alcance 2/);
+  assert.match(texto, /Energ.a el.ctrica/);
   assert.ok(!texto.includes('no pudo clasificarse'));
 });
 

@@ -132,4 +132,8 @@ export const MOTIVOS_SIN_ALCANCE = [
   ['sin_coincidencia', 'sin coincidencia con ninguna categoría del motor'],
   ['motor_sin_categoria', 'sin categoría asignada por el motor (ej. notas de crédito)'],
   ['alcance_no_legible', 'con un alcance GHG no legible en el catálogo'],
+  // Solo del flujo público de facturas (adaptador filasDesdeFacturas): la
+  // categoría existe pero no consta de dónde salió — documentos anteriores
+  // a la migración 077 o calculados por el motor externo.
+  ['procedencia_no_registrada', 'sin registro de la fuente de su categoría'],
 ];

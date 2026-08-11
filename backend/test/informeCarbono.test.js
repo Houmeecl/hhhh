@@ -132,3 +132,44 @@ test('generateInformeCarbono no exige por_alcance: el informe sale igual sin el 
   assert.equal(buf.subarray(0, 5).toString('latin1'), '%PDF-');
   assert.doesNotMatch(texto, /Emisiones por alcance/);
 });
+
+test('generateInformeCarbono imprime el desglose por categoría DENTRO de cada alcance', async () => {
+  const conCategorias = {
+    ...ANALISIS,
+    emisiones: {
+      ...ANALISIS.emisiones,
+      total_co2e_tref: 20,
+      por_alcance: {
+        alcances: [
+          {
+            alcance: 3, tco2e: 20, n_documentos: 4,
+            categorias: [
+              { codigo: 'materiales', nombre: 'Materiales de construcción', categoria_ghg: 1, categoria_ghg_nombre: 'Bienes y servicios adquiridos', tco2e: 15, n_documentos: 3 },
+              { codigo: 'residuos', nombre: 'Gestión de residuos', categoria_ghg: 5, categoria_ghg_nombre: 'Residuos generados en las operaciones', tco2e: 5, n_documentos: 1 },
+            ],
+          },
+        ],
+        sin_clasificar: { tco2e: 0, n_documentos: 0 },
+      },
+    },
+  };
+  const texto = textoDelPdf(await generateInformeCarbono({ empresa: EMPRESA, periodo: ANALISIS.periodo, analisis: conCategorias }));
+  assert.match(texto, /Materiales de construcci/);
+  assert.match(texto, /Gesti.n de residuos/);
+  assert.match(texto, /Cat\. 1/);
+  assert.match(texto, /Cat\. 5/);
+});
+
+test('generateInformeCarbono declara límites, exclusiones y el rol de insumo (nunca certificación)', async () => {
+  const texto = textoDelPdf(await generateInformeCarbono({ empresa: EMPRESA, periodo: ANALISIS.periodo, analisis: ANALISIS }));
+  assert.match(texto, /L.mites y exclusiones declaradas/);
+  assert.match(texto, /location-based/);
+  assert.match(texto, /sin desglose por gas individual/i);
+  assert.match(texto, /Sin a.o base/);
+  // El programa HuellaChile reconoce a la empresa titular — nunca a sicr3p.
+  assert.match(texto, /HuellaChile/);
+  assert.match(texto, /nunca a sicr3p/);
+  assert.match(texto, /No constituye certificaci.n/);
+  // "INSUMO", no "certificado": el informe se prepara, no acredita.
+  assert.match(texto, /INSUMO/);
+});

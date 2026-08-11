@@ -178,6 +178,32 @@ terceros — ver la tabla al final de este documento); esto documenta la parte q
   `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key de
   mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
 
+### Informe entregable por Alcances 1/2/3 — hecho, y lo que queda fuera
+
+Pedido del usuario ("para entregar a HuellaChile u otras… el informe debe ser
+completo, con detalle de Alcances 1/2/3"). Lo construido: (1) la tabla
+"Emisiones por alcance (GHG Protocol)" ahora también en el informe del flujo
+público de facturas (`generateReport`), con el adaptador
+`filasDesdeFacturas` que traduce el vocabulario de `facturas` y declara el
+saldo "sin registro de la fuente de su categoría" con causa propia; (2) el
+desglose por categoría DENTRO de cada alcance, en ambos PDFs; (3) el export
+entregable `GET …/sii/:id/inventario/:periodo?formato=csv|json` (admin y
+panel proveedor): una fila por categoría con alcance, categoría canónica
+GHG Protocol (A3), método físico/gasto y fuente del factor citada desde el
+snapshot congelado de la versión del motor, con pie de saldo por causa;
+(4) la sección "Límites y exclusiones declaradas" del informe SII (cobertura
+documental, A2 solo location-based, sin gases individuales, sin año base) y
+el aviso de rol: insumo para procesos externos — HuellaChile reconoce a la
+empresa titular, nunca a sicr3p ni a través de sicr3p.
+
+**Fuera de alcance, documentado (no construido)**: el expediente HuellaChile
+completo (fila propia arriba en Integraciones oficiales — exige cliente real
+y Ventanilla Única RETC), Alcance 2 dual market-based, desglose por gas
+individual (CO2/CH4/N2O), año base y recálculo, y datos de actividad
+medidos de A1/A2 (litros/kWh de fuente propia que no consten en documentos).
+Son los siguientes pasos naturales del inventario cuando exista el cliente
+que los exija.
+
 ## 2. Producto y datos
 
 | Ítem | Qué falta | Base ya construida |

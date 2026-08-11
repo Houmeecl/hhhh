@@ -8,6 +8,10 @@ import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
 import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
 import { formatearRut } from './mandante.js';
+// Import circular benigno con alcanceGhg.js (que toma citaFuente de acá):
+// citaFuente es una function declaration —hoisted—, así que está disponible
+// aunque alcanceGhg se evalúe primero; y estas dos solo se llaman en runtime.
+import { agregarPorAlcance, filasDesdeFacturas } from './alcanceGhg.js';
 
 // ============================================================
 // Generación de PDF: informe consolidado "defendible" y etiqueta por factura.
@@ -383,18 +387,17 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   // del informe sin aviso — el mismo acoplamiento frágil que describe la
   // migración 077. Se conserva el respaldo por nombre para los documentos
   // anteriores a esa migración, que no tienen `categoria_codigo`.
-  const alcancePorCodigo = new Map(alcancesGhg.map((a) => [a.codigo, a.alcance_ghg]));
-  const alcancePorNombre = new Map(alcancesGhg.map((a) => [a.nombre, a.alcance_ghg]));
-  const alcancesPeriodo = [...new Set(
-    atribuibles
-      .map((f) => alcancePorCodigo.get(f.categoria_codigo) || alcancePorNombre.get(f.categoria))
-      .filter(Boolean)
-  )];
-  if (alcancesPeriodo.length) {
-    if (y > 760) { doc.addPage(); y = 48; }
-    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY)
-      .text(`Alcances del período: ${alcancesPeriodo.join('; ')}`, 48, y, { width: 499 });
-    y = doc.y + 10;
+  // Tabla "Emisiones por alcance (GHG Protocol)" — la misma del informe SII,
+  // ahora también en el informe del flujo público: un inventario entregable
+  // (programa HuellaChile del MMA, verificadores externos) exige el detalle
+  // por Alcance 1/2/3 con su desglose por categoría, no una línea de texto.
+  // El adaptador traduce el vocabulario de `facturas` y el saldo sin alcance
+  // sale con su causa (misma regla central: solo se atribuye alcance a la
+  // categoría que salió de la glosa real del documento o de un operador).
+  const porAlcance = agregarPorAlcance(filasDesdeFacturas(facturas, alcancesGhg));
+  if (porAlcance.alcances.length || porAlcance.sin_clasificar.n_documentos > 0) {
+    if (y > 620) { doc.addPage(); y = 48; }
+    y = tablaPorAlcance(doc, 48, y, 499, porAlcance, totalCo2e);
   }
   // Lo que quedó fuera no se esconde: su CO2e está dentro del total de arriba,
   // así que omitirlo dejaría un informe que no cuadra consigo mismo.
@@ -1183,7 +1186,20 @@ function tablaPorAlcance(doc, x, y, ancho, porAlcance, total) {
   y += 16;
 
   const filas = [
-    ...alcances.map((a) => ({ etiqueta: `Alcance ${a.alcance}`, desc: DESC[a.alcance], n: a.n_documentos, co2e: a.tco2e })),
+    ...alcances.flatMap((a) => [
+      { etiqueta: `Alcance ${a.alcance}`, desc: DESC[a.alcance], n: a.n_documentos, co2e: a.tco2e },
+      // Desglose por categoría DENTRO del alcance: un inventario entregable
+      // (programa HuellaChile del MMA, verificadores externos) necesita ver
+      // de qué se compone cada alcance, no solo su total. En Alcance 3 se
+      // cita además la categoría canónica del GHG Protocol.
+      ...(a.categorias || []).map((c) => ({
+        etiqueta: `   · ${c.nombre}`,
+        desc: c.categoria_ghg ? `Cat. ${c.categoria_ghg} — ${c.categoria_ghg_nombre || ''}` : '',
+        n: c.n_documentos,
+        co2e: c.tco2e,
+        sub: true,
+      })),
+    ]),
     ...(sin?.n_documentos > 0
       ? [{
         etiqueta: 'Sin alcance atribuido',
@@ -1206,18 +1222,30 @@ function tablaPorAlcance(doc, x, y, ancho, porAlcance, total) {
   const anchoDesc = ancho - 200;
   let zebra = false;
   for (const f of filas) {
+    // Las filas de categoría (sub) son de una línea: etiqueta y descripción
+    // comparten renglón, con tipografía menor — el alcance sigue siendo el
+    // protagonista y su desglose se lee como sangría.
     doc.font('Helvetica').fontSize(7);
-    const altoDesc = doc.heightOfString(f.desc, { width: anchoDesc });
-    const alto = Math.max(22, 12 + altoDesc + 4);
+    const altoDesc = f.sub ? 0 : doc.heightOfString(f.desc, { width: anchoDesc });
+    const alto = f.sub ? 13 : Math.max(22, 12 + altoDesc + 4);
     if (y + alto > doc.page.height - 100) { doc.addPage(); y = 60; }
     if (zebra) doc.rect(x, y, ancho, alto).fill(LIGHT);
     zebra = !zebra;
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: anchoDesc });
-    doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(f.desc, x + 6, y + 12, { width: anchoDesc });
-    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
-      .text(nfp(f.n), x + ancho - 190, y + 6, { width: 50, align: 'right' })
-      .text(nf(f.co2e, 2), x + ancho - 140, y + 6, { width: 65, align: 'right' })
-      .text(pct(f.co2e), x + ancho - 70, y + 6, { width: 64, align: 'right' });
+    if (f.sub) {
+      doc.font('Helvetica').fontSize(7).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: 160, lineBreak: false });
+      if (f.desc) doc.font('Helvetica').fontSize(6.5).fillColor(GRAY).text(f.desc, x + 170, y + 3.5, { width: anchoDesc - 164, lineBreak: false, ellipsis: true });
+      doc.font('Helvetica').fontSize(7).fillColor(NAVY)
+        .text(nfp(f.n), x + ancho - 190, y + 3, { width: 50, align: 'right' })
+        .text(nf(f.co2e, 2), x + ancho - 140, y + 3, { width: 65, align: 'right' })
+        .text(pct(f.co2e), x + ancho - 70, y + 3, { width: 64, align: 'right' });
+    } else {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text(f.etiqueta, x + 6, y + 3, { width: anchoDesc });
+      doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(f.desc, x + 6, y + 12, { width: anchoDesc });
+      doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+        .text(nfp(f.n), x + ancho - 190, y + 6, { width: 50, align: 'right' })
+        .text(nf(f.co2e, 2), x + ancho - 140, y + 6, { width: 65, align: 'right' })
+        .text(pct(f.co2e), x + ancho - 70, y + 6, { width: 64, align: 'right' });
+    }
     y += alto;
   }
   return y + 14;
@@ -1272,6 +1300,48 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
 
   y = tablaPorTipo(doc, M, y, W, 'Compras por tipo de documento', analisis.por_tipo?.compra);
   y = tablaPorTipo(doc, M, y, W, 'Ventas por tipo de documento', analisis.por_tipo?.venta);
+
+  // --- Límites y exclusiones declaradas ---
+  // Un verificador externo (o el programa HuellaChile del MMA) necesita los
+  // límites A LA VISTA, no deducidos: qué cubre este inventario y qué no.
+  // Texto honesto — declara lo que el método puede y no puede, sin prometer
+  // completitud que no consta.
+  if (y > doc.page.height - 240) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text('Límites y exclusiones declaradas', M, y, { width: W });
+  y = doc.y + 6;
+  const LIMITES = [
+    'Cobertura: el inventario se deriva de los documentos tributarios del período (RCV y DTE del SII). '
+      + 'No incluye datos de actividad medidos directamente (litros de combustible, kWh de fuente propia, '
+      + 'fugas de refrigerantes) salvo que consten en un documento del período.',
+    'Alcance 2: solo enfoque location-based (factor promedio del sistema eléctrico citado en la metodología); '
+      + 'no se aplica el enfoque market-based (contratos de suministro renovable).',
+    'Resultados en CO2e: sin desglose por gas individual (CO2, CH4, N2O).',
+    'Sin año base ni recálculo histórico: cada período se informa por separado.',
+    'Solo se atribuye alcance GHG al documento cuya categoría salió del detalle real de sus ítems; '
+      + 'el saldo restante se declara aparte con su causa (tabla de alcances).',
+  ];
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES) {
+    if (y > doc.page.height - 130) { doc.addPage(); y = 60; }
+    doc.text(`• ${l}`, M, y, { width: W });
+    y = doc.y + 4;
+  }
+  y += 4;
+  // Para qué sirve este documento — y para qué NO. El programa HuellaChile
+  // del MMA reconoce a la empresa titular, nunca a sicr3p ni a través de
+  // sicr3p; este informe es un insumo que la empresa presenta, no un
+  // certificado.
+  if (y > doc.page.height - 150) { doc.addPage(); y = 60; }
+  doc.roundedRect(M, y, W, 46, 6).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(7.5).fillColor(NAVY).text(
+    'Este informe se prepara como INSUMO para procesos de reporte o verificación externos (por ejemplo, '
+    + 'el programa HuellaChile del MMA, que reconoce a la empresa titular del inventario — nunca a sicr3p '
+    + 'ni a través de sicr3p). No constituye certificación ni verificación de tercera parte: esa revisión '
+    + 'la realiza el programa o el verificador que la empresa contrate.',
+    M + 10, y + 7, { width: W - 20 }
+  );
+  y += 56;
 
   // La versión que se cita es la ESTAMPADA al calcular (migración 076), no la
   // vigente al emitir el PDF: si alguien editó el motor después, este informe

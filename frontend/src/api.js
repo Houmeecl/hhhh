@@ -329,6 +329,9 @@ export const api = {
   // Igual que en el panel de la empresa: descarga real, no window.open.
   descargarInformeCarbonoPdf: (proveedorId, periodo) =>
     descargarAuth(`/api/admin/sii/${proveedorId}/informe/${periodo}.pdf`, auth, `informe-carbono-${periodo}.pdf`),
+  // Inventario por Alcance GHG (CSV entregable a procesos externos).
+  descargarInventarioSiiCsv: (proveedorId, periodo) =>
+    descargarAuth(`/api/admin/sii/${proveedorId}/inventario/${periodo}?formato=csv`, auth, `inventario-${periodo}.csv`),
   adminSiiContrato: (proveedorId) => request(`/admin/sii/${proveedorId}/contrato`, { authed: true }),
   adminSiiEmitirContrato: (proveedorId, tipo) => request(`/admin/sii/${proveedorId}/contrato`, { method: 'POST', body: { tipo }, authed: true }),
   abrirSiiContratoPdf: (proveedorId) => abrirPdfAuth(`/api/admin/sii/${proveedorId}/contrato.pdf`),
@@ -570,6 +573,9 @@ export const api = {
   // ningún mensaje que se lo explique.
   descargarProveedorInformeCarbonoPdf: (periodo) =>
     descargarAuth(`/api/panel-proveedor/sii/informe/${periodo}.pdf`, authProveedor, `informe-carbono-${periodo}.pdf`),
+  // Inventario por Alcance GHG (CSV entregable a procesos externos).
+  descargarProveedorInventarioSiiCsv: (periodo) =>
+    descargarAuth(`/api/panel-proveedor/sii/inventario/${periodo}?formato=csv`, authProveedor, `inventario-${periodo}.csv`),
 };
 
 async function abrirPdfAuth(url, store = auth) {

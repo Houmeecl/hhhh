@@ -197,6 +197,11 @@ export default function AnalisisSii() {
               </button>
             )}
             <button className="btn btn-outline btn-sm"
+              onClick={() => api.descargarProveedorInventarioSiiCsv(analisis.periodo).catch((e) => flash(e.message, true))}
+              title="Una fila por categoría con su Alcance GHG (1/2/3), método y fuente del factor — para presentar a procesos externos.">
+              Inventario por alcance (CSV)
+            </button>
+            <button className="btn btn-outline btn-sm"
               onClick={() => api.descargarProveedorInformeCarbonoPdf(analisis.periodo).catch((e) => flash(e.message, true))}>
               Descargar informe (PDF)
             </button>

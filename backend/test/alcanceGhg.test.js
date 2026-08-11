@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsearAlcanceGHG, agregarAlcance3, agregarPorAlcance, CATEGORIAS_ALCANCE3_GHG_PROTOCOL } from '../src/services/alcanceGhg.js';
+import { parsearAlcanceGHG, agregarAlcance3, agregarPorAlcance, filasDesdeFacturas, CATEGORIAS_ALCANCE3_GHG_PROTOCOL } from '../src/services/alcanceGhg.js';
 
 test('parsearAlcanceGHG: Alcance 1 sin categoría', () => {
   assert.deepEqual(parsearAlcanceGHG('Alcance 1 — combustión estacionaria (gas natural)'),
@@ -221,4 +221,68 @@ test('sin versiones del motor, un documento sin categoría NO se rotula como des
   ]);
   assert.equal(sin_clasificar.motor_sin_categoria, 1);
   assert.equal(sin_clasificar.descarga_antigua, 0, 'volver a descargar no lo cambiaría: no se ofrece');
+});
+
+// ---------- filasDesdeFacturas: adaptador del flujo público ----------
+
+test('filasDesdeFacturas: traduce el vocabulario de facturas y resuelve el alcance por código con respaldo por nombre', () => {
+  const catalogo = [
+    { codigo: 'electricidad', nombre: 'Energía eléctrica', alcance_ghg: 'Alcance 2 — electricidad comprada' },
+    { codigo: 'combustibles', nombre: 'Combustibles', alcance_ghg: 'Alcance 1 — combustión' },
+  ];
+  const facturas = [
+    { categoria: 'Energía eléctrica', categoria_codigo: 'electricidad', categoria_origen: 'glosa', total_co2e: 1.5 },
+    { categoria: 'Energía eléctrica', categoria_codigo: null, categoria_origen: 'glosa', total_co2e: 0.5 }, // pre-077: respaldo por nombre
+    { categoria: 'Servicios', categoria_codigo: 'servicios', categoria_origen: 'sin_coincidencia', total_co2e: 2 },
+    { categoria: 'Combustibles', categoria_codigo: 'combustibles', categoria_origen: null, total_co2e: 3 }, // motor externo / pre-077
+  ];
+  const filas = filasDesdeFacturas(facturas, catalogo);
+  assert.equal(filas[0].alcance_ghg, 'Alcance 2 — electricidad comprada');
+  assert.equal(filas[1].alcance_ghg, 'Alcance 2 — electricidad comprada'); // respaldo por nombre
+  assert.equal(filas[3].categoria_origen, 'sin_procedencia'); // NULL con categoría → marcador explícito
+
+  const r = agregarPorAlcance(filas);
+  // Solo lo atribuible recibe alcance ('glosa' es atribuible en facturas).
+  assert.equal(r.alcances.length, 1);
+  assert.equal(r.alcances[0].alcance, 2);
+  assert.equal(r.alcances[0].tco2e, 2);
+  // El saldo declara SUS causas: catch-all y procedencia no registrada —
+  // nunca "descargado antes de la clasificación", que acá sería falsa.
+  assert.equal(r.sin_clasificar.sin_coincidencia, 1);
+  assert.equal(r.sin_clasificar.procedencia_no_registrada, 1);
+  assert.equal(r.sin_clasificar.descarga_antigua, 0);
+  assert.equal(r.sin_clasificar.tco2e, 5);
+});
+
+test('filasDesdeFacturas: la reclasificación de un operador es atribuible', () => {
+  const catalogo = [{ codigo: 'combustibles', nombre: 'Combustibles', alcance_ghg: 'Alcance 1 — combustión' }];
+  const r = agregarPorAlcance(filasDesdeFacturas(
+    [{ categoria: 'Combustibles', categoria_codigo: 'combustibles', categoria_origen: 'operador', total_co2e: 4 }],
+    catalogo
+  ));
+  assert.equal(r.alcances[0].alcance, 1);
+  assert.equal(r.alcances[0].tco2e, 4);
+});
+
+// ---------- fuente del factor y método físico por categoría ----------
+
+test('agregarPorAlcance: junta las citas de fuente por categoría y cuenta el método físico', () => {
+  const filas = [
+    { categoria: 'electricidad', categoria_nombre: 'Energía eléctrica', alcance_ghg: 'Alcance 2 — electricidad', co2e: 1, categoria_origen: 'xml', metodo: 'fisico', fuente_organismo: 'Coordinador Eléctrico Nacional', fuente_documento: 'Factor SEN', fuente_version_anio: '2025' },
+    { categoria: 'electricidad', categoria_nombre: 'Energía eléctrica', alcance_ghg: 'Alcance 2 — electricidad', co2e: 2, categoria_origen: 'xml', metodo: 'gasto', fuente_organismo: 'Coordinador Eléctrico Nacional', fuente_documento: 'Factor SEN', fuente_version_anio: '2026' },
+  ];
+  const r = agregarPorAlcance(filas);
+  const cat = r.alcances[0].categorias[0];
+  assert.equal(cat.n_fisico, 1);
+  assert.equal(cat.n_documentos, 2);
+  // Dos versiones del motor con fuentes distintas: NINGUNA se pierde.
+  assert.match(cat.fuente_factor, /Factor SEN \(2025\)/);
+  assert.match(cat.fuente_factor, /Factor SEN \(2026\)/);
+  // El Set interno no se filtra al resultado.
+  assert.equal('fuentes' in cat, false);
+});
+
+test('agregarPorAlcance: sin fuente en las filas, fuente_factor queda null (no un string vacío)', () => {
+  const r = agregarPorAlcance([{ categoria: 'x', categoria_nombre: 'X', alcance_ghg: 'Alcance 1 — directas', co2e: 1, categoria_origen: 'xml' }]);
+  assert.equal(r.alcances[0].categorias[0].fuente_factor, null);
 });
