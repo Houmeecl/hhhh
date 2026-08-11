@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR, puntoDe, etiquetaInstruccion } from '../lib/corredor.js';
+import { PUNTOS_CORREDOR, puntoDe, etiquetaInstruccion, horasSinAvance, estadoAvance, textoDuracion } from '../lib/corredor.js';
 import { Icon, TRUCK_MARKER_SVG } from '../components/icons.jsx';
 
 // ============================================================
@@ -133,9 +133,14 @@ export default function TorreFlota() {
                   {flota && !flota.length && <p className="muted" style={{ fontSize: 13 }}>{t('torre.flota_vacia')}</p>}
                   {[...enMapa, ...sinPos].map((c) => {
                     const p = c.ultimo_paso ? puntoDe({ datos: c.ultimo_paso }) : null;
+                    // Ordenado por el backend (más tiempo sin avance primero);
+                    // acá solo se colorea, no se reordena.
+                    const horas = horasSinAvance(c.ultimo_paso?.creado);
+                    const estado = estadoAvance(horas);
+                    const colorIcono = estado === 'rojo' ? '#dc2626' : estado === 'ambar' ? '#d97706' : p ? 'var(--green-600)' : 'var(--gray)';
                     return (
                       <div key={c.codigo} className="torre-msg">
-                        <span style={{ color: p ? 'var(--green-600)' : 'var(--gray)' }}>
+                        <span style={{ color: colorIcono }} title={estado === 'rojo' || estado === 'ambar' ? `${t('torre.sin_avance')} ${textoDuracion(horas)}` : undefined}>
                           {p ? <Icon.Truck size={20} /> : <Icon.Pause size={20} />}
                         </span>
                         <div style={{ minWidth: 0, flex: 1 }}>
@@ -146,6 +151,9 @@ export default function TorreFlota() {
                           <div className="muted" style={{ fontSize: 11 }}>
                             {p ? `${p.nombre}` : (c.ultimo_paso?.punto_control || t('torre.sin_posicion'))}
                             {c.instruccion ? ` · 📢 ${etiquetaInstruccion(c.instruccion, t)}` : ''}
+                            {(estado === 'ambar' || estado === 'rojo') && (
+                              <span style={{ color: colorIcono, fontWeight: 700 }}> · {t('torre.sin_avance')} {textoDuracion(horas)}</span>
+                            )}
                           </div>
                         </div>
                         <Link className="btn btn-sm btn-outline" to={`/torre/${c.codigo}`}>{t('torre.abrir')}</Link>

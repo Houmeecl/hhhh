@@ -6,7 +6,10 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon, TRUCK_MARKER_SVG } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, puntoDestinoDe, etiquetaInstruccion } from '../lib/corredor.js';
+import {
+  PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, puntoDestinoDe, etiquetaInstruccion,
+  horasSinAvance, estadoAvance, textoDuracion, pasosRetrocedidos,
+} from '../lib/corredor.js';
 
 // ============================================================
 // Torre de Control — /torre/:codigo
@@ -140,6 +143,11 @@ export default function Torre() {
   const pasos = eslabones.filter((e) => e.datos?.punto_control || e.datos?.punto_id);
   const vigente = mensajes[0] || null;
   const hayCamion = pasos.some((e) => puntoDe(e));
+  // Alerta de avance: horas desde el ÚLTIMO paso sellado (con o sin punto
+  // reconocido en el mapa — cualquier paso cuenta como actividad real).
+  const horas = horasSinAvance(pasos[pasos.length - 1]?.creado);
+  const estado = estadoAvance(horas);
+  const retrocedidos = pasosRetrocedidos(pasos);
 
   return (
     <PublicLayout>
@@ -177,6 +185,15 @@ export default function Torre() {
 
         {!error && data && (
           <>
+            {(estado === 'ambar' || estado === 'rojo') && (
+              <div className={`torre-banner ${estado === 'rojo' ? 'torre-banner-rojo' : ''}`} title={t('torre.sin_avance_hint')}>
+                <span className="torre-banner-icono">{estado === 'rojo' ? '🔴' : '🟡'}</span>
+                <div>
+                  <div className="torre-banner-titulo">{t('torre.sin_avance')} {textoDuracion(horas)}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{t('torre.sin_avance_hint')}</div>
+                </div>
+              </div>
+            )}
             {vigente && (
               <div className="torre-banner">
                 <span className="torre-banner-icono">📢</span>
@@ -226,6 +243,9 @@ export default function Torre() {
                           <div style={{ fontSize: 13, fontWeight: 600 }}>
                             #{e.eslabon} · {e.datos?.punto_control || e.datos?.punto_id}
                             {!puntoDe(e) && <span className="muted" style={{ fontWeight: 400 }}> · {t('torre.fuera_mapa')}</span>}
+                            {retrocedidos.has(e.eslabon) && (
+                              <span className="torre-retroceso" title={t('torre.retrocedio_hint')}> · ↩ {t('torre.retrocedio')}</span>
+                            )}
                           </div>
                           <div className="muted" style={{ fontSize: 11 }}>
                             {e.pais} · {e.fecha ? new Date(e.fecha).toLocaleDateString('es-CL') : ''}

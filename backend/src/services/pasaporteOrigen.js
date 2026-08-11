@@ -197,6 +197,17 @@ export function filtrarPorVisibilidad(eslabones, nivelLector = 'publico') {
     if (!base.divulgado) return base;
     return {
       ...base,
+      // Momento en que el eslabón quedó SELLADO (created_at, con precisión
+      // de segundo — distinto de `fecha`, la fecha de negocio declarada
+      // por el actor). NO es parte del hash ni de la integridad de la
+      // cadena: es metadata de servidor, así que sale con la misma
+      // visibilidad que el resto del contenido comercial. Publicarla
+      // siempre para un eslabón 'privado' sería un canal lateral — cruzada
+      // con un registro externo (portuario, de flota) podría delatar quién
+      // hizo ese paso que la visibilidad justamente quería ocultar. La
+      // torre de control (alerta de "sin avance") solo necesita el paso
+      // divulgado más reciente, así que no pierde nada con esto.
+      creado: e.created_at,
       rut_empresa: e.rut_empresa ?? null,
       nombre_empresa: e.nombre_empresa ?? null,
       cantidad: e.cantidad ?? null,

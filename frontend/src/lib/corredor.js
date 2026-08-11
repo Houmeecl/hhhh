@@ -106,3 +106,66 @@ export function puntoDe(eslabon) {
   }
   return null;
 }
+
+// ============================================================
+// Torre de control — alertas operativas (puramente informativas: nunca
+// bloquean el registro de un paso, solo llaman la atención del operador).
+// ============================================================
+
+const indicePorId = new Map(PUNTOS_CORREDOR.map((p, i) => [p.id, i]));
+
+// Umbrales de "sin avance" en horas. El corredor no tiene horario fijo
+// (depende de fronteras, clima, descansos del conductor), así que son
+// heurísticas blandas — un color de aviso, no una infracción — calibradas
+// sobre el tramo más largo típico entre dos puntos consecutivos del
+// catálogo (Mariscal Estigarribia↔Pozo Hondo, Chaco paraguayo).
+export const HORAS_ALERTA_AMBAR = 12;
+export const HORAS_ALERTA_ROJA = 24;
+
+// Horas transcurridas desde el último paso sellado hasta ahora (`ahoraMs`
+// inyectable para tests). null si aún no hay paso.
+export function horasSinAvance(isoCreado, ahoraMs = Date.now()) {
+  if (!isoCreado) return null;
+  const ms = ahoraMs - new Date(isoCreado).getTime();
+  return ms >= 0 ? ms / 3_600_000 : 0;
+}
+
+// Estado visual a partir de las horas sin avance: null (sin paso aún),
+// 'ok', 'ambar' o 'rojo'.
+export function estadoAvance(horas) {
+  if (horas == null) return null;
+  if (horas >= HORAS_ALERTA_ROJA) return 'rojo';
+  if (horas >= HORAS_ALERTA_AMBAR) return 'ambar';
+  return 'ok';
+}
+
+// Texto corto de una duración en horas ("3h", "2d"): abreviatura de
+// magnitud, no de idioma (igual en es/en/pt en un panel de logística),
+// así que no pasa por el diccionario i18n.
+export function textoDuracion(horas) {
+  if (horas == null) return '';
+  return horas < 48 ? `${Math.round(horas)}h` : `${Math.round(horas / 24)}d`;
+}
+
+// Detecta pasos que RETROCEDEN en el catálogo del corredor: dado un
+// arreglo de eslabones YA ordenado ascendente por número de eslabón,
+// devuelve el Set de números de eslabón cuyo punto tiene un índice menor
+// al máximo índice ya alcanzado por un paso anterior. Es una señal de
+// posible error de tipeo o de un paso registrado en el orden equivocado
+// — el timeline lo marca, no lo rechaza (el punto pudo ser un desvío
+// real, y castigar con un rechazo penalizaría al conductor por algo que
+// no eligió el sistema).
+// Los eslabones sin punto reconocible (puntoDe = null) no cuentan ni
+// rompen la secuencia: simplemente se ignoran.
+export function pasosRetrocedidos(eslabonesOrdenados) {
+  const retrocedidos = new Set();
+  let maxIndice = -1;
+  for (const e of eslabonesOrdenados || []) {
+    const p = puntoDe(e);
+    if (!p) continue;
+    const i = indicePorId.get(p.id);
+    if (i < maxIndice) retrocedidos.add(e.eslabon);
+    else maxIndice = i;
+  }
+  return retrocedidos;
+}

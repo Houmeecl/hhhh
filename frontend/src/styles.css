@@ -721,6 +721,17 @@ table.data tr:hover td { background: #f3f8f5; }
 .torre-banner-icono { font-size: 20px; line-height: 1.2; }
 .torre-banner-titulo { font-weight: 700; color: #92400e; }
 
+/* Variante roja: camión sin avance por más tiempo del umbral alto (ver
+   HORAS_ALERTA_ROJA en lib/corredor.js). Misma forma que el banner ámbar
+   por defecto — solo cambia el color, para que se lea como "más urgente"
+   sin aprender un componente nuevo. */
+.torre-banner-rojo { background: #fef2f2; border-color: #fecaca; border-left-color: #dc2626; }
+.torre-banner-rojo .torre-banner-titulo { color: #991b1b; }
+
+/* Marca "retrocedió" en el timeline de pasos: aviso, no error — el punto
+   pudo ser un desvío real del camión. */
+.torre-retroceso { font-size: 11px; font-weight: 700; color: #b45309; }
+
 .torre-msg {
   display: flex;
   gap: 10px;

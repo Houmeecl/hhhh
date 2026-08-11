@@ -53,6 +53,13 @@ torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, n
 // lote sigue siendo público por su propio código, como siempre).
 // Un lote "aparece en el mapa" recién cuando tiene un paso con punto
 // reconocible — un camión nuevo se ve al ACTIVARSE con su primer paso.
+//
+// Orden: el camión con el paso sellado MÁS ANTIGUO primero — es el que
+// lleva más tiempo sin avanzar, el que más necesita atención del
+// operador (ver lib/corredor.js estadoAvance en el frontend, que colorea
+// esta lista con los umbrales de alerta). Los que aún no tienen ningún
+// paso reconocible van al final (NULLS LAST): el frontend ya los separa
+// en su propia sección "sin posición".
 torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
     const { rows } = await query(
@@ -60,7 +67,7 @@ torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next
               (SELECT json_build_object(
                  'punto_id', e.datos->>'punto_id',
                  'punto_control', e.datos->>'punto_control',
-                 'fecha', e.fecha, 'pais', e.pais)
+                 'fecha', e.fecha, 'pais', e.pais, 'creado', e.created_at)
                FROM lote_eslabones e
                WHERE e.lote_id = l.id
                  AND (e.datos ? 'punto_id' OR e.datos ? 'punto_control')
@@ -75,7 +82,10 @@ torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next
        FROM lotes_minerales l
        WHERE l.estado = 'abierto'
          AND EXISTS (SELECT 1 FROM tarjetas_viaje t WHERE t.lote_id = l.id AND t.activo)
-       ORDER BY l.updated_at DESC
+       ORDER BY (SELECT e.created_at FROM lote_eslabones e
+                  WHERE e.lote_id = l.id
+                    AND (e.datos ? 'punto_id' OR e.datos ? 'punto_control')
+                  ORDER BY e.eslabon DESC LIMIT 1) ASC NULLS LAST
        LIMIT 100`
     );
     res.json({ flota: rows });
