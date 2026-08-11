@@ -29,30 +29,54 @@ import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
 import SelectorPanel from './SelectorPanel.jsx';
 
+// El menú creció a 23 entradas: plano era ilegible (sobre todo en el
+// drawer del celular). Se agrupa por lo que la persona viene a hacer —
+// operar el día a día, un módulo de producto, lo comercial, o el sistema.
+// Ningún acceso se elimina ni cambia de ruta: solo se ordena.
 const NAV = [
-  { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
-  { to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
-  { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
-  { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
-  { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
-  { to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
-  { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
-  { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
-  { to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
-  { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
-  { to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
-  { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
-  { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
-  { to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
-  { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
-  { to: '/admin/motor-propio', ico: Icon.Cog, label: 'Motor propio' },
-  { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
-  { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
-  { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
-  { to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
-  { to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
-  { to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
-  { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
+  {
+    titulo: 'Operación',
+    items: [
+      { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
+      { to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
+      { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
+      { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
+      { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
+      { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
+    ],
+  },
+  {
+    titulo: 'Módulos',
+    items: [
+      { to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
+      { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
+      { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
+      { to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
+      { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
+      { to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
+      { to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
+      { to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
+    ],
+  },
+  {
+    titulo: 'Comercial',
+    items: [
+      { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
+      { to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
+      { to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
+      { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
+    ],
+  },
+  {
+    titulo: 'Sistema',
+    items: [
+      { to: '/admin/motor-propio', ico: Icon.Cog, label: 'Motor propio' },
+      { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
+      { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
+      { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
+      { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
+    ],
+  },
 ];
 
 // El panel admin es su propia "app" instalable, distinta del sitio público
@@ -141,14 +165,19 @@ export default function AdminApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand"><Logo size={26} light tagline /></div>
         <nav>
-          {NAV.map((n) => {
-            const Ico = n.ico;
-            return (
-              <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
-                <span className="icon-badge"><Ico size={18} /></span> {n.label}
-              </NavLink>
-            );
-          })}
+          {NAV.map((sec) => (
+            <div key={sec.titulo}>
+              <div className="nav-sec">{sec.titulo}</div>
+              {sec.items.map((n) => {
+                const Ico = n.ico;
+                return (
+                  <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <span className="icon-badge"><Ico size={18} /></span> {n.label}
+                  </NavLink>
+                );
+              })}
+            </div>
+          ))}
         </nav>
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>

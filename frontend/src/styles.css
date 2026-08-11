@@ -265,6 +265,9 @@ table.data tr:hover td { background: #f3f8f5; }
 .admin-side { width: 240px; background: var(--navy); color: #cbd5e1; display: flex; flex-direction: column; position: fixed; height: 100vh; }
 .admin-side .brand { padding: 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
 .admin-side nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+/* Título de sección del menú admin (agrupa las 23 entradas por uso). */
+.admin-side nav .nav-sec { padding: 14px 14px 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+.admin-side nav > div:first-child .nav-sec { padding-top: 2px; }
 .admin-side nav a { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 9px; color: #cbd5e1; font-size: 14px; font-weight: 500; margin-bottom: 2px; }
 .admin-side nav a:hover { background: rgba(255,255,255,0.06); text-decoration: none; }
 .admin-side nav a.active { background: var(--green); color: #fff; }
