@@ -4,7 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import Dropzone from '../components/Dropzone.jsx';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
-import { api, clienteAuth } from '../api.js';
+import { api, clienteAuth, crearSesionConProgreso } from '../api.js';
 
 const MAX = 5;
 const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
@@ -18,13 +18,33 @@ export default function Cargar() {
   const [form, setForm] = useState({ rut: '', empresa: '', email: '' });
   const [error, setError] = useState('');
   const [procesando, setProcesando] = useState(false);
+  // 0-100 de la SUBIDA real (bytes enviados, vía XMLHttpRequest — ver
+  // crearSesionConProgreso en api.js). Llega a 100 cuando el navegador
+  // terminó de mandar los archivos, no cuando el servidor terminó de leerlos
+  // y calcular: esa segunda etapa no es medible sin cambiar cómo se arma la
+  // sesión en el backend, así que se muestra aparte como indeterminada
+  // (spinner), no con un porcentaje o conteo por documento inventado.
   const [progreso, setProgreso] = useState(0);
+  const [terminado, setTerminado] = useState(false); // ya llegó la respuesta del servidor
   const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'|'rechazado'
   const [aviso, setAviso] = useState(''); // rechazo parcial: documentos emitidos a otro RUT
   const [codigoInfo, setCodigoInfo] = useState(null); // código de acceso con créditos (mini sitio)
-  const [bump, setBump] = useState(false); // pulso del contador al completar un documento
+  // Autocompletado por RUT con datos públicos del SII (mismo endpoint y
+  // criterio que /inscripcion — el backend consulta BaseAPI con su propia
+  // API key, acá nunca hay ninguna clave). Cualquier falla — módulo
+  // apagado, RUT sin registro, rate limit — se ignora en silencio: el
+  // campo Empresa sigue siendo editable a mano, esto es solo una ayuda.
+  const [sii, setSii] = useState(null); // null | 'consultando' | {razonSocial, giro}
 
-  const listos = estados.filter((s) => s === 'listo').length;
+  async function consultarSii(rut) {
+    if (!validarRut(rut)) { setSii(null); return; }
+    setSii('consultando');
+    try {
+      const { situacion } = await api.consultarRutSiiPublico(rut);
+      setSii({ razonSocial: situacion.razonSocial, giro: situacion.actividades?.[0]?.descripcion || null });
+      setForm((f) => (f.empresa.trim() ? f : { ...f, empresa: situacion.razonSocial }));
+    } catch { setSii(null); }
+  }
 
   useEffect(() => {
     const c = sessionStorage.getItem('sicr3p_codigo');
@@ -38,14 +58,6 @@ export default function Cargar() {
       .then(setCodigoInfo)
       .catch(() => sessionStorage.removeItem('sicr3p_codigo'));
   }, []);
-
-  // Pulso breve del contador cada vez que se completa un documento.
-  useEffect(() => {
-    if (listos === 0) return;
-    setBump(true);
-    const t = setTimeout(() => setBump(false), 350);
-    return () => clearTimeout(t);
-  }, [listos]);
 
   // Con código, el tope es el menor entre 5 y los créditos restantes.
   const maxEfectivo = codigoInfo ? Math.min(MAX, codigoInfo.creditos_restantes) : MAX;
@@ -97,23 +109,8 @@ export default function Cargar() {
 
     setProcesando(true);
     setProgreso(0);
+    setTerminado(false);
     setEstados(files.map(() => 'pendiente'));
-
-    // Progreso por factura: marca cada una "procesando" y luego "listo" de forma escalonada
-    // mientras el backend estructura la información.
-    let cursor = 0;
-    setEstados((prev) => prev.map((s, i) => (i === 0 ? 'procesando' : s)));
-    const timer = setInterval(() => {
-      setEstados((prev) => {
-        if (cursor >= prev.length) return prev;
-        const next = [...prev];
-        next[cursor] = 'listo';
-        if (cursor + 1 < next.length) next[cursor + 1] = 'procesando';
-        cursor += 1;
-        return next;
-      });
-      setProgreso((p) => Math.min(p + 90 / files.length, 90));
-    }, 550);
 
     try {
       const fd = new FormData();
@@ -122,19 +119,24 @@ export default function Cargar() {
       fd.append('email', form.email);
       if (codigoInfo) fd.append('codigo', codigoInfo.codigo);
       files.forEach((f) => fd.append('archivos', f));
-      const { sesion, rechazados = [], aviso: avisoRut } = await api.crearSesion(fd);
-      clearInterval(timer);
+      const { sesion, rechazados = [], aviso: avisoRut } = await crearSesionConProgreso(fd, (pct) => {
+        setProgreso(pct);
+        // Al llegar al 100% de la subida el servidor recién empieza a leer
+        // y calcular — de acá en adelante no hay señal real de avance por
+        // archivo, así que todos pasan a "procesando" juntos en vez de ir
+        // marcándose uno por uno con un tiempo inventado.
+        if (pct >= 100) setEstados((prev) => prev.map(() => 'procesando'));
+      });
       // Rechazo PARCIAL: el backend creó la sesión con lo que calza y
       // devuelve los nombres emitidos a otro RUT — se marcan y se da
       // tiempo a leer el aviso antes de pasar al informe.
       setEstados(files.map((f) => (rechazados.includes(f.name) ? 'rechazado' : 'listo')));
-      setProgreso(100);
+      setTerminado(true);
       if (avisoRut) setAviso(avisoRut);
       setTimeout(() => nav(`/resultado/${sesion.id}`), rechazados.length > 0 ? 4500 : 900);
     } catch (e) {
-      clearInterval(timer);
       // e.message ya trae el motivo puntual del backend (RUT no calza,
-      // formato rechazado, etc.) salvo cuando el fetch ni siquiera llegó a
+      // formato rechazado, etc.) salvo cuando el envío ni siquiera llegó a
       // responder (sin conexión, servidor caído) — ahí el navegador tira un
       // "Failed to fetch" en inglés que no le dice nada al usuario.
       setError(e.name === 'TypeError' || e.message === 'Failed to fetch'
@@ -195,12 +197,26 @@ export default function Cargar() {
               <input
                 value={form.rut}
                 onChange={(e) => setForm({ ...form, rut: e.target.value })}
-                onBlur={() => form.rut && validarRut(form.rut) && setForm((f) => ({ ...f, rut: formatearRut(f.rut) }))}
+                onBlur={() => {
+                  if (!form.rut || !validarRut(form.rut)) return;
+                  setForm((f) => ({ ...f, rut: formatearRut(f.rut) }));
+                  consultarSii(form.rut);
+                }}
                 placeholder="76.123.456-7"
                 style={!rutValido ? { borderColor: '#ef4444', outlineColor: '#ef4444' } : {}}
               />
               {!rutValido && <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 4 }}>RUT inválido (dígito verificador)</div>}
-              {form.rut && rutValido && <div style={{ color: 'var(--green-600)', fontSize: 12, marginTop: 4 }}>✓ RUT válido</div>}
+              {form.rut && rutValido && sii === 'consultando' && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Consultando el SII…</div>
+              )}
+              {form.rut && rutValido && sii && sii !== 'consultando' && (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Según el SII: <b>{sii.razonSocial}</b>{sii.giro ? ` · ${sii.giro}` : ''}
+                </div>
+              )}
+              {form.rut && rutValido && !sii && (
+                <div style={{ color: 'var(--green-600)', fontSize: 12, marginTop: 4 }}>✓ RUT válido</div>
+              )}
             </div>
             <div className="field">
               <label>Empresa</label>
@@ -227,21 +243,25 @@ export default function Cargar() {
 
           {procesando ? (
             <div className="send-sequence">
-              {progreso < 100 ? (
-                <>
-                  <div className={`send-counter${bump ? ' bump' : ''}`}>{listos}/{files.length}</div>
-                  <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>documentos procesados</div>
-                  <div className="progress-bar" style={{ maxWidth: 320, margin: '0 auto' }}>
-                    <div style={{ width: `${progreso}%` }} />
-                  </div>
-                  <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>Estructurando la información…</p>
-                </>
-              ) : (
+              {terminado ? (
                 <div className="send-done">
                   <div style={{ color: 'var(--green-600)' }}><Icon.Sparkles size={36} /></div>
                   <div style={{ fontWeight: 800, fontSize: 20, marginTop: 6 }}>¡Todo listo!</div>
                   <p className="muted" style={{ fontSize: 13 }}>Preparando tu resultado…</p>
                 </div>
+              ) : progreso < 100 ? (
+                <>
+                  <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>Subiendo tus documentos…</div>
+                  <div className="progress-bar" style={{ maxWidth: 320, margin: '0 auto' }}>
+                    <div style={{ width: `${progreso}%` }} />
+                  </div>
+                  <p className="muted" style={{ fontSize: 13, marginTop: 10 }}>{progreso}%</p>
+                </>
+              ) : (
+                <>
+                  <span className="spinner dark" style={{ width: 28, height: 28 }} />
+                  <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>Estructurando la información…</p>
+                </>
               )}
             </div>
           ) : (

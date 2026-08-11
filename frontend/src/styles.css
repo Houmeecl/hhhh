@@ -372,17 +372,11 @@ table.data tr:hover td { background: #f3f8f5; }
 
 /* ---------- Secuencia de envío (carga con energía) ---------- */
 .send-sequence { text-align: center; padding: 6px 0; }
-.send-counter {
-  font-size: 40px; font-weight: 800; color: var(--green-600);
-  font-variant-numeric: tabular-nums; transition: transform 0.2s ease;
-}
-.send-counter.bump { animation: counterBump 0.35s ease; }
-@keyframes counterBump { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
 .send-check-pop { animation: checkPop 0.3s ease; }
 @keyframes checkPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .send-done { animation: fadeUp 0.4s ease; }
 @media (prefers-reduced-motion: reduce) {
-  .send-counter.bump, .send-check-pop, .send-done { animation: none; }
+  .send-check-pop, .send-done { animation: none; }
 }
 
 @media (max-width: 900px) {
@@ -416,7 +410,6 @@ table.data tr:hover td { background: #f3f8f5; }
   .capture-actions { display: flex; flex-direction: column; }
   .capture-actions .btn { max-width: none; }
   .file-item { flex-wrap: wrap; gap: 6px; padding: 9px 12px; font-size: 13px; }
-  .send-counter { font-size: 32px; }
 }
 
 /* En dispositivos táctiles (aunque el viewport sea ancho) también se ofrece "Tomar foto". */

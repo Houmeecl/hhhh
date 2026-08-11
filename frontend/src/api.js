@@ -106,6 +106,53 @@ async function request(path, { method = 'GET', body, formData, authed = false, a
   return data;
 }
 
+// Como crearSesion pero por XMLHttpRequest en vez de fetch: es el único
+// mecanismo del navegador que expone el progreso REAL de una subida (bytes
+// enviados), algo que fetch() no ofrece de forma confiable entre navegadores.
+// Solo la usa el flujo público /cargar (Cargar.jsx) — el resto de los
+// llamadores de crearSesion sigue con fetch, sin necesitar barra de progreso.
+// `onProgress(pct)` recibe 0-100 de la SUBIDA únicamente: una vez que el
+// navegador terminó de enviar los bytes, el procesamiento en el servidor
+// (OCR, motor de cálculo) no es observable desde acá sin cambiar cómo se
+// arma la sesión en el backend (ver public.js, comentario en la pre-lectura
+// dentro de POST /sesiones) — por eso el llamador debe mostrar esa segunda
+// etapa como indeterminada, no simularle un porcentaje que no existe.
+export function crearSesionConProgreso(formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/sesiones');
+    // Mismo criterio de credencial que crearSesion: el header del cliente
+    // pisa al de authedAv si ambos existen. A diferencia de un objeto plano
+    // de headers (lo que usa request() con fetch), XMLHttpRequest.
+    // setRequestHeader llamado dos veces con el MISMO nombre no reemplaza
+    // el valor anterior: los CONCATENA con ", " (spec WHATWG "combine a
+    // header"). Dos llamadas sucesivas, una por token, mandarían
+    // "Bearer <av>, Bearer <cliente>" — un header que jwt.verify no puede
+    // parsear — así que la precedencia se resuelve ANTES, con un solo
+    // valor y una sola llamada.
+    const token = clienteAuth.token || authAv.access;
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* respuesta no-JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data);
+      } else {
+        const err = new Error(data.error || 'Ocurrió un error');
+        err.data = data;
+        reject(err);
+      }
+    };
+    // Mismo mensaje que produce un fetch() fallido (ver request()), para
+    // que el catch de Cargar.jsx lo reconozca sin duplicar la traducción.
+    xhr.onerror = () => reject(new Error('Failed to fetch'));
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   // Público
   // La carga adjunta la credencial que exista: sesión del operador de
