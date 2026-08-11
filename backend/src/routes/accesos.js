@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
 import { crearCuentaEntidad, enviarActivacion } from '../services/cuentas.js';
@@ -23,7 +23,7 @@ const hashToken = hashApiKey; // misma función que verifica routes/mandante.js 
 // externos).
 
 // ---------- MANDANTES ----------
-router.get('/mandantes', async (req, res, next) => {
+router.get('/mandantes', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT m.id, m.nombre_empresa, m.rut, m.email, m.activo, m.webhook_url, m.ultimo_uso, m.created_at,
@@ -42,11 +42,11 @@ router.get('/mandantes', async (req, res, next) => {
 // Agencia y proveedor son distintos: la agencia CAPTURA el expediente en
 // terreno (sube documentos, ver agencia.js) y el proveedor opera sus
 // propios datos (onboarding, SII, REP, firma) — ambos nacen operador.
-router.post('/mandantes/:id/crear-cuenta', adminOnly, (req, res, next) =>
+router.post('/mandantes/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
   crearCuentaEntidad({ req, res, panel: 'mandante', columnaFk: 'mandante_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
-router.post('/mandantes', adminOnly, async (req, res, next) => {
+router.post('/mandantes', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre_empresa, rut, email } = req.body;
     if (!nombre_empresa || !rut) return res.status(400).json({ error: 'Empresa y RUT son obligatorios.' });
@@ -62,7 +62,7 @@ router.post('/mandantes', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/mandantes/:id', adminOnly, async (req, res, next) => {
+router.put('/mandantes/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo, webhook_url } = req.body;
     if (webhook_url && !webhookUrlValida(webhook_url)) {
@@ -84,7 +84,7 @@ router.put('/mandantes/:id', adminOnly, async (req, res, next) => {
 // ---------- Permisos finos: proveedores permitidos por mandante ----------
 // Lista blanca opcional: sin filas = el mandante ve todos los proveedores
 // que le facturaron (comportamiento actual, sin cambios).
-router.get('/mandantes/:id/proveedores', async (req, res, next) => {
+router.get('/mandantes/:id/proveedores', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM mandante_proveedores WHERE mandante_id = $1 ORDER BY created_at DESC`,
@@ -94,7 +94,7 @@ router.get('/mandantes/:id/proveedores', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/mandantes/:id/proveedores', adminOnly, async (req, res, next) => {
+router.post('/mandantes/:id/proveedores', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const rut = normalizarRut(req.body.rut_proveedor);
     if (!rut) return res.status(400).json({ error: 'RUT de proveedor obligatorio.' });
@@ -110,7 +110,7 @@ router.post('/mandantes/:id/proveedores', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/mandantes/:id/proveedores/:proveedorId', adminOnly, async (req, res, next) => {
+router.delete('/mandantes/:id/proveedores/:proveedorId', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `DELETE FROM mandante_proveedores WHERE id = $1 AND mandante_id = $2`,
@@ -125,7 +125,7 @@ router.delete('/mandantes/:id/proveedores/:proveedorId', adminOnly, async (req, 
 // A diferencia de mandantes (RUT receptor sobre facturas nacionales), un
 // puerto se ancla a un punto_id del Corredor (catálogo PUNTOS_CORREDOR del
 // frontend) — ver routes/puerto.js.
-router.get('/puertos', async (req, res, next) => {
+router.get('/puertos', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre, p.punto_id, p.activo, p.ultimo_uso, p.created_at,
@@ -139,11 +139,11 @@ router.get('/puertos', async (req, res, next) => {
 
 // Acceso web propio del puerto (panel /panel-puerto) — distinto de la API
 // key (X-Api-Key, integración de sistemas): esto es un login humano.
-router.post('/puertos/:id/crear-cuenta', adminOnly, (req, res, next) =>
+router.post('/puertos/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
   crearCuentaEntidad({ req, res, panel: 'puerto', columnaFk: 'puerto_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
-router.post('/puertos', adminOnly, async (req, res, next) => {
+router.post('/puertos', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre, punto_id } = req.body || {};
     const puntoLimpio = sanearPuntoId(punto_id);
@@ -160,7 +160,7 @@ router.post('/puertos', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/puertos/:id', adminOnly, async (req, res, next) => {
+router.put('/puertos/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo } = req.body || {};
     const { rows } = await query(
@@ -178,7 +178,7 @@ router.put('/puertos/:id', adminOnly, async (req, res, next) => {
 // infraestructura documental/de trazabilidad — nunca se presenta como
 // agencia de aduanas. Acceso por lotes tipo 'documental' scopeados a SU
 // lotes_minerales.agencia_id (migración 046), no por punto_id como puerto.
-router.get('/agencias', async (req, res, next) => {
+router.get('/agencias', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT a.id, a.nombre, a.rut, a.activo, a.ultimo_uso, a.created_at,
@@ -192,11 +192,11 @@ router.get('/agencias', async (req, res, next) => {
 
 // Acceso web propio de la agencia (panel /panel-agencia) — distinto de la
 // API key (X-Api-Key, integración de sistemas): esto es un login humano.
-router.post('/agencias/:id/crear-cuenta', adminOnly, (req, res, next) =>
+router.post('/agencias/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
   crearCuentaEntidad({ req, res, panel: 'agencia', columnaFk: 'agencia_id', entidadId: req.params.id }).catch(next)
 );
 
-router.post('/agencias', adminOnly, async (req, res, next) => {
+router.post('/agencias', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre, rut } = req.body || {};
     if (!nombre) return res.status(400).json({ error: 'Nombre es obligatorio.' });
@@ -212,7 +212,7 @@ router.post('/agencias', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/agencias/:id', adminOnly, async (req, res, next) => {
+router.put('/agencias/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo } = req.body || {};
     const { rows } = await query(
@@ -232,7 +232,7 @@ router.put('/agencias/:id', adminOnly, async (req, res, next) => {
 // un trazador puede seguir existiendo solo como cuenta humana. Su acceso a
 // datos SIEMPRE depende de trazador_ruts — sin filas ahí, no ve ningún RUT
 // (nunca "todos").
-router.get('/trazadores', async (req, res, next) => {
+router.get('/trazadores', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT t.id, t.nombre, t.activo, t.ultimo_uso, t.created_at,
@@ -246,14 +246,14 @@ router.get('/trazadores', async (req, res, next) => {
 });
 
 // Acceso web propio del trazador (panel /panel-trazador).
-router.post('/trazadores/:id/crear-cuenta', adminOnly, (req, res, next) =>
+router.post('/trazadores/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
   crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
 // Genera (o rota) la API key del trazador — se muestra UNA sola vez. Solo
 // se usa cuando el trazador integra un sistema propio (ej. Kontax); no es
 // obligatoria para el resto, que sigue entrando solo con su cuenta web.
-router.post('/trazadores/:id/generar-api-key', adminOnly, async (req, res, next) => {
+router.post('/trazadores/:id/generar-api-key', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const token = `trz_${crypto.randomBytes(24).toString('base64url')}`;
     const { rows } = await query(
@@ -266,7 +266,7 @@ router.post('/trazadores/:id/generar-api-key', adminOnly, async (req, res, next)
   } catch (err) { next(err); }
 });
 
-router.post('/trazadores', adminOnly, async (req, res, next) => {
+router.post('/trazadores', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre } = req.body || {};
     if (!nombre) return res.status(400).json({ error: 'Nombre es obligatorio.' });
@@ -280,7 +280,7 @@ router.post('/trazadores', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/trazadores/:id', adminOnly, async (req, res, next) => {
+router.put('/trazadores/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo } = req.body || {};
     const { rows } = await query(
@@ -294,7 +294,7 @@ router.put('/trazadores/:id', adminOnly, async (req, res, next) => {
 });
 
 // ---------- Lista blanca de RUT del trazador ----------
-router.get('/trazadores/:id/ruts', async (req, res, next) => {
+router.get('/trazadores/:id/ruts', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM trazador_ruts WHERE trazador_id = $1 ORDER BY created_at DESC`,
@@ -304,7 +304,7 @@ router.get('/trazadores/:id/ruts', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/trazadores/:id/ruts', adminOnly, async (req, res, next) => {
+router.post('/trazadores/:id/ruts', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const rut = normalizarRut(req.body.rut);
     if (!rut) return res.status(400).json({ error: 'RUT obligatorio.' });
@@ -320,7 +320,7 @@ router.post('/trazadores/:id/ruts', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/trazadores/:id/ruts/:rutId', adminOnly, async (req, res, next) => {
+router.delete('/trazadores/:id/ruts/:rutId', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `DELETE FROM trazador_ruts WHERE id = $1 AND trazador_id = $2`,
@@ -337,7 +337,7 @@ router.delete('/trazadores/:id/ruts/:rutId', adminOnly, async (req, res, next) =
 // un proveedor acá tiene una identidad estable contra la cual registrar su
 // llave FIDO2 y firmar N lotes en el tiempo. La autorización de qué lote
 // puede firmar vive en proveedor_lotes (routes/origen.js), no acá.
-router.get('/proveedores', async (req, res, next) => {
+router.get('/proveedores', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo, p.ultimo_uso, p.created_at,
@@ -359,7 +359,7 @@ router.get('/proveedores', async (req, res, next) => {
 // razón social, que sí está desde que se creó la empresa; sin esto el
 // enrolamiento moría con "Email y nombre son obligatorios" y la invitación
 // nunca salía.
-router.post('/proveedores/:id/crear-cuenta', adminOnly, async (req, res, next) => {
+router.post('/proveedores/:id/crear-cuenta', requireSeccion('accesos_externos', 'enrolar'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query('SELECT nombre_empresa FROM proveedores WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Proveedor no encontrado.' });
@@ -378,7 +378,7 @@ router.post('/proveedores/:id/crear-cuenta', adminOnly, async (req, res, next) =
 // El enlace se manda SIEMPRE al correo registrado de la cuenta, nunca al que
 // venga en el request: reenviar no puede ser una forma de redirigir el acceso
 // de una empresa a otra casilla.
-router.post('/proveedores/:id/reenviar-invitacion', adminOnly, async (req, res, next) => {
+router.post('/proveedores/:id/reenviar-invitacion', requireSeccion('accesos_externos', 'enrolar'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, email, nombre, estado FROM usuarios WHERE proveedor_id = $1 AND panel = 'proveedor'`,
@@ -412,7 +412,7 @@ router.post('/proveedores/:id/reenviar-invitacion', adminOnly, async (req, res, 
   } catch (err) { next(err); }
 });
 
-router.post('/proveedores', adminOnly, async (req, res, next) => {
+router.post('/proveedores', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     // El formulario de esta pestaña usa el mismo nombre de campo que
     // Mandantes/Agencias/Trazadores más arriba en este archivo (`rut`,
@@ -438,7 +438,7 @@ router.post('/proveedores', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/proveedores/:id', adminOnly, async (req, res, next) => {
+router.put('/proveedores/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo } = req.body || {};
     const { rows } = await query(
@@ -452,7 +452,7 @@ router.put('/proveedores/:id', adminOnly, async (req, res, next) => {
 });
 
 // ---------- CÓDIGOS DE ACCESO (créditos) ----------
-router.get('/codigos', async (req, res, next) => {
+router.get('/codigos', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM codigos_acceso ORDER BY created_at DESC LIMIT 300`
@@ -461,7 +461,7 @@ router.get('/codigos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/codigos', adminOnly, async (req, res, next) => {
+router.post('/codigos', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const n = Math.min(50, Math.max(1, Number(req.body.cantidad) || 1));
     const creditos = Math.min(100, Math.max(1, Number(req.body.creditos) || 5));
@@ -485,7 +485,7 @@ router.post('/codigos', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/codigos/:id', adminOnly, async (req, res, next) => {
+router.put('/codigos/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { activo, creditos, modo_juego: modoJuego } = req.body;
     const { rows } = await query(
@@ -518,7 +518,7 @@ function parLatLng(lat, lng) {
   return { lat: la, lng: ln };
 }
 
-router.get('/puntos-limpios', async (req, res, next) => {
+router.get('/puntos-limpios', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT pl.*, ca.codigo AS campana_codigo, ca.empresa AS campana_empresa,
@@ -530,7 +530,7 @@ router.get('/puntos-limpios', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/puntos-limpios', adminOnly, async (req, res, next) => {
+router.post('/puntos-limpios', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre, direccion, lat, lng, codigo_id } = req.body || {};
     if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'Nombre es obligatorio.' });
@@ -547,7 +547,7 @@ router.post('/puntos-limpios', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/puntos-limpios/:id', adminOnly, async (req, res, next) => {
+router.put('/puntos-limpios/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
   try {
     const { nombre, direccion, lat, lng, activo } = req.body || {};
     const coords = lat !== undefined || lng !== undefined ? parLatLng(lat, lng) : undefined;
@@ -571,7 +571,7 @@ router.put('/puntos-limpios/:id', adminOnly, async (req, res, next) => {
 
 // Cartel QR imprimible (PNG grande). El QR codifica la URL de la pantalla
 // Reciclar con el punto pre-seleccionado.
-router.get('/puntos-limpios/:id/qr.png', async (req, res, next) => {
+router.get('/puntos-limpios/:id/qr.png', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT token FROM puntos_limpios WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Punto limpio no encontrado' });

@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import multer from 'multer';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, requireNivelOperador, logActividad, signAccess } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, requireNivelOperador, logActividad, signAccess } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadenaHash.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
@@ -62,7 +62,7 @@ const ROLES_CREDENCIAL_VALIDOS = ['proveedor', 'puerto'];
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('origen'));
 const adminOnly = requireRole('admin', 'operador');
 
 const NORM_SQL = `regexp_replace(COALESCE($1,''), '[^0-9kK]', '', 'g')`;

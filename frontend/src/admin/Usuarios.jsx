@@ -2,6 +2,52 @@ import { useEffect, useState } from 'react';
 import { startRegistration } from '@simplewebauthn/browser';
 import { api, fmtFecha } from '../api.js';
 import PasswordUnaVez from '../components/PasswordUnaVez.jsx';
+import { SECCIONES_ADMIN_NAV } from './secciones.js';
+
+// Checkboxes de secciones del panel (migración 092), agrupados igual que
+// el propio sidebar que se está configurando. Dashboard va siempre
+// marcado y deshabilitado: toda cuenta necesita un landing tras el login.
+function SelectorSecciones({ valor, onChange }) {
+  const set = new Set(valor || []);
+  const toggle = (slug) => {
+    const s = new Set(set);
+    if (s.has(slug)) s.delete(slug); else s.add(slug);
+    s.add('dashboard');
+    onChange([...s]);
+  };
+  const marcarGrupo = (grupo, marcar) => {
+    const s = new Set(set);
+    for (const item of grupo.items) { if (marcar) s.add(item.slug); else if (!item.siempre) s.delete(item.slug); }
+    s.add('dashboard');
+    onChange([...s]);
+  };
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {SECCIONES_ADMIN_NAV.map((grupo) => (
+        <div key={grupo.titulo} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '8px 12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <b style={{ fontSize: 12, textTransform: 'uppercase', color: 'var(--gray)' }}>{grupo.titulo}</b>
+            <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => marcarGrupo(grupo, true)}>todas</button>
+            <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => marcarGrupo(grupo, false)}>ninguna</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 4 }}>
+            {grupo.items.map((item) => (
+              <label key={item.slug} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, fontWeight: 400, cursor: item.siempre ? 'default' : 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={item.siempre || set.has(item.slug)}
+                  disabled={item.siempre}
+                  onChange={() => toggle(item.slug)}
+                />
+                {item.label}
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 const ROLES = ['admin', 'operador', 'cliente'];
 // Paneles internos: el alta es directa y el rol se elige. Los 5 paneles
@@ -43,6 +89,8 @@ export default function Usuarios({ yo }) {
   // PIN de una llave de archivo recién emitida — se muestra UNA sola vez,
   // igual que la contraseña temporal (no se autocierra ni se puede recuperar).
   const [pinResultado, setPinResultado] = useState(null); // {serial, pin}
+  // Editor de secciones del panel de una cuenta sicrep: {usuario, valor}.
+  const [seccionesModal, setSeccionesModal] = useState(null);
 
   const cargar = () => api.usuarios().then((r) => setUsuarios(r.usuarios)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -196,7 +244,7 @@ export default function Usuarios({ yo }) {
             <option value="">Todos los paneles</option>
             {TODOS_PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
           </select>
-          <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador', panel: 'sicrep', entidad_id: '', nivel_acceso: 'operador' })}>+ Nuevo usuario</button>
+          <button className="btn btn-primary" onClick={() => setModal({ email: '', nombre: '', rol: 'operador', panel: 'sicrep', entidad_id: '', nivel_acceso: 'operador', secciones_admin: ['dashboard'] })}>+ Nuevo usuario</button>
         </div>
       </div>
 
@@ -280,6 +328,12 @@ export default function Usuarios({ yo }) {
                       recuperación general (el correo de reset tampoco es
                       confiable), así que no se limita por estado. */}
                   <button className="btn btn-sm btn-outline" onClick={() => reenviar(u)}>Generar contraseña nueva</button>
+                  {(u.panel || 'sicrep') === 'sicrep' && !u.es_superadmin && (
+                    <button className="btn btn-sm btn-outline" style={{ marginLeft: 6 }}
+                      onClick={() => setSeccionesModal({ usuario: u, valor: u.secciones_admin || [] })}>
+                      Secciones ({(u.secciones_admin || []).length})
+                    </button>
+                  )}
                 </td>
               </tr>
               );
@@ -343,9 +397,37 @@ export default function Usuarios({ yo }) {
                 del panel. Las entidades se crean en «Accesos externos».
               </p>
             )}
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            {/* Secciones del panel (solo sicrep): qué partes del panel verá
+                esta cuenta. Sin marcar nada, solo ve el Dashboard. */}
+            {modal.panel === 'sicrep' && (
+              <div className="field" style={{ marginTop: 8 }}>
+                <label>Secciones del panel que esta cuenta puede ver</label>
+                <SelectorSecciones valor={modal.secciones_admin} onChange={(v) => setModal({ ...modal, secciones_admin: v })} />
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 12 }}>
               <button className="btn btn-outline" onClick={() => setModal(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={crear} disabled={cfgExterno && !modal.entidad_id}>Crear usuario</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {seccionesModal && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setSeccionesModal(null)}>
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <h2 style={{ marginTop: 0 }}>Secciones de {seccionesModal.usuario.nombre}</h2>
+            <p className="muted" style={{ fontSize: 13 }}>
+              Qué partes del panel ve y usa esta cuenta. El cambio se aplica al guardar; la sesión
+              activa de la persona lo toma en su próximo inicio de sesión o refresco de token.
+            </p>
+            <SelectorSecciones valor={seccionesModal.valor} onChange={(v) => setSeccionesModal({ ...seccionesModal, valor: v })} />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
+              <button className="btn btn-outline" onClick={() => setSeccionesModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={async () => {
+                await cambiar(seccionesModal.usuario, 'secciones_admin', seccionesModal.valor);
+                setSeccionesModal(null);
+              }}>Guardar</button>
             </div>
           </div>
         </div>

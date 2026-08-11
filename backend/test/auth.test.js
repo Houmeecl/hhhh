@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import { config } from '../src/config.js';
-import { signAccess, requireHomePanel } from '../src/middleware/auth.js';
+import { signAccess, requireHomePanel, requireSeccion } from '../src/middleware/auth.js';
+import { SECCIONES_ADMIN, seccionesValidas } from '../src/constants/seccionesAdmin.js';
 
 // Mismo estilo del resto de la suite: unidades puras, sin servidor HTTP ni
 // base de datos (no hay precedente de tests de integración sobre rutas en
@@ -102,4 +103,73 @@ test('requireHomePanel rechaza cuando no hay req.user (JWT no verificado antes)'
   requireHomePanel('sicrep')(req, res, () => { llamoNext = true; });
   assert.equal(llamoNext, false);
   assert.equal(res.statusCode, 403);
+});
+
+// ---------- secciones_admin (migración 092) ----------
+
+test('signAccess incluye secciones_admin; sin la columna cae a [] (no undefined)', () => {
+  const con = jwt.verify(
+    signAccess({ id: 'u8', rol: 'admin', email: 'a@sicrep.cl', secciones_admin: ['clientes', 'sii'] }),
+    config.jwt.accessSecret
+  );
+  assert.deepEqual(con.secciones_admin, ['clientes', 'sii']);
+  const sin = jwt.verify(signAccess({ id: 'u9', rol: 'admin', email: 'a@sicrep.cl' }), config.jwt.accessSecret);
+  assert.deepEqual(sin.secciones_admin, []);
+});
+
+test('requireSeccion deja pasar con la sección y rechaza sin ella', () => {
+  const conSeccion = { user: { rol: 'operador', secciones_admin: ['clientes'] } };
+  const res1 = mockRes();
+  let paso1 = false;
+  requireSeccion('clientes')(conSeccion, res1, () => { paso1 = true; });
+  assert.equal(paso1, true);
+
+  const sinSeccion = { user: { rol: 'operador', secciones_admin: ['sii'] } };
+  const res2 = mockRes();
+  let paso2 = false;
+  requireSeccion('clientes')(sinSeccion, res2, () => { paso2 = true; });
+  assert.equal(paso2, false);
+  assert.equal(res2.statusCode, 403);
+});
+
+test('requireSeccion acepta cualquiera de varios slugs (rutas compartidas entre secciones)', () => {
+  const req = { user: { rol: 'admin', secciones_admin: ['enrolar'] } };
+  const res = mockRes();
+  let paso = false;
+  requireSeccion('sii', 'enrolar')(req, res, () => { paso = true; });
+  assert.equal(paso, true);
+});
+
+test('requireSeccion: superadmin bypasea sin tener la sección', () => {
+  const req = { user: { rol: 'admin', es_superadmin: true, secciones_admin: [] } };
+  const res = mockRes();
+  let paso = false;
+  requireSeccion('capital_natural')(req, res, () => { paso = true; });
+  assert.equal(paso, true);
+});
+
+test('requireSeccion: secciones_admin ausente o vacío se trata como sin acceso (fail-closed)', () => {
+  for (const user of [{ rol: 'admin' }, { rol: 'admin', secciones_admin: [] }]) {
+    const res = mockRes();
+    let paso = false;
+    requireSeccion('clientes')({ user }, res, () => { paso = true; });
+    assert.equal(paso, false);
+    assert.equal(res.statusCode, 403);
+  }
+});
+
+test('requireSeccion sin req.user responde 401, no 403', () => {
+  const res = mockRes();
+  let paso = false;
+  requireSeccion('clientes')({}, res, () => { paso = true; });
+  assert.equal(paso, false);
+  assert.equal(res.statusCode, 401);
+});
+
+test('seccionesValidas: acepta subconjuntos del vocabulario y rechaza slugs inventados', () => {
+  assert.equal(SECCIONES_ADMIN.length, 23);
+  assert.equal(seccionesValidas(['clientes', 'sii']), true);
+  assert.equal(seccionesValidas([]), true);
+  assert.equal(seccionesValidas(['inventada']), false);
+  assert.equal(seccionesValidas('clientes'), false); // debe ser array
 });

@@ -124,7 +124,7 @@ router.get('/me', requireAuth, async (req, res) => {
   }
   const { rows } = await query(
     `SELECT id, email, nombre, rol, panel, cliente_id, puerto_id, mandante_id, agencia_id, trazador_id, proveedor_id,
-            must_reset_password, es_superadmin
+            must_reset_password, es_superadmin, secciones_admin
      FROM usuarios WHERE id = $1`,
     [req.user.sub]
   );

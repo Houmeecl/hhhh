@@ -1,6 +1,6 @@
 import express from 'express';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { generateBalanceNatural } from '../services/pdf.js';
 import { valorizarActivo, anexarMovimiento } from '../services/capitalNatural.js';
 import { verificarCadenaCompleta } from '../services/cadenaHash.js';
@@ -11,7 +11,7 @@ import { verificarCadenaCompleta } from '../services/cadenaHash.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('capital_natural'));
 const adminOnly = requireRole('admin', 'operador');
 
 const ORDEN = `array_position(ARRAY['AGUA','ENER','CO2E','MATR','SUEL','BIOD'], codigo)`;

@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { SECCIONES_ADMIN } from '../src/constants/seccionesAdmin.js';
 import webauthnRouter from '../src/routes/webauthn.js';
 import adminRouter from '../src/routes/admin.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
@@ -52,7 +53,7 @@ before(async () => {
   );
   usuarioId = rows[0].id;
 
-  tokenAdmin = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
+  tokenAdmin = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep', secciones_admin: [...SECCIONES_ADMIN] });
   tokenNoAdmin = signAccess({ id: crypto.randomUUID(), rol: 'operador', email: `op-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
 
   const app = express();

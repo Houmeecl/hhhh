@@ -26,6 +26,14 @@ router.use((req, res, next) => {
   if (req.user.imp) return res.status(403).json({ error: 'No disponible en una sesión de vista de superadmin.' });
   next();
 });
+// Gate por sección (migración 092) SOLO para cuentas del panel sicrep:
+// las de aduana_verde no llevan secciones_admin poblado (la columna es
+// del panel núcleo) y bloquearlas rompería la transversalidad documentada
+// arriba — para ellas todo sigue igual que antes.
+router.use((req, res, next) => {
+  if (req.user.panel !== 'sicrep') return next();
+  return requireSeccion('capacitacion')(req, res, next);
+});
 
 async function cursoActivoPorSlug(slug) {
   const { rows } = await query(`SELECT * FROM cursos WHERE slug = $1 AND activo = true`, [slug]);

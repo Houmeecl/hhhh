@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { calcularCo2eViaje, validarViaje } from '../services/transporte.js';
 import { rutValido } from '../services/dte.js';
 
@@ -11,7 +11,7 @@ import { rutValido } from '../services/dte.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('transporte'));
 const adminOnly = requireRole('admin', 'operador');
 
 // ---------- Modos y factores ----------

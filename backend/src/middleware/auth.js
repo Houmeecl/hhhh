@@ -7,7 +7,8 @@ export function signAccess(user) {
     { sub: user.id, rol: user.rol, email: user.email, cliente_id: user.cliente_id || null,
       panel: user.panel || 'sicrep', puerto_id: user.puerto_id || null, mandante_id: user.mandante_id || null,
       agencia_id: user.agencia_id || null, trazador_id: user.trazador_id || null, proveedor_id: user.proveedor_id || null,
-      es_superadmin: user.es_superadmin === true, nivel_acceso: user.nivel_acceso || 'operador' },
+      es_superadmin: user.es_superadmin === true, nivel_acceso: user.nivel_acceso || 'operador',
+      secciones_admin: Array.isArray(user.secciones_admin) ? user.secciones_admin : [] },
     config.jwt.accessSecret,
     { expiresIn: config.jwt.accessTtl }
   );
@@ -63,6 +64,27 @@ export function requireSuperadmin(req, res, next) {
     return res.status(403).json({ error: 'Solo un superadmin puede hacer esto' });
   }
   next();
+}
+
+// Exige que la cuenta tenga ALGUNA de las secciones del panel admin
+// indicadas en usuarios.secciones_admin (migración 092). Un superadmin
+// (069) siempre pasa — mismo criterio que requireSuperadmin: es un nivel
+// por encima de cualquier scoping de sección. Convive con requireRole,
+// no lo reemplaza: la sección decide QUÉ partes del panel ve/usa la
+// cuenta; el rol sigue decidiendo si dentro de una sección puede solo
+// leer o también mutar. secciones_admin viaja en el JWT (igual que
+// rol/panel/nivel_acceso): un cambio de secciones tarda hasta accessTtl
+// en reflejarse — mismo comportamiento que ya tiene un cambio de rol.
+export function requireSeccion(...slugs) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: 'No autenticado' });
+    if (req.user.es_superadmin === true) return next();
+    const propias = req.user.secciones_admin || [];
+    if (!slugs.some((s) => propias.includes(s))) {
+      return res.status(403).json({ error: 'Tu cuenta no tiene acceso a esta sección.' });
+    }
+    next();
+  };
 }
 
 // Exige nivel_acceso='operador' — usado en las 2 mutaciones que hoy

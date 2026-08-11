@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireNivelOperador, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireSeccion, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generarPasswordTemporal, crearCuentaEntidad, enviarActivacion, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
 import {
@@ -32,6 +32,7 @@ import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiterAdmin } from '../middleware/rateLimit.js';
 import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
+import { seccionesValidas } from '../constants/seccionesAdmin.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -146,7 +147,7 @@ router.put('/perfil/password', async (req, res, next) => {
 // ============================================================
 // CLIENTES (CRUD + contratos)
 // ============================================================
-router.get('/clientes', async (req, res, next) => {
+router.get('/clientes', requireSeccion('clientes'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM clientes ORDER BY created_at DESC`);
     res.json({ clientes: rows });
@@ -157,7 +158,7 @@ router.get('/clientes', async (req, res, next) => {
 // autocompletar el alta de clientes. Va ANTES de las rutas /clientes/:id
 // en orden de lectura, pero Express igual la distingue por el prefijo
 // fijo /clientes/sii/. Apagado limpio (503) si no hay BASEAPI_API_KEY.
-router.get('/clientes/sii/:rut', adminOnly, siiLimiterAdmin, async (req, res, next) => {
+router.get('/clientes/sii/:rut', requireSeccion('clientes', 'enrolar'), adminOnly, siiLimiterAdmin, async (req, res, next) => {
   try {
     if (!config.baseapi.enabled) {
       return res.status(503).json({ error: 'Consulta SII no configurada (BASEAPI_API_KEY).' });
@@ -177,7 +178,7 @@ router.get('/clientes/sii/:rut', adminOnly, siiLimiterAdmin, async (req, res, ne
 // estado 'borrador' porque la plantilla todavía tiene puntos pendientes de
 // revisión legal (ver services/contrato.js) — el documento se genera solo,
 // pero no se firma hasta que un abogado cierre esos puntos.
-router.post('/clientes', adminOnly, async (req, res, next) => {
+router.post('/clientes', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     const { rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan } = req.body;
     if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre de empresa son obligatorios' });
@@ -230,7 +231,7 @@ async function emitirContrato(client, entidad, tipoPedido, sujeto = 'cliente') {
   throw new Error('No se pudo generar un número de contrato único');
 }
 
-router.put('/clientes/:id', adminOnly, async (req, res, next) => {
+router.put('/clientes/:id', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     const { nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan } = req.body;
     const { rows } = await query(
@@ -249,7 +250,7 @@ router.put('/clientes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
+router.delete('/clientes/:id', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     await query(`DELETE FROM clientes WHERE id = $1`, [req.params.id]);
     await logActividad({ usuarioId: req.user.sub, accion: 'eliminar_cliente', entidad: 'cliente', entidadId: req.params.id, ip: req.ip });
@@ -261,7 +262,7 @@ router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
 // genera aquí una contraseña temporal que se muestra UNA sola vez en este
 // response; la cuenta queda activa de inmediato con must_reset_password=true
 // (mismo criterio que crearCuentaEntidad de routes/accesos.js).
-router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
+router.post('/clientes/:id/crear-cuenta', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
     const cliente = cRows[0];
@@ -290,7 +291,7 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
 // LEE: nunca escribe en `clientes`. Quien da de alta decide si acepta lo que
 // viene o corrige — el dato que quede es el que se congela en el contrato,
 // así que no se pisa nada en silencio.
-router.get('/clientes/consultar-rut/:rut', adminOnly, async (req, res, next) => {
+router.get('/clientes/consultar-rut/:rut', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     const { datos, limites } = await clayEmpresa(req.params.rut);
     const nombre = datos?.name || null;
@@ -323,7 +324,7 @@ router.get('/clientes/consultar-rut/:rut', adminOnly, async (req, res, next) => 
 // El método sale POR GASTO: Clay no entrega unidad de medida en el detalle
 // de línea. Cargar el XML del documento sí habilita además el método
 // físico. Se informa en la respuesta, no se esconde.
-router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => {
+router.post('/clientes/:id/importar-clay', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   const { desde, hasta } = req.body || {};
   if (!desde) return res.status(400).json({ error: 'Indica la fecha `desde` (YYYY-MM-DD) del período a importar' });
 
@@ -476,7 +477,7 @@ router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => 
 // Contrato vigente del cliente. Los clientes dados de alta antes de la
 // migración 043 no tienen contrato: se responde 404 y el panel ofrece
 // generarlo, en vez de fabricar uno en silencio al leer.
-router.get('/clientes/:id/contrato', async (req, res, next) => {
+router.get('/clientes/:id/contrato', requireSeccion('clientes'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
@@ -490,7 +491,7 @@ router.get('/clientes/:id/contrato', async (req, res, next) => {
 // Emite el contrato de un cliente que no lo tiene (alta anterior a la
 // migración 043). Si ya hay uno vigente devuelve 409: reemplazarlo es otra
 // operación, no un efecto secundario de pedirlo de nuevo.
-router.post('/clientes/:id/contrato', adminOnly, async (req, res, next) => {
+router.post('/clientes/:id/contrato', requireSeccion('clientes'), adminOnly, async (req, res, next) => {
   try {
     const contrato = await withTx(async (client) => {
       const { rows: cRows } = await client.query(`SELECT * FROM clientes WHERE id = $1 FOR UPDATE`, [req.params.id]);
@@ -509,7 +510,7 @@ router.post('/clientes/:id/contrato', adminOnly, async (req, res, next) => {
   }
 });
 
-router.get('/clientes/:id/contrato.pdf', async (req, res, next) => {
+router.get('/clientes/:id/contrato.pdf', requireSeccion('clientes'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
@@ -525,7 +526,7 @@ router.get('/clientes/:id/contrato.pdf', async (req, res, next) => {
 });
 
 // ---------- Postulaciones de auspicio ----------
-router.get('/solicitudes-auspicio', async (req, res, next) => {
+router.get('/solicitudes-auspicio', requireSeccion('auspiciadores'), async (req, res, next) => {
   try {
     const estado = ['pendiente', 'aceptada', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
     const { rows } = await query(
@@ -543,7 +544,7 @@ router.get('/solicitudes-auspicio', async (req, res, next) => {
 // Aceptar crea el auspiciador y emite sus contratos, todo en la misma
 // transacción: si algo falla, la postulación sigue pendiente en vez de
 // quedar aceptada sin auspiciador detrás.
-router.post('/solicitudes-auspicio/:id/aceptar', adminOnly, async (req, res, next) => {
+router.post('/solicitudes-auspicio/:id/aceptar', requireSeccion('auspiciadores'), adminOnly, async (req, res, next) => {
   try {
     const salida = await withTx(async (client) => {
       const { rows } = await client.query(
@@ -589,7 +590,7 @@ router.post('/solicitudes-auspicio/:id/aceptar', adminOnly, async (req, res, nex
   }
 });
 
-router.post('/solicitudes-auspicio/:id/rechazar', adminOnly, async (req, res, next) => {
+router.post('/solicitudes-auspicio/:id/rechazar', requireSeccion('auspiciadores'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `UPDATE solicitudes_auspicio
@@ -604,7 +605,7 @@ router.post('/solicitudes-auspicio/:id/rechazar', adminOnly, async (req, res, ne
 });
 
 // ---------- Inscripciones de empresas (formulario público /inscripcion) ----------
-router.get('/solicitudes-inscripcion', async (req, res, next) => {
+router.get('/solicitudes-inscripcion', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const estado = ['pendiente', 'convertida', 'descartada'].includes(req.query.estado) ? req.query.estado : null;
     const { rows } = await query(
@@ -622,7 +623,7 @@ router.get('/solicitudes-inscripcion', async (req, res, next) => {
 // Convertir crea el prospecto en el pipeline comercial y marca la
 // solicitud, en la misma transacción: si algo falla, la inscripción
 // sigue pendiente en vez de quedar convertida sin prospecto detrás.
-router.post('/solicitudes-inscripcion/:id/convertir', async (req, res, next) => {
+router.post('/solicitudes-inscripcion/:id/convertir', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const salida = await withTx(async (client) => {
       const { rows } = await client.query(
@@ -665,7 +666,7 @@ router.post('/solicitudes-inscripcion/:id/convertir', async (req, res, next) => 
 // que admin/Enrolar.jsx, pero partiendo de un lead ya calificado en vez de
 // que el admin retipee los datos. Todo en una transacción: si algo falla,
 // la solicitud sigue pendiente.
-router.post('/solicitudes-inscripcion/:id/enrolar', adminOnly, async (req, res, next) => {
+router.post('/solicitudes-inscripcion/:id/enrolar', requireSeccion('prospectos'), adminOnly, async (req, res, next) => {
   try {
     const rutForzado = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
     const salida = await withTx(async (client) => {
@@ -756,7 +757,7 @@ router.post('/solicitudes-inscripcion/:id/enrolar', adminOnly, async (req, res, 
   }
 });
 
-router.post('/solicitudes-inscripcion/:id/descartar', async (req, res, next) => {
+router.post('/solicitudes-inscripcion/:id/descartar', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `UPDATE solicitudes_inscripcion
@@ -775,7 +776,7 @@ router.post('/solicitudes-inscripcion/:id/descartar', async (req, res, next) => 
 // (vehículo, dinero, difusión) y firma su propio convenio. Se le da de alta
 // con el mismo control que a un cliente — registro, contrato generado y
 // sellado — porque es exactamente lo que se pidió.
-router.get('/auspiciadores', async (req, res, next) => {
+router.get('/auspiciadores', requireSeccion('auspiciadores'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT a.*, (
@@ -791,7 +792,7 @@ router.get('/auspiciadores', async (req, res, next) => {
 // El alta emite el Convenio Marco; si además aporta vehículo, emite también
 // el comodato. Los dos en la misma transacción que el alta: un auspiciador
 // sin convenio no debería existir.
-router.post('/auspiciadores', adminOnly, async (req, res, next) => {
+router.post('/auspiciadores', requireSeccion('auspiciadores'), adminOnly, async (req, res, next) => {
   try {
     const { rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin } = req.body || {};
     if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre son obligatorios' });
@@ -818,7 +819,7 @@ router.post('/auspiciadores', adminOnly, async (req, res, next) => {
 
 // Emite un contrato de auspicio que falte (p. ej. el comodato, si el
 // vehículo se acordó después del alta).
-router.post('/auspiciadores/:id/contrato', adminOnly, async (req, res, next) => {
+router.post('/auspiciadores/:id/contrato', requireSeccion('auspiciadores'), adminOnly, async (req, res, next) => {
   try {
     const contrato = await withTx(async (client) => {
       const { rows } = await client.query(`SELECT * FROM auspiciadores WHERE id = $1 FOR UPDATE`, [req.params.id]);
@@ -834,7 +835,7 @@ router.post('/auspiciadores/:id/contrato', adminOnly, async (req, res, next) => 
   }
 });
 
-router.get('/auspiciadores/:id/contrato.pdf', async (req, res, next) => {
+router.get('/auspiciadores/:id/contrato.pdf', requireSeccion('auspiciadores'), async (req, res, next) => {
   try {
     const tipo = tipoValido(req.query.tipo) ? req.query.tipo : 'auspicio';
     const { rows } = await query(
@@ -862,7 +863,7 @@ function pdfDeContrato(contrato) {
 }
 
 // Alerta de contratos por vencer (próximos 30 días) o vencidos.
-router.get('/contratos/alertas', async (req, res, next) => {
+router.get('/contratos/alertas', requireSeccion('clientes'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, nombre_empresa, rut, estado_contrato, fecha_fin,
@@ -879,7 +880,7 @@ router.get('/contratos/alertas', async (req, res, next) => {
 // ============================================================
 // SESIONES E INFORMES
 // ============================================================
-router.get('/sesiones', async (req, res, next) => {
+router.get('/sesiones', requireSeccion('sesiones'), async (req, res, next) => {
   try {
     const { q, desde, hasta } = req.query;
     const cond = [];
@@ -897,7 +898,7 @@ router.get('/sesiones', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/sesiones/:id', async (req, res, next) => {
+router.get('/sesiones/:id', requireSeccion('sesiones'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
@@ -913,7 +914,7 @@ router.get('/sesiones/:id', async (req, res, next) => {
 // ============================================================
 // MÉTRICAS
 // ============================================================
-router.get('/metricas', async (req, res, next) => {
+router.get('/metricas', requireSeccion('metricas'), async (req, res, next) => {
   try {
     const [porCliente, serie, porCategoria] = await Promise.all([
       query(`SELECT nombre_cliente, count(*)::int AS sesiones,
@@ -945,7 +946,7 @@ router.get('/metricas', async (req, res, next) => {
 // no existe un factor validado para convertir envases a CO2e y no se
 // inventa — la página muestra envases, puntos y km tal cual).
 // ============================================================
-router.get('/juego/resumen', async (req, res, next) => {
+router.get('/juego/resumen', requireSeccion('juego'), async (req, res, next) => {
   try {
     const [
       totales, reciclajes, trayectos, mixPuntos, porMaterial, porCampana, porPunto, serieEnvases,
@@ -1004,13 +1005,13 @@ router.get('/juego/resumen', async (req, res, next) => {
 // ============================================================
 // PROSPECTOS (pipeline comercial)
 // ============================================================
-router.get('/prospectos', async (req, res, next) => {
+router.get('/prospectos', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM prospectos ORDER BY created_at DESC`);
     res.json({ prospectos: rows });
   } catch (err) { next(err); }
 });
-router.post('/prospectos', async (req, res, next) => {
+router.post('/prospectos', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const { nombre_empresa, rut, contacto, etapa, origen, notas, proxima_accion } = req.body;
     if (!nombre_empresa) return res.status(400).json({ error: 'El nombre de la empresa es obligatorio' });
@@ -1022,7 +1023,7 @@ router.post('/prospectos', async (req, res, next) => {
     res.status(201).json({ prospecto: rows[0] });
   } catch (err) { next(err); }
 });
-router.put('/prospectos/:id', async (req, res, next) => {
+router.put('/prospectos/:id', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const { nombre_empresa, rut, contacto, etapa, origen, notas, proxima_accion } = req.body;
     const { rows } = await query(
@@ -1036,7 +1037,7 @@ router.put('/prospectos/:id', async (req, res, next) => {
     res.json({ prospecto: rows[0] });
   } catch (err) { next(err); }
 });
-router.delete('/prospectos/:id', async (req, res, next) => {
+router.delete('/prospectos/:id', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     await query(`DELETE FROM prospectos WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
@@ -1047,7 +1048,7 @@ router.delete('/prospectos/:id', async (req, res, next) => {
 // Los que llegaron por los formularios cortos de las landings o dejaron
 // su correo en la calculadora — sin RUT, así que no son prospectos aún:
 // el equipo los contacta y decide.
-router.get('/interesados', async (req, res, next) => {
+router.get('/interesados', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     const estados = ['nuevo', 'contactado', 'descartado'];
     const estado = estados.includes(req.query.estado) ? req.query.estado : null;
@@ -1062,7 +1063,7 @@ router.get('/interesados', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/interesados/:id/estado', async (req, res, next) => {
+router.put('/interesados/:id/estado', requireSeccion('prospectos'), async (req, res, next) => {
   try {
     // Un id que no es UUID haría fallar la consulta con un error de
     // Postgres y un 500; se responde 404, que es lo que realmente pasa
@@ -1091,7 +1092,7 @@ router.put('/interesados/:id/estado', async (req, res, next) => {
 // ============================================================
 // SIMPLE API — consumo por endpoint / latencia / errores
 // ============================================================
-router.get('/simple-api', async (req, res, next) => {
+router.get('/simple-api', requireSeccion('motor_externo'), async (req, res, next) => {
   try {
     const [ping, porEndpoint, errores] = await Promise.all([
       simpleApi.ping(),
@@ -1112,11 +1113,11 @@ router.get('/simple-api', async (req, res, next) => {
 // ============================================================
 // USUARIOS Y ROLES
 // ============================================================
-router.get('/usuarios', adminOnly, async (req, res, next) => {
+router.get('/usuarios', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
-              u.created_at, c.nombre_empresa AS cliente, u.es_superadmin, u.nivel_acceso,
+              u.created_at, c.nombre_empresa AS cliente, u.es_superadmin, u.nivel_acceso, u.secciones_admin,
               (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb,
               (SELECT count(*) FROM credenciales_archivo ca WHERE ca.usuario_id = u.id AND ca.activo) AS num_llaves_archivo
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
@@ -1134,7 +1135,7 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
 // sigue el alta directa de siempre. El correo no se envía: se genera aquí
 // una contraseña temporal que se muestra UNA sola vez en este response;
 // la cuenta queda activa de inmediato con must_reset_password=true.
-router.post('/usuarios', adminOnly, async (req, res, next) => {
+router.post('/usuarios', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { email, nombre, rol, cliente_id, panel, entidad_id, nivel_acceso } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
@@ -1157,14 +1158,23 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
       });
     }
 
+    // secciones_admin (migración 092): qué partes del panel sicrep verá la
+    // cuenta. Se valida contra el vocabulario ANTES del CHECK de BD para
+    // responder 400 legible en vez de un 500 de constraint.
+    const secciones = req.body.secciones_admin;
+    if (secciones !== undefined && !seccionesValidas(secciones)) {
+      return res.status(400).json({ error: 'secciones_admin trae una sección que no existe.' });
+    }
+
     const emailNorm = String(email).toLowerCase();
     const password = generarPasswordTemporal();
     const hash = await bcrypt.hash(password, config.bcryptRounds);
     const { rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, nivel_acceso, estado, password_hash, must_reset_password)
-       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),$6,'activo',$7,true)
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, nivel_acceso, estado, password_hash, must_reset_password, secciones_admin)
+       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),$6,'activo',$7,true,COALESCE($8::text[],'{}'::text[]))
        ON CONFLICT (email) DO NOTHING RETURNING id, email, nombre, rol`,
-      [emailNorm, nombre, rol, cliente_id || null, panel, nivel_acceso === 'lectura' ? 'lectura' : 'operador', hash]
+      [emailNorm, nombre, rol, cliente_id || null, panel, nivel_acceso === 'lectura' ? 'lectura' : 'operador', hash,
+       secciones !== undefined ? secciones : null]
     );
     if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
 
@@ -1179,7 +1189,7 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
 // activación, que perdió sentido: con el alta ya sin estado 'pendiente' no
 // hay ninguna cuenta "atascada" esperando un enlace. Sirve también como
 // recuperación general, dado que el correo de reset tampoco es confiable.
-router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, next) => {
+router.post('/usuarios/:id/reenviar-activacion', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1193,7 +1203,7 @@ router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, nex
   } catch (err) { next(err); }
 });
 
-router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
+router.put('/usuarios/:id', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { rol, estado, nombre, panel, nivel_acceso } = req.body;
     // es_superadmin: solo un superadmin puede otorgar/quitar la marca a
@@ -1204,14 +1214,19 @@ router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
       ? req.body.es_superadmin
       : null;
     const nivelAcceso = nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : null;
+    const secciones = req.body.secciones_admin;
+    if (secciones !== undefined && !seccionesValidas(secciones)) {
+      return res.status(400).json({ error: 'secciones_admin trae una sección que no existe.' });
+    }
     let rows;
     try {
       ({ rows } = await query(
         `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
                 panel = COALESCE($5,panel), es_superadmin = COALESCE($6,es_superadmin),
-                nivel_acceso = COALESCE($7,nivel_acceso)
-         WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso`,
-        [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso]
+                nivel_acceso = COALESCE($7,nivel_acceso), secciones_admin = COALESCE($8::text[],secciones_admin)
+         WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso, secciones_admin`,
+        [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso,
+         secciones !== undefined ? secciones : null]
       ));
     } catch (e) {
       // 23514 = CHECK. El caso real es bajarle el rol o cambiarle el panel
@@ -1249,7 +1264,7 @@ async function protegerCredencialesDeSuperadmin(req, res, next) {
 // El registro lo hace un admin, no el propio usuario (autoservicio queda
 // pendiente, no es parte de esta ronda). El login con la llave ya
 // registrada es público: vive en routes/webauthn.js.
-router.get('/usuarios/:id/webauthn', adminOnly, async (req, res, next) => {
+router.get('/usuarios/:id/webauthn', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, nombre_dispositivo, created_at, last_used_at
@@ -1260,7 +1275,7 @@ router.get('/usuarios/:id/webauthn', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/webauthn/opciones', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+router.post('/usuarios/:id/webauthn/opciones', requireSeccion('usuarios'), adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1292,7 +1307,7 @@ router.post('/usuarios/:id/webauthn/opciones', adminOnly, protegerCredencialesDe
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/webauthn/verificar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+router.post('/usuarios/:id/webauthn/verificar', requireSeccion('usuarios'), adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1349,7 +1364,7 @@ router.post('/usuarios/:id/webauthn/verificar', adminOnly, protegerCredencialesD
   } catch (err) { next(err); }
 });
 
-router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+router.delete('/usuarios/:id/webauthn/:credencialId', requireSeccion('usuarios'), adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `DELETE FROM credenciales_webauthn WHERE id = $1 AND usuario_id = $2`,
@@ -1368,7 +1383,7 @@ router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, protegerCredenc
 // bloqueo tras varios fallos), nunca cifrando el archivo. El registro
 // también lo hace un admin; el login ya emitido es público y vive en
 // routes/llaveArchivo.js.
-router.get('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => {
+router.get('/usuarios/:id/llaves-archivo', requireSeccion('usuarios'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, serial, nombre, activo, intentos_fallidos, bloqueado_hasta, created_at, last_used_at
@@ -1379,7 +1394,7 @@ router.get('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/llaves-archivo', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+router.post('/usuarios/:id/llaves-archivo', requireSeccion('usuarios'), adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
     const usuario = rows[0];
@@ -1426,7 +1441,7 @@ router.post('/usuarios/:id/llaves-archivo', adminOnly, protegerCredencialesDeSup
   } catch (err) { next(err); }
 });
 
-router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+router.post('/usuarios/:id/llaves-archivo/:credId/revocar', requireSeccion('usuarios'), adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
   try {
     const { rowCount } = await query(
       `UPDATE credenciales_archivo SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo`,
@@ -1506,7 +1521,7 @@ router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
 // ============================================================
 // LOG DE ACTIVIDAD
 // ============================================================
-router.get('/actividad', adminOnly, async (req, res, next) => {
+router.get('/actividad', requireSeccion('actividad'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT a.*, u.email AS usuario_email
@@ -1521,7 +1536,7 @@ router.get('/actividad', adminOnly, async (req, res, next) => {
 // La ley no pide tener una política de retención: pide poder demostrar
 // que se aplica. Por eso se expone el historial de purgas junto con los
 // plazos vigentes y el inventario de qué se conserva y por qué.
-router.get('/retencion', async (req, res, next) => {
+router.get('/retencion', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.*, u.email AS usuario_email
@@ -1541,7 +1556,7 @@ router.get('/retencion', async (req, res, next) => {
 });
 
 // Correrla a mano, sin esperar al temporizador diario.
-router.post('/retencion/purgar', adminOnly, async (req, res, next) => {
+router.post('/retencion/purgar', requireSeccion('datos_personales'), adminOnly, async (req, res, next) => {
   try {
     const r = await purgar({ origen: 'manual', usuarioId: req.user.sub });
     await logActividad({ usuarioId: req.user.sub, accion: 'purgar_datos', entidad: 'retencion', detalle: { filas: r.filas }, ip: req.ip });
@@ -1550,7 +1565,7 @@ router.post('/retencion/purgar', adminOnly, async (req, res, next) => {
 });
 
 // ---------- Derechos del titular (ARCOP) ----------
-router.get('/arcop', async (req, res, next) => {
+router.get('/arcop', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     const estado = ['pendiente', 'resuelta', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
     const { rows } = await query(
@@ -1583,7 +1598,7 @@ router.get('/arcop', async (req, res, next) => {
 // Las tablas se recorren desde el inventario, así que una tabla nueva con
 // datos personales entra sola en cuanto se clasifica (y el test obliga a
 // clasificarla).
-router.get('/arcop/:id/datos', async (req, res, next) => {
+router.get('/arcop/:id/datos', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     const { rows: sRows } = await query(`SELECT * FROM solicitudes_arcop WHERE id = $1`, [req.params.id]);
     const sol = sRows[0];
@@ -1627,7 +1642,7 @@ router.get('/arcop/:id/datos', async (req, res, next) => {
 // pantalla lo muestra ANTES de confirmar una supresión, para que la
 // respuesta al titular salga del sistema y no de la memoria de quien
 // atiende.
-router.get('/arcop/limites-supresion', async (req, res, next) => {
+router.get('/arcop/limites-supresion', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     res.json(limitesDeSupresion());
   } catch (err) { next(err); }
@@ -1637,7 +1652,7 @@ router.get('/arcop/limites-supresion', async (req, res, next) => {
 // —cada derecho se atiende con criterio y algunos datos no se pueden
 // eliminar—, pero deja constancia de la respuesta, que es lo que la ley
 // exige poder demostrar.
-router.post('/arcop/:id/resolver', adminOnly, async (req, res, next) => {
+router.post('/arcop/:id/resolver', requireSeccion('datos_personales'), adminOnly, async (req, res, next) => {
   try {
     const estado = req.body?.estado === 'rechazada' ? 'rechazada' : 'resuelta';
     const resolucion = String(req.body?.resolucion || '').trim().slice(0, 4000);
@@ -1664,7 +1679,7 @@ router.post('/arcop/:id/resolver', adminOnly, async (req, res, next) => {
 // peor que no tenerla. Lo que aporta la tabla es la cronología —cuándo
 // ocurrió, cuándo se supo, cuándo se avisó—, que en una brecha es la
 // defensa.
-router.get('/brechas', async (req, res, next) => {
+router.get('/brechas', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT b.*, u.nombre AS registrada_por_nombre
@@ -1676,7 +1691,7 @@ router.get('/brechas', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/brechas', adminOnly, async (req, res, next) => {
+router.post('/brechas', requireSeccion('datos_personales'), adminOnly, async (req, res, next) => {
   try {
     const b = req.body || {};
     const titulo = String(b.titulo || '').trim().slice(0, 200);
@@ -1700,7 +1715,7 @@ router.post('/brechas', adminOnly, async (req, res, next) => {
 // Actualizar: riesgo, estado, medidas y las fechas de notificación. Solo
 // se tocan los campos que vienen, para que marcar "ya avisamos a la
 // Agencia" no pise el resto.
-router.put('/brechas/:id', adminOnly, async (req, res, next) => {
+router.put('/brechas/:id', requireSeccion('datos_personales'), adminOnly, async (req, res, next) => {
   try {
     const b = req.body || {};
     const { rows } = await query(
@@ -1730,7 +1745,7 @@ router.put('/brechas/:id', adminOnly, async (req, res, next) => {
 // El registro de actividades de tratamiento, para exportarlo cuando la
 // Agencia lo pida. Sale del mismo inventario que usan la purga y ARCOP,
 // así que no puede quedar desincronizado con el código.
-router.get('/retencion/registro', async (req, res, next) => {
+router.get('/retencion/registro', requireSeccion('datos_personales'), async (req, res, next) => {
   try {
     res.json({
       generado_at: new Date().toISOString(),
@@ -1754,7 +1769,7 @@ router.get('/retencion/registro', async (req, res, next) => {
 // deploy/SII-CREDENCIALES.md) contra /sii/auth/validar ANTES de operar.
 // Por-request: acá no se guarda nada — el frontend retiene las credenciales
 // solo en memoria mientras la pantalla está abierta.
-router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
+router.post('/sii/sesion', requireSeccion('sii'), requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
     if (!b.rut || !b.password) return res.status(400).json({ error: 'Ingresa el RUT y la clave tributaria.' });
@@ -1781,7 +1796,7 @@ router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, re
 // GET /api/admin/sii/empresas — proveedores con su estado SII: si tienen
 // credenciales guardadas (solo el hecho, jamás la clave) y qué períodos ya
 // descargaron.
-router.get('/sii/empresas', async (req, res, next) => {
+router.get('/sii/empresas', requireSeccion('sii'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo,
@@ -1802,7 +1817,7 @@ router.get('/sii/empresas', async (req, res, next) => {
 
 // POST /api/admin/sii/empresas — alta rápida de una empresa (proveedor)
 // desde la misma pantalla, para agregar y generar sin pasar por Accesos.
-router.post('/sii/empresas', adminOnly, async (req, res, next) => {
+router.post('/sii/empresas', requireSeccion('sii', 'enrolar'), adminOnly, async (req, res, next) => {
   try {
     const nombre = String(req.body?.nombre_empresa || '').trim();
     const rut = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
@@ -1839,7 +1854,7 @@ router.post('/sii/empresas', adminOnly, async (req, res, next) => {
 // rut/password = credenciales SII que el admin ingresa (por-request, NO se
 // guardan). El RUT de la empresa consultada SALE de la fila `proveedores`,
 // nunca del body.
-router.post('/sii/:proveedorId/descargar', requireNivelOperador, async (req, res, next) => {
+router.post('/sii/:proveedorId/descargar', requireSeccion('sii'), requireNivelOperador, async (req, res, next) => {
   const b = req.body || {};
   try {
     const { rows } = await query(`SELECT id, rut, activo FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
@@ -1877,7 +1892,7 @@ router.post('/sii/:proveedorId/descargar', requireNivelOperador, async (req, res
 
 // GET /api/admin/sii/:proveedorId/analisis/:periodo — análisis de lo ya
 // descargado (sin costo, sin clave) + períodos disponibles.
-router.get('/sii/:proveedorId/analisis/:periodo', async (req, res, next) => {
+router.get('/sii/:proveedorId/analisis/:periodo', requireSeccion('sii'), async (req, res, next) => {
   try {
     res.json({
       analisis: await analizarPeriodo(query, req.params.proveedorId, req.params.periodo),
@@ -1888,7 +1903,7 @@ router.get('/sii/:proveedorId/analisis/:periodo', async (req, res, next) => {
 
 // GET /api/admin/sii/:proveedorId/informe/:periodo.pdf — informe de
 // contabilidad de carbono del período, ya descargado (sin costo, sin clave).
-router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, res, next) => {
+router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', requireSeccion('sii'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
     const empresa = rows[0];
@@ -1905,7 +1920,7 @@ router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, 
 // export entregable del inventario por Alcance GHG y categoría (hermano
 // del informe.pdf, patrón export/alcance3): el archivo que la empresa
 // presenta a procesos externos. Sin costo, sin clave: lee lo descargado.
-router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', async (req, res, next) => {
+router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', requireSeccion('sii'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
     const empresa = rows[0];
@@ -1929,7 +1944,7 @@ router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', async (req, r
 });
 
 // GET /api/admin/sii/:proveedorId/periodos — solo el selector de períodos.
-router.get('/sii/:proveedorId/periodos', async (req, res, next) => {
+router.get('/sii/:proveedorId/periodos', requireSeccion('sii'), async (req, res, next) => {
   try {
     res.json({ periodos: await periodosDescargados(query, req.params.proveedorId) });
   } catch (err) { next(err); }
@@ -1940,7 +1955,7 @@ router.get('/sii/:proveedorId/periodos', async (req, res, next) => {
 // (services/contrato.js), ahora también sobre la empresa enrolada en esta
 // sección. GET nunca 404: null cuando aún no tiene contrato, para que el
 // frontend muestre "Emitir" sin depender de un catch.
-router.get('/sii/:proveedorId/contrato', async (req, res, next) => {
+router.get('/sii/:proveedorId/contrato', requireSeccion('sii'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
@@ -1950,7 +1965,7 @@ router.get('/sii/:proveedorId/contrato', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/sii/:proveedorId/contrato', adminOnly, async (req, res, next) => {
+router.post('/sii/:proveedorId/contrato', requireSeccion('sii'), adminOnly, async (req, res, next) => {
   try {
     const contrato = await withTx(async (client) => {
       const { rows } = await client.query(`SELECT * FROM proveedores WHERE id = $1 FOR UPDATE`, [req.params.proveedorId]);
@@ -1972,7 +1987,7 @@ router.post('/sii/:proveedorId/contrato', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.get('/sii/:proveedorId/contrato.pdf', async (req, res, next) => {
+router.get('/sii/:proveedorId/contrato.pdf', requireSeccion('sii'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
@@ -1988,7 +2003,7 @@ router.get('/sii/:proveedorId/contrato.pdf', async (req, res, next) => {
 // POST /api/admin/correo/prueba { to } — envía un correo de prueba con un
 // enlace, para verificar el sistema de correo (SMTP propio o Resend) y ver
 // por qué transporte salió. Devuelve el transporte usado ('smtp'|'resend'|dev).
-router.post('/correo/prueba', adminOnly, async (req, res, next) => {
+router.post('/correo/prueba', requireSeccion('datos_personales'), adminOnly, async (req, res, next) => {
   try {
     const to = String(req.body?.to || '').trim();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return res.status(400).json({ error: 'Correo de destino inválido.' });

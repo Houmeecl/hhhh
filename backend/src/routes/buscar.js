@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { bigquery } from '../services/bigquery.js';
 
 // ============================================================
@@ -11,7 +11,7 @@ import { bigquery } from '../services/bigquery.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('buscar'));
 
 const rutNorm = (r) => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();
 const NORM = (col) => `regexp_replace(COALESCE(${col},''), '[^0-9kK]', '', 'g')`;

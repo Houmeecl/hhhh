@@ -153,6 +153,13 @@ Ver `.env.example`. Las principales:
   escritura que existen fuera de sicrep/terreno: subir un documento en Agencia y firmar un lote en
   Proveedor. Puerto, Mandante y Trazador son de solo lectura por diseño, así que ahí el campo no
   cambia nada — y por eso la interfaz no lo ofrece donde no tiene efecto.
+- **Secciones del panel admin** (`usuarios.secciones_admin`, migración 092): cada cuenta sicrep ve
+  y usa solo las secciones que se le asignan (checkboxes en Usuarios.jsx) — el resto desaparece
+  del menú, una URL directa rebota al Dashboard y la API responde 403 (`requireSeccion`, aplicado
+  en cada router del backend, no solo en el NAV). Ortogonal a `rol`: la sección decide QUÉ partes
+  del panel se ven; el rol sigue decidiendo si dentro de una sección se puede solo leer o también
+  mutar. Un alta nueva sin secciones marcadas solo ve el Dashboard (fail-closed); el superadmin ve
+  todo siempre. Las cuentas creadas antes de la migración conservan acceso completo (backfill).
 - **Rate limiting** en el login (`express-rate-limit`).
 - **helmet** y **CORS restringido**.
 - Tokens de activación/reset **hasheados** (SHA-256) con expiración.

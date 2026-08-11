@@ -1,13 +1,13 @@
 import express from 'express';
 import multer from 'multer';
 import { query, withTx } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { bigquery } from '../services/bigquery.js';
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('corredor'));
 const adminOnly = requireRole('admin', 'operador');
 
 const upload = multer({

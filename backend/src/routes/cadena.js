@@ -10,6 +10,10 @@ import { verificarCadenaGlobal } from '../services/cadenaGlobal.js';
 // ============================================================
 
 const router = express.Router();
+// Sin requireSeccion a propósito (excepción como la de capacitacion.js):
+// estas dos rutas alimentan el widget de integridad del Dashboard — la
+// sección universal que toda cuenta sicrep ve — y solo exponen metadata
+// de la cadena de hash, ningún dato de negocio.
 router.use(requireAuth, requireHomePanel('sicrep'));
 
 router.get('/estado', async (req, res, next) => {

@@ -2,7 +2,7 @@ import express from 'express';
 import { query, withTx } from '../lib/db.js';
 import { crearVersion } from '../services/motorVersiones.js';
 import { actualizarFactores } from '../services/actualizarFactores.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { config } from '../config.js';
 import {
   ESTADOS_REVISABLES, recalcularPorGasto, anexarAjuste, verificarCadenaAjustes,
@@ -22,7 +22,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('motor_propio'));
 const adminOnly = requireRole('admin', 'operador');
 
 router.get('/categorias', async (req, res, next) => {

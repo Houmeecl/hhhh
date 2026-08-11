@@ -9,6 +9,7 @@ import { config } from '../src/config.js';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { SECCIONES_ADMIN } from '../src/constants/seccionesAdmin.js';
 import { verificarCadenaCompleta } from '../src/services/cadenaHash.js';
 import origenRoutes, { proveedorPanelRouter, firmaProveedorRouter } from '../src/routes/origen.js';
 import accesosRoutes from '../src/routes/accesos.js';
@@ -65,7 +66,7 @@ before(async () => {
 
   await runMigrations(); // idempotente: valida además el punto de la migración 062
 
-  adminToken = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
+  adminToken = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep', secciones_admin: [...SECCIONES_ADMIN] });
 
   const { rows: provRows } = await query(
     `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2),($3,$4) RETURNING id, nombre_empresa, rut`,

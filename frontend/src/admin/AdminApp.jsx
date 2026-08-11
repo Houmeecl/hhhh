@@ -29,56 +29,21 @@ import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
 import SelectorPanel from './SelectorPanel.jsx';
+import { SECCIONES_ADMIN_NAV, puedeVerSeccion } from './secciones.js';
 
-// El menú creció a 23 entradas: plano era ilegible (sobre todo en el
-// drawer del celular). Se agrupa por lo que la persona viene a hacer —
-// operar el día a día, un módulo de producto, lo comercial, o el sistema.
-// Ningún acceso se elimina ni cambia de ruta: solo se ordena.
-const NAV = [
-  {
-    titulo: 'Operación',
-    items: [
-      { to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard' },
-      { to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
-      { to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
-      { to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
-      { to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
-      { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
-    ],
-  },
-  {
-    titulo: 'Módulos',
-    items: [
-      { to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
-      { to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
-      { to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
-      { to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
-      { to: '/admin/corredor', ico: Icon.Target, label: 'Corredor Bioceánico' },
-      { to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
-      { to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
-      { to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
-    ],
-  },
-  {
-    titulo: 'Comercial',
-    items: [
-      { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
-      { to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
-      { to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
-      { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
-    ],
-  },
-  {
-    titulo: 'Sistema',
-    items: [
-      { to: '/admin/motor-propio', ico: Icon.Cog, label: 'Motor propio' },
-      { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
-      { to: '/admin/usuarios', ico: Icon.Users, label: 'Usuarios y roles' },
-      { to: '/admin/actividad', ico: Icon.List, label: 'Log de actividad' },
-      { to: '/admin/datos', ico: Icon.Shield, label: 'Datos personales' },
-    ],
-  },
-];
+// El menú (23 entradas agrupadas por lo que la persona viene a hacer)
+// vive en secciones.js — misma fuente que los checkboxes de Usuarios.jsx.
+// Desde la migración 092 cada cuenta ve solo sus secciones asignadas
+// (superadmin ve todo); el gate real está en el backend (requireSeccion),
+// esto solo evita mostrar puertas que van a dar 403.
+
+// Envuelve una pantalla que exige sección: sin permiso, rebota al
+// Dashboard en vez de renderizar — así una URL tecleada a mano tampoco
+// muestra nada, aunque el NAV ya la esconda.
+function RequiereSeccion({ user, slug, children }) {
+  if (!puedeVerSeccion(user, slug)) return <Navigate to="/admin" replace />;
+  return children;
+}
 
 // El panel admin es su propia "app" instalable, distinta del sitio público
 // (que usa /manifest.webmanifest, start_url "/"): mientras se está en
@@ -166,19 +131,23 @@ export default function AdminApp() {
       <aside className={`admin-side ${menuOpen ? 'open' : ''}`}>
         <div className="brand"><Logo size={26} light tagline /></div>
         <nav>
-          {NAV.map((sec) => (
-            <div key={sec.titulo}>
-              <div className="nav-sec">{sec.titulo}</div>
-              {sec.items.map((n) => {
-                const Ico = n.ico;
-                return (
-                  <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
-                    <span className="icon-badge"><Ico size={18} /></span> {n.label}
-                  </NavLink>
-                );
-              })}
-            </div>
-          ))}
+          {SECCIONES_ADMIN_NAV.map((sec) => {
+            const visibles = sec.items.filter((n) => puedeVerSeccion(user, n.slug));
+            if (!visibles.length) return null; // grupo sin nada que mostrar: ni el título
+            return (
+              <div key={sec.titulo}>
+                <div className="nav-sec">{sec.titulo}</div>
+                {visibles.map((n) => {
+                  const Ico = n.ico;
+                  return (
+                    <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
+                      <span className="icon-badge"><Ico size={18} /></span> {n.label}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            );
+          })}
         </nav>
         <div className="foot">
           <div style={{ fontWeight: 600 }}>{user?.nombre}</div>
@@ -229,29 +198,29 @@ export default function AdminApp() {
       <main className="admin-main">
         <Routes>
           <Route index element={<Dashboard />} />
-          <Route path="clientes" element={<Clientes rol={user?.rol} />} />
-          <Route path="sesiones" element={<Sesiones />} />
-          <Route path="corredor" element={<Corredor />} />
-          <Route path="origen" element={<Origen />} />
-          <Route path="origen-carteles-qr" element={<CorredorQR />} />
-          <Route path="capital" element={<CapitalNatural />} />
-          <Route path="trazabilidad" element={<Trazabilidad />} />
-          <Route path="buscar" element={<Buscar />} />
-          <Route path="transporte" element={<Transporte />} />
-          <Route path="accesos" element={<Accesos />} />
-          <Route path="metricas" element={<Metricas />} />
-          <Route path="juego" element={<Juego />} />
-          <Route path="prospectos" element={<Prospectos />} />
-          <Route path="motor-propio" element={<MotorPropio />} />
-          <Route path="motor" element={<SimpleApi />} />
-          <Route path="usuarios" element={<Usuarios yo={user} />} />
-          <Route path="actividad" element={<Actividad />} />
-          <Route path="capacitacion/*" element={<Capacitacion />} />
-          <Route path="apl" element={<Apl />} />
-          <Route path="auspiciadores" element={<Auspiciadores rol={user?.rol} />} />
-          <Route path="datos" element={<Datos rol={user?.rol} />} />
-          <Route path="sii" element={<Sii />} />
-          <Route path="enrolar" element={<Enrolar />} />
+          <Route path="clientes" element={<RequiereSeccion user={user} slug="clientes"><Clientes rol={user?.rol} /></RequiereSeccion>} />
+          <Route path="sesiones" element={<RequiereSeccion user={user} slug="sesiones"><Sesiones /></RequiereSeccion>} />
+          <Route path="corredor" element={<RequiereSeccion user={user} slug="corredor"><Corredor /></RequiereSeccion>} />
+          <Route path="origen" element={<RequiereSeccion user={user} slug="origen"><Origen /></RequiereSeccion>} />
+          <Route path="origen-carteles-qr" element={<RequiereSeccion user={user} slug="origen"><CorredorQR /></RequiereSeccion>} />
+          <Route path="capital" element={<RequiereSeccion user={user} slug="capital_natural"><CapitalNatural /></RequiereSeccion>} />
+          <Route path="trazabilidad" element={<RequiereSeccion user={user} slug="trazabilidad"><Trazabilidad /></RequiereSeccion>} />
+          <Route path="buscar" element={<RequiereSeccion user={user} slug="buscar"><Buscar /></RequiereSeccion>} />
+          <Route path="transporte" element={<RequiereSeccion user={user} slug="transporte"><Transporte /></RequiereSeccion>} />
+          <Route path="accesos" element={<RequiereSeccion user={user} slug="accesos_externos"><Accesos /></RequiereSeccion>} />
+          <Route path="metricas" element={<RequiereSeccion user={user} slug="metricas"><Metricas /></RequiereSeccion>} />
+          <Route path="juego" element={<RequiereSeccion user={user} slug="juego"><Juego /></RequiereSeccion>} />
+          <Route path="prospectos" element={<RequiereSeccion user={user} slug="prospectos"><Prospectos /></RequiereSeccion>} />
+          <Route path="motor-propio" element={<RequiereSeccion user={user} slug="motor_propio"><MotorPropio /></RequiereSeccion>} />
+          <Route path="motor" element={<RequiereSeccion user={user} slug="motor_externo"><SimpleApi /></RequiereSeccion>} />
+          <Route path="usuarios" element={<RequiereSeccion user={user} slug="usuarios"><Usuarios yo={user} /></RequiereSeccion>} />
+          <Route path="actividad" element={<RequiereSeccion user={user} slug="actividad"><Actividad /></RequiereSeccion>} />
+          <Route path="capacitacion/*" element={<RequiereSeccion user={user} slug="capacitacion"><Capacitacion /></RequiereSeccion>} />
+          <Route path="apl" element={<RequiereSeccion user={user} slug="apl"><Apl /></RequiereSeccion>} />
+          <Route path="auspiciadores" element={<RequiereSeccion user={user} slug="auspiciadores"><Auspiciadores rol={user?.rol} /></RequiereSeccion>} />
+          <Route path="datos" element={<RequiereSeccion user={user} slug="datos_personales"><Datos rol={user?.rol} /></RequiereSeccion>} />
+          <Route path="sii" element={<RequiereSeccion user={user} slug="sii"><Sii /></RequiereSeccion>} />
+          <Route path="enrolar" element={<RequiereSeccion user={user} slug="enrolar"><Enrolar /></RequiereSeccion>} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>

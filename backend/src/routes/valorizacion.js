@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { valorizar } from '../services/valorizacion.js';
 
 // ============================================================
@@ -9,7 +9,7 @@ import { valorizar } from '../services/valorizacion.js';
 // ============================================================
 
 const router = express.Router();
-router.use(requireAuth, requireHomePanel('sicrep'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('trazabilidad'));
 const adminOnly = requireRole('admin', 'operador');
 
 const rutNorm = (r) => String(r || '').replace(/[^0-9kK]/g, '').toUpperCase();

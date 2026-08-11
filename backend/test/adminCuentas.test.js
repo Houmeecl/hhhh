@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { SECCIONES_ADMIN } from '../src/constants/seccionesAdmin.js';
 import { hashApiKey } from '../src/services/mandante.js';
 import adminRouter from '../src/routes/admin.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
@@ -48,7 +49,7 @@ before(async () => {
   );
   puertoId = puertos[0].id;
 
-  tokenAdmin = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep' });
+  tokenAdmin = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, panel: 'sicrep', secciones_admin: [...SECCIONES_ADMIN] });
   tokenSuperadmin = signAccess({
     id: crypto.randomUUID(), rol: 'admin', email: `super-${sufijo}@ejemplo.cl`,
     panel: 'sicrep', es_superadmin: true,
@@ -127,6 +128,44 @@ test('POST /admin/usuarios devuelve password en vez de correo_enviado, con estad
   assert.equal(rows[0].estado, 'activo');
   assert.equal(rows[0].must_reset_password, true);
   assert.equal(await bcrypt.compare(body.password, rows[0].password_hash), true);
+});
+
+test('POST /admin/usuarios con secciones_admin parciales las persiste; con un slug inventado responde 400', { skip: SALTO_PROD }, async () => {
+  const email = `seccionado-${sufijo}@ejemplo.cl`;
+  const res = await fetch(`${baseUrl}/api/admin/usuarios`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, nombre: 'Solo REP', rol: 'operador', secciones_admin: ['dashboard', 'clientes', 'sii'] }),
+  });
+  assert.equal(res.status, 201);
+  const { usuario } = await res.json();
+  const { rows } = await query(`SELECT secciones_admin FROM usuarios WHERE id = $1`, [usuario.id]);
+  assert.deepEqual(rows[0].secciones_admin, ['dashboard', 'clientes', 'sii']);
+
+  const malo = await fetch(`${baseUrl}/api/admin/usuarios`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: `malo-${sufijo}@ejemplo.cl`, nombre: 'X', secciones_admin: ['inventada'] }),
+  });
+  assert.equal(malo.status, 400);
+
+  // PUT: edita las secciones; slug inválido también 400.
+  const put = await fetch(`${baseUrl}/api/admin/usuarios/${usuario.id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secciones_admin: ['dashboard', 'prospectos'] }),
+  });
+  assert.equal(put.status, 200);
+  assert.deepEqual((await put.json()).usuario.secciones_admin, ['dashboard', 'prospectos']);
+
+  const putMalo = await fetch(`${baseUrl}/api/admin/usuarios/${usuario.id}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${tokenAdmin}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secciones_admin: ['x'] }),
+  });
+  assert.equal(putMalo.status, 400);
+
+  await query(`DELETE FROM usuarios WHERE id = $1`, [usuario.id]);
 });
 
 test('POST /admin/usuarios/:id/reenviar-activacion regenera la contraseña y funciona con bcrypt.compare', { skip: SALTO_PROD }, async () => {

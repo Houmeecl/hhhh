@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
 import { signAccess } from '../src/middleware/auth.js';
+import { SECCIONES_ADMIN } from '../src/constants/seccionesAdmin.js';
 import origenRoutes, { tarjetaRouter } from '../src/routes/origen.js';
 import { torreRouter } from '../src/routes/torre.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
@@ -35,7 +36,7 @@ before(async () => {
 
   await runMigrations();
 
-  adminToken = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl` });
+  adminToken = signAccess({ id: crypto.randomUUID(), rol: 'admin', email: `admin-${sufijo}@ejemplo.cl`, secciones_admin: [...SECCIONES_ADMIN] });
 
   const app = express();
   app.use(express.json());

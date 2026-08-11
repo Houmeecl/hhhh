@@ -1,6 +1,6 @@
 import express from 'express';
 import { query } from '../lib/db.js';
-import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
+import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import {
   validarAcuerdo, validarMeta, evidenciaDisponible, resumenMetas,
 } from '../services/apl.js';
@@ -17,7 +17,7 @@ const router = express.Router();
 // Todo el módulo (incluidas las lecturas) es de admin/operador: las
 // cuentas de portal con rol 'cliente' comparten el panel 'sicrep' y no
 // deben ver los APL de otros clientes.
-router.use(requireAuth, requireHomePanel('sicrep'), requireRole('admin', 'operador'));
+router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('apl'), requireRole('admin', 'operador'));
 
 
 // ---------- Listado de acuerdos (con cliente y avance) ----------
