@@ -56,8 +56,22 @@ test('apigateway.cl: normaliza el detalle det* a las mismas claves que BaseAPI/S
   assert.equal(r.compra[0].folio, '100');
   assert.equal(r.compra[0].rut_contraparte, '770000000'); // 77.000.000-0 normalizado
   assert.equal(r.compra[0].total, 416500);
+  assert.equal(r.compra[0].fecha, '2025-01-15'); // detFchDoc DD/MM/YYYY → ISO
   assert.equal(r.compra[0].origen_calculo, 'texto'); // sin detalle de ítems => método por gasto
   assert.equal(r.compra[0].items.length, 1);
+});
+
+test('apigateway.cl: fechas con guiones o en ISO también quedan en ISO (no NULL en silencio)', async () => {
+  const fetcher = fakeFetch((url) => {
+    if (url.includes('/misii/contribuyente/datos')) return { json: { data: { datos: { codigoError: 0 } } } };
+    if (url.includes('/resumen/')) return { json: { data: { respEstado: { codRespuesta: 0 }, data: [] } } };
+    if (url.includes('/compras/detalle/')) return { json: { data: [{ ...FILA_DETALLE, detFchDoc: '15-01-2025' }] } };
+    if (url.includes('/ventas/detalle/')) return { json: { data: [{ ...FILA_DETALLE, detFchDoc: '2025-01-15' }] } };
+    return { json: { data: [] } };
+  });
+  const r = await descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG });
+  assert.equal(r.compra[0].fecha, '2025-01-15');
+  assert.equal(r.venta[0].fecha, '2025-01-15');
 });
 
 test('apigateway.cl: suma la fila-resumen de boletas (tipos sin detalle)', async () => {
@@ -94,6 +108,25 @@ test('apigateway.cl: 401 en la validación se marca como error de credenciales',
 test('apigateway.cl: codigoError != 0 con HTTP 200 también se trata como credenciales inválidas', async () => {
   const fetcher = fakeFetch(() => ({ json: { data: { datos: { codigoError: 7 } } } }));
   assert.equal(await validarCredencialesSii({ rut: RUT, password: 'mala' }, { fetcher, cfg: CFG }), false);
+});
+
+test('apigateway.cl: 400 en descarga da el mensaje honesto (clave/período/representación)', async () => {
+  const fetcher = fakeFetch((url) => {
+    if (url.includes('/misii/contribuyente/datos')) return { json: { data: { datos: { codigoError: 0 } } } };
+    return { status: 400, json: {} };
+  });
+  await assert.rejects(
+    () => descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG }),
+    (e) => e.entrada === true && /clave tributaria/.test(e.message) && /período/.test(e.message)
+  );
+});
+
+test('apigateway.cl: 429 explica la cuota del proveedor y pide esperar', async () => {
+  const fetcher = fakeFetch(() => ({ status: 429, json: {} }));
+  await assert.rejects(
+    () => descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG }),
+    (e) => e.fuente === true && e.status === 429 && /cuota/.test(e.message)
+  );
 });
 
 test('apigateway.cl: un error de la fuente nunca revela la clave', async () => {

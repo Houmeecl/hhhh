@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normalizarFilaRcv, normalizarDteRecibido, normalizarResumenRcv, descargarRcv, descargarDteRecibidos, descargarComprasVentas, validarCredencialesSii, PERIODO_RE,
+  montoNum, fechaISO, rutConGuion,
 } from '../src/services/baseapiSii.js';
 
 // Config inyectada: nunca la key real, nunca red real.
@@ -21,6 +22,40 @@ test('PERIODO_RE acepta AAAA-MM y rechaza el resto', () => {
   assert.ok(!PERIODO_RE.test('2025-13'));
   assert.ok(!PERIODO_RE.test('202501'));
   assert.ok(!PERIODO_RE.test('enero'));
+});
+
+test('montoNum: el punto del RCV chileno es separador de MILES, nunca decimal', () => {
+  // Antes '350.000' se leía 350 y '1.234.567' daba 0 (NaN→0): los montos
+  // quedaban divididos por mil en silencio y el CO2e por gasto, corrupto.
+  assert.equal(montoNum('350.000'), 350000);
+  assert.equal(montoNum('1.234.567'), 1234567);
+  assert.equal(montoNum('350000'), 350000); // sin separador, igual que siempre
+  assert.equal(montoNum(416500), 416500);   // numérico directo
+  assert.equal(montoNum('-15.000'), -15000); // notas de crédito
+  assert.equal(montoNum(null), 0);
+  assert.equal(montoNum(''), 0);
+  assert.equal(montoNum('sin monto'), 0);
+});
+
+test('fechaISO acepta los formatos que mezclan el SII y sus pasarelas', () => {
+  assert.equal(fechaISO('15/01/2025'), '2025-01-15'); // DD/MM/YYYY clásico
+  assert.equal(fechaISO('15-01-2025'), '2025-01-15'); // con guiones
+  assert.equal(fechaISO('5/1/2025'), '2025-01-05');   // sin cero a la izquierda
+  assert.equal(fechaISO('15.01.2025'), '2025-01-15'); // con puntos
+  assert.equal(fechaISO('2025-01-15'), '2025-01-15'); // ya ISO
+  assert.equal(fechaISO('2025-1-5'), '2025-01-05');   // ISO sin ceros
+  assert.equal(fechaISO('2025-01-15T00:00:00'), '2025-01-15'); // ISO con hora
+  assert.equal(fechaISO(''), null);
+  assert.equal(fechaISO('ayer'), null);
+  assert.equal(fechaISO(null), null);
+});
+
+test('rutConGuion normaliza puntos/guión/k y rechaza DV malo sin gastar cuota', () => {
+  assert.equal(rutConGuion('76.520.943-9'), '76520943-9');
+  assert.equal(rutConGuion('76520943-9'), '76520943-9');
+  assert.equal(rutConGuion('765209439'), '76520943-9');
+  assert.throws(() => rutConGuion('76520943-0'), (e) => e.entrada === true); // DV no cuadra
+  assert.throws(() => rutConGuion('123'), (e) => e.entrada === true);        // muy corto
 });
 
 test('normalizarFilaRcv reduce la fila y normaliza RUT/montos/fecha', () => {
@@ -104,12 +139,48 @@ test('validar: BaseAPI responde 400 para credenciales inválidas → false (no e
   assert.equal(await validarCredencialesSii({ rut: RUT, password: 'mala' }, { fetcher, cfg: CFG }), false);
 });
 
-test('RCV con 400 da un mensaje accionable de período/empresa', async () => {
+test('RCV con 400: mensaje honesto que no culpa solo al período', async () => {
+  // El 400 de BaseAPI también puede ser la clave o la falta de
+  // representación electrónica — el mensaje debe decir las tres causas.
   const fetcher = fakeFetch({}, { status: 400 });
   await assert.rejects(
     () => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG }),
-    /revisa el período/
+    (e) => e.entrada === true && e.status === 400
+      && /clave tributaria/.test(e.message)
+      && /período/.test(e.message)
+      && /represente/.test(e.message)
   );
+});
+
+test('HTTP 429 del proveedor: error de fuente que explica la cuota y pide esperar', async () => {
+  const fetcher = fakeFetch({}, { status: 429 });
+  await assert.rejects(
+    () => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG }),
+    (e) => e.fuente === true && e.status === 429 && /cuota/.test(e.message) && /Espera unos minutos/.test(e.message)
+  );
+});
+
+test('el detalle del error del proveedor va al log del servidor, sin la clave', async () => {
+  // Sin este log, diagnosticar un 400/429 real era imposible; pero el
+  // detalle JAMÁS viaja al cliente ni incluye la clave tributaria.
+  const avisos = [];
+  const warnOriginal = console.warn;
+  console.warn = (...a) => avisos.push(a.join(' '));
+  try {
+    // El fixture ecoa la clave a propósito: la redacción debe taparla.
+    const fetcher = fakeFetch({ error: { message: `periodo formato invalido segun proveedor (pass: ${CLAVE})` } }, { status: 400 });
+    await assert.rejects(
+      () => descargarRcv({ rut: RUT, password: CLAVE, periodo: '2025-01', tipo: 'venta' }, { fetcher, cfg: CFG }),
+      (e) => !e.message.includes('proveedor formato') // el detalle crudo no va al cliente
+    );
+  } finally {
+    console.warn = warnOriginal;
+  }
+  assert.equal(avisos.length, 1);
+  assert.match(avisos[0], /\[siiBaseapi\] HTTP 400/);
+  assert.match(avisos[0], /periodo formato invalido/);
+  assert.ok(!avisos[0].includes(CLAVE), 'el log no puede contener la clave');
+  assert.match(avisos[0], /\*\*\*/, 'la clave ecoada por el proveedor queda redactada');
 });
 
 test('resumenPorTipo: boletas/comprobantes entran como fila-resumen; los tipos con detalle NO se duplican', async () => {
@@ -168,9 +239,9 @@ test('DTE recibidos SIEMPRE envía rut_empresa (el endpoint lo exige), aunque se
   assert.equal(enviado.rut_empresa, RUT, 'rut_empresa debe ir presente, igual al rut');
 });
 
-test('descargarComprasVentas valida, trae compras (DTE) y ventas (RCV)', async () => {
+test('descargarComprasVentas trae compras (DTE) y ventas (RCV) SIN validación previa', async () => {
   const capturas = [];
-  // Fetcher que responde según la URL: validar, DTE recibidos, RCV venta.
+  // Fetcher que responde según la URL: DTE recibidos, RCV venta.
   const fetcher = async (url, opts) => {
     capturas.push({ url, body: opts.body });
     let body = { success: true };
@@ -181,11 +252,13 @@ test('descargarComprasVentas valida, trae compras (DTE) y ventas (RCV)', async (
   const r = await descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG });
   assert.equal(r.compra.length, 1);
   assert.equal(r.venta.length, 1);
-  // 3 llamadas: validar + DTE recibidos (compras) + RCV venta.
-  assert.equal(capturas.length, 3);
-  assert.match(capturas[0].url, /\/sii\/auth\/validar$/);
-  assert.match(capturas[1].url, /\/sii\/dte\/recibidos\/2025-01$/);
-  assert.match(capturas[2].url, /\/rcv\/2025-01\/venta$/);
+  // 2 llamadas, SIN /sii/auth/validar: la validación previa gastaba un
+  // tercio de la cuota en cada descarga (y con planes chicos, gatillaba
+  // el 429). Una clave mala igual falla en la primera llamada real.
+  assert.equal(capturas.length, 2);
+  assert.match(capturas[0].url, /\/sii\/dte\/recibidos\/2025-01$/);
+  assert.match(capturas[1].url, /\/rcv\/2025-01\/venta$/);
+  assert.ok(capturas.every((c) => !/auth\/validar/.test(c.url)));
 });
 
 test('sin BASEAPI_API_KEY el módulo queda apagado', async () => {

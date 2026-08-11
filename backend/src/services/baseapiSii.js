@@ -49,21 +49,27 @@ export function rutConGuion(rutCrudo) {
 
 // Lee un monto que el SII entrega como string ('350000', a veces con
 // separadores) y lo devuelve como número. Nunca NaN: cae a 0.
-function montoNum(v) {
+// El RCV chileno viene en PESOS ENTEROS: el punto es SIEMPRE separador de
+// miles ('350.000' = 350000, '1.234.567' = 1234567), nunca decimal — se
+// elimina antes de limpiar el resto. Conservarlo hacía que Number() lo
+// leyera como decimal y los montos quedaran divididos por mil (o en NaN→0)
+// en silencio, corrompiendo totales y el CO2e por gasto.
+export function montoNum(v) {
   if (v == null) return 0;
-  const n = Number(String(v).replace(/[^\d.-]/g, ''));
+  const n = Number(String(v).replace(/\./g, '').replace(/[^\d-]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
 
-// 'DD/MM/YYYY' (formato del RCV) -> 'YYYY-MM-DD'. Deja pasar lo que ya
-// venga en ISO; devuelve null si no reconoce el formato (la columna es
-// opcional en BD).
-function fechaISO(v) {
+// Fecha del RCV -> 'YYYY-MM-DD'. El SII y sus pasarelas mezclan formatos:
+// 'DD/MM/YYYY', 'DD-MM-YYYY', día/mes sin cero a la izquierda, e ISO.
+// Devuelve null si no reconoce el formato (la columna es opcional en BD).
+export function fechaISO(v) {
   const s = String(v || '').trim();
   if (!s) return null;
-  const dmy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const dmy = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  const ymd = s.match(/^(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})/);
+  if (ymd) return `${ymd[1]}-${ymd[2].padStart(2, '0')}-${ymd[3].padStart(2, '0')}`;
   return null;
 }
 
@@ -162,16 +168,33 @@ async function llamar(path, { rut, password, rutEmpresa }, { fetcher = fetch, cf
   }
 
   if (!res.ok) {
+    // Detalle del error del proveedor SOLO al log del servidor (nunca al
+    // cliente, nunca la clave — la respuesta no la trae, y igual se
+    // trunca): sin esto, diagnosticar un 400/429 real era imposible.
+    const detalle = await res.json().catch(() => null);
+    // Redacción defensiva: si el proveedor algún día ecoara el body en su
+    // error, la clave no puede llegar ni al log del servidor.
+    const motivo = String(detalle?.error?.message || detalle?.error || detalle?.message || '')
+      .split(password).join('***').slice(0, 300);
+    if (motivo) console.warn(`[siiBaseapi] HTTP ${res.status} en ${path}: ${motivo}`);
+
     // 401/403 = credenciales SII inválidas en RCV/DTE. OJO: /sii/auth/validar
     // responde 400 para "credenciales inválidas" (así lo documenta BaseAPI);
     // ese caso lo interpreta validarCredencialesSii() con e.status.
     if (res.status === 401 || res.status === 403) {
       throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true, status: res.status });
     }
+    if (res.status === 429) {
+      // Cuota o frecuencia del PROVEEDOR agotada — no es culpa de la clave
+      // ni del período, y reintentar de inmediato solo la agota más.
+      throw errFuente('El proveedor de conexión al SII rechazó la consulta por exceso de solicitudes (HTTP 429): se agotó la cuota del plan o hubo demasiados intentos seguidos. Espera unos minutos antes de reintentar — cada intento consume cuota.', 429);
+    }
     if (res.status === 400) {
-      // En RCV/DTE un 400 es período/empresa inválidos. Mensaje accionable,
-      // sin cuerpo crudo de la respuesta remota.
-      throw Object.assign(errEntrada('El SII rechazó la consulta: revisa el período (AAAA-MM) y que el RUT de la empresa exista en el SII.'), { status: 400 });
+      // Un 400 acá NO siempre es el período: BaseAPI también responde 400
+      // por credenciales inválidas o por falta de representación
+      // electrónica sobre la empresa consultada. No afirmar una causa que
+      // no consta — mensaje honesto con las tres posibilidades reales.
+      throw Object.assign(errEntrada('El SII rechazó la consulta (HTTP 400). Puede ser la clave tributaria, el período solicitado, o que el RUT autenticado no represente a esta empresa en el SII.'), { status: 400 });
     }
     throw errFuente(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`, res.status);
   }
@@ -264,17 +287,17 @@ export async function descargarDteRecibidos({ rut, password, rutEmpresa, periodo
   return docs.map(normalizarDteRecibido).filter(Boolean);
 }
 
-// Descarga compras Y ventas de un período en una sola operación. Valida
-// primero las credenciales con el endpoint barato: si están malas, no
-// gasta las llamadas caras.
+// Descarga compras Y ventas de un período en una sola operación.
 //  - COMPRAS: por DTE recibidos (con XML) para extraer todo el detalle y
 //    poder calcular emisiones por ítem.
 //  - VENTAS: por RCV (totales); las ventas no alimentan la estimación de
 //    emisiones de compras, basta el resumen.
+// SIN validación previa de credenciales: la llamada extra a /sii/auth/validar
+// gastaba un tercio de la cuota del proveedor en cada intento (y con planes
+// chicos gatillaba el 429 más rápido). Una clave mala igual falla en la
+// primera descarga con su propio mensaje (401/403/400).
 export async function descargarComprasVentas({ rut, password, rutEmpresa, periodo }, opts = {}) {
   if (!PERIODO_RE.test(String(periodo || ''))) throw errEntrada('Período inválido: usa AAAA-MM (ej: 2026-06).');
-  const ok = await validarCredencialesSii({ rut, password }, opts);
-  if (!ok) throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true });
   const compra = await descargarDteRecibidos({ rut, password, rutEmpresa, periodo }, opts);
   const venta = await descargarRcv({ rut, password, rutEmpresa, periodo, tipo: 'venta' }, opts);
   return { compra, venta };

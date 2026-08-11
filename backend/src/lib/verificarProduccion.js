@@ -53,6 +53,20 @@ export function verificarConfigProduccion(cfg) {
   if (!cfg.baseapi?.enabled) {
     advertencias.push('BASEAPI_API_KEY vacía — el autocompletado SII por RUT queda deshabilitado');
   }
+
+  // Coherencia de SII_PROVEEDOR: un typo ('simplapi') caía en silencio a
+  // baseapi y toda descarga culpaba al proveedor equivocado. FATAL si el
+  // valor no es uno conocido; FATAL también si el proveedor elegido no
+  // tiene su API Key (la descarga del RCV fallaría en el primer uso real).
+  const proveedorSii = cfg.sii?.proveedor;
+  const PROVEEDORES_SII = ['baseapi', 'simpleapi', 'apigateway'];
+  if (proveedorSii && !PROVEEDORES_SII.includes(proveedorSii)) {
+    fatales.push(`SII_PROVEEDOR="${proveedorSii}" no es un proveedor conocido (${PROVEEDORES_SII.join(', ')}) — caería en silencio a baseapi`);
+  } else if (proveedorSii === 'simpleapi' && !cfg.sii?.simpleapi?.enabled) {
+    fatales.push('SII_PROVEEDOR=simpleapi pero SIMPLEAPI_KEY está vacía — la descarga del RCV fallaría en el primer uso');
+  } else if (proveedorSii === 'apigateway' && !cfg.sii?.apigateway?.enabled) {
+    fatales.push('SII_PROVEEDOR=apigateway pero APIGATEWAY_API_KEY está vacía — la descarga del RCV fallaría en el primer uso');
+  }
   // FATAL, no advertencia. En modo mock, `simpleApi.mockAnalyzeInvoice` genera
   // el CO2e con un PRNG: ítems de una lista fija, cantidades aleatorias, hasta
   // un RUT emisor falso. Ese número entra a `facturas`, SE SELLA EN LA CADENA

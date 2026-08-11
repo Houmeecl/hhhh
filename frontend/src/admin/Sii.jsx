@@ -5,11 +5,14 @@ import { normalizarPeriodo, periodoValido } from '../lib/periodo.js';
 import AnalisisSiiVista from '../components/AnalisisSiiVista.jsx';
 
 // Sección admin "SII": elegir una empresa y GENERAR en un solo paso. La
-// primera vez pide el RUT y clave tributaria de la persona que ingresa al
-// SII (se validan y quedan en memoria mientras la pantalla está abierta);
-// desde la segunda empresa en adelante, "Generar" descarga directo, sin
-// volver a pedirlas. El RUT de la empresa sale de la fila, nunca del
-// formulario. Las credenciales no se guardan ni acá ni en el servidor.
+// primera vez pide las credenciales que inician sesión en el SII — lo
+// recomendado es el RUT de la EMPRESA con su propia Clave Tributaria
+// (ver deploy/SII-CREDENCIALES.md); un RUT de persona solo sirve si esa
+// persona representa electrónicamente a la empresa en el SII. Se validan
+// y quedan en memoria mientras la pantalla está abierta; desde la segunda
+// empresa en adelante, "Generar" descarga directo, sin volver a pedirlas.
+// El RUT de la empresa consultada sale de la fila, nunca del formulario.
+// Las credenciales no se guardan ni acá ni en el servidor.
 function periodoAnterior() {
   const d = new Date();
   d.setDate(1);
@@ -36,8 +39,9 @@ export default function Sii() {
       </div>
       <p className="muted" style={{ fontSize: 14, maxWidth: 760, marginTop: 0 }}>
         Elige una empresa y presiona Generar: sicr3p descarga los documentos del período, extrae el
-        detalle y genera la contabilidad de carbono. La primera vez te pide el RUT y clave tributaria
-        de quien ingresa al SII; el resto de las empresas se generan directo, sin volver a pedirla.
+        detalle y genera la contabilidad de carbono. La primera vez te pide el RUT y la Clave
+        Tributaria con que se entra al SII (lo recomendado: los de la empresa); el resto de las
+        empresas se generan directo, sin volver a pedirla.
       </p>
 
       {sesion && (
@@ -125,7 +129,7 @@ function GenerarEmpresa({ empresa, sesion, onSesion, flash, onDescargado }) {
 
     let activa = sesion;
     if (!activa) {
-      if (!validarRut(rut)) { flash('El RUT no es válido — es el de la persona que ingresa al SII.', true); return; }
+      if (!validarRut(rut)) { flash('El RUT no es válido — revisa el dígito verificador (ej: 76520943-9).', true); return; }
       if (!clave) { flash('Ingresa la clave tributaria.', true); return; }
       activa = { rut, password: clave };
     }
@@ -163,8 +167,8 @@ function GenerarEmpresa({ empresa, sesion, onSesion, flash, onDescargado }) {
         {!sesion && (
           <>
             <div className="field" style={{ margin: 0 }}>
-              <label>RUT que ingresa al SII (persona)</label>
-              <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="12345678-9" required />
+              <label>RUT que inicia sesión en el SII</label>
+              <input value={rut} onChange={(e) => setRut(e.target.value)} placeholder="76520943-9" required />
             </div>
             <div className="field" style={{ margin: 0 }}>
               <label>Clave tributaria (no se guarda)</label>
@@ -183,8 +187,10 @@ function GenerarEmpresa({ empresa, sesion, onSesion, flash, onDescargado }) {
       {!sesion ? (
         <>
           <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>
-            🔒 Es el RUT de la persona (o representante) que entra al SII con su clave — no el RUT de
-            la empresa. Se valida y descarga en un solo paso; no se guarda.
+            🔒 Lo recomendado es el <strong>RUT de la empresa con su propia Clave Tributaria</strong> (la
+            que abre sesión en sii.cl digitando directo el RUT de la empresa). Un RUT de persona solo
+            funciona si representa electrónicamente a la empresa en el SII. Se valida y descarga en un
+            solo paso; la clave no se guarda.
           </p>
           <details style={{ marginTop: 10 }}>
             <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--muted)' }}>¿El SII rechaza las credenciales?</summary>

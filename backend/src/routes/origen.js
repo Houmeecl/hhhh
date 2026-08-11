@@ -1546,12 +1546,20 @@ proveedorPanelRouter.post('/sii/credenciales', requireNivelOperador, async (req,
     if (!b.password) return res.status(400).json({ error: 'Falta la clave tributaria.' });
 
     // Validar contra el SII antes de guardar: no guardamos una clave mala.
-    const { validarCredencialesSii } = await import('../services/baseapiSii.js');
+    // Vía siiProveedor: respeta SII_PROVEEDOR (con simpleapi/apigateway
+    // activo, validar contra BaseAPI culpaba al proveedor equivocado).
+    const { validarCredencialesSii } = await import('../services/siiProveedor.js');
     let ok;
     try {
       ok = await validarCredencialesSii({ rut: b.rut, password: b.password });
     } catch (e) {
-      return res.status(502).json({ error: e.message });
+      // Mismo mapeo que la ruta de descarga: errores de ENTRADA (período,
+      // datos malformados) son culpa del request → 400; solo los de FUENTE
+      // (SII caído, cuota) son 502. Cualquier otro se relanza al manejador
+      // global sin filtrar el mensaje interno.
+      if (e.credenciales || e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
     }
     if (!ok) return res.status(400).json({ error: 'Clave tributaria incorrecta o bloqueada en el SII.' });
 

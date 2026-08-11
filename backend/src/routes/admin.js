@@ -1672,8 +1672,9 @@ router.get('/retencion/registro', async (req, res, next) => {
 // ============================================================
 
 // POST /api/admin/sii/sesion — PASO 1 del flujo: iniciar sesión con la API
-// del SII. Valida las credenciales de la PERSONA que ingresa al SII (RUT +
-// clave tributaria) contra /sii/auth/validar ANTES de operar empresas.
+// del SII. Valida las credenciales que inician sesión en el SII (RUT +
+// clave tributaria — lo recomendado: los de la EMPRESA, ver
+// deploy/SII-CREDENCIALES.md) contra /sii/auth/validar ANTES de operar.
 // Por-request: acá no se guarda nada — el frontend retiene las credenciales
 // solo en memoria mientras la pantalla está abierta.
 router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
@@ -1689,7 +1690,7 @@ router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, re
       throw e;
     }
     if (!valida) {
-      return res.status(401).json({ error: 'El SII rechazó esas credenciales: revisa el RUT (el de la persona que ingresa al SII, no el de la empresa) y la clave tributaria.' });
+      return res.status(401).json({ error: 'El SII rechazó esas credenciales: revisa que el RUT y la Clave Tributaria correspondan al mismo contribuyente (lo recomendado: el RUT de la empresa con su propia clave, no la del representante).' });
     }
     // Solo el hecho de la validación: NUNCA la clave.
     await logActividad({

@@ -66,6 +66,32 @@ test('SimpleAPI: 401 se marca como error de credenciales; validar → false', as
   );
 });
 
+test('SimpleAPI: validar envía un Periodo válido — sin él, toda clave parecía mala', async () => {
+  // SimpleAPI responde 400 si falta Periodo en /rcv/compra; como el 400 se
+  // interpreta "credenciales malas", el login del admin quedaba imposible.
+  const capturas = [];
+  const fetcher = fakeFetch(() => ({ json: { data: [] } }), { capturas });
+  assert.equal(await validarCredencialesSii({ rut: RUT, password: CLAVE }, { fetcher, cfg: CFG }), true);
+  const enviado = JSON.parse(capturas[0].body);
+  assert.match(String(enviado.Periodo || ''), /^\d{4}-(0[1-9]|1[0-2])$/, 'la validación debe llevar Periodo AAAA-MM');
+});
+
+test('SimpleAPI: 400 en descarga da el mensaje honesto (clave/período/representación)', async () => {
+  const fetcher = fakeFetch(() => ({ status: 400, json: {} }));
+  await assert.rejects(
+    () => descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG }),
+    (e) => e.entrada === true && /clave tributaria/.test(e.message) && /período/.test(e.message)
+  );
+});
+
+test('SimpleAPI: 429 explica la cuota del proveedor y pide esperar', async () => {
+  const fetcher = fakeFetch(() => ({ status: 429, json: {} }));
+  await assert.rejects(
+    () => descargarComprasVentas({ rut: RUT, password: CLAVE, periodo: '2025-01' }, { fetcher, cfg: CFG }),
+    (e) => e.fuente === true && e.status === 429 && /cuota/.test(e.message)
+  );
+});
+
 test('SimpleAPI: un error de la fuente nunca revela la clave', async () => {
   const fetcher = fakeFetch(() => ({ status: 500, json: {} }));
   try {

@@ -50,11 +50,24 @@ async function llamar(path, { rut, password }, { fetcher = fetch, cfg = config.s
   }
 
   if (!res.ok) {
+    // Detalle del error del proveedor solo al log del servidor (sin clave).
+    const detalle = await res.json().catch(() => null);
+    // Redacción defensiva: si el proveedor algún día ecoara el body en su
+    // error, la clave no puede llegar ni al log del servidor.
+    const motivo = String(detalle?.error?.message || detalle?.error || detalle?.message || '')
+      .split(password).join('***').slice(0, 300);
+    if (motivo) console.warn(`[siiApigateway] HTTP ${res.status} en ${path}: ${motivo}`);
+
     if (res.status === 401 || res.status === 403) {
       throw Object.assign(new Error('Clave tributaria incorrecta o bloqueada en el SII.'), { credenciales: true, status: res.status });
     }
+    if (res.status === 429) {
+      throw errFuente('El proveedor de conexión al SII rechazó la consulta por exceso de solicitudes (HTTP 429): se agotó la cuota del plan o hubo demasiados intentos seguidos. Espera unos minutos antes de reintentar — cada intento consume cuota.', 429);
+    }
     if (res.status === 400) {
-      throw Object.assign(errEntrada('El SII rechazó la consulta: revisa el período (AAAA-MM) y que el RUT de la empresa exista en el SII.'), { status: 400 });
+      // No afirmar una causa que no consta: un 400 también puede ser la
+      // clave o la representación electrónica, no solo el período.
+      throw Object.assign(errEntrada('El SII rechazó la consulta (HTTP 400). Puede ser la clave tributaria, el período solicitado, o que el RUT autenticado no represente a esta empresa en el SII.'), { status: 400 });
     }
     throw errFuente(`El SII respondió con un error (HTTP ${res.status}). Intenta más tarde.`, res.status);
   }

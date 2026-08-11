@@ -114,6 +114,44 @@ test('SII_CRED_KEY demasiado corta es fatal', () => {
   assert.match(fatales[0], /SII_CRED_KEY/);
 });
 
+// Un typo en SII_PROVEEDOR ('simplapi') caía en SILENCIO a baseapi: toda
+// descarga usaba el proveedor equivocado sin que nadie lo notara.
+test('SII_PROVEEDOR desconocido es fatal (no puede caer en silencio a baseapi)', () => {
+  const cfg = base();
+  cfg.sii = { proveedor: 'simplapi', simpleapi: { enabled: true }, apigateway: { enabled: false } };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /SII_PROVEEDOR/);
+  assert.match(fatales[0], /simplapi/);
+});
+
+test('SII_PROVEEDOR=simpleapi sin SIMPLEAPI_KEY es fatal', () => {
+  const cfg = base();
+  cfg.sii = { proveedor: 'simpleapi', simpleapi: { enabled: false }, apigateway: { enabled: false } };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /SIMPLEAPI_KEY/);
+});
+
+test('SII_PROVEEDOR=apigateway sin APIGATEWAY_API_KEY es fatal', () => {
+  const cfg = base();
+  cfg.sii = { proveedor: 'apigateway', simpleapi: { enabled: false }, apigateway: { enabled: false } };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.equal(fatales.length, 1);
+  assert.match(fatales[0], /APIGATEWAY_API_KEY/);
+});
+
+test('SII_PROVEEDOR válido con su key presente no arroja fatales', () => {
+  const cfg = base();
+  cfg.sii = { proveedor: 'simpleapi', simpleapi: { enabled: true }, apigateway: { enabled: false } };
+  const { fatales } = verificarConfigProduccion(cfg);
+  assert.deepEqual(fatales, []);
+  // baseapi por defecto tampoco (su falta de key ya tiene advertencia propia).
+  const cfg2 = base();
+  cfg2.sii = { proveedor: 'baseapi', simpleapi: { enabled: false }, apigateway: { enabled: false } };
+  assert.deepEqual(verificarConfigProduccion(cfg2).fatales, []);
+});
+
 test('los defaults de desarrollo acumulan varios fatales a la vez', () => {
   const cfg = base();
   cfg.jwt.accessSecret = 'dev_access_secret_change_me';
