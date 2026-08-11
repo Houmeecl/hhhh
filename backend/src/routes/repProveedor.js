@@ -6,6 +6,7 @@ import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } fro
 import { validarComponentes, calcularReciclabilidad, MATERIALES_REP } from '../services/rep.js';
 import {
   validarItemsVenta, snapshotItemsVenta, totalesVenta, resumenRep,
+  normalizarNumeroDoc, cruzarConRcv,
 } from '../services/repProveedor.js';
 
 // ============================================================
@@ -159,7 +160,7 @@ router.put('/productos/:id', requireNivelOperador, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ---------- GET /ventas — ventas propias + resumen REP ----------
+// ---------- GET /ventas — ventas propias + resumen REP + cruce RCV ----------
 router.get('/ventas', async (req, res, next) => {
   try {
     const { rows } = await query(
@@ -169,8 +170,16 @@ router.get('/ventas', async (req, res, next) => {
         ORDER BY fecha_documento DESC, created_at DESC`,
       [req.user.proveedor_id]
     );
+    // Cruce contra las ventas REALES del RCV que el mismo proveedor
+    // descargó del SII: la declaración REP se contrasta, no se cree sola.
+    const { rows: rcv } = await query(
+      `SELECT periodo, folio, tipo_dte FROM dte_proveedor WHERE proveedor_id = $1 AND tipo = 'venta'`,
+      [req.user.proveedor_id]
+    );
+    const cruce = cruzarConRcv(rows, rcv);
     res.json({
-      ventas: rows,
+      ventas: rows.map((v) => ({ ...v, consta_en_rcv: cruce.por_venta.get(v.id) ?? null })),
+      cruce_rcv: cruce.por_periodo,
       resumen: resumenRep(rows),
       // El texto que el frontend muestra junto al resumen — una sola
       // fuente para no reescribirlo distinto en cada pantalla.
@@ -192,6 +201,29 @@ router.post('/ventas', requireNivelOperador, uploadArchivo, async (req, res, nex
     const fecha = String(req.body?.fecha_documento || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || Number.isNaN(Date.parse(fecha))) {
       return res.status(400).json({ error: 'La fecha del documento debe ser AAAA-MM-DD.' });
+    }
+    // Una factura con fecha futura no existe todavía. Margen de 1 día por
+    // zonas horarias (el servidor puede ir en UTC, un día "adelante" de Chile).
+    if (Date.parse(fecha) > Date.now() + 24 * 3600 * 1000) {
+      return res.status(400).json({ error: 'La fecha del documento está en el futuro — revísala.' });
+    }
+
+    // La misma factura registrada dos veces DUPLICA kilos en el resumen
+    // que alimenta la declaración RETC/SGR. Este chequeo compara por
+    // número normalizado a dígitos ("F-123" = "123") y es el que atrapa
+    // las variantes con prefijo. El índice único de la migración 088
+    // cubre solo el duplicado exacto (lower/trim) — es el respaldo contra
+    // dobles envíos simultáneos del MISMO texto, no un candado total.
+    const { rows: existentes } = await query(
+      `SELECT numero_documento FROM ventas_rep WHERE proveedor_id = $1`,
+      [req.user.proveedor_id]
+    );
+    const numNorm = normalizarNumeroDoc(numero);
+    const repetida = existentes.find((e) => normalizarNumeroDoc(e.numero_documento) === numNorm);
+    if (repetida) {
+      return res.status(409).json({
+        error: `La factura N° ${repetida.numero_documento} ya está registrada — registrarla de nuevo duplicaría sus kilos en tu declaración.`,
+      });
     }
 
     let items;
@@ -228,7 +260,14 @@ router.post('/ventas', requireNivelOperador, uploadArchivo, async (req, res, nex
       ip: req.ip,
     });
     res.status(201).json({ venta: rows[0] });
-  } catch (err) { next(err); }
+  } catch (err) {
+    // Carrera contra el índice único de la 088 (dos envíos simultáneos
+    // del mismo número): mismo 409 amable que el chequeo de arriba.
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'Esa factura ya está registrada — registrarla de nuevo duplicaría sus kilos en tu declaración.' });
+    }
+    next(err);
+  }
 });
 
 // ---------- GET /ventas/:id/archivo — descargar la evidencia propia ----------

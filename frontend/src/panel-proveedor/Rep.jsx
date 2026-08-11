@@ -23,12 +23,15 @@ export default function Rep() {
   const [productos, setProductos] = useState(null);
   const [ventas, setVentas] = useState(null);
   const [resumen, setResumen] = useState(null);
+  const [cruceRcv, setCruceRcv] = useState([]);
   const [aviso, setAviso] = useState('');
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 4000); };
 
   const cargarProductos = () => api.proveedorRepProductos().then((d) => setProductos(d.productos));
-  const cargarVentas = () => api.proveedorRepVentas().then((d) => { setVentas(d.ventas); setResumen(d.resumen); setAviso(d.aviso); });
+  const cargarVentas = () => api.proveedorRepVentas().then((d) => {
+    setVentas(d.ventas); setResumen(d.resumen); setCruceRcv(d.cruce_rcv || []); setAviso(d.aviso);
+  });
 
   useEffect(() => {
     cargarProductos().catch((e) => flash(e.message, true));
@@ -47,7 +50,7 @@ export default function Rep() {
         tu empresa declara en RETC/SGR.
       </p>
 
-      <ResumenRep resumen={resumen} aviso={aviso} />
+      <ResumenRep resumen={resumen} aviso={aviso} cruceRcv={cruceRcv} />
       <Productos productos={productos} recargar={() => cargarProductos().catch((e) => flash(e.message, true))} flash={flash} />
       <RegistrarVenta
         productos={productos.filter((p) => p.activo)}
@@ -62,8 +65,11 @@ export default function Rep() {
 }
 
 // ---------- Resumen: kilos por material (la base de la declaración) ----------
-function ResumenRep({ resumen, aviso }) {
+function ResumenRep({ resumen, aviso, cruceRcv }) {
   if (!resumen || resumen.total.n_ventas === 0) return null;
+  // El empujón honesto: períodos donde el RCV del SII (pestaña "Compras y
+  // ventas") tiene ventas que aún no están pegadas a productos REP.
+  const pendientes = (cruceRcv || []).filter((p) => p.rcv_descargado && p.n_sin_pegar > 0);
   const anioActual = String(new Date().getFullYear());
   const kgAnio = resumen.por_periodo
     .filter((p) => p.periodo.startsWith(anioActual))
@@ -91,6 +97,13 @@ function ResumenRep({ resumen, aviso }) {
           </tbody>
         </table>
       </div>
+      {pendientes.length > 0 && (
+        <div className="badge badge-amber" style={{ display: 'block', padding: '10px 14px', marginTop: 12, marginBottom: 4 }}>
+          Según tu RCV del SII, hay ventas del período que aún no están pegadas a productos:{' '}
+          {pendientes.map((p) => `${p.periodo}: ${fmtInt(p.n_sin_pegar)} de ${fmtInt(p.n_rcv)}`).join(' · ')}.
+          {' '}Si corresponden a productos con envase, regístralas — las ventas de servicios o sin envase no van acá.
+        </div>
+      )}
       {kgAnio > 0 && kgAnio < UMBRAL_EXENCION_REP_KG && (
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
           Llevas {fmt(kgAnio, 1)} kg este año. {EXENCION_REP_NOTA}
@@ -340,12 +353,20 @@ function Ventas({ ventas, flash }) {
     <div className="card">
       <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Fecha</th><th>Documento</th><th>Productos</th><th className="num">kg envases</th><th className="num">kg reciclables</th><th>Evidencia</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Documento</th><th>RCV (SII)</th><th>Productos</th><th className="num">kg envases</th><th className="num">kg reciclables</th><th>Evidencia</th></tr></thead>
           <tbody>
             {ventas.map((v) => (
               <tr key={v.id}>
                 <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(v.fecha_documento)}</td>
                 <td>N° {v.numero_documento}</td>
+                {/* Cruce contra el RCV del SII: true = el número consta en
+                    tus ventas del período; false = el período está
+                    descargado y NO aparece; null = período sin descargar. */}
+                <td>
+                  {v.consta_en_rcv === true && <span className="badge badge-green" title="El número calza con una venta de tu RCV del período.">Consta ✓</span>}
+                  {v.consta_en_rcv === false && <span className="badge badge-amber" title="Tu RCV del período está descargado y este número no aparece — revisa el número o el período.">No aparece</span>}
+                  {v.consta_en_rcv === null && <span className="muted" style={{ fontSize: 12 }} title="Descarga el período en «Compras y ventas (SII)» para contrastar.">—</span>}
+                </td>
                 <td style={{ fontSize: 13 }}>
                   {v.items.map((it) => `${it.nombre} ×${fmtInt(it.unidades)}`).join(' · ')}
                 </td>

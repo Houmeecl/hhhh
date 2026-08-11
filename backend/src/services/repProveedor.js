@@ -22,6 +22,15 @@ import { MATERIALES_REP } from './rep.js';
 export const MAX_ITEMS_VENTA = 50;
 export const MAX_UNIDADES = 1e6;
 
+// Número de documento comparable: solo los dígitos, sin ceros a la
+// izquierda — "F-123", "N° 0123" y "123" son la misma factura. Si no
+// trae ningún dígito (raro pero posible), cae al texto normalizado.
+export function normalizarNumeroDoc(numero) {
+  const s = String(numero || '').trim();
+  const digitos = s.replace(/\D/g, '').replace(/^0+/, '');
+  return digitos || s.toLowerCase();
+}
+
 const NOMBRE_MATERIAL = new Map(MATERIALES_REP.map((m) => [m.codigo, m.nombre]));
 
 // Valida los items de una venta: [{producto_id, unidades}].
@@ -159,4 +168,77 @@ export function resumenRep(ventas) {
       n_unidades: unidades,
     },
   };
+}
+
+// Cruce de las ventas REP contra el RCV del SII del MISMO proveedor
+// (dte_proveedor, tipo='venta'): el sistema ya conoce las ventas reales
+// de la empresa, así que la declaración REP no vive en el aire.
+//
+//   ventas: filas de ventas_rep (periodo, numero_documento)
+//   rcv:    filas de dte_proveedor tipo='venta' (periodo, folio, tipo_dte).
+//           Solo cuentan los documentos que PONEN productos en el mercado:
+//           facturas (33/34) y boletas (39/41). Las notas de crédito (61)
+//           y débito (56) se excluyen — calzar una venta REP contra el
+//           folio de una NC sería una afirmación falsa — igual que las
+//           filas 'resumen-*' (boletas agregadas sin folio real). Un
+//           tipo_dte NULL (descargas antiguas) se incluye: excluirlo
+//           haría desaparecer ventas reales del contraste.
+//           Límite conocido y asumido: el calce es por folio del período
+//           (la venta REP no registra tipo de DTE); si una factura y una
+//           boleta comparten número en el mismo período, cuentan como uno.
+//
+// Devuelve:
+//   por_venta: Map(id de venta → true|false|null)
+//     true  = su número calza con un folio del RCV de su período
+//     false = el período TIENE RCV descargado y el número no aparece
+//     null  = ese período no tiene RCV descargado (no se puede afirmar nada)
+//   por_periodo: [{periodo, rcv_descargado, n_rcv, n_pegadas, n_sin_pegar}]
+//     n_rcv       = ventas del RCV del período (sin resúmenes)
+//     n_pegadas   = cuántas de ESAS están pegadas a productos REP
+//     n_sin_pegar = las que faltan — el empujón honesto al usuario
+// Tipos de DTE de venta que ponen productos en el mercado (factura
+// afecta/exenta, boleta afecta/exenta). NC/ND y el resto quedan fuera.
+const TIPOS_DTE_VENTA_REP = new Set(['33', '34', '39', '41']);
+
+export function cruzarConRcv(ventas, rcv) {
+  const rcvPorPeriodo = new Map(); // periodo → Set(folio normalizado)
+  for (const d of rcv) {
+    if (String(d.folio || '').startsWith('resumen-')) continue;
+    if (d.tipo_dte != null && !TIPOS_DTE_VENTA_REP.has(String(d.tipo_dte))) continue;
+    const set = rcvPorPeriodo.get(d.periodo) || new Set();
+    set.add(normalizarNumeroDoc(d.folio));
+    rcvPorPeriodo.set(d.periodo, set);
+  }
+
+  const porVenta = new Map();
+  const pegadasPorPeriodo = new Map(); // periodo → Set(folio calzado)
+  for (const v of ventas) {
+    const set = rcvPorPeriodo.get(v.periodo);
+    if (!set) { porVenta.set(v.id, null); continue; }
+    const num = normalizarNumeroDoc(v.numero_documento);
+    const calza = set.has(num);
+    porVenta.set(v.id, calza);
+    if (calza) {
+      const p = pegadasPorPeriodo.get(v.periodo) || new Set();
+      p.add(num);
+      pegadasPorPeriodo.set(v.periodo, p);
+    }
+  }
+
+  // Un período aparece si tiene ventas REP o RCV descargado.
+  const periodos = new Set([...rcvPorPeriodo.keys(), ...ventas.map((v) => v.periodo)]);
+  const porPeriodo = [...periodos].sort().reverse().map((periodo) => {
+    const set = rcvPorPeriodo.get(periodo);
+    if (!set) return { periodo, rcv_descargado: false, n_rcv: 0, n_pegadas: 0, n_sin_pegar: 0 };
+    const pegadas = pegadasPorPeriodo.get(periodo)?.size || 0;
+    return {
+      periodo,
+      rcv_descargado: true,
+      n_rcv: set.size,
+      n_pegadas: pegadas,
+      n_sin_pegar: set.size - pegadas,
+    };
+  });
+
+  return { por_venta: porVenta, por_periodo: porPeriodo };
 }

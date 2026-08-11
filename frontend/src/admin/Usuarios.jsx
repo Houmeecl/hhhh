@@ -90,6 +90,24 @@ export default function Usuarios({ yo }) {
 
   const badge = (e) => e === 'activo' ? 'badge-green' : e === 'pendiente' ? 'badge-amber' : 'badge-red';
 
+  // Orden con lógica en vez del orden de creación: agrupado por panel
+  // (sicrep → terreno → externos, mismo orden que el selector) y dentro
+  // de cada panel por jerarquía (superadmin → admin → operador → cliente)
+  // y nombre. Así "¿quiénes pueden entrar a X?" se responde de un vistazo.
+  const RANGO_ROL = { admin: 0, operador: 1, cliente: 2 };
+  const visibles = usuarios.filter((u) => !filtroPanel || (u.panel || 'sicrep') === filtroPanel);
+  const grupos = TODOS_PANELES
+    .map((panel) => ({
+      panel,
+      usuarios: visibles
+        .filter((u) => (u.panel || 'sicrep') === panel)
+        .sort((a, b) =>
+          (b.es_superadmin === true) - (a.es_superadmin === true)
+          || (RANGO_ROL[a.rol] ?? 9) - (RANGO_ROL[b.rol] ?? 9)
+          || String(a.nombre || '').localeCompare(String(b.nombre || ''), 'es')),
+    }))
+    .filter((g) => g.usuarios.length > 0);
+
   // ---------- Llaves USB de huella (WebAuthn/FIDO2) ----------
   async function abrirLlaves(u) {
     setNombreLlaveNueva(''); setNombreArchivoNueva('');
@@ -187,7 +205,13 @@ export default function Usuarios({ yo }) {
         <table className="data">
           <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Panel</th><th>Nivel</th><th>Estado</th><th>Cliente</th><th>Último acceso</th><th>Llaves</th><th></th></tr></thead>
           <tbody>
-            {usuarios.filter((u) => !filtroPanel || (u.panel || 'sicrep') === filtroPanel).map((u) => {
+            {grupos.map((g) => [
+              <tr key={`sec-${g.panel}`}>
+                <td colSpan={10} style={{ background: 'var(--bg)', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#64748b', padding: '8px 12px' }}>
+                  {PANEL_LABEL[g.panel]} · {g.usuarios.length} cuenta{g.usuarios.length === 1 ? '' : 's'}
+                </td>
+              </tr>,
+              ...g.usuarios.map((u) => {
               const esInterno = PANELES_INTERNOS.includes(u.panel || 'sicrep');
               return (
               <tr key={u.id}>
@@ -259,7 +283,8 @@ export default function Usuarios({ yo }) {
                 </td>
               </tr>
               );
-            })}
+              }),
+            ])}
           </tbody>
         </table>
         </div>

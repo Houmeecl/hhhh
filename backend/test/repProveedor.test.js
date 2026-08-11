@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   validarItemsVenta, snapshotItemsVenta, totalesVenta, resumenRep, MAX_ITEMS_VENTA,
+  normalizarNumeroDoc, cruzarConRcv,
 } from '../src/services/repProveedor.js';
 
 // ============================================================
@@ -125,4 +126,60 @@ test('la suma por material cuadra con el total: nada se pierde ni se duplica', (
   const sumaMateriales = r.por_material.reduce((s, m) => s + m.kg, 0);
   assert.ok(Math.abs(sumaMateriales - r.total.kg_envases) < 0.005,
     `por material ${sumaMateriales} vs total ${r.total.kg_envases}`);
+});
+
+// ---------- Lógica de integridad (migración 088 + cruce RCV) ----------
+
+test('normalizarNumeroDoc: "F-123", "N° 0123" y "123" son la misma factura', () => {
+  assert.equal(normalizarNumeroDoc('F-123'), '123');
+  assert.equal(normalizarNumeroDoc('N° 0123'), '123');
+  assert.equal(normalizarNumeroDoc(' 123 '), '123');
+  assert.equal(normalizarNumeroDoc('123'), normalizarNumeroDoc('F-123'));
+  // Sin dígitos cae al texto normalizado, no a cadena vacía (una cadena
+  // vacía haría "iguales" a todos los números sin dígitos).
+  assert.equal(normalizarNumeroDoc('SIN-NUM'), 'sin-num');
+  assert.notEqual(normalizarNumeroDoc('SIN-NUM'), normalizarNumeroDoc('OTRA'));
+});
+
+test('cruzarConRcv: consta / no aparece / período sin descargar, y el saldo sin pegar', () => {
+  const ventas = [
+    { id: 'v1', periodo: '2026-07', numero_documento: 'F-101' },  // calza con folio 101
+    { id: 'v2', periodo: '2026-07', numero_documento: '999' },    // RCV descargado, no aparece
+    { id: 'v3', periodo: '2026-06', numero_documento: '55' },     // período sin RCV
+  ];
+  const rcv = [
+    { periodo: '2026-07', folio: '101', tipo_dte: '33' },
+    { periodo: '2026-07', folio: '102', tipo_dte: '39' },          // boleta con folio real: cuenta
+    { periodo: '2026-07', folio: '103', tipo_dte: null },          // descarga antigua sin tipo: cuenta
+    { periodo: '2026-07', folio: '104', tipo_dte: '61' },          // nota de crédito: NO cuenta
+    { periodo: '2026-07', folio: '105', tipo_dte: '56' },          // nota de débito: NO cuenta
+    { periodo: '2026-07', folio: 'resumen-39', tipo_dte: '39' },   // boletas agregadas: fuera del conteo
+  ];
+  const c = cruzarConRcv(ventas, rcv);
+  assert.equal(c.por_venta.get('v1'), true);
+  assert.equal(c.por_venta.get('v2'), false);
+  assert.equal(c.por_venta.get('v3'), null, 'sin RCV del período no se afirma nada');
+
+  const jul = c.por_periodo.find((p) => p.periodo === '2026-07');
+  assert.equal(jul.rcv_descargado, true);
+  assert.equal(jul.n_rcv, 3, 'NC (61), ND (56) y resumen-* quedan fuera del conteo');
+  assert.equal(jul.n_pegadas, 1);
+  assert.equal(jul.n_sin_pegar, 2, 'las 2 ventas del RCV que faltan por pegar a productos');
+
+  const jun = c.por_periodo.find((p) => p.periodo === '2026-06');
+  assert.equal(jun.rcv_descargado, false);
+  assert.equal(jun.n_sin_pegar, 0, 'sin RCV no se inventa un pendiente');
+});
+
+test('cruzarConRcv: la misma factura pegada no se cuenta dos veces como cubierta', () => {
+  // Dos filas REP con el mismo folio (no debería pasar por el candado 088,
+  // pero el cruce tampoco debe inflar la cobertura si pasara).
+  const ventas = [
+    { id: 'a', periodo: '2026-07', numero_documento: 'F-101' },
+    { id: 'b', periodo: '2026-07', numero_documento: '101' },
+  ];
+  const rcv = [{ periodo: '2026-07', folio: '101' }, { periodo: '2026-07', folio: '102' }];
+  const jul = cruzarConRcv(ventas, rcv).por_periodo.find((p) => p.periodo === '2026-07');
+  assert.equal(jul.n_pegadas, 1);
+  assert.equal(jul.n_sin_pegar, 1);
 });
