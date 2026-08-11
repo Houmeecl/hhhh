@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import LeadCta from '../components/LeadForm.jsx';
 import { api } from '../api.js';
 
 // Mini sitio de prueba: se entra con un código que trae créditos
@@ -56,9 +57,17 @@ export default function Prueba() {
             </button>
           </form>
         </div>
-        <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>
-          ¿No tienes código? Escríbenos a <a href="mailto:contacto@sicrep.cl?subject=Quiero%20un%20c%C3%B3digo%20de%20prueba%20sicr3p">contacto@sicrep.cl</a>
-        </p>
+        {/* Antes: mailto a contacto@sicrep.cl — en el celular suele no abrir
+            nada y quien llegó hasta acá (intención altísima: quiere probar)
+            se perdía sin dejar rastro. Ahora deja su correo y queda como
+            lead en el panel. */}
+        <div style={{ textAlign: 'center', marginTop: 14 }}>
+          <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>¿No tienes código?</p>
+          <LeadCta
+            origen="prueba" etiqueta="Pídenos un código de prueba"
+            className="btn btn-outline btn-sm" hint="Quiero un código de prueba"
+          />
+        </div>
       </div>
     </PublicLayout>
   );

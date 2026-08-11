@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { Donut, Serie } from '../components/Charts.jsx';
@@ -91,6 +92,18 @@ export default function Dashboard() {
           <div className="l">Clientes totales</div>
           <span className="muted" style={{ fontSize: 12.5 }}>{fmt(d.co2e_acumulado, 1)} t CO2e acumulado</span>
         </div>
+        {/* Leads sin atender: inscripciones pendientes + interesados de las
+            landings/calculadora. Antes esto no se veía en ninguna parte del
+            dashboard y un lead podía enfriarse días sin que nadie lo notara. */}
+        <Link to="/admin/prospectos" className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <div className="n" style={(d.leads?.inscripciones_pendientes + d.leads?.interesados_nuevos) > 0 ? { color: '#b45309' } : {}}>
+            {fmtInt((d.leads?.inscripciones_pendientes || 0) + (d.leads?.interesados_nuevos || 0))}
+          </div>
+          <div className="l">Leads por atender</div>
+          <span className="muted" style={{ fontSize: 12.5 }}>
+            {fmtInt(d.leads?.inscripciones_pendientes || 0)} inscripciones · {fmtInt(d.leads?.interesados_nuevos || 0)} interesados
+          </span>
+        </Link>
       </div>
 
       <div className="two-col-grid" style={{ marginTop: 20, alignItems: 'stretch' }}>

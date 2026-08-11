@@ -43,6 +43,20 @@ export const cargaLimiter = rateLimit({
   message: { error: 'Demasiados envíos seguidos. Intenta nuevamente en un rato.' },
 });
 
+// Formularios de captación (POST /api/interesados). 10 por hora por IP
+// alcanza de sobra para cualquier humano (nadie deja su correo 10 veces)
+// y corta la ráfaga de un script simple; al bot genérico lo frena antes
+// el honeypot (services/interesados.js). Captcha queda para cuando haya
+// abuso real, no antes: cada fricción extra en un formulario de lead es
+// un lead menos.
+export const leadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados envíos seguidos. Intenta nuevamente en un rato.' },
+});
+
 // Límite general de la API pública.
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

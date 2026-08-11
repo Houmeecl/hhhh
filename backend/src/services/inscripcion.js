@@ -8,9 +8,18 @@
 // ============================================================
 
 import { rutValido } from './dte.js';
+import { escaparHtml } from './interesados.js';
 
 export const INTERESES = ['carbono', 'corredor', 'capacitacion', 'rep'];
 export const MAX_MENSAJE = 2000;
+
+// Etiquetas visibles de los intereses (mismas claves que INTERESES).
+const INTERES_LABEL = {
+  carbono: 'Contabilidad de carbono',
+  corredor: 'Corredor Bioceánico',
+  capacitacion: 'Capacitación',
+  rep: 'Ley REP',
+};
 
 const texto = (v, max) => String(v ?? '').trim().slice(0, max);
 
@@ -53,6 +62,25 @@ export function validarInscripcion(entrada) {
       intereses,
       mensaje: texto(body.mensaje, MAX_MENSAJE) || null,
     },
+  };
+}
+
+// Acuse de recibo al que envió la inscripción — hasta ahora el formulario
+// respondía solo en pantalla y el primer correo real llegaba recién si un
+// humano lo enrolaba días después: el lead quedaba en silencio total.
+// Puro (patrón activationEmail de mailer.js): devuelve {subject, html}.
+export function acuseInscripcionEmail({ nombre_empresa, contacto_nombre, intereses } = {}) {
+  const lista = (Array.isArray(intereses) ? intereses : [])
+    .map((i) => INTERES_LABEL[i]).filter(Boolean);
+  return {
+    subject: 'Recibimos tu inscripción · sicr3p',
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Recibimos la inscripción de <b>${escaparHtml(nombre_empresa || 'tu empresa')}</b></h2>
+        <p>Hola${contacto_nombre ? ` ${escaparHtml(contacto_nombre)}` : ''}, tu solicitud quedó registrada${lista.length ? ` con interés en: <b>${lista.map(escaparHtml).join(', ')}</b>` : ''}.</p>
+        <p>Nuestro equipo la revisa y te contactamos al correo que dejaste — normalmente dentro de 1 a 2 días hábiles.</p>
+        <p style="color:#64748b;font-size:13px">Si no enviaste esta solicitud, ignora este correo.</p>
+      </div>`,
   };
 }
 

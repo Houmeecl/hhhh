@@ -41,6 +41,12 @@ export default function CalculadoraCompensacion() {
   const [estado, setEstado] = useState('cargando'); // cargando | ok | error
   const [valores, setValores] = useState(() =>
     Object.fromEntries(ENTRADAS.map((e) => [e.codigo, e.inicial])));
+  // Captura del lead en el momento de máxima intención: quien acaba de
+  // ver SU número. Antes el único camino era el botón a /inscripcion,
+  // que descartaba la estimación — el visitante se iba sin dejar nada.
+  const [emailLead, setEmailLead] = useState('');
+  const [estadoLead, setEstadoLead] = useState('inicial'); // inicial | enviando | listo | error
+  const [errorLead, setErrorLead] = useState('');
 
   useEffect(() => {
     let vivo = true;
@@ -156,7 +162,56 @@ export default function CalculadoraCompensacion() {
               {t('calc.nota')}
             </div>
           </div>
-          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+          {/* Captura del lead: la estimación viaja al correo del visitante
+              (y al panel) en vez de perderse al salir de la página. */}
+          <div style={{ marginTop: 16 }}>
+            {estadoLead === 'listo' ? (
+              <div className="badge badge-green" style={{ display: 'inline-block', padding: '10px 14px', fontSize: 13 }}>
+                ✓ {t('calc.email_ok')}
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setEstadoLead('enviando');
+                  setErrorLead('');
+                  try {
+                    await api.crearInteresado({
+                      origen: 'calculadora',
+                      email: emailLead,
+                      estimacion: {
+                        total_t: totalT,
+                        compensacion_clp: compensacion,
+                        usd,
+                        entradas: Object.fromEntries(filas.map((f) => [f.codigo, parseCL(valores[f.codigo])])),
+                      },
+                    });
+                    setEstadoLead('listo');
+                  } catch (err) {
+                    setEstadoLead('error');
+                    setErrorLead(err.message);
+                  }
+                }}
+              >
+                <label htmlFor="calc-email" style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                  {t('calc.email_label')}
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <input
+                    id="calc-email" type="email" required value={emailLead}
+                    onChange={(e) => setEmailLead(e.target.value)}
+                    placeholder="contacto@empresa.cl"
+                    style={{ flex: '1 1 180px', minWidth: 0 }}
+                  />
+                  <button type="submit" className="btn btn-outline" disabled={estadoLead === 'enviando'}>
+                    {estadoLead === 'enviando' ? <span className="spinner dark" /> : t('calc.email_btn')}
+                  </button>
+                </div>
+                {errorLead && <div className="badge badge-red" style={{ display: 'block', padding: '8px 12px', marginTop: 8 }}>{errorLead}</div>}
+              </form>
+            )}
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
             <Link to="/inscripcion" className="btn btn-primary">{t('calc.cta')}</Link>
           </div>
         </div>

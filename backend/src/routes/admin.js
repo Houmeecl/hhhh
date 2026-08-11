@@ -48,6 +48,7 @@ router.get('/dashboard', async (req, res, next) => {
     const [
       clientes, sesionesMes, sesionesMesAnt, facturasMes, facturasMesAnt,
       co2eAcum, co2eMes, co2eMesAnt, ping, uso, serieSesiones, serieFacturas, actividadReciente,
+      inscripcionesPend, interesadosNuevos,
     ] = await Promise.all([
       query(`SELECT estado_contrato, count(*)::int AS n FROM clientes GROUP BY estado_contrato`),
       query(`SELECT count(*)::int AS n FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
@@ -67,6 +68,11 @@ router.get('/dashboard', async (req, res, next) => {
       query(`SELECT a.accion, a.entidad, a.entidad_id, a.created_at, u.email AS usuario_email
              FROM actividad_log a LEFT JOIN usuarios u ON u.id = a.usuario_id
              ORDER BY a.created_at DESC LIMIT 6`),
+      // Leads sin atender: hasta ahora el dashboard no los mostraba y el
+      // único lugar donde se veían era una tarjeta condicional dentro de
+      // Prospectos — un lead podía enfriarse días sin que nadie lo viera.
+      query(`SELECT count(*)::int AS n FROM solicitudes_inscripcion WHERE estado = 'pendiente'`),
+      query(`SELECT count(*)::int AS n FROM interesados WHERE estado = 'nuevo'`),
     ]);
     const porEstado = { piloto: 0, activo: 0, vencido: 0 };
     for (const r of clientes.rows) porEstado[r.estado_contrato] = r.n;
@@ -105,6 +111,10 @@ router.get('/dashboard', async (req, res, next) => {
       consumo_api_mes: uso.rows[0],
       serie_mensual: serieMensual,
       actividad_reciente: actividadReciente.rows,
+      leads: {
+        inscripciones_pendientes: inscripcionesPend.rows[0].n,
+        interesados_nuevos: interesadosNuevos.rows[0].n,
+      },
     });
   } catch (err) {
     next(err);
@@ -702,9 +712,23 @@ router.post('/solicitudes-inscripcion/:id/enrolar', adminOnly, async (req, res, 
         }
       }
 
+      // El lead TAMBIÉN entra al pipeline comercial: antes enrolar
+      // marcaba 'convertida' sin crear prospecto ni prospecto_id — el
+      // camino más caliente (un clic, invitación enviada) era justo el
+      // que desaparecía del CRM. Etapa 'ganado' porque este lead ya se
+      // convirtió en empresa enrolada; mismo INSERT que /convertir.
+      const base = prospectoDesdeInscripcion(sol);
+      const { rows: pRows } = await client.query(
+        `INSERT INTO prospectos (nombre_empresa, rut, contacto, etapa, origen, notas)
+         VALUES ($1,$2,$3,'ganado',$4,$5) RETURNING id`,
+        [base.nombre_empresa, base.rut, base.contacto, base.origen, base.notas]
+      );
+
       await client.query(
-        `UPDATE solicitudes_inscripcion SET estado = 'convertida', resuelta_por = $2, resuelta_at = now() WHERE id = $1`,
-        [sol.id, req.user.sub]
+        `UPDATE solicitudes_inscripcion
+            SET estado = 'convertida', prospecto_id = $2, resuelta_por = $3, resuelta_at = now()
+          WHERE id = $1`,
+        [sol.id, pRows[0].id, req.user.sub]
       );
       return { empresa, yaExistia, acceso, tieneCuentaPrevia: Boolean(uExistente[0]) };
     });
@@ -1016,6 +1040,51 @@ router.delete('/prospectos/:id', async (req, res, next) => {
   try {
     await query(`DELETE FROM prospectos WHERE id = $1`, [req.params.id]);
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Interesados del sitio (leads livianos, migración 091) ----------
+// Los que llegaron por los formularios cortos de las landings o dejaron
+// su correo en la calculadora — sin RUT, así que no son prospectos aún:
+// el equipo los contacta y decide.
+router.get('/interesados', async (req, res, next) => {
+  try {
+    const estados = ['nuevo', 'contactado', 'descartado'];
+    const estado = estados.includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT id, origen, nombre, email, empresa, telefono, mensaje, estimacion, estado, created_at
+         FROM interesados
+        WHERE ($1::text IS NULL OR estado = $1)
+        ORDER BY created_at DESC LIMIT 200`,
+      [estado]
+    );
+    res.json({ interesados: rows });
+  } catch (err) { next(err); }
+});
+
+router.put('/interesados/:id/estado', async (req, res, next) => {
+  try {
+    // Un id que no es UUID haría fallar la consulta con un error de
+    // Postgres y un 500; se responde 404, que es lo que realmente pasa
+    // (mismo patrón que repProveedor.js).
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.params.id))) {
+      return res.status(404).json({ error: 'Interesado no encontrado.' });
+    }
+    const estado = String(req.body?.estado || '');
+    if (!['nuevo', 'contactado', 'descartado'].includes(estado)) {
+      return res.status(400).json({ error: 'Estado inválido.' });
+    }
+    const { rows } = await query(
+      `UPDATE interesados SET estado = $2 WHERE id = $1
+       RETURNING id, origen, nombre, email, empresa, telefono, mensaje, estimacion, estado, created_at`,
+      [req.params.id, estado]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Interesado no encontrado.' });
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'estado_interesado', entidad: 'interesado',
+      entidadId: req.params.id, detalle: { estado }, ip: req.ip,
+    });
+    res.json({ interesado: rows[0] });
   } catch (err) { next(err); }
 });
 

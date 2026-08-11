@@ -361,6 +361,11 @@ export const api = {
   crearProspecto: (b) => request('/admin/prospectos', { method: 'POST', body: b, authed: true }),
   editarProspecto: (id, b) => request(`/admin/prospectos/${id}`, { method: 'PUT', body: b, authed: true }),
   eliminarProspecto: (id) => request(`/admin/prospectos/${id}`, { method: 'DELETE', authed: true }),
+  // Leads livianos del sitio (crearInteresado es PÚBLICO: formularios de
+  // las landings y la calculadora — sin sesión).
+  crearInteresado: (b) => request('/interesados', { method: 'POST', body: b }),
+  interesados: (estado) => request(`/admin/interesados${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  estadoInteresado: (id, estado) => request(`/admin/interesados/${id}/estado`, { method: 'PUT', body: { estado }, authed: true }),
   simpleApi: () => request('/admin/simple-api', { authed: true }),
   usuarios: () => request('/admin/usuarios', { authed: true }),
   cambiarPassword: (actual, nueva) => request('/admin/perfil/password', { method: 'PUT', body: { actual, nueva }, authed: true }),

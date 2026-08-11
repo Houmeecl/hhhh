@@ -188,6 +188,26 @@ export const config = {
     password: process.env.ADMIN_PASSWORD || '',
   },
 
+  leads: {
+    // A dónde llegan las alertas internas de lead nuevo (formulario de
+    // inscripción y formularios cortos de las landings). Cae al correo
+    // del admin para que nunca quede sin destinatario. Se lee
+    // process.env.ADMIN_EMAIL directo (no config.admin.email): dentro del
+    // mismo literal el objeto aún no existe.
+    notifyEmail: process.env.LEADS_NOTIFY_EMAIL || process.env.ADMIN_EMAIL || 'admin@sicrep.cl',
+  },
+
+  // Réplica opcional de leads a una base de datos de Notion (el CRM
+  // liviano que pidió el usuario). Sin las dos variables queda apagada y
+  // los leads viven solo en el panel — nunca es requisito.
+  notion: {
+    enabled: Boolean(process.env.NOTION_TOKEN && process.env.NOTION_DATABASE_ID),
+    token: process.env.NOTION_TOKEN || '',
+    databaseId: process.env.NOTION_DATABASE_ID || '',
+    version: process.env.NOTION_VERSION || '2022-06-28',
+    timeoutMs: parseInt(process.env.NOTION_TIMEOUT_MS || '8000', 10),
+  },
+
   // Export de datos escaneados a BigQuery (apagado por defecto).
   // Se activa con BIGQUERY_EXPORT=true + una cuenta de servicio de GCP.
   bigquery: {

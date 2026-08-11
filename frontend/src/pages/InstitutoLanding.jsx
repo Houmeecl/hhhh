@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { useScrollReveal } from '../lib/scrollReveal.js';
@@ -129,8 +130,9 @@ export default function InstitutoLanding() {
               {t('inst.cta_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicrep.cl?subject=Instituto%20sicr3p" className="btn btn-primary">{t('inst.cta1')}</a>
-              <a href="mailto:contacto@sicrep.cl?subject=Instituto%20sicr3p%20-%20convenio" className="btn btn-outline">{t('inst.cta2')}</a>
+              {/* Formulario inline en vez de mailto (en móvil no abría nada). */}
+              <LeadCta origen="instituto" etiqueta={t('inst.cta1')} className="btn btn-primary" hint="Instituto sicr3p" />
+              <LeadCta origen="instituto" etiqueta={t('inst.cta2')} className="btn btn-outline" hint="Instituto sicr3p — convenio" />
             </div>
             <p className="muted" style={{ fontSize: 12, marginTop: 20, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
               {t('inst.disclaimer')}

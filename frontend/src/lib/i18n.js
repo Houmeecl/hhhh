@@ -159,6 +159,19 @@ const DICCIONARIOS = {
     'calc.clp_mes': 'de compensación al mes',
     'calc.nota': 'Estimación referencial con los factores reales del motor sicr3p y la tarifa vigente — tu número exacto sale de tus documentos.',
     'calc.cta': 'Inscríbete y calcula con tus facturas reales',
+    'calc.email_label': 'Recibe esta estimación en tu correo',
+    'calc.email_btn': 'Enviar',
+    'calc.email_ok': 'Listo — te enviamos la estimación.',
+
+    // Captación de leads (LeadForm.jsx, formularios cortos de las landings)
+    'lead.nombre': 'Nombre',
+    'lead.email': 'Correo',
+    'lead.empresa': 'Empresa',
+    'lead.mensaje': 'Mensaje',
+    'lead.enviar': 'Enviar',
+    'lead.cancelar': 'Cancelar',
+    'lead.gracias': 'Recibido — te contactaremos al correo que dejaste.',
+    'lead.privacidad': 'Usaremos tu correo solo para responderte. Puedes pedir su eliminación cuando quieras en "Mis datos personales".',
 
     // Verificación pública (/verificar/:id)
     'ver.error_titulo': 'Documento no encontrado',
@@ -688,6 +701,18 @@ const DICCIONARIOS = {
     'calc.clp_mes': 'of monthly offsetting',
     'calc.nota': 'Reference estimate using the real factors of the sicr3p engine and the current rate — your exact number comes from your documents.',
     'calc.cta': 'Register and calculate with your real invoices',
+    'calc.email_label': 'Get this estimate in your inbox',
+    'calc.email_btn': 'Send',
+    'calc.email_ok': 'Done — we sent you the estimate.',
+
+    'lead.nombre': 'Name',
+    'lead.email': 'Email',
+    'lead.empresa': 'Company',
+    'lead.mensaje': 'Message',
+    'lead.enviar': 'Send',
+    'lead.cancelar': 'Cancel',
+    'lead.gracias': 'Received — we will contact you at the email you left.',
+    'lead.privacidad': 'We will only use your email to reply. You can request its deletion anytime under "My personal data".',
 
     'ver.error_titulo': 'Document not found',
     'ver.error_texto': 'We could not verify the traceability of this document.',
@@ -1207,6 +1232,18 @@ const DICCIONARIOS = {
     'calc.clp_mes': 'de compensação por mês',
     'calc.nota': 'Estimativa referencial com os fatores reais do motor sicr3p e a tarifa vigente — seu número exato sai dos seus documentos.',
     'calc.cta': 'Inscreva-se e calcule com suas faturas reais',
+    'calc.email_label': 'Receba esta estimativa no seu e-mail',
+    'calc.email_btn': 'Enviar',
+    'calc.email_ok': 'Pronto — enviamos a estimativa.',
+
+    'lead.nombre': 'Nome',
+    'lead.email': 'E-mail',
+    'lead.empresa': 'Empresa',
+    'lead.mensaje': 'Mensagem',
+    'lead.enviar': 'Enviar',
+    'lead.cancelar': 'Cancelar',
+    'lead.gracias': 'Recebido — entraremos em contato pelo e-mail informado.',
+    'lead.privacidad': 'Usaremos seu e-mail apenas para responder. Você pode pedir sua exclusão quando quiser em "Meus dados pessoais".',
 
     'ver.error_titulo': 'Documento não encontrado',
     'ver.error_texto': 'Não foi possível verificar a rastreabilidade deste documento.',

@@ -1,9 +1,22 @@
 import { useEffect, useState } from 'react';
-import { api, fmtFecha } from '../api.js';
+import { api, fmt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 
 const ETAPAS = ['nuevo', 'contactado', 'demo', 'piloto', 'ganado', 'perdido'];
 const VACIO = { nombre_empresa: '', rut: '', contacto: '', etapa: 'nuevo', origen: '', notas: '', proxima_accion: '' };
+
+// Etiqueta visible del origen de un interesado (catálogo de la migración 091).
+const ORIGEN_LABEL = {
+  calculadora: 'Calculadora', corredor: 'Corredor', instituto: 'Instituto',
+  prueba: 'Códigos de prueba', magic_sin_historial: 'Acceso sin historial', otro: 'Sitio web',
+};
+
+// Próxima acción vencida = fecha de hoy o anterior en un prospecto que
+// sigue vivo (ni ganado ni perdido). Antes el campo era decorativo: nada
+// lo destacaba al vencer y el seguimiento dependía de la memoria.
+const accionVencida = (p) =>
+  p.proxima_accion && !['ganado', 'perdido'].includes(p.etapa)
+  && new Date(p.proxima_accion) <= new Date();
 
 export default function Prospectos() {
   const [items, setItems] = useState([]);
@@ -12,12 +25,19 @@ export default function Prospectos() {
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
   const [inscripciones, setInscripciones] = useState([]);
+  const [interesados, setInteresados] = useState([]);
 
   const cargar = () => {
     api.prospectos().then((r) => setItems(r.prospectos)).catch((e) => flash(e.message, true));
     api.solicitudesInscripcion('pendiente').then((r) => setInscripciones(r.solicitudes)).catch(() => {});
+    api.interesados().then((r) => setInteresados(r.interesados)).catch(() => {});
   };
   useEffect(() => { cargar(); }, []);
+
+  async function marcarInteresado(i, estado) {
+    try { await api.estadoInteresado(i.id, estado); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
 
   async function convertir(id) {
     try { await api.convertirInscripcion(id); cargar(); flash('Inscripción convertida en prospecto.'); }
@@ -74,7 +94,11 @@ export default function Prospectos() {
               <div key={p.id} style={{ background: 'var(--bg)', borderRadius: 8, padding: 8, marginBottom: 6, fontSize: 13 }}>
                 <div style={{ fontWeight: 600 }}>{p.nombre_empresa}</div>
                 <div className="muted" style={{ fontSize: 11 }}>{p.contacto || '—'}</div>
-                {p.proxima_accion && <div className="muted" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}><Icon.Calendar size={12} /> {fmtFecha(p.proxima_accion)}</div>}
+                {p.proxima_accion && (
+                  <div className="muted" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, ...(accionVencida(p) ? { color: '#b91c1c', fontWeight: 700 } : {}) }}>
+                    <Icon.Calendar size={12} /> {fmtFecha(p.proxima_accion)}{accionVencida(p) ? ' · vencida' : ''}
+                  </div>
+                )}
                 <div style={{ marginTop: 4 }}>
                   <span style={{ cursor: 'pointer', fontSize: 11 }} onClick={() => setModal({ ...p, proxima_accion: p.proxima_accion?.slice(0,10) || '' })}>editar</span>
                 </div>
@@ -121,6 +145,45 @@ export default function Prospectos() {
         </div>
       )}
 
+      {/* Interesados livianos capturados en el sitio (formularios cortos de
+          las landings + calculadora de la portada) — sin RUT: el equipo los
+          contacta y decide si pasan al pipeline. */}
+      {interesados.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div style={{ padding: '14px 16px 0' }}>
+            <b>Interesados del sitio</b>
+            <span className="muted" style={{ fontSize: 13 }}> · formularios de las landings y la calculadora · {interesados.filter((i) => i.estado === 'nuevo').length} nuevo{interesados.filter((i) => i.estado === 'nuevo').length === 1 ? '' : 's'}</span>
+          </div>
+          <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Origen</th><th>Contacto</th><th>Mensaje / estimación</th><th>Recibido</th><th>Estado</th></tr></thead>
+            <tbody>
+              {interesados.map((i) => (
+                <tr key={i.id} style={i.estado === 'descartado' ? { opacity: 0.55 } : {}}>
+                  <td><span className="badge badge-gray">{ORIGEN_LABEL[i.origen] || i.origen}</span></td>
+                  <td>
+                    {i.nombre || <span className="muted">—</span>}{i.empresa ? ` · ${i.empresa}` : ''}
+                    <div className="muted" style={{ fontSize: 12 }}>{i.email}{i.telefono ? ` · ${i.telefono}` : ''}</div>
+                  </td>
+                  <td className="muted" style={{ fontSize: 13, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={i.mensaje || ''}>
+                    {i.estimacion?.total_t != null
+                      ? <span className="badge badge-green">≈ {fmt(i.estimacion.total_t, 2)} t CO2e</span>
+                      : (i.mensaje || '—')}
+                  </td>
+                  <td>{fmtFecha(i.created_at)}</td>
+                  <td>
+                    <select className="badge" value={i.estado} onChange={(e) => marcarInteresado(i, e.target.value)} style={{ border: 'none', background: 'var(--bg)', padding: '4px 8px', borderRadius: 6 }}>
+                      {['nuevo', 'contactado', 'descartado'].map((e) => <option key={e} value={e}>{e}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="table-scroll">
         <table className="data">
@@ -136,7 +199,9 @@ export default function Prospectos() {
                   </select>
                 </td>
                 <td className="muted">{p.origen}</td>
-                <td>{fmtFecha(p.proxima_accion)}</td>
+                <td style={accionVencida(p) ? { color: '#b91c1c', fontWeight: 700 } : {}}>
+                  {fmtFecha(p.proxima_accion)}{accionVencida(p) && <span className="badge badge-red" style={{ marginLeft: 6 }}>vencida</span>}
+                </td>
                 <td><button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => eliminar(p.id)}>Eliminar</button></td>
               </tr>
             ))}

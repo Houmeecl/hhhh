@@ -133,6 +133,18 @@ export const INVENTARIO = {
     cadena: CADENA.NINGUNA,
     retencion: 'Se anonimiza el contacto de las descartadas pasado el plazo; se conserva el hecho y su resolución.',
   },
+  interesados: {
+    clasificacion: PERSONAL,
+    columnas: ['nombre', 'email', 'telefono', 'ip'],
+    nota: 'Leads livianos del sitio público (calculadora de la portada, landings del Corredor '
+      + 'e Instituto, página de códigos de prueba) — sin RUT: es un primer contacto, no una '
+      + 'postulación. Si NOTION_TOKEN está configurado, una copia se replica a un workspace '
+      + 'de Notion (encargado de tratamiento externo, fuera de Chile).',
+    finalidad: 'Contactar a quien dejó su correo pidiendo información o su estimación de CO2e.',
+    base: BASE.CONSENTIMIENTO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Los descartados se borran completos pasado el plazo; los contactados siguen el ciclo comercial.',
+  },
 
   sii_consultas: {
     clasificacion: PERSONAL,

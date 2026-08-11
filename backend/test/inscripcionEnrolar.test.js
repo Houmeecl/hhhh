@@ -2,6 +2,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { query, pool } from '../src/lib/db.js';
 import { runMigrations } from '../src/lib/migrate.js';
+import { prospectoDesdeInscripcion } from '../src/services/inscripcion.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
@@ -21,6 +22,7 @@ after(async () => {
     await query(`DELETE FROM usuarios WHERE proveedor_id IN (SELECT id FROM proveedores WHERE rut = $1)`, [RUT]);
     await query(`DELETE FROM proveedores WHERE rut = $1`, [RUT]);
     await query(`DELETE FROM solicitudes_inscripcion WHERE rut = $1`, ['78.345.120-4']);
+    await query(`DELETE FROM prospectos WHERE rut = $1`, ['78.345.120-4']);
   }
   await pool.end();
 });
@@ -59,4 +61,41 @@ test('enrolar desde inscripción: crea la empresa y su acceso, uno solo por prov
   ({ rows: existentes } = await query(`SELECT * FROM proveedores WHERE rut = $1`, [RUT]));
   assert.equal(existentes.length, 1);
   assert.equal(existentes[0].id, empresa.id);
+});
+
+test('enrolar desde inscripción: crea el prospecto etapa "ganado" y lo vincula (antes desaparecía del pipeline)', { skip: SALTO_PROD }, async () => {
+  await runMigrations();
+  await query(`DELETE FROM prospectos WHERE rut = $1`, ['78.345.120-4']);
+  await query(`DELETE FROM solicitudes_inscripcion WHERE rut = $1`, ['78.345.120-4']);
+
+  const { rows: solRows } = await query(
+    `INSERT INTO solicitudes_inscripcion
+       (rut, nombre_empresa, contacto_nombre, contacto_email, intereses)
+     VALUES ($1,$2,$3,$4,$5::jsonb) RETURNING *`,
+    ['78.345.120-4', 'Fábrica de Prueba Ltda.', 'Ana Prueba', 'ana@fabrica-prueba.cl', JSON.stringify(['carbono'])]
+  );
+  const sol = solRows[0];
+
+  // Mismo SQL que la ruta usa dentro de la transacción de enrolar.
+  const base = prospectoDesdeInscripcion(sol);
+  const { rows: pRows } = await query(
+    `INSERT INTO prospectos (nombre_empresa, rut, contacto, etapa, origen, notas)
+     VALUES ($1,$2,$3,'ganado',$4,$5) RETURNING id, etapa`,
+    [base.nombre_empresa, base.rut, base.contacto, base.origen, base.notas]
+  );
+  assert.equal(pRows[0].etapa, 'ganado');
+
+  await query(
+    `UPDATE solicitudes_inscripcion SET estado = 'convertida', prospecto_id = $2 WHERE id = $1`,
+    [sol.id, pRows[0].id]
+  );
+
+  const { rows: check } = await query(
+    `SELECT s.prospecto_id, p.etapa, p.rut FROM solicitudes_inscripcion s
+     JOIN prospectos p ON p.id = s.prospecto_id WHERE s.id = $1`,
+    [sol.id]
+  );
+  assert.equal(check[0].prospecto_id, pRows[0].id);
+  assert.equal(check[0].etapa, 'ganado');
+  assert.equal(check[0].rut, '78.345.120-4');
 });

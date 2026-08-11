@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
+import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
 
@@ -63,9 +64,12 @@ export default function CorredorLanding() {
               <p className="av2-t2"><span className="av2-grad">{t('cor.h1_grad')}</span></p>
               <p className="av2-sub">{t('cor.sub')}</p>
               <div className="hero-actions">
-                <a href="mailto:contacto@sicrep.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary" style={{ padding: '14px 26px', fontSize: 16 }}>
-                  {t('cor.cta_piloto')}
-                </a>
+                {/* Formulario inline en vez de mailto: en el celular el
+                    mailto suele no abrir nada y el interesado se perdía. */}
+                <LeadCta
+                  origen="corredor" etiqueta={t('cor.cta_piloto')}
+                  className="btn btn-primary" hint="Piloto Corredor Bioceánico"
+                />
                 <Link to="/torre" className="btn av2-btn-ghost">{t('cor.cta_torre')}</Link>
               </div>
               <div className="av2-trust">
@@ -218,8 +222,8 @@ export default function CorredorLanding() {
               {t('cor.pre_texto')}
             </p>
             <div className="hero-actions" style={{ justifyContent: 'center' }}>
-              <a href="mailto:contacto@sicrep.cl?subject=Piloto%20Corredor%20Bioce%C3%A1nico" className="btn btn-primary">{t('cor.pre_cta1')}</a>
-              <a href="mailto:contacto@sicrep.cl?subject=Quiero%20ser%20punto%20del%20corredor" className="btn btn-outline">{t('cor.pre_cta2')}</a>
+              <LeadCta origen="corredor" etiqueta={t('cor.pre_cta1')} className="btn btn-primary" hint="Piloto Corredor Bioceánico" />
+              <LeadCta origen="corredor" etiqueta={t('cor.pre_cta2')} className="btn btn-outline" hint="Quiero ser punto del corredor" />
             </div>
             <p className="muted" style={{ fontSize: 12, marginTop: 20, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
               {t('cor.disclaimer')}

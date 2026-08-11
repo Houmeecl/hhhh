@@ -27,9 +27,11 @@ import { validarCompensacion, calcularMonto } from '../services/compensacion.js'
 import { generarSelloSvg } from '../services/sello.js';
 import { filaEslabonPublico, hashCorto } from '../services/cadenaPublica.js';
 import { validarSolicitud } from '../services/auspicio.js';
-import { validarInscripcion } from '../services/inscripcion.js';
+import { validarInscripcion, acuseInscripcionEmail } from '../services/inscripcion.js';
+import { validarInteresado, esBot, correoEstimacion, alertaLeadEmail } from '../services/interesados.js';
+import { enviarLeadANotion } from '../services/notionLeads.js';
 import { consultarRut } from '../services/baseapi.js';
-import { siiLimiter, cargaLimiter } from '../middleware/rateLimit.js';
+import { siiLimiter, cargaLimiter, leadLimiter } from '../middleware/rateLimit.js';
 import { presupuestoIA } from '../services/analisisIA.js';
 import { categoriaParaMostrar, alcanceAtribuible } from '../services/categoriaPresentacion.js';
 import { calcularPuntosPorFactura, otorgarPuntos, evaluarMisionesContador } from '../services/juego.js';
@@ -921,15 +923,94 @@ router.post('/inscripcion', async (req, res, next) => {
        datos.mensaje, req.ip || null]
     );
 
-    // Sin fila devuelta = ya había una pendiente con ese RUT. Se responde
-    // igual que si fuera nueva (mismo criterio que /auspicio): reenviar el
-    // formulario no debe verse como error ni filtrar estado interno.
+    // Sin fila devuelta = ya había una pendiente con ese RUT. Antes se
+    // respondía "recibimos tu inscripción" también en ese caso — una
+    // mentira amable: no se guardó nada y el que reenvió quedaba
+    // esperando doble respuesta. Decir "ya la tenemos" no filtra nada
+    // sensible y es lo que de verdad pasó. Sigue siendo 201 (no un
+    // error: la solicitud del usuario ESTÁ registrada) y el frontend
+    // muestra `mensaje` tal cual, sin cambio alguno allá.
+    if (!rows[0]) {
+      return res.status(201).json({
+        ok: true,
+        recibida: true,
+        ya_registrada: true,
+        mensaje: 'Ya tenemos una solicitud tuya en revisión — no necesitas enviarla de nuevo. Te contactaremos al correo que dejaste.',
+        id: null,
+      });
+    }
+
+    // La respuesta sale ANTES de los efectos de correo/Notion: la
+    // captación jamás espera a un tercero. Cada efecto va con su propio
+    // .catch — si el correo falla, la solicitud ya está guardada y el
+    // panel la muestra igual.
     res.status(201).json({
       ok: true,
       recibida: true,
       mensaje: 'Recibimos tu inscripción. Te contactaremos al correo indicado.',
-      id: rows[0]?.id || null,
+      id: rows[0].id,
     });
+
+    // Acuse al lead: hasta ahora el primer correo real le llegaba recién
+    // si un humano lo enrolaba días después — silencio total entremedio.
+    sendMail({ to: datos.contacto_email, area: 'Comercial', ...acuseInscripcionEmail(datos) })
+      .catch((err) => console.error('[inscripcion] acuse no enviado:', err.message));
+    // Alerta interna: sin esto el equipo se enteraba solo si abría el panel.
+    sendMail({ to: config.leads.notifyEmail, area: 'Comercial', ...alertaLeadEmail({ tipo: 'inscripcion', datos }) })
+      .catch((err) => console.error('[inscripcion] alerta interna no enviada:', err.message));
+    // Réplica opcional a Notion (fail-safe interno, nunca lanza).
+    enviarLeadANotion({ tipo: 'inscripcion', datos });
+  } catch (err) { next(err); }
+});
+
+// ---------- POST /api/interesados — lead liviano del sitio público ----------
+// Captura los contactos que antes se perdían en mailto: (landings del
+// Corredor e Instituto, página de códigos de prueba) y la estimación de
+// la calculadora de la portada. A diferencia de /inscripcion NO exige
+// RUT: es un primer toque, no una postulación. Validación pura en
+// services/interesados.js; honeypot `sitio_web` responde 201 falso sin
+// insertar (no se le enseña al bot que fue detectado).
+router.post('/interesados', leadLimiter, async (req, res, next) => {
+  try {
+    if (esBot(req.body)) return res.status(201).json({ ok: true, mensaje: 'Listo. Te contactaremos al correo indicado.' });
+    const { ok, error, datos } = validarInteresado(req.body);
+    if (!ok) return res.status(400).json({ error });
+
+    // ON CONFLICT contra el índice único parcial (lower(email), origen)
+    // WHERE estado='nuevo': reenviar el formulario (o recalcular en la
+    // calculadora) actualiza la fila en vez de duplicarla. `xmax = 0`
+    // distingue INSERT real de UPDATE por conflicto — el equipo recibe
+    // UNA alerta por lead, no una por cada reenvío.
+    const { rows } = await query(
+      `INSERT INTO interesados (origen, nombre, email, empresa, telefono, mensaje, estimacion, ip)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
+       ON CONFLICT (lower(email), origen) WHERE estado = 'nuevo'
+       DO UPDATE SET
+         nombre = COALESCE(EXCLUDED.nombre, interesados.nombre),
+         empresa = COALESCE(EXCLUDED.empresa, interesados.empresa),
+         telefono = COALESCE(EXCLUDED.telefono, interesados.telefono),
+         mensaje = COALESCE(EXCLUDED.mensaje, interesados.mensaje),
+         estimacion = COALESCE(EXCLUDED.estimacion, interesados.estimacion),
+         created_at = now()
+       RETURNING id, (xmax = 0) AS nuevo`,
+      [datos.origen, datos.nombre, datos.email, datos.empresa, datos.telefono,
+       datos.mensaje, datos.estimacion ? JSON.stringify(datos.estimacion) : null, req.ip || null]
+    );
+    const esNuevo = rows[0]?.nuevo === true;
+
+    res.status(201).json({ ok: true, mensaje: 'Listo. Te contactaremos al correo indicado.' });
+
+    // Efectos después de responder, cada uno con su .catch (la captación
+    // nunca depende del correo ni de Notion).
+    if (datos.origen === 'calculadora' && datos.estimacion) {
+      sendMail({ to: datos.email, area: 'Comercial', ...correoEstimacion(datos) })
+        .catch((err) => console.error('[interesados] estimación no enviada:', err.message));
+    }
+    if (esNuevo) {
+      sendMail({ to: config.leads.notifyEmail, area: 'Comercial', ...alertaLeadEmail({ tipo: 'interesado', datos }) })
+        .catch((err) => console.error('[interesados] alerta interna no enviada:', err.message));
+      enviarLeadANotion({ tipo: 'interesado', datos });
+    }
   } catch (err) { next(err); }
 });
 

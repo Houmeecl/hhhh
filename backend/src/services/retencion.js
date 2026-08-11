@@ -47,6 +47,11 @@ export const PLAZOS = {
   documentos_rechazados: dias('RETENCION_RECHAZADOS_DIAS', 365),
   // Prospecto perdido: el seguimiento comercial ya terminó.
   prospecto_perdido: dias('RETENCION_PROSPECTOS_DIAS', 730),
+  // Interesado descartado: un lead liviano (solo correo, sin RUT ni
+  // resolución formal) que se decidió no contactar. Sin el correo la
+  // fila no informa nada, así que se borra completa — a diferencia de
+  // las solicitudes con RUT, donde el hecho sí vale conservarlo.
+  interesado_descartado: dias('RETENCION_INTERESADOS_DIAS', 180),
 };
 
 // Cada minuto de más acá es una consulta pesada en producción; cada
@@ -135,6 +140,14 @@ const TAREAS = [
              AND resuelta_at IS NOT NULL
              AND resuelta_at < now() - ($1 || ' days')::interval
              AND (contacto_nombre <> '' OR contacto_email <> '' OR ip IS NOT NULL)`,
+  },
+  {
+    nombre: 'interesados',
+    accion: 'borrar',
+    plazo: () => PLAZOS.interesado_descartado,
+    sql: `DELETE FROM interesados
+           WHERE estado = 'descartado'
+             AND created_at < now() - ($1 || ' days')::interval`,
   },
   {
     nombre: 'solicitudes_arcop.ip',
