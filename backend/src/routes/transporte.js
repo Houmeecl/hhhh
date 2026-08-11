@@ -49,8 +49,15 @@ router.get('/viajes', async (req, res, next) => {
     if (req.query.rut) { params.push(`%${String(req.query.rut).replace(/[^0-9kK]/g, '')}%`); cond.push(`regexp_replace(COALESCE(rut_cliente,''),'[^0-9kK]','','g') ILIKE $${params.length}`); }
     if (req.query.desde) { params.push(req.query.desde); cond.push(`fecha >= $${params.length}`); }
     if (req.query.hasta) { params.push(req.query.hasta); cond.push(`fecha <= $${params.length}`); }
+    // Columnas explícitas, no v.*: la migración 090 agregó la evidencia
+    // BYTEA (hasta 15 MB por fila) de los viajes que registran los
+    // proveedores — con v.* el listado admin arrastraría esos binarios
+    // completos en cada carga sin que el frontend los use.
     const { rows: viajes } = await query(
-      `SELECT v.*, m.nombre AS modo_nombre FROM transporte_viajes v
+      `SELECT v.id, v.rut_cliente, v.fecha, v.modo, v.origen, v.destino, v.km,
+              v.pasajeros, v.ida_vuelta, v.co2e, v.notas, v.proveedor_id,
+              v.archivo_nombre, v.created_at, m.nombre AS modo_nombre
+       FROM transporte_viajes v
        JOIN transporte_modos m ON m.codigo = v.modo
        WHERE ${cond.join(' AND ')} ORDER BY v.fecha DESC, v.created_at DESC LIMIT 300`, params
     );

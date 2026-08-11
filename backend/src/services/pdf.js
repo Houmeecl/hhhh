@@ -1366,6 +1366,128 @@ export async function generateInformeCarbono({ empresa, periodo, analisis }) {
   return bufferDoc(doc);
 }
 
+// ---------- INFORME MENSUAL — Transporte de personal (Cat. 7) ----------
+// Mismo estilo que generateInformeCarbono (arriba), consolidado del propio
+// proveedor: registró sus traslados vía panel-proveedor (routes/
+// transporteProveedor.js), este PDF resume el período para su declaración.
+function tablaPorModo(doc, x, y, ancho, filas) {
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('Por modo de transporte', x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!filas?.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin traslados en este período.', x, y);
+    return doc.y + 12;
+  }
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Modo', x + 6, y + 4).text('Viajes', x + ancho - 190, y + 4, { width: 50, align: 'right' })
+    .text('Km', x + ancho - 140, y + 4, { width: 65, align: 'right' })
+    .text('tCO2e', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+  let zebra = false;
+  for (const f of filas) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 15).fill(LIGHT);
+    zebra = !zebra;
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(f.nombre, x + 6, y + 3, { width: ancho - 200 })
+      .text(nfp(f.n_viajes), x + ancho - 190, y + 3, { width: 50, align: 'right' })
+      .text(nf(f.km, 1), x + ancho - 140, y + 3, { width: 65, align: 'right' })
+      .text(nf(f.co2e, 3), x + ancho - 70, y + 3, { width: 64, align: 'right' });
+    y += 15;
+  }
+  return y + 14;
+}
+
+function tablaViajes(doc, x, y, ancho, viajes) {
+  if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('Detalle de traslados', x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!viajes?.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin traslados en este período.', x, y);
+    return doc.y + 12;
+  }
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Fecha', x + 6, y + 4, { width: 55 })
+    .text('Trayecto', x + 64, y + 4, { width: ancho - 260 })
+    .text('Modo', x + ancho - 190, y + 4, { width: 60 })
+    .text('Km', x + ancho - 120, y + 4, { width: 50, align: 'right' })
+    .text('tCO2e', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+  let zebra = false;
+  for (const v of viajes) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 15).fill(LIGHT);
+    zebra = !zebra;
+    const { dia, mes } = fechaLocal(v.fecha);
+    doc.font('Helvetica').fontSize(7.5).fillColor(NAVY)
+      .text(`${String(dia).padStart(2, '0')}-${MESES[mes]}`, x + 6, y + 3, { width: 55 })
+      // '->' en vez de '→': la fuente estándar Helvetica/WinAnsi de PDFKit
+      // no trae el glifo de flecha (U+2192) y lo mostraría corrupto.
+      .text(`${v.origen} -> ${v.destino}${v.ida_vuelta ? ' (i/v)' : ''}`, x + 64, y + 3, { width: ancho - 260 })
+      .text(v.modo_nombre, x + ancho - 190, y + 3, { width: 60 })
+      .text(nf(v.km, 0), x + ancho - 120, y + 3, { width: 50, align: 'right' })
+      .text(nf(v.co2e, 3), x + ancho - 70, y + 3, { width: 64, align: 'right' });
+    y += 15;
+  }
+  return y + 14;
+}
+
+export async function generateInformeTransporte({ empresa, periodo, viajes, resumen }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const M = 48;
+  const W = doc.page.width - M * 2;
+
+  drawLogo(doc, M, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`CT-${(periodo || '').replace('-', '')} · Emitido el ${fechaCorta(new Date())}`, M, 50, { width: W, align: 'right' });
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
+    .text('Transporte de personal', M, 96, { width: W });
+  doc.font('Helvetica').fontSize(10.5).fillColor(GRAY)
+    .text(`Alcance 3 · Categoría 7 (GHG Protocol) — traslados del período ${periodo}`, M, doc.y + 4, { width: W });
+
+  doc.roundedRect(M, 148, W, 46, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('EMPRESA', M + 16, 160);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+    .text(`${empresa?.nombre_empresa || ''}  ·  ${formatearRut(empresa?.rut)}`, M + 16, 173);
+
+  let y = 216;
+  doc.roundedRect(M, y, W, 60, 8).fillAndStroke('#f0fdfa', '#14b8a6');
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${nf(resumen.total.co2e, 3)} tCO2e`, M + 16, y + 10);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
+    `${nfp(resumen.total.n_viajes)} traslado${resumen.total.n_viajes === 1 ? '' : 's'} · ${nf(resumen.total.km, 1)} km recorridos en total.`,
+    M + 16, y + 36, { width: W - 32 }
+  );
+  y += 76;
+
+  y = tablaPorModo(doc, M, y, W, resumen.por_modo);
+  y = tablaViajes(doc, M, y, W, viajes);
+
+  // Límites declarados — mismo criterio de honestidad que el informe SII:
+  // qué cubre este número y qué no, a la vista, no deducido.
+  if (y > doc.page.height - 200) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text('Límites y exclusiones declaradas', M, y, { width: W });
+  y = doc.y + 6;
+  const LIMITES = [
+    'Cobertura: solo los traslados que la propia empresa registró en sicr3p para este período — '
+      + 'no incluye desplazamientos no declarados.',
+    'Factores por modo (bus/camioneta/auto/tren/avión) son referenciales — validar con la fuente '
+      + 'oficial (HuellaChile / DEFRA) antes de reportar; quedan citados en el panel de Transporte.',
+    'Sin desglose por gas individual (CO2, CH4, N2O).',
+  ];
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES) {
+    if (y > doc.page.height - 100) { doc.addPage(); y = 60; }
+    doc.text(`• ${l}`, M, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  avisoNoVerificacion(doc, M, doc.page.height - 54, W);
+  return bufferDoc(doc);
+}
+
 // ---------- CREDENCIAL VIRTUAL — Firma del actor de la cadena (atestación) ----------
 // IMPORTANTE (honestidad, ver migraciones 038/039): esto NO es una firma
 // electrónica con validez legal (Ley N° 19.799 de Chile). Es una

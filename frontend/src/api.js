@@ -631,6 +631,16 @@ export const api = {
   proveedorRepRegistrarVenta: (formData) => request('/panel-proveedor/rep/ventas', { method: 'POST', body: formData, formData: true, authedProveedor: true }),
   proveedorRepDescargarEvidencia: (id, nombre) =>
     descargarAuth(`/api/panel-proveedor/rep/ventas/${id}/archivo`, authProveedor, nombre || 'factura'),
+  // --- Transporte de personal (Cat. 7): viajes propios + informe mensual ---
+  proveedorTransporteModos: () => request('/panel-proveedor/transporte/modos', { authedProveedor: true }),
+  proveedorTransporteViajes: () => request('/panel-proveedor/transporte/viajes', { authedProveedor: true }),
+  proveedorTransporteCrearViaje: (formData) =>
+    request('/panel-proveedor/transporte/viajes', { method: 'POST', body: formData, formData: true, authedProveedor: true }),
+  proveedorTransporteEliminarViaje: (id) => request(`/panel-proveedor/transporte/viajes/${id}`, { method: 'DELETE', authedProveedor: true }),
+  proveedorTransporteDescargarEvidencia: (id, nombre) =>
+    descargarAuth(`/api/panel-proveedor/transporte/viajes/${id}/archivo`, authProveedor, nombre || 'evidencia'),
+  descargarProveedorTransporteInformePdf: (periodo) =>
+    descargarAuth(`/api/panel-proveedor/transporte/informe/${periodo}.pdf`, authProveedor, `transporte-${periodo}.pdf`),
 };
 
 async function abrirPdfAuth(url, store = auth) {

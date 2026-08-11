@@ -355,7 +355,10 @@ Sin dependencias nuevas: autenticación JWT RS256 + streaming `insertAll` vía R
   precio medio ponderado, en CLP + CO2e, con salidas manuales para valorizar el consumo.
 - **Transporte de personal** (GHG Protocol Categoría 7): modos con factor editable
   (kgCO2e/pasajero-km, referenciales — validar fuente antes de reportar) y registro de
-  traslados; cada viaje carga la cuenta de carbono del Capital Natural.
+  traslados; cada viaje carga la cuenta de carbono del Capital Natural. La empresa
+  enrolada también registra sus propios traslados desde su panel (pestaña
+  "Transporte Cat. 7"), con evidencia opcional (PDF/XML/foto) y un informe mensual
+  consolidado en PDF por período — mismos modos y cálculo que el admin.
 
 ### Acceso de prueba con códigos (créditos)
 
