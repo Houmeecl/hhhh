@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validarRespuestaIA, analisisIA } from '../src/services/analisisIA.js';
+import { validarRespuestaIA, validarRespuestaEmbalaje, analisisIA } from '../src/services/analisisIA.js';
+import { validarComponentes } from '../src/services/rep.js';
 
 // ============================================================
 // Validación de la respuesta de la IA — SIN red: analisisIA.analizarTexto
@@ -99,4 +100,56 @@ test('analisisIA.analizarTexto() nunca lanza: sin clave configurada se apaga sol
 test('analisisIA.analizarTexto() devuelve null con texto vacío, sin llamar a nada', async () => {
   assert.equal(await analisisIA.analizarTexto(''), null);
   assert.equal(await analisisIA.analizarTexto(null), null);
+});
+
+// ---------- Estimación de embalaje REP por foto ----------
+
+test('validarRespuestaEmbalaje: propuesta válida queda lista para el formulario Y pasa validarComponentes de rep.js', () => {
+  const r = validarRespuestaEmbalaje({
+    foto_valida: true,
+    componentes: [
+      { material: 'vidrio', peso_gr: 300.55, cantidad: 1, reciclable: true },
+      { material: 'metales', peso_gr: 2, cantidad: 1, reciclable: true },
+      { material: 'papel_carton', peso_gr: 5, cantidad: 1, reciclable: true },
+    ],
+  });
+  assert.equal(r.fotoValida, true);
+  assert.equal(r.componentes.length, 3);
+  assert.equal(r.componentes[0].peso_gr, 300.6); // redondeado a 1 decimal
+  // La propuesta debe ser directamente guardable: misma barrera del servidor.
+  assert.equal(validarComponentes(r.componentes).ok, true);
+});
+
+test('validarRespuestaEmbalaje: descarta materiales fuera de la taxonomía REP, pesos/cantidades inválidos', () => {
+  const r = validarRespuestaEmbalaje({
+    foto_valida: true,
+    componentes: [
+      { material: 'pet', peso_gr: 25, cantidad: 1, reciclable: true },       // taxonomía del JUEGO, no REP → fuera
+      { material: 'plasticos', peso_gr: 0, cantidad: 1, reciclable: true },  // peso 0 → fuera
+      { material: 'plasticos', peso_gr: -5, cantidad: 1, reciclable: true }, // negativo → fuera
+      { material: 'vidrio', peso_gr: 300, cantidad: 0, reciclable: true },   // cantidad 0 → fuera
+      { material: 'vidrio', peso_gr: 300, cantidad: 1.5, reciclable: true }, // no entero → fuera
+      { material: 'compuestos', peso_gr: 30, cantidad: 2, reciclable: false }, // válido
+    ],
+  });
+  assert.equal(r.componentes.length, 1);
+  assert.equal(r.componentes[0].material, 'compuestos');
+  assert.equal(r.componentes[0].reciclable, false);
+});
+
+test('validarRespuestaEmbalaje: esquema inválido devuelve null; foto_valida=false conserva el aviso', () => {
+  assert.equal(validarRespuestaEmbalaje(null), null);
+  assert.equal(validarRespuestaEmbalaje({ componentes: [] }), null);
+  assert.equal(validarRespuestaEmbalaje({ foto_valida: 'si', componentes: [] }), null);
+  const r = validarRespuestaEmbalaje({ foto_valida: false, componentes: [] });
+  assert.equal(r.fotoValida, false);
+  assert.equal(r.componentes.length, 0);
+});
+
+test('analisisIA.estimarEmbalaje: sin IA configurada devuelve null (el formulario manual sigue); media type raro también', async () => {
+  if (!analisisIA.enabled) {
+    assert.equal(await analisisIA.estimarEmbalaje({ imagenBase64: 'x', mediaType: 'image/jpeg' }), null);
+  }
+  assert.equal(await analisisIA.estimarEmbalaje({ imagenBase64: 'x', mediaType: 'image/gif' }), null);
+  assert.equal(await analisisIA.estimarEmbalaje({ imagenBase64: '', mediaType: 'image/jpeg' }), null);
 });

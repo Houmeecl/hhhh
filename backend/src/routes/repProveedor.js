@@ -8,6 +8,7 @@ import {
   validarItemsVenta, snapshotItemsVenta, totalesVenta, resumenRep,
   normalizarNumeroDoc, cruzarConRcv,
 } from '../services/repProveedor.js';
+import { analisisIA } from '../services/analisisIA.js';
 
 // ============================================================
 // Ley REP desde el panel del proveedor (/api/panel-proveedor/rep).
@@ -69,6 +70,52 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const CAMPOS_PRODUCTO = `id, nombre, codigo, componentes, peso_total_gr, peso_reciclable_gr,
                          porcentaje, nivel, activo, created_at, updated_at`;
+
+// ---------- POST /estimar-embalaje — foto → componentes propuestos ----------
+// El mismo mecanismo de visión del juego "Sube y Suma", pero para dejar
+// de declarar el embalaje al ojo: la foto del producto le precarga los
+// componentes al formulario (material/peso/cantidad en la taxonomía REP)
+// y la persona los revisa y ajusta ANTES de guardar — el servidor
+// re-valida y recalcula todo al guardar, igual que con el tipeo manual.
+// La foto se analiza en memoria y se descarta (patrón juego.js: nunca se
+// persiste). Si la IA no está configurada o se agotó el presupuesto
+// diario, se responde 503 con mensaje claro y el tipeo manual sigue —
+// la declaración REP es una obligación legal, jamás depende de la IA.
+const uploadFotoEmbalaje = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\//.test(file.mimetype);
+    cb(ok ? null : new Error('Sube una foto (JPG, PNG o WEBP).'), ok);
+  },
+});
+
+router.post('/estimar-embalaje', requireNivelOperador, (req, res, next) => {
+  uploadFotoEmbalaje.single('foto')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'La foto debe pesar menos de 15 MB.' : 'No se pudo procesar la foto.' });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}, async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Falta la foto.' });
+    const mediaType = req.file.mimetype === 'image/png' ? 'image/png'
+      : req.file.mimetype === 'image/webp' ? 'image/webp' : 'image/jpeg';
+    const r = await analisisIA.estimarEmbalaje({
+      imagenBase64: req.file.buffer.toString('base64'),
+      mediaType,
+    });
+    if (!r) {
+      return res.status(503).json({ error: 'La estimación por foto no está disponible en este momento — ingresa los componentes a mano.' });
+    }
+    if (!r.fotoValida || !r.componentes.length) {
+      return res.status(422).json({ error: 'No se pudo identificar el embalaje en la foto. Toma otra con el producto completo y buena luz, o ingresa los componentes a mano.' });
+    }
+    res.json({ componentes: r.componentes, referencial: true });
+  } catch (err) { next(err); }
+});
 
 // ---------- GET /productos — catálogo propio ----------
 router.get('/productos', async (req, res, next) => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Icon } from './icons.jsx';
 import { api, fmt, fmtInt } from '../api.js';
+import EstimarEmbalajeFoto from './EstimarEmbalajeFoto.jsx';
 import {
   MATERIALES_REP,
   calcularReciclabilidad,
@@ -18,7 +19,12 @@ export const NIVEL_BADGE = { Alto: 'badge-green', Medio: 'badge-amber', Bajo: 'b
 // Componente controlado: `componentes`/`setComponentes` y la declaración ya
 // guardada (`guardada`) viven en la página que lo usa, para sobrevivir a
 // cambios de paso o re-render de la página.
-export default function DeclaracionEmbalaje({ sesionId, componentes, setComponentes, guardada, onGuardada, onModificar }) {
+// `estimarFoto` (opcional): async (file) => { componentes } — si viene,
+// se ofrece "Estimar con una foto" (visión IA) que PRECARGA los
+// componentes para que la persona los revise; sin la prop, el formulario
+// es 100% manual como siempre (el flujo público no la pasa: el endpoint
+// de visión exige sesión para proteger el presupuesto de IA).
+export default function DeclaracionEmbalaje({ sesionId, componentes, setComponentes, guardada, onGuardada, onModificar, estimarFoto }) {
   const [abierta, setAbierta] = useState(() => !!guardada);
   const [guardando, setGuardando] = useState(false);
   const [errorGuardar, setErrorGuardar] = useState('');
@@ -101,6 +107,9 @@ export default function DeclaracionEmbalaje({ sesionId, componentes, setComponen
 
       {abierta && !guardada && (
         <div style={{ padding: 16 }}>
+          {estimarFoto && (
+            <EstimarEmbalajeFoto estimar={estimarFoto} onResultado={setComponentes} />
+          )}
           {componentes.length === 0 && (
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
               Agrega los componentes del embalaje (caja, film, zuncho…) para estimar su reciclabilidad.

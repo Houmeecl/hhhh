@@ -187,6 +187,7 @@ export default function CargarAv() {
           guardada={embalajeGuardado}
           onGuardada={setEmbalajeGuardado}
           onModificar={() => setEmbalajeGuardado(null)}
+          estimarFoto={api.posEstimarEmbalaje}
         />
 
         {compensacionHabilitada && (

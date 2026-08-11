@@ -3,28 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import Dropzone from '../components/Dropzone.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
+import { comprimirImagen } from '../lib/imagen.js';
 
 const MATERIAL_LABEL = { pet: 'botella PET', vidrio: 'envase de vidrio', lata: 'lata', tetra: 'caja tetra' };
-
-// Comprime la foto a JPEG (lado mayor ≤1568 px): convierte el HEIC del
-// iPhone a un formato que la IA acepta y acota el peso del upload y el
-// costo de visión. Si el navegador no puede decodificarla, se envía tal
-// cual y el backend decide.
-async function comprimirImagen(file) {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, 1568 / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * escala);
-    canvas.height = Math.round(bitmap.height * escala);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/jpeg', 0.8));
-    if (!blob) return file;
-    return new File([blob], 'envases.jpg', { type: 'image/jpeg' });
-  } catch {
-    return file;
-  }
-}
 
 function obtenerUbicacion() {
   return new Promise((resolve, reject) => {

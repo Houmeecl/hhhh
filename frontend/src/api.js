@@ -506,6 +506,19 @@ export const api = {
   accesosProveedorReenviarInvitacion: (id) => request(`/admin/accesos/proveedores/${id}/reenviar-invitacion`, { method: 'POST', authed: true }),
 
   // Panel del mostrador presencial (authedAv: sesión propia, separada del panel núcleo)
+  // Estimación de embalaje REP por foto (visión IA, referencial): el
+  // operador del terreno y el proveedor tienen cada uno su endpoint con
+  // su propia sesión — no hay versión pública (protege el presupuesto de IA).
+  posEstimarEmbalaje: (file) => {
+    const fd = new FormData();
+    fd.append('foto', file);
+    return request('/pos/estimar-embalaje', { method: 'POST', body: fd, formData: true, authedAv: true });
+  },
+  repEstimarEmbalaje: (file) => {
+    const fd = new FormData();
+    fd.append('foto', file);
+    return request('/panel-proveedor/rep/estimar-embalaje', { method: 'POST', body: fd, formData: true, authedProveedor: true });
+  },
   editarPosConfig: (b) => request('/admin/pos/config', { method: 'PUT', body: b, authedAv: true }),
   compensacionesResumen: () => request('/admin/pos/compensaciones/resumen', { authedAv: true }),
   compensacionesAv: (qs = '') => request(`/admin/pos/compensaciones${qs}`, { authedAv: true }),

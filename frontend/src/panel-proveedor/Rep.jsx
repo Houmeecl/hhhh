@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import Dropzone from '../components/Dropzone.jsx';
+import EstimarEmbalajeFoto from '../components/EstimarEmbalajeFoto.jsx';
 import { MATERIALES_REP, calcularReciclabilidad, UMBRAL_EXENCION_REP_KG, EXENCION_REP_NOTA } from '../lib/rep.js';
 
 // ============================================================
@@ -198,6 +199,10 @@ function Productos({ productos, recargar, flash }) {
             <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
               Envase de UNA unidad vendida: cada componente con su material, peso y si es reciclable.
             </div>
+            <EstimarEmbalajeFoto
+              estimar={api.repEstimarEmbalaje}
+              onResultado={(cs) => setEdit({ ...edit, componentes: cs })}
+            />
             {edit.componentes.map((c, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
                 <div className="field" style={{ margin: 0, flex: '1 1 140px' }}>

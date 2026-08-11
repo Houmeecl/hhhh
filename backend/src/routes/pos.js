@@ -2,7 +2,9 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../lib/db.js';
 import { config } from '../config.js';
+import multer from 'multer';
 import { signAccess, requireAuth, requireRole, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
+import { analisisIA } from '../services/analisisIA.js';
 import { validarTarifa, validarTipoCambio } from '../services/compensacion.js';
 import { actualizarDolar } from '../services/tipoCambio.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
@@ -107,6 +109,53 @@ router.get('/config', async (req, res, next) => {
     res.json(formatearConfig(await leerConfig()));
   } catch (err) { next(err); }
 });
+
+// ---------- POST /estimar-embalaje — foto → componentes REP propuestos ----------
+// Gemelo del endpoint de repProveedor.js (mismo contrato y mismos
+// mensajes) pero para el operador del panel de terreno (aduana_verde),
+// que declara el embalaje en el mostrador con DeclaracionEmbalaje.jsx.
+// Guard propio a nivel de ruta (no adminRouter): el operador de mostrador
+// puede ser rol 'operador', no solo 'admin'. NO se ofrece en el flujo
+// público de /cargar — un endpoint de IA sin login sería una puerta
+// abierta para quemar el presupuesto diario de visión.
+const uploadFotoEmbalajePos = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\//.test(file.mimetype);
+    cb(ok ? null : new Error('Sube una foto (JPG, PNG o WEBP).'), ok);
+  },
+});
+
+router.post('/estimar-embalaje',
+  requireAuth, requireHomePanel('aduana_verde'), requireRole('admin', 'operador'),
+  (req, res, next) => {
+    uploadFotoEmbalajePos.single('foto')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'La foto debe pesar menos de 15 MB.' : 'No se pudo procesar la foto.' });
+      }
+      if (err) return res.status(400).json({ error: err.message });
+      next();
+    });
+  },
+  async (req, res, next) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Falta la foto.' });
+      const mediaType = req.file.mimetype === 'image/png' ? 'image/png'
+        : req.file.mimetype === 'image/webp' ? 'image/webp' : 'image/jpeg';
+      const r = await analisisIA.estimarEmbalaje({
+        imagenBase64: req.file.buffer.toString('base64'),
+        mediaType,
+      });
+      if (!r) {
+        return res.status(503).json({ error: 'La estimación por foto no está disponible en este momento — ingresa los componentes a mano.' });
+      }
+      if (!r.fotoValida || !r.componentes.length) {
+        return res.status(422).json({ error: 'No se pudo identificar el embalaje en la foto. Toma otra con el producto completo y buena luz, o ingresa los componentes a mano.' });
+      }
+      res.json({ componentes: r.componentes, referencial: true });
+    } catch (err) { next(err); }
+  });
 
 // ============================================================
 // Administración (solo admin) — montado en /api/admin/pos
