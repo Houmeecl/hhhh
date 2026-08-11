@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Alcance 3 para mandantes — tu cadena de valor medida desde documentos reales</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">CARPETA DE SERVICIO · ALCANCE 3</div>
+    <h1>Alcance 3 (Scope 3)<br>para mandantes</h1>
+    <p class="bajada">Las emisiones de tu cadena de valor, armadas desde las facturas reales de
+    tus proveedores — no desde promedios de industria — en las 15 categorías del GHG Protocol,
+    con la fuente de cada factor citada y export listo para tu reporte NCG 461 / IFRS S2.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Agosto 2026</span>
+  </div>
+</div>
+
+<div class="pagina">
+  <h2>1. El problema que resuelve</h2>
+  <p>El Alcance 3 son las emisiones que tu empresa no genera directamente pero que ocurren
+  gracias a su actividad: lo que compras, lo que transportan terceros, lo que tus proveedores
+  queman. Es el alcance que más pesa en la mayoría de las empresas y el que los marcos
+  modernos — <strong>NCG 461 de la CMF, IFRS S2 del ISSB, CDP</strong> — exigen con más fuerza.</p>
+  <p>La práctica habitual es enviar planillas a los proveedores y recibir estimaciones sin
+  respaldo. El resultado: cifras que nadie puede defender ante un tercero.</p>
+
+  <div class="caja-navy">
+    <h4>Lo que sicr3p hace distinto</h4>
+    <p style="margin:0; text-align:left;">Cuando tus proveedores procesan sus documentos en
+    sicr3p, cada factura emitida a tu RUT queda asociada a ti, calculada con un factor de
+    emisión citado y sellada en una cadena de integridad verificable. Tu Alcance 3 se arma
+    <strong>desde evidencia documental de origen</strong>, proveedor por proveedor, categoría
+    por categoría.</p>
+  </div>
+
+  <h2>2. Cómo funciona, en cuatro pasos</h2>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Tus proveedores procesan sus documentos.</b> Suben facturas (foto, PDF o XML del SII); el motor de sicr3p calcula el CO2e de cada ítem con metodología citada.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Cada documento queda asociado a tu RUT.</b> El sistema agrupa automáticamente por proveedor y por categoría GHG (patrón "Alcance N · Cat. M" en cada categoría del motor).</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Tú lo ves en tu panel.</b> Panel propio del mandante: CO2e por proveedor, número de documentos, y la proporción de cada uno en tu cadena.</div></div>
+    <div class="paso"><div class="num">4</div><div class="txt"><b>Exportas en el formato de tu reporte.</b> CSV o JSON por API, o desde el panel — cada fila conserva la fuente del factor con que se calculó.</div></div>
+  </div>
+
+  <div class="captura"><img src="img/servicios/pantalla-panel-mandante.png" alt="Panel del mandante"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">El panel del
+  mandante: proporción de CO2e por proveedor y exports a un clic (datos de demostración).</p>
+</div>
+
+<div class="pagina">
+  <h2>3. Las 15 categorías del GHG Protocol</h2>
+  <p>El export clasifica cada tonelada en la categoría oficial (WRI/WBCSD):</p>
+  <table>
+    <tr><th>#</th><th>Categoría</th><th>#</th><th>Categoría</th></tr>
+    <tr><td>1</td><td>Bienes y servicios adquiridos</td><td>9</td><td>Transporte y distribución aguas abajo</td></tr>
+    <tr><td>2</td><td>Bienes de capital</td><td>10</td><td>Procesamiento de productos vendidos</td></tr>
+    <tr><td>3</td><td>Combustibles y energía (no A1/A2)</td><td>11</td><td>Uso de productos vendidos</td></tr>
+    <tr><td>4</td><td>Transporte y distribución aguas arriba</td><td>12</td><td>Fin de vida de productos vendidos</td></tr>
+    <tr><td>5</td><td>Residuos de las operaciones</td><td>13</td><td>Activos arrendados aguas abajo</td></tr>
+    <tr><td>6</td><td>Viajes de negocios</td><td>14</td><td>Franquicias</td></tr>
+    <tr><td>7</td><td>Desplazamiento de empleados</td><td>15</td><td>Inversiones</td></tr>
+    <tr><td>8</td><td>Activos arrendados aguas arriba</td><td></td><td></td></tr>
+  </table>
+
+  <h2>4. El export, tal como sale</h2>
+  <p>Endpoint <strong>GET /api/mandante/export/alcance3?anio=&amp;formato=csv</strong>
+  (autenticado con la API key de tu empresa o tu sesión de panel). Columnas:</p>
+  <table>
+    <tr><th>rut_proveedor</th><th>cat.</th><th>categoría GHG</th><th>descripción</th><th>docs</th><th>t CO2e</th><th>fuente del factor</th></tr>
+    <tr><td>78.345.120-4</td><td>3</td><td>Combustibles y energía</td><td>Energía eléctrica</td><td>1</td><td>3,8412</td><td>MMA Chile — HuellaChile (2023)</td></tr>
+    <tr><td>79.218.440-5</td><td>3</td><td>Combustibles y energía</td><td>Combustibles</td><td>1</td><td>3,2160</td><td>IPCC — Guías 2006 (v2)</td></tr>
+  </table>
+  <p style="font-size:8.5pt; color:#64748b; font-style:italic;">Filas del export de muestra con
+  datos ficticios.</p>
+
+  <div class="caja">
+    <h4>Además del Alcance 3</h4>
+    <p style="margin:0;">El mismo panel entrega el <strong>export CBAM</strong> (para tus lotes
+    de exportación a la UE) y la <strong>carpeta de evidencia</strong> imprimible de cada
+    trámite de un proveedor, con su hoja de comprobación por QR.</p>
+  </div>
+
+  <h2>5. Qué es y qué no es</h2>
+  <table>
+    <tr><th>Es</th><th>No es</th></tr>
+    <tr><td>Datos de apoyo trazables hasta el documento de origen, con factor y fuente por fila.</td><td>Una verificación de tercera parte acreditada — si tu marco la exige, el expediente de sicr3p queda listo para entregársela al verificador.</td></tr>
+    <tr><td>Cobertura de los proveedores que procesan en sicr3p.</td><td>Cobertura mágica del 100% de tu cadena desde el día uno: crece proveedor a proveedor.</td></tr>
+  </table>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Contacto</h4>
+    <p style="margin:0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicrep.cl</strong> · www.sicr3p.cl</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Carpeta de servicio: Alcance 3 · Versión 1.0 · Agosto 2026 ·
+  Material informativo comercial. sicr3p no es certificador, auditor ni autoridad: registra,
+  estructura y sella declaraciones verificables.</p>
+</div>
+
+</body>
+</html>

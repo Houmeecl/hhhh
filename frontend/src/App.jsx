@@ -1,27 +1,153 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
 import Cargar from './pages/Cargar.jsx';
 import Resultado from './pages/Resultado.jsx';
 import Verificar from './pages/Verificar.jsx';
+import Pasaporte from './pages/Pasaporte.jsx';
+import PasaporteLote from './pages/PasaporteLote.jsx';
+import TarjetaViaje from './pages/TarjetaViaje.jsx';
+import FirmaProveedor from './pages/FirmaProveedor.jsx';
+import AccesoUnico from './pages/AccesoUnico.jsx';
+import Prueba from './pages/Prueba.jsx';
+import Acceso from './pages/Acceso.jsx';
+import MisSesiones from './pages/MisSesiones.jsx';
+import CorredorLanding from './pages/CorredorLanding.jsx';
+import InstitutoLanding from './pages/InstitutoLanding.jsx';
+import Inscripcion from './pages/Inscripcion.jsx';
+import SolicitarAuspicio from './pages/SolicitarAuspicio.jsx';
+import MisDatos from './pages/MisDatos.jsx';
+import Cadena from './pages/Cadena.jsx';
+import ConstanciaPublica from './pages/ConstanciaPublica.jsx';
+import LoginSuma from './juego/Login.jsx';
+import ConstanciaPublicaSuma from './juego/ConstanciaPublica.jsx';
 import Login from './admin/Login.jsx';
-import Activar from './admin/Activar.jsx';
-import AdminApp from './admin/AdminApp.jsx';
+import ActivarCuenta from './components/ActivarCuenta.jsx';
+import EntrarComoSuperadmin from './components/EntrarComoSuperadmin.jsx';
+import LoginAv from './admin-av/LoginAv.jsx';
+import LoginPuerto from './panel-puerto/LoginPuerto.jsx';
+import LoginMandante from './panel-mandante/LoginMandante.jsx';
+import LoginAgencia from './panel-agencia/LoginAgencia.jsx';
+import LoginTrazador from './panel-trazador/LoginTrazador.jsx';
+import LoginProveedor from './panel-proveedor/LoginProveedor.jsx';
+
+// Code-splitting: los paneles admin son la mitad del bundle y solo los
+// usan operadores logueados — se cargan bajo demanda para que las
+// páginas públicas (pasaportes, verificación) abran rápido en el
+// teléfono de un tercero que escanea un QR.
+const AdminApp = lazy(() => import('./admin/AdminApp.jsx'));
+const AdminAvApp = lazy(() => import('./admin-av/AdminAvApp.jsx'));
+const PuertoApp = lazy(() => import('./panel-puerto/PuertoApp.jsx'));
+const MandanteApp = lazy(() => import('./panel-mandante/MandanteApp.jsx'));
+const AgenciaApp = lazy(() => import('./panel-agencia/AgenciaApp.jsx'));
+const TrazadorApp = lazy(() => import('./panel-trazador/TrazadorApp.jsx'));
+const ProveedorApp = lazy(() => import('./panel-proveedor/ProveedorApp.jsx'));
+// La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
+const Torre = lazy(() => import('./pages/Torre.jsx'));
+const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
+const JuegoApp = lazy(() => import('./juego/JuegoApp.jsx'));
+
+const CargandoModulo = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
+    <span className="spinner" />
+  </div>
+);
+
+// El mismo bundle sirve también el subdominio del Instituto
+// (instituto.sicrep.cl / instituto.sicr3p.cl, ver deploy/INSTITUTO-SUBDOMINIO.md):
+// bajo ese host la raíz muestra la landing del Instituto en vez de la
+// portada general. Todas las demás rutas siguen operativas en ambos hosts.
+const ES_SUBDOMINIO_INSTITUTO = window.location.hostname.startsWith('instituto.');
 
 export default function App() {
   return (
+    <Suspense fallback={<CargandoModulo />}>
     <Routes>
       {/* Flujo público (sin login) */}
-      <Route path="/" element={<Landing />} />
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : <Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
+      <Route path="/pasaporte/:id" element={<Pasaporte />} />
+      <Route path="/lote/:codigo" element={<PasaporteLote />} />
+      <Route path="/v/:serial" element={<TarjetaViaje />} />
+      <Route path="/f/:serial" element={<FirmaProveedor />} />
+      <Route path="/torre" element={<TorreFlota />} />
+      <Route path="/torre/:codigo" element={<Torre />} />
+      {/* Acceso único del sitio: paneles (detección automática) + clientes
+          (magic link). /panel/ingresar queda como redirect: está enlazado
+          desde builds ya desplegados y posibles marcadores. */}
+      <Route path="/ingresar" element={<AccesoUnico />} />
+      <Route path="/panel/ingresar" element={<Navigate to="/ingresar" replace />} />
+      <Route path="/prueba" element={<Prueba />} />
+      <Route path="/acceso" element={<Acceso />} />
+      <Route path="/mis-sesiones" element={<MisSesiones />} />
+      {/* /aduana-verde era una segunda landing del canal presencial, con sus
+          propios header y footer y los mismos destinos que la portada. Su
+          contenido útil vive ahora en "/". La ruta se conserva como
+          redirección porque el enlace ya salió repartido en material impreso
+          y en versiones anteriores del sitio. */}
+      <Route path="/aduana-verde" element={<Navigate to="/" replace />} />
+      <Route path="/corredor" element={<CorredorLanding />} />
+      <Route path="/instituto" element={<InstitutoLanding />} />
+      <Route path="/inscripcion" element={<Inscripcion />} />
+      <Route path="/auspicio" element={<SolicitarAuspicio />} />
+      {/* Ejercicio de derechos ARCOP sin cuenta: el titular se identifica
+          por RUT o correo (Ley 21.719). */}
+      <Route path="/mis-datos" element={<MisDatos />} />
+      <Route path="/cadena" element={<Cadena />} />
+      <Route path="/constancia/:serial" element={<ConstanciaPublica />} />
+      <Route path="/suma/constancia/:serial" element={<ConstanciaPublicaSuma />} />
 
-      {/* Admin */}
+      {/* Puente de la vista de superadmin: guarda el token de vista en el
+          almacén del panel elegido y redirige a su raíz (ver
+          EntrarComoSuperadmin.jsx). */}
+      <Route path="/impersonar/:panel" element={<EntrarComoSuperadmin />} />
+
+      {/* Admin — panel sicrep (núcleo/plataforma) */}
       <Route path="/admin/login" element={<Login />} />
-      <Route path="/admin/activar" element={<Activar />} />
+      <Route path="/admin/activar" element={<ActivarCuenta loginPath="/admin/login" />} />
       <Route path="/admin/*" element={<AdminApp />} />
+
+      {/* Panel de terreno — compensación, tarifa y REP, cuentas propias */}
+      <Route path="/panel-verde/login" element={<LoginAv />} />
+      <Route path="/panel-verde/activar" element={<ActivarCuenta loginPath="/panel-verde/login" titulo="el panel de terreno" />} />
+      <Route path="/panel-verde/*" element={<AdminAvApp />} />
+
+      {/* Panel de Puerto — lectura completa de tránsitos por su propio punto del Corredor */}
+      <Route path="/panel-puerto/login" element={<LoginPuerto />} />
+      <Route path="/panel-puerto/activar" element={<ActivarCuenta loginPath="/panel-puerto/login" titulo="el panel de Puerto" />} />
+      <Route path="/panel-puerto/*" element={<PuertoApp />} />
+
+      {/* Panel de Mandante — trazabilidad y CO2e de sus proveedores */}
+      <Route path="/panel-mandante/login" element={<LoginMandante />} />
+      <Route path="/panel-mandante/activar" element={<ActivarCuenta loginPath="/panel-mandante/login" titulo="el panel de Mandante" />} />
+      <Route path="/panel-mandante/*" element={<MandanteApp />} />
+
+      {/* Panel de Agencia de Aduana — expedientes del Corredor + captura de documentos (tablet/PC) */}
+      <Route path="/panel-agencia/login" element={<LoginAgencia />} />
+      <Route path="/panel-agencia/activar" element={<ActivarCuenta loginPath="/panel-agencia/login" titulo="el panel de Agencia" />} />
+      <Route path="/panel-agencia/*" element={<AgenciaApp />} />
+
+      {/* Panel de Trazador — cruces de los RUT que tiene autorizados por whitelist */}
+      <Route path="/panel-trazador/login" element={<LoginTrazador />} />
+      <Route path="/panel-trazador/activar" element={<ActivarCuenta loginPath="/panel-trazador/login" titulo="el panel de Trazador" />} />
+      <Route path="/panel-trazador/*" element={<TrazadorApp />} />
+
+      {/* Panel de Proveedor — entidad persistente con login FIDO2; firma
+          los lotes tipo 'producto' que le asignó el admin desde Origen.jsx */}
+      <Route path="/panel-proveedor/login" element={<LoginProveedor />} />
+      <Route path="/panel-proveedor/activar" element={<ActivarCuenta loginPath="/panel-proveedor/login" titulo="el panel de Proveedor" />} />
+      <Route path="/panel-proveedor/*" element={<ProveedorApp />} />
+
+      {/* "Sube y Suma" — escaneo gamificado con código de campaña de una
+          empresa cliente. Sin /activar: el jugador entra por magic link,
+          nunca con contraseña. */}
+      <Route path="/suma/login" element={<LoginSuma />} />
+      <Route path="/suma/*" element={<JuegoApp />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }

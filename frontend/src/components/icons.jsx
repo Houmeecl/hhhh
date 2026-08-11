@@ -75,9 +75,23 @@ export const Icon = {
   Leaf: ({ size = 22 }) => base(size, <>
     <path d="M20 4S8 4 5 12c-1.5 4 1 7 5 7 8 0 10-11 10-15Z" /><path d="M5 19S8 12 15 9" />
   </>),
+  // Triángulo de flechas de reciclaje (tres tramos con punta de flecha).
+  Recycle: ({ size = 22 }) => base(size, <>
+    <path d="M7 19H4.8a1.8 1.8 0 0 1-1.55-2.7l2.1-3.6" />
+    <path d="m14 16-3 3 3 3" />
+    <path d="M7 19h6" />
+    <path d="m5.3 12.8 2.3-4 1.1 4.1" />
+    <path d="m7.6 8.8 1.7-3a1.8 1.8 0 0 1 3.1 0l1.9 3.3" />
+    <path d="M18.4 12.4 16.3 8.7 20.4 9" />
+    <path d="m16.3 8.7 2.9 5a1.8 1.8 0 0 1-1.55 2.7H16" />
+  </>),
   Download: ({ size = 22 }) => base(size, <>
     <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
     <path d="M12 3v12M12 15l-4-4M12 15l4-4" />
+  </>),
+  Printer: ({ size = 22 }) => base(size, <>
+    <path d="M6 9V3h12v6" /><rect x="4" y="9" width="16" height="8" rx="1.5" />
+    <path d="M6 17v4h12v-4" /><path d="M7 12h.01" />
   </>),
   Logout: ({ size = 22 }) => base(size, <>
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" /><path d="M10 12H3M3 12l3-3M3 12l3 3" />
@@ -86,6 +100,46 @@ export const Icon = {
     <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
   </>),
   ArrowRight: ({ size = 22 }) => base(size, <path d="M5 12h14M13 6l6 6-6 6" />),
+  Camera: ({ size = 22 }) => base(size, <>
+    <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </>),
+  Nfc: ({ size = 22 }) => base(size, <>
+    <rect x="2" y="6" width="13" height="12" rx="2" />
+    <path d="M18 9a3 3 0 0 1 0 6M21 7a6 6 0 0 1 0 10" />
+  </>),
+  CreditCard: ({ size = 22 }) => base(size, <>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <path d="M2 10h20M6 15h4" />
+  </>),
+  Package: ({ size = 22 }) => base(size, <>
+    <path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" />
+    <path d="M3 8l9 5 9-5M12 13v8" />
+    <path d="M7.5 5.5l9 5" />
+  </>),
+  Coin: ({ size = 22 }) => base(size, <>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v10M9.5 9.2c0-1.2 1.1-2 2.5-2s2.5.9 2.5 2-1.1 1.8-2.5 1.8-2.5.7-2.5 1.9 1.1 2 2.5 2 2.5-.8 2.5-2" />
+  </>),
+  Book: ({ size = 22 }) => base(size, <>
+    <path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5c-.8 0-1.5-.7-1.5-1.5v-13Z" />
+    <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5c.8 0 1.5-.7 1.5-1.5v-13Z" />
+    <path d="M11 4v16M11 8h-4M11 12h-4" />
+  </>),
+  Truck: ({ size = 22 }) => base(size, <>
+    <path d="M2 8h11v8H2Z" />
+    <path d="M13 11h4l3 3v2h-7Z" />
+    <circle cx="6.5" cy="17.3" r="1.8" /><circle cx="17" cy="17.3" r="1.8" />
+  </>),
+  Pause: ({ size = 22 }) => base(size, <path d="M8 5v14M16 5v14" />),
 };
 
 export default Icon;
+
+// Marcador de camión para mapas Leaflet (Torre de control): L.divIcon exige
+// un string de HTML crudo, no JSX, así que el trazo de Icon.Truck se repite
+// acá como SVG plano en vez de reusar el componente React.
+export const TRUCK_MARKER_SVG =
+  '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#218838" stroke-width="1.8" ' +
+  'stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11v8H2Z"/><path d="M13 11h4l3 3v2h-7Z"/>' +
+  '<circle cx="6.5" cy="17.3" r="1.8"/><circle cx="17" cy="17.3" r="1.8"/></svg>';

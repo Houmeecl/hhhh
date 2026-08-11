@@ -1,6 +1,27 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtFecha } from '../api.js';
 
+// Etiquetas humanas por motor de cálculo. Los tres variantes "propio" van en verde;
+// 'externo' (o cualquier valor desconocido, mostrado tal cual) va en gris.
+const MOTOR_LABELS = {
+  propio: 'Propio · XML',
+  propio_texto: 'Propio · PDF texto',
+  propio_ocr: 'Propio · OCR',
+  propio_revisado: 'Propio · Revisado',
+  revision: 'En revisión',
+  externo: 'Externo',
+};
+
+function BadgeMotor({ motor }) {
+  const esPropio = ['propio', 'propio_texto', 'propio_ocr', 'propio_revisado'].includes(motor);
+  const enRevision = motor === 'revision';
+  return (
+    <span className={`badge ${esPropio ? 'badge-green' : enRevision ? 'badge-yellow' : 'badge-gray'}`}>
+      {MOTOR_LABELS[motor] || motor || '—'}
+    </span>
+  );
+}
+
 export default function Sesiones() {
   const [sesiones, setSesiones] = useState([]);
   const [q, setQ] = useState('');
@@ -29,6 +50,7 @@ export default function Sesiones() {
       </div>
 
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Fecha</th><th>Empresa</th><th>RUT</th><th className="num">Facturas</th><th className="num">t CO2e</th><th></th></tr></thead>
           <tbody>
@@ -48,6 +70,7 @@ export default function Sesiones() {
             {sesiones.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin sesiones.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       {detalle && (
@@ -58,8 +81,9 @@ export default function Sesiones() {
               <a className="btn btn-primary btn-sm" href={api.informeUrl(detalle.sesion.id)} target="_blank" rel="noreferrer">Descargar informe</a>
             </div>
             <p className="muted">{detalle.sesion.rut_cliente} · {fmtFecha(detalle.sesion.created_at)} · Total {fmt(detalle.sesion.total_co2e, 3)} t CO2e</p>
+            <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>N° venta</th><th>Categoría</th><th>Emisor</th><th className="num">t CO2e</th><th></th></tr></thead>
+              <thead><tr><th>N° venta</th><th>Categoría</th><th>Emisor</th><th className="num">t CO2e</th><th>Motor</th><th></th></tr></thead>
               <tbody>
                 {detalle.facturas.map((f) => (
                   <tr key={f.id}>
@@ -67,11 +91,13 @@ export default function Sesiones() {
                     <td><span className="badge badge-green">{f.categoria}</span></td>
                     <td className="muted">{f.rut_emisor}</td>
                     <td className="num">{fmt(f.total_co2e, 3)}</td>
+                    <td><BadgeMotor motor={f.motor} /></td>
                     <td><a className="btn btn-ghost btn-sm" href={api.etiquetaUrl(f.id)} target="_blank" rel="noreferrer">Etiqueta</a></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
             <div style={{ textAlign: 'right', marginTop: 12 }}><button className="btn btn-outline" onClick={() => setDetalle(null)}>Cerrar</button></div>
           </div>
         </div>

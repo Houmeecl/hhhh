@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>La red de actores — un panel para cada rol de tu cadena</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">CARPETA DE SERVICIO · RED DE ACTORES</div>
+    <h1>Un panel para<br>cada rol de tu cadena</h1>
+    <p class="bajada">Puerto, mandante, agencia de aduana, proveedor y trazador: cada actor de
+    la cadena entra a su propio panel, ve exactamente lo suyo — y nada más — y alimenta la
+    misma cadena de integridad. El aislamiento no es una limitación: es la garantía que hace
+    posible que competidores convivan en la misma plataforma.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Agosto 2026</span>
+  </div>
+</div>
+
+<div class="pagina">
+  <h2>1. Los cinco paneles externos</h2>
+  <table>
+    <tr><th>Panel</th><th>Quién entra</th><th>Qué ve</th><th>Qué NO ve</th></tr>
+    <tr><td><strong>Puerto</strong></td><td>El operador del puerto</td><td>Los tránsitos que sellaron un eslabón en SU punto del corredor, con cadena de custodia y expediente</td><td>Tránsitos de otros puntos</td></tr>
+    <tr><td><strong>Mandante</strong></td><td>La empresa que exige datos</td><td>El CO2e de SUS proveedores y sus exports (Alcance 3, CBAM)</td><td>Datos de proveedores ajenos</td></tr>
+    <tr><td><strong>Agencia</strong></td><td>La agencia de aduana</td><td>Los expedientes de las cargas que se le asignaron; captura documentos y mueve el semáforo</td><td>Expedientes de otras agencias</td></tr>
+    <tr><td><strong>Proveedor</strong></td><td>El generador de la carga</td><td>Los lotes que se le asignaron para firmar (con llave física FIDO2 opcional)</td><td>Todo lo demás</td></tr>
+    <tr><td><strong>Trazador</strong></td><td>Un tercero autorizado</td><td>Los cruces comprador-vendedor SOLO de los RUT que el administrador le autorizó</td><td>Cualquier otro RUT</td></tr>
+  </table>
+
+  <div class="caja-navy">
+    <h4>Cómo se garantiza el aislamiento</h4>
+    <p style="margin:0; text-align:left;">No es un filtro de pantalla: cada sesión lleva su
+    panel y su entidad grabados en el token, y el servidor filtra <strong>cada consulta</strong>
+    por esa entidad. Un puerto no puede pedir datos de otro punto ni construyendo la URL a
+    mano. Cada panel tiene además su color de identidad, para que el operador siempre sepa
+    dónde está.</p>
+  </div>
+
+  <div class="captura"><img src="img/servicios/pantalla-panel-puerto.png" alt="Panel de puerto"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">Panel de
+  Puerto (azul): tránsitos del propio punto, con estados y cadena de custodia.</p>
+</div>
+
+<div class="pagina">
+  <h2>2. Así se ve cada rol</h2>
+  <div class="captura"><img src="img/servicios/pantalla-panel-agencia.png" alt="Panel de agencia"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">Agencia
+  (ámbar): expedientes asignados y captura documental.</p>
+  <div class="captura"><img src="img/servicios/pantalla-panel-trazador.png" alt="Panel de trazador"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">Trazador
+  (rojo): cruces de un RUT autorizado — sesiones, quién le emite, a quién le emite.</p>
+  <div class="captura"><img src="img/servicios/pantalla-panel-proveedor.png" alt="Panel de proveedor"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">Proveedor
+  (turquesa): lotes pendientes de firma, con formulario en línea.</p>
+</div>
+
+<div class="pagina">
+  <h2>3. Cómo se incorpora un actor (desde tu admin)</h2>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Se crea la entidad</b> en Accesos externos (puerto, mandante, agencia, proveedor o trazador), con sus permisos: punto del corredor, RUT autorizados, lotes asignados.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Se le crea el acceso web</b> con un clic: el sistema envía la activación y fuerza el cambio de contraseña en el primer ingreso. Para roles que firman, se puede exigir llave física FIDO2.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>El actor opera solo.</b> Todo lo que hace queda en el log de actividad y, cuando corresponde, sellado en la cadena del lote.</div></div>
+  </div>
+
+  <h2>4. Para integraciones: API y webhooks</h2>
+  <p>El mandante que prefiere integrar sus sistemas usa la <strong>API con clave</strong>
+  (encabezado X-Api-Key) para los mismos datos de su panel — proveedores, Alcance 3, CBAM — y
+  puede suscribir un <strong>webhook</strong> para recibir eventos en su propio sistema.</p>
+
+  <dl>
+    <dt>¿Qué le cuesta al actor externo entrar?</dt>
+    <dd>Nada de infraestructura: navegador y su credencial. Los paneles funcionan en escritorio, tablet y teléfono.</dd>
+    <dt>¿Puede un actor negarse a usar otra plataforma más?</dt>
+    <dd>Es la objeción clásica, y la respuesta es el diseño: cada panel hace UNA cosa (firmar, consultar, capturar) y se aprende en minutos — no es "otro sistema", es un formulario con respaldo.</dd>
+  </dl>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Contacto</h4>
+    <p style="margin:0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicrep.cl</strong> · www.sicr3p.cl</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Carpeta de servicio: Red de actores · Versión 1.0 · Agosto 2026 ·
+  Material informativo comercial. Capturas con datos de demostración. sicr3p no es
+  certificador, auditor ni autoridad.</p>
+</div>
+
+</body>
+</html>

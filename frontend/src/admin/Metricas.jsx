@@ -1,24 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt } from '../api.js';
-import { Donut, Sparkbars } from '../components/Charts.jsx';
-
-// Barra horizontal simple (sin librerías externas).
-function Bar({ value, max, label, right }) {
-  const pct = max > 0 ? Math.max(3, (value / max) * 100) : 0;
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-        <span>{label}</span><span className="muted">{right}</span>
-      </div>
-      <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
-    </div>
-  );
-}
+import { Donut, Sparkbars, Bar } from '../components/Charts.jsx';
+import { SkeletonCards } from '../components/Skeleton.jsx';
 
 export default function Metricas() {
   const [m, setM] = useState(null);
   useEffect(() => { api.metricas().then(setM).catch(() => {}); }, []);
-  if (!m) return <div><span className="spinner dark" /> Cargando…</div>;
+  if (!m) return <div><div className="admin-head"><h1>Métricas</h1></div><SkeletonCards n={3} /></div>;
 
   const maxCliente = Math.max(...m.co2e_por_cliente.map((c) => c.co2e), 1);
   const maxCat = Math.max(...m.por_categoria.map((c) => c.co2e), 1);
@@ -27,7 +15,7 @@ export default function Metricas() {
   return (
     <div>
       <div className="admin-head"><h1>Métricas</h1></div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="two-col-grid">
         <div className="card card-pad">
           <h3 style={{ marginTop: 0 }}>CO2e por cliente</h3>
           {m.co2e_por_cliente.map((c, i) => (
@@ -42,10 +30,11 @@ export default function Metricas() {
         </div>
 
         <div className="card card-pad" style={{ gridColumn: '1 / -1' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <h3 style={{ margin: 0 }}>Serie mensual (facturas y CO2e)</h3>
-            <div style={{ width: 220 }}><Sparkbars values={m.serie_mensual.map((s) => s.co2e)} height={40} /></div>
+            <div style={{ width: 220, maxWidth: '100%' }}><Sparkbars values={m.serie_mensual.map((s) => s.co2e)} height={40} /></div>
           </div>
+          <div className="table-scroll">
           <table className="data">
             <thead><tr><th>Mes</th><th className="num">Facturas</th><th className="num">t CO2e</th><th>Tendencia</th></tr></thead>
             <tbody>
@@ -60,6 +49,7 @@ export default function Metricas() {
               {m.serie_mensual.length === 0 && <tr><td colSpan={4} className="muted">Sin datos.</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     </div>

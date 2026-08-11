@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Propuesta para el mundo aduanero: el expediente que llega ordenado</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">PROPUESTA · AGENCIAS DE ADUANA Y OPERACIÓN ADUANERA · CORREDOR BIOCEÁNICO</div>
+    <h1>El expediente que<br>llega ordenado<br>a la frontera</h1>
+    <p class="bajada">Propuesta para agencias de aduana y para la conversación institucional
+    con la operación aduanera del Corredor: que cada carga viaje con su expediente documental
+    completo, sellado por hash y con semáforo de completitud a la vista — capturado una vez,
+    verificable por cualquiera, sin integrarse a ningún sistema estatal.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Agosto 2026</span>
+  </div>
+</div>
+
+<!-- 1. LA PROPUESTA EN UNA PÁGINA -->
+<div class="pagina">
+  <h2>1. La propuesta en una página</h2>
+  <p>El despacho de una carga que cruza cuatro países vive o muere por sus papeles: factura,
+  packing list, MIC/DTA, certificados de origen y sanitarios, comprobantes de frontera. Hoy ese
+  expediente se arma a última hora, por correo y WhatsApp, y cada eslabón vuelve a pedir lo que
+  el anterior ya tenía.</p>
+
+  <p><strong>sicr3p le da al expediente una sola casa</strong>: la agencia captura cada documento
+  una vez (foto o archivo), el sistema lo lee, lo clasifica y lo sella en la cadena del lote, y
+  un <strong>semáforo de completitud</strong> muestra en verde/amarillo/rojo qué falta — visible
+  para la agencia, el exportador, el puerto y el mandante, cada uno desde su propio panel.</p>
+
+  <table>
+    <tr><th>Actor</th><th>Qué recibe</th><th>Qué pone</th></tr>
+    <tr>
+      <td><strong>Agencia de aduana</strong></td>
+      <td>Panel propio con sus expedientes asignados, captura documental desde el teléfono,
+      semáforo automático y el expediente PDF sellado listo para el despacho. Menos persecución
+      de papeles, más despachos por persona.</td>
+      <td>Un piloto con una carga real: capturar los documentos que ya recibe, donde los recibe.</td>
+    </tr>
+    <tr>
+      <td><strong>Exportador / mandante</strong></td>
+      <td>Ver en tiempo real si su carga viaja con el expediente completo — antes de que el
+      camión llegue a la frontera, no después del problema.</td>
+      <td>Nada nuevo: sus documentos de siempre.</td>
+    </tr>
+    <tr>
+      <td><strong>Operación aduanera (conversación institucional)</strong></td>
+      <td>Cargas que llegan al control con expediente ordenado, completo y verificable por QR —
+      menos rechazos, menos tiempo por camión en el paso fronterizo.</td>
+      <td>Nada: sicr3p no pide integración ni acceso a sistemas estatales.</td>
+    </tr>
+  </table>
+
+  <div class="caja">
+    <strong>La idea de fondo:</strong> sicr3p no le cambia el trabajo a nadie — ordena y sella
+    lo que el proceso ya produce. El beneficio aduanero no viene de un sistema nuevo en la
+    frontera, sino de que <strong>la carga llegue con la tarea hecha</strong>.
+  </div>
+
+  <p class="ref">Todo lo descrito está construido y operativo en la plataforma (panel de
+  agencias, semáforo, expediente sellado); no es una promesa de desarrollo. Lo pendiente es
+  operarlo con despachos reales — exactamente lo que esta propuesta pide.</p>
+</div>
+
+<!-- 2. CÓMO SE VE -->
+<div class="pagina">
+  <h2>2. Cómo se ve en la práctica</h2>
+
+  <h3>El panel de la agencia</h3>
+  <p>Cada agencia entra a su panel y ve solo sus expedientes asignados. Al abrir uno: los
+  documentos capturados con su estado, la cadena de custodia del lote y el semáforo.</p>
+  <div class="captura"><img src="img/servicios/pantalla-panel-agencia.png" alt="Panel de agencia"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">El panel de
+  agencia (datos de demostración): expedientes, estados y captura documental.</p>
+
+  <h3>El semáforo documental</h3>
+  <table>
+    <tr><th>Color</th><th>Significado</th><th>Quién lo ve</th></tr>
+    <tr><td><strong>Verde</strong></td><td>Expediente completo según el catálogo de documentos del tipo de carga.</td><td rowspan="3">Agencia, exportador, puerto y mandante — cada uno desde su panel; y el pasaporte público del lote muestra el estado general.</td></tr>
+    <tr><td><strong>Amarillo</strong></td><td>Parcial: hay documentos, faltan otros.</td></tr>
+    <tr><td><strong>Rojo</strong></td><td>Sin documentos aún — la alerta llega antes de la frontera, no en ella.</td></tr>
+  </table>
+
+  <h3>El entregable: expediente sellado</h3>
+  <div class="captura" style="max-width:105mm; margin-left:auto; margin-right:auto;"><img src="img/servicios/doc-expediente-lote.png" alt="Expediente sellado del lote"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">El expediente
+  PDF del lote: cadena de custodia, documentos, semáforo y sello de integridad — muestra con
+  datos ficticios.</p>
+</div>
+
+<!-- 3. INCORPORACIÓN Y LÍMITES -->
+<div class="pagina">
+  <h2>3. Cómo se incorpora una agencia (en un día)</h2>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Se crea la agencia y su acceso</b> desde el panel de administración de sicr3p, con los expedientes que le corresponden asignados.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Su equipo aprende en minutos</b>: el panel hace una sola cosa — capturar documentos y ver el semáforo. Existe un curso corto con constancia verificable para la inducción.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Primer despacho piloto</b>: una carga real, sus documentos de siempre, y al final el expediente sellado que hoy no existe.</div></div>
+  </div>
+
+  <h2>4. Lo que esta propuesta NO es (los límites, por escrito)</h2>
+  <table>
+    <tr><th>sicr3p NO…</th><th>Porque…</th></tr>
+    <tr><td>…se integra a sistemas del Servicio Nacional de Aduanas ni de organismos estatales.</td><td>El valor está en que la carga llegue ordenada, no en tocar sistemas públicos. La declaración formal sigue su canal oficial de siempre.</td></tr>
+    <tr><td>…reemplaza al agente de aduana ni emite documentos aduaneros.</td><td>Traza copias selladas de los documentos que los actores ya emiten; el despacho sigue siendo del agente.</td></tr>
+    <tr><td>…certifica ni fiscaliza.</td><td>sicr3p no es certificador, auditor ni autoridad: registra, estructura y sella declaraciones verificables de los actores de la cadena.</td></tr>
+  </table>
+
+  <dl>
+    <dt>¿Qué gana la agencia si el exportador todavía no usa sicr3p?</dt>
+    <dd>El orden interno: sus propios despachos con expediente único, semáforo y PDF sellado. El efecto de red con exportadores y puertos suma después.</dd>
+    <dt>¿Los documentos quedan expuestos públicamente?</dt>
+    <dd>No. El pasaporte público del lote muestra el estado del semáforo y la cadena de custodia; el contenido documental solo lo ven los actores autorizados de ese lote.</dd>
+  </dl>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Contacto</h4>
+    <p style="margin:0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicrep.cl</strong> · www.sicr3p.cl</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Propuesta: agencias de aduana y operación aduanera · Versión 1.0 ·
+  Agosto 2026 · Material informativo comercial; no constituye asesoría legal ni aduanera.
+  Capturas con datos de demostración.</p>
+</div>
+
+</body>
+</html>

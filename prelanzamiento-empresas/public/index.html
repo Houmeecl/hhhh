@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- ============ SEO ============ -->
+<title>sicr3p · Contabilidad de carbono trazable para empresas — acceso anticipado</title>
+<meta name="description" content="sicr3p convierte la captura de tus facturas y boletas en datos de contabilidad de carbono trazable. Tu equipo escanea un QR y juega; tú obtienes trazabilidad y CO2e real. Piloto por invitación en Chile." />
+<meta name="keywords" content="contabilidad de carbono trazable, trazabilidad empresas Chile, captura de facturas carbono, contabilidad de carbono empresas, GHG Protocol Scope 3, HuellaChile, Corredor Bioceánico, sicr3p, piloto sostenibilidad Chile" />
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#0f1f2e" />
+<link rel="canonical" href="https://sicr3p.cl/" />
+<link rel="alternate" hreflang="es-CL" href="https://sicr3p.cl/" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1f2e'/%3E%3Ctext x='15' y='25' font-family='Arial' font-size='22' font-weight='bold' fill='white' text-anchor='middle'%3E3%3C/text%3E%3Ccircle cx='25' cy='8' r='3.4' fill='%2328a745'/%3E%3C/svg%3E" />
+
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="sicr3p" />
+<meta property="og:locale" content="es_CL" />
+<meta property="og:title" content="sicr3p · Contabilidad de carbono trazable" />
+<meta property="og:description" content="Tu equipo escanea un QR y captura documentos jugando; tú obtienes contabilidad de carbono trazable. Piloto por invitación." />
+<meta property="og:url" content="https://sicr3p.cl/" />
+<meta property="og:image" content="https://sicr3p.cl/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="sicr3p · Contabilidad de carbono trazable" />
+<meta name="twitter:description" content="Captura documentos jugando (QR → webapp) y obtén trazabilidad y CO2e real. Piloto por invitación." />
+
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"Organization","name":"SICR3P SpA","alternateName":"sicr3p","url":"https://sicr3p.cl/","email":"contacto@sicrep.cl","areaServed":"CL","address":{"@type":"PostalAddress","addressLocality":"Antofagasta","addressCountry":"CL"},"description":"Plataforma chilena de contabilidad de carbono trazable: captura tus facturas y documentos y obtén trazabilidad y CO2e con metodologías reconocidas."},
+ {"@type":"WebSite","name":"sicr3p","url":"https://sicr3p.cl/","inLanguage":"es-CL"},
+ {"@type":"FAQPage","mainEntity":[
+   {"@type":"Question","name":"¿Qué es sicr3p?","acceptedAnswer":{"@type":"Answer","text":"Una plataforma chilena de contabilidad de carbono trazable: subes tus facturas y documentos y obtienes trazabilidad y CO2e real, con metodologías GHG Protocol, ISO 14064-1 y factores HuellaChile."}},
+   {"@type":"Question","name":"¿Cómo se capturan los documentos?","acceptedAnswer":{"@type":"Answer","text":"Con una dinámica gamificada: tu equipo escanea un QR que abre una webapp y sube boletas y facturas ganando puntos y ranking. Cada dato alimenta tu contabilidad de carbono."}},
+   {"@type":"Question","name":"¿En qué se diferencia para empresas?","acceptedAnswer":{"@type":"Answer","text":"En la empresa el flujo se integra a tu contabilidad: los documentos capturados por el equipo se consolidan en informes de trazabilidad y CO2e por período, área y proveedor."}},
+   {"@type":"Question","name":"¿Cómo entro al piloto?","acceptedAnswer":{"@type":"Answer","text":"Con un código de piloto por invitación, o sumándote a la lista de espera para recibir tu cupo. Tus datos son tuyos y cumplimos la Ley 19.628."}}
+ ]}
+]}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet" />
+
+<style>
+  :root{
+    --green:#28a745; --green-600:#218838; --green-50:#eaf6ef;
+    --navy:#0f1f2e; --ink:#0f1f2e; --gray:#64748b; --border:#e6e9ed; --bg:#f8fafc;
+    --radius:14px; --shadow:0 10px 30px rgba(15,23,42,.10);
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+    --head:'Poppins',var(--sans); /* tipografía oficial de títulos/logotipo */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--sans);color:var(--ink);background:#fff;line-height:1.55}
+  h1,h2,h3{letter-spacing:-.02em;line-height:1.06;margin:0;font-weight:700;font-family:var(--head)}
+  a{color:var(--green-600);text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:13px 24px;border-radius:11px;border:none;font:inherit;font-weight:700;font-size:16px;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--green);color:#fff}.btn-primary:hover{background:var(--green-600)}
+  .btn-ghost{background:#fff;color:var(--ink);border:1.5px solid var(--border)}.btn-ghost:hover{border-color:var(--navy)}
+  .btn:focus-visible{outline:3px solid #8fd4a0;outline-offset:2px}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:var(--green-50);color:var(--green-600);font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px}
+
+  /* Logo sicr3p: minúsculas, punto verde sobre la i + tagline oficial */
+  .brandbox{display:inline-flex;flex-direction:column;gap:2px;line-height:1}
+  .logo{display:inline-flex;align-items:baseline;font-weight:700;font-size:26px;color:var(--navy);position:relative;line-height:1;letter-spacing:-.02em;font-family:var(--head)}
+  .logo .i{position:relative}
+  .logo .i .dot{position:absolute;left:50%;top:-7px;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .logo.light{color:#fff}
+  .tagline{font-size:10.5px;font-weight:700;color:var(--navy);letter-spacing:.01em}
+  .tagline.light{color:#cbd5e1}
+
+  header.nav{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:66px}
+  .nav-links{display:flex;gap:26px;align-items:center}
+  .nav-links a{color:var(--ink);font-weight:600;font-size:15px}
+  @media(max-width:820px){.nav-links a:not(.btn){display:none}}
+
+  .hero{position:relative;overflow:hidden;background:
+    radial-gradient(900px 500px at 85% -5%,rgba(40,167,69,.16),transparent 60%),
+    linear-gradient(180deg,#f8fafc,#fff)}
+  .hero-in{display:grid;grid-template-columns:1.05fr .95fr;gap:40px;align-items:center;padding:64px 0 56px}
+  .hero h1{font-size:clamp(34px,5vw,58px);color:var(--navy)}
+  .hero h1 .g{color:var(--green-600)}
+  .hero p.lead{font-size:19px;color:#334155;max-width:520px;margin:18px 0 26px}
+  .hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+  .cupos{margin-top:20px;display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--gray)}
+  .cupos b{color:var(--green-600);font-size:16px}
+  .trust{display:flex;gap:18px;flex-wrap:wrap;margin-top:26px;color:var(--gray);font-size:13px;font-weight:600}
+
+  /* QR / juego card */
+  .qrcard{background:#fff;border:1px solid var(--border);border-radius:20px;box-shadow:var(--shadow);padding:24px;text-align:center}
+  .qrcard .qr{width:150px;height:150px;margin:6px auto 0;border-radius:12px;background:
+    conic-gradient(#0f1f2e 25%,#fff 0 50%,#0f1f2e 0 75%,#fff 0) 0 0/20px 20px,
+    linear-gradient(#0f1f2e,#0f1f2e) center/70% 70% no-repeat;
+    -webkit-mask:radial-gradient(#000,#000);position:relative;border:8px solid #fff;box-shadow:inset 0 0 0 2px var(--border)}
+  .qrcard .qr::after{content:'♻';position:absolute;inset:0;display:grid;place-items:center;font-size:34px;color:#fff;background:var(--navy);width:46px;height:46px;border-radius:10px;margin:auto}
+  .qrcard h3{color:var(--navy);margin-top:16px;font-size:18px}
+  .qrcard p{color:var(--gray);font-size:14px;margin:6px 0 0}
+  .mini-rank{margin-top:16px;text-align:left;border-top:1px dashed var(--border);padding-top:12px}
+  .mini-rank .r{display:flex;gap:10px;align-items:center;font-size:14px;padding:5px 0}
+  .mini-rank .n{width:22px;height:22px;border-radius:50%;background:var(--green-50);color:var(--green-600);font-weight:700;font-size:12px;display:grid;place-items:center}
+  .mini-rank .r b{margin-left:auto;font-variant-numeric:tabular-nums}
+
+  section{padding:64px 0}
+  .eyebrow{color:var(--green-600);font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:.06em}
+  .h2{font-size:clamp(26px,3.5vw,40px);color:var(--navy);margin:8px 0 10px}
+  .sub{color:#475569;font-size:17px;max-width:660px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:34px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:34px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:22px}
+  .card .ico{width:48px;height:48px;border-radius:12px;background:var(--green-50);color:var(--green-600);display:grid;place-items:center;font-size:22px;margin-bottom:12px}
+  .card h3{font-size:19px;color:var(--navy);margin-bottom:6px}
+  .card p{color:#475569;font-size:15px;margin:0}
+  .alt{background:var(--bg)}
+
+  .capture{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:34px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-weight:600;font-size:14px;margin-bottom:6px}
+  .field input,.field select{width:100%;min-height:48px;padding:12px 14px;border:1.5px solid var(--border);border-radius:11px;font:inherit;font-size:15px}
+  .field input:focus,.field select:focus{outline:3px solid #b7e0c2;border-color:var(--green)}
+  .seg{display:flex;gap:8px;margin-bottom:14px}
+  .seg button{flex:1;min-height:44px;border:1.5px solid var(--border);background:#fff;border-radius:11px;font:inherit;font-weight:700;cursor:pointer}
+  .seg button.on{background:var(--green);color:#fff;border-color:var(--green)}
+  .msg{min-height:20px;font-size:14px;font-weight:600;margin-top:8px}
+  .msg.ok{color:var(--green-600)}.msg.err{color:#dc2626}
+  .vip input[name=codigo]{letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+
+  .faq details{border:1px solid var(--border);border-radius:12px;padding:0 18px;margin-bottom:10px;background:#fff}
+  .faq summary{cursor:pointer;font-weight:700;padding:16px 0;font-size:16px;color:var(--navy)}
+  .faq p{color:#475569;padding-bottom:16px;margin:0}
+
+  footer{background:var(--navy);color:#cbd5e1;padding:40px 0;font-size:14px}
+  footer .fin{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px;align-items:center}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:14px 22px;border-radius:12px;box-shadow:var(--shadow);z-index:50;font-weight:600;max-width:90vw}
+  .toast.err{background:#b91c1c}
+  @media(max-width:820px){ .hero-in{grid-template-columns:1fr;padding:40px 0} .grid4{grid-template-columns:1fr 1fr} .two,.capture{grid-template-columns:1fr} }
+  @media(max-width:480px){ .grid4{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+
+<header class="nav"><div class="wrap nav-in">
+  <div class="brandbox">
+    <div class="logo">s<span class="i">i<span class="dot"></span></span>cr3p</div>
+    <div class="tagline">Tu contabilidad, tu trazabilidad</div>
+  </div>
+  <nav class="nav-links">
+    <a href="#como">Cómo funciona</a>
+    <a href="#empresas">Para empresas</a>
+    <a href="#faq">Preguntas</a>
+    <a class="btn btn-primary" href="#sumarme" style="min-height:40px;padding:9px 18px">Sumarme</a>
+  </nav>
+</div></header>
+
+<!-- HERO -->
+<section class="hero"><div class="wrap hero-in">
+  <div>
+    <span class="chip">🚀 Acceso anticipado · Piloto por invitación</span>
+    <h1 style="margin-top:16px">Contabilidad de carbono <span class="g">trazable</span>.</h1>
+    <p class="lead">Tu equipo <b>escanea un QR</b>, abre la webapp y captura boletas y facturas
+      <b>jugando</b>. Tú descargas tu <b>contabilidad de carbono</b> con trazabilidad real. Controla. Traza. Decide.</p>
+    <div class="hero-cta">
+      <a href="#sumarme" class="btn btn-primary">Sumarme a la lista</a>
+      <a href="#codigo" class="btn btn-ghost">Tengo un código de piloto</a>
+    </div>
+    <div class="cupos">🎟️ <span>Cupos de piloto: <b id="cupos">—</b> disponibles</span></div>
+    <div class="trust"><span>🛡️ GHG Protocol Scope 3</span><span>✓ ISO 14064-1</span><span>🍃 HuellaChile</span><span>🔒 Ley 19.628</span></div>
+  </div>
+  <div class="qrcard">
+    <div style="font-weight:700;color:var(--navy);margin-bottom:6px">Escanea y juega</div>
+    <div class="qr" role="img" aria-label="Código QR que abre la webapp del juego"></div>
+    <h3>El QR abre la webapp</h3>
+    <p>Tu equipo sube documentos, gana puntos y sube en el ranking.</p>
+    <div class="mini-rank">
+      <div style="font-size:12px;color:var(--gray);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Ranking por área</div>
+      <div class="r"><span class="n">1</span> Operaciones <b>2.480</b></div>
+      <div class="r"><span class="n">2</span> Logística <b>2.190</b></div>
+      <div class="r"><span class="n">3</span> Administración <b>1.870</b></div>
+      <div style="font-size:11px;color:var(--gray);margin-top:6px;font-style:italic">Ejemplo ilustrativo del juego</div>
+    </div>
+  </div>
+</div></section>
+
+<!-- CÓMO FUNCIONA -->
+<section id="como"><div class="wrap">
+  <span class="eyebrow">Cómo funciona</span>
+  <h2 class="h2">Capturar datos es un juego.</h2>
+  <p class="sub">Tu equipo juega; sicr3p convierte cada documento en contabilidad de carbono trazable.</p>
+  <div class="grid4">
+    <div class="card"><div class="ico">📱</div><h3>1. Escanea el QR</h3><p>Se abre la webapp del juego en el teléfono. Sin instalar nada.</p></div>
+    <div class="card"><div class="ico">📸</div><h3>2. Sube documentos</h3><p>Boletas y facturas. Cada captura suma puntos, insignias y ranking.</p></div>
+    <div class="card"><div class="ico">🏆</div><h3>3. Compite y gana</h3><p>Ranking por área y equipo; premios y reconocimiento para los que más suman.</p></div>
+    <div class="card"><div class="ico">📊</div><h3>4. Descarga tu carbono</h3><p>sicr3p consolida todo en trazabilidad y CO2e por período, área y proveedor.</p></div>
+  </div>
+</div></section>
+
+<!-- EMPRESAS vs PERSONAS -->
+<section id="empresas" class="alt"><div class="wrap">
+  <span class="eyebrow">Para empresas</span>
+  <h2 class="h2">En la empresa, el flujo es distinto.</h2>
+  <div class="two">
+    <div class="card">
+      <div class="ico">🏢</div><h3>Tu empresa</h3>
+      <p>Los documentos que captura tu equipo se <b>integran a tu contabilidad</b>: informes de
+        trazabilidad y CO2e por período, área y proveedor (GHG Protocol Scope 3). El 85% de las
+        empresas ya mide, pero falta profundidad y datos de la cadena de valor
+        <span style="color:var(--gray);font-size:13px">(Sustainability Transformation Monitor 2026, Bertelsmann)</span> —
+        aquí los generas jugando, sin fricción.</p>
+    </div>
+    <div class="card">
+      <div class="ico">👥</div><h3>Tu equipo (y más)</h3>
+      <p>La dinámica engancha: puntos, niveles, insignias y ranking. Escanean el QR, suben boletas y
+        compiten entre áreas. <b>Cada dato suma</b> a la contabilidad de carbono de la empresa.</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- CAPTURA -->
+<section id="sumarme"><div class="wrap">
+  <span class="eyebrow">Acceso anticipado</span>
+  <h2 class="h2">Súmate al piloto.</h2>
+  <p class="sub">Deja tus datos y te avisamos cuando abramos tu cupo. ¿Ya tienes un código de piloto? Actívalo a la derecha.</p>
+  <div class="capture">
+    <form class="card" id="wl">
+      <h3 style="margin-bottom:12px">Lista de espera</h3>
+      <div class="seg"><button type="button" class="on" data-tipo="empresa">Soy empresa</button><button type="button" data-tipo="persona">Soy persona</button></div>
+      <div class="field" id="f-empresa"><label>Empresa</label><input name="empresa" placeholder="Mi Empresa SpA" /></div>
+      <div class="field"><label>Nombre de contacto</label><input name="contacto" placeholder="Tu nombre" /></div>
+      <div class="field"><label>Correo *</label><input name="email" type="email" placeholder="tucorreo@dominio.cl" required /></div>
+      <div class="field" id="f-rubro"><label>Rubro</label><input name="rubro" placeholder="Logística, minería, retail…" /></div>
+      <div class="field" id="f-tam"><label>Tamaño del equipo</label>
+        <select name="tamano"><option value="">Selecciona…</option><option>1–10</option><option>11–50</option><option>51–200</option><option>200+</option></select></div>
+      <button class="btn btn-primary" style="width:100%" type="submit">Sumarme a la lista</button>
+      <div class="msg" id="wl-msg"></div>
+    </form>
+    <form class="card vip" id="vip" style="align-self:start">
+      <h3 id="codigo" style="margin-bottom:12px">Activar código de piloto</h3>
+      <p style="color:#475569;font-size:15px;margin-top:0">¿Recibiste una invitación? Ingresa tu código y serás <b>empresa fundadora</b>.</p>
+      <div class="field"><label>Empresa (opcional)</label><input name="empresa" placeholder="Mi Empresa SpA" /></div>
+      <div class="field"><label>Código de piloto *</label><input name="codigo" placeholder="PILOTO-XXXXXX" required /></div>
+      <button class="btn btn-primary" style="width:100%" type="submit">Activar mi cupo</button>
+      <div class="msg" id="vip-msg"></div>
+      <div style="margin-top:14px;font-size:13px;color:var(--gray)">🎟️ Quedan <b id="cupos2">—</b> cupos de fundador.</div>
+    </form>
+  </div>
+</div></section>
+
+<!-- FAQ -->
+<section id="faq" class="alt"><div class="wrap faq">
+  <span class="eyebrow">Preguntas frecuentes</span>
+  <h2 class="h2" style="margin-bottom:26px">Todo lo que necesitas saber.</h2>
+  <details open><summary>¿Qué es sicr3p?</summary><p>Una plataforma chilena de contabilidad de carbono trazable: subes tus facturas y documentos y obtienes trazabilidad y CO2e real, con metodologías GHG Protocol Scope 3, ISO 14064-1 y factores HuellaChile.</p></details>
+  <details><summary>¿Cómo se capturan los documentos?</summary><p>Con una dinámica gamificada: tu equipo escanea un QR que abre una webapp y sube boletas y facturas ganando puntos y ranking. Cada dato alimenta tu contabilidad de carbono.</p></details>
+  <details><summary>¿En qué se diferencia para empresas?</summary><p>En la empresa el flujo se integra a tu contabilidad: los documentos capturados por el equipo se consolidan en informes de trazabilidad y CO2e por período, área y proveedor.</p></details>
+  <details><summary>¿Qué pasa con mis datos?</summary><p>Los datos de tu empresa son tuyos. Cumplimos la Ley 19.628 de protección de datos de Chile.</p></details>
+  <details><summary>¿Necesito instalar una app?</summary><p>No. El juego se abre desde el navegador al escanear el QR y se puede instalar como app (PWA).</p></details>
+</div></section>
+
+<footer><div class="wrap fin">
+  <div class="brandbox">
+    <div class="logo light">s<span class="i">i<span class="dot"></span></span>cr3p</div>
+    <div class="tagline light">Tu contabilidad, tu trazabilidad</div>
+  </div>
+  <div>© 2025 SICR3P SpA · Antofagasta, Chile · contacto@sicrep.cl</div>
+  <div>Contabilidad de carbono trazable · Ley 19.628</div>
+</div></footer>
+
+<script>
+  const $=s=>document.querySelector(s);
+  const toast=(m,err)=>{const t=document.createElement('div');t.className='toast'+(err?' err':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3600);};
+  async function api(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Error');return d;}
+  fetch('/api/piloto/cupos').then(r=>r.json()).then(d=>{const v=d.restantes??'—';if($('#cupos'))$('#cupos').textContent=v;if($('#cupos2'))$('#cupos2').textContent=v;}).catch(()=>{});
+  let tipo='empresa';
+  document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{tipo=b.dataset.tipo;document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));const emp=tipo==='empresa';$('#f-empresa').style.display=emp?'':'none';$('#f-rubro').style.display=emp?'':'none';$('#f-tam').style.display=emp?'':'none';});
+  $('#wl').addEventListener('submit',async e=>{e.preventDefault();const f=e.target,msg=$('#wl-msg');msg.textContent='';
+    try{const d=await api('/api/waitlist',{empresa:f.empresa.value,contacto:f.contacto.value,email:f.email.value,rubro:f.rubro.value,tamano:f.tamano.value,origen:tipo});msg.className='msg ok';msg.textContent=d.mensaje;f.reset();toast('¡Estás en la lista! 🎉');}
+    catch(err){msg.className='msg err';msg.textContent=err.message;}});
+  $('#vip').addEventListener('submit',async e=>{e.preventDefault();const f=e.target,msg=$('#vip-msg');msg.textContent='';
+    try{const d=await api('/api/piloto/validar',{codigo:f.codigo.value,empresa:f.empresa.value});msg.className='msg ok';msg.textContent=d.mensaje;f.reset();toast('¡Cupo de fundador activado! 🏆');
+      fetch('/api/piloto/cupos').then(r=>r.json()).then(d=>{if($('#cupos'))$('#cupos').textContent=d.restantes;if($('#cupos2'))$('#cupos2').textContent=d.restantes;});}
+    catch(err){msg.className='msg err';msg.textContent=err.message;}});
+</script>
+</body>
+</html>

@@ -3,11 +3,26 @@ name: CI
 on:
   push:
     branches: ['**']
-  pull_request:
+  # Sin trigger pull_request: cada push a la rama del PR ya dispara el run
+  # de arriba con el mismo commit — el trigger doble solo duplicaba la cola
+  # (visto: 2 runs "queued" por commit con el runner self-hosted caído).
+
+# Un solo run vigente por rama: si llega un commit nuevo, el run anterior
+# (encolado o corriendo) se cancela. Evita que la cola se apile cuando el
+# runner self-hosted está desconectado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    # GitHub-hosted runners (ubuntu-latest) dejaron de asignarse a esta cuenta
+    # (runner_id: 0, billable: 0ms en todas las corridas — el job nunca llega
+    # a arrancar). Se usa un runner propio registrado en el VPS: es la propia
+    # máquina la que se conecta a buscar trabajo, en vez de que GitHub
+    # despache una VM — evita el bloqueo de asignación por completo.
+    # Registro del runner: ver ORDEN-DE-EJECUCION.md, sección 6.
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

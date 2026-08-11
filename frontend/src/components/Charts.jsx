@@ -1,5 +1,5 @@
 // Gráficos SVG propios, sin librerías externas. Paleta coherente con la marca.
-export const PALETTE = ['#22c55e', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b'];
+export const PALETTE = ['#28a745', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#64748b'];
 
 // Donut con leyenda. data = [{ label, value }]
 export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }) {
@@ -25,7 +25,7 @@ export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }
           offset += len;
           return seg;
         })}
-        <text x={cx} y={cx - 4} textAnchor="middle" fontSize="24" fontWeight="800" fill="#1e2a3a">
+        <text x={cx} y={cx - 4} textAnchor="middle" fontSize="24" fontWeight="800" fill="#0f1f2e">
           {total.toLocaleString('es-CL', { maximumFractionDigits: 1 })}
         </text>
         <text x={cx} y={cx + 16} textAnchor="middle" fontSize="11" fill="#64748b">{unit}</text>
@@ -44,8 +44,39 @@ export function Donut({ data = [], size = 168, thickness = 26, unit = 't CO2e' }
   );
 }
 
+// Línea/área con puntos + etiquetas, para series mensuales cortas (5-12
+// puntos). data = [{ label, value }]. Sin librerías: solo SVG.
+export function Serie({ data = [], height = 140, color = '#28a745', unit = '' }) {
+  const w = Math.max(280, data.length * 64);
+  const padX = 28, padY = 18;
+  const max = Math.max(...data.map((d) => Number(d.value) || 0), 1);
+  const stepX = data.length > 1 ? (w - padX * 2) / (data.length - 1) : 0;
+  const y = (v) => padY + (height - padY * 2) * (1 - (Number(v) || 0) / max);
+  const puntos = data.map((d, i) => [padX + i * stepX, y(d.value)]);
+  const linea = puntos.map(([x, py], i) => `${i === 0 ? 'M' : 'L'} ${x} ${py}`).join(' ');
+  const area = `${linea} L ${puntos[puntos.length - 1]?.[0] || padX} ${height - padY} L ${padX} ${height - padY} Z`;
+
+  return (
+    <div style={{ overflowX: data.length > 6 ? 'auto' : 'visible' }}>
+      <svg width={w} height={height + 22} viewBox={`0 0 ${w} ${height + 22}`}>
+        <line x1={padX} y1={height - padY} x2={w - padX} y2={height - padY} stroke="#eef2f7" strokeWidth={1} />
+        {data.length > 0 && <path d={area} fill={color} opacity={0.12} />}
+        {data.length > 1 && <path d={linea} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />}
+        {puntos.map(([x, py], i) => (
+          <g key={i}>
+            <circle cx={x} cy={py} r={3.5} fill="#fff" stroke={color} strokeWidth={2} />
+            <text x={x} y={height + 16} textAnchor="middle" fontSize="10.5" fill="#64748b">{data[i].label}</text>
+          </g>
+        ))}
+        {data.length === 0 && <text x={w / 2} y={height / 2} textAnchor="middle" fontSize="12" fill="#94a3b8">Sin datos.</text>}
+      </svg>
+      {unit && <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{unit}</div>}
+    </div>
+  );
+}
+
 // Sparkline / mini barras. values = [numbers]
-export function Sparkbars({ values = [], height = 48, color = '#22c55e' }) {
+export function Sparkbars({ values = [], height = 48, color = '#28a745' }) {
   const max = Math.max(...values, 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height }}>
@@ -57,6 +88,20 @@ export function Sparkbars({ values = [], height = 48, color = '#22c55e' }) {
         }} />
       ))}
       {values.length === 0 && <span className="muted" style={{ fontSize: 12 }}>Sin datos</span>}
+    </div>
+  );
+}
+
+// Barra horizontal simple (sin librerías externas) — usada por Métricas y
+// por la página del juego.
+export function Bar({ value, max, label, right }) {
+  const pct = max > 0 ? Math.max(3, (value / max) * 100) : 0;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
+        <span>{label}</span><span className="muted">{right}</span>
+      </div>
+      <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
     </div>
   );
 }

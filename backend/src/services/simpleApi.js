@@ -14,7 +14,8 @@ const CATEGORIAS = [
   { key: 'Combustibles', peso: 0.25, min: 0.6, max: 4.5 },
   { key: 'Transporte y logística', peso: 0.15, min: 0.3, max: 2.1 },
   { key: 'Insumos y materiales', peso: 0.15, min: 0.1, max: 1.8 },
-  { key: 'Servicios', peso: 0.1, min: 0.05, max: 0.9 },
+  { key: 'Agua', peso: 0.05, min: 0.02, max: 0.4 },
+  { key: 'Servicios', peso: 0.05, min: 0.05, max: 0.9 },
 ];
 
 const GLOSAS = {
@@ -22,6 +23,7 @@ const GLOSAS = {
   Combustibles: ['Diésel B5 flota', 'Gasolina 95', 'Gas licuado GLP'],
   'Transporte y logística': ['Flete regional', 'Distribución última milla', 'Courier documentos'],
   'Insumos y materiales': ['Papelería y toner', 'Envases cartón', 'Repuestos menores'],
+  Agua: ['Suministro agua potable', 'Consumo m3 planta', 'Agua industrial'],
   Servicios: ['Servicio de aseo', 'Mantención equipos', 'Arriendo maquinaria'],
 };
 

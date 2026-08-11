@@ -1,0 +1,17 @@
+{
+  "name": "sicr3p — Contabilidad de carbono trazable",
+  "short_name": "sicr3p",
+  "description": "Sube tus documentos, calcula tu CO2e y verifica tu trazabilidad — contabilidad de carbono, tu contabilidad.",
+  "lang": "es-CL",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1f2e",
+  "theme_color": "#0f1f2e",
+  "icons": [
+    { "src": "/icons/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

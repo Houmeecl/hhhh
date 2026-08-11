@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import Logo from '../components/Logo.jsx';
+import Logo from './Logo.jsx';
 import { api } from '../api.js';
 
-export default function Activar() {
+// Página de activación/reset de contraseña compartida por los siete paneles
+// (sicrep, terreno, puerto, mandante, agencia, trazador, proveedor) — el token identifica
+// la fila de `usuarios` y ya trae su panel correcto (services/cuentas.js
+// arma el link con la ruta de este componente); lo único que cambia por
+// panel es a qué login se vuelve tras definir la contraseña.
+export default function ActivarCuenta({ loginPath, titulo = 'sicr3p' }) {
   const [params] = useSearchParams();
   const nav = useNavigate();
   const token = params.get('token') || '';
@@ -20,7 +25,7 @@ export default function Activar() {
     try {
       await api.activar(token, password);
       setOk(true);
-      setTimeout(() => nav('/admin/login'), 1800);
+      setTimeout(() => nav(loginPath), 1800);
     } catch (err) { setError(err.message); }
   }
 
@@ -37,7 +42,7 @@ export default function Activar() {
             </div>
           ) : (
             <>
-              <p className="muted" style={{ fontSize: 14, marginTop: 0 }}>Define tu contraseña para acceder a sicr3p.</p>
+              <p className="muted" style={{ fontSize: 14, marginTop: 0 }}>Define tu contraseña para acceder a {titulo}.</p>
               <div className="field" style={{ marginBottom: 14 }}>
                 <label>Nueva contraseña</label>
                 <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -50,7 +55,7 @@ export default function Activar() {
               <button className="btn btn-primary" style={{ width: '100%' }} disabled={!token}>Activar mi cuenta</button>
             </>
           )}
-          <p style={{ textAlign: 'center', marginTop: 16, fontSize: 13 }}><Link to="/admin/login">Volver al acceso</Link></p>
+          <p style={{ textAlign: 'center', marginTop: 16, fontSize: 13 }}><Link to={loginPath}>Volver al acceso</Link></p>
         </form>
       </div>
     </div>

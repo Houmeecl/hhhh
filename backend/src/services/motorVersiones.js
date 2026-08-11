@@ -1,0 +1,174 @@
+// ============================================================
+// Versiones del motor de cálculo.
+//
+// Regla dura: versionar SOLO INSERTA. `motor_categorias` es el estado
+// vigente y se sigue editando como siempre; cada edición congela una
+// copia completa de la tabla en `motor_categorias_version`. Nunca se
+// modifica ni se borra una versión ya emitida — es lo que permite que
+// un informe de marzo siga citando la metodología de marzo.
+//
+// El consumidor principal es services/pdf.js: antes leía
+// `motor_categorias` en vivo al armar el PDF (y el PDF se rearma en
+// cada descarga), así que un cambio de factor alteraba la página de
+// metodología de informes ya emitidos.
+// ============================================================
+
+import { query } from '../lib/db.js';
+
+// Permite usar estos helpers dentro de una transacción (client.query) o
+// fuera de ella (query del pool) — mismo patrón que cargarCategorias().
+const runner = (run) => run || query;
+
+// Versión vigente = la última creada. Devuelve null si la migración 051
+// aún no corrió o la tabla está vacía; el llamador decide qué hacer con
+// eso (nunca se rechaza un cálculo por falta de versión).
+export async function versionVigente(run) {
+  try {
+    const { rows } = await runner(run)(
+      `SELECT id, nota, origen, creada_at FROM motor_versiones ORDER BY id DESC LIMIT 1`
+    );
+    return rows[0] || null;
+  } catch (e) {
+    if (e.code === '42P01') return null; // tabla ausente: migración sin correr
+    throw e;
+  }
+}
+
+// Congela el estado actual de `motor_categorias` como una versión nueva.
+// Se llama DESPUÉS de aplicar la edición: la versión N refleja el motor
+// tal como quedó, y las facturas calculadas desde ese instante apuntan
+// a ella. La versión anterior queda intacta con el estado previo.
+export async function crearVersion(run, { nota, origen = 'edicion_manual', creadaPor = null } = {}) {
+  const q = runner(run);
+  const { rows } = await q(
+    `INSERT INTO motor_versiones (nota, origen, creada_por) VALUES ($1,$2,$3) RETURNING *`,
+    [nota || null, origen, creadaPor]
+  );
+  const version = rows[0];
+  // La fuente va desnormalizada: `fuentes_metodologicas` también es
+  // editable, y una FK dejaría la cita de un informe viejo expuesta a
+  // que alguien corrija el año del documento.
+  await q(
+    `INSERT INTO motor_categorias_version (
+       version_id, codigo, nombre, unidad_fisica, factor_fisico_kgco2e,
+       factor_gasto_kgco2e_clp1000, palabras_clave, fuente, activo, alcance_ghg,
+       fuente_organismo, fuente_documento, fuente_version_anio
+     )
+     SELECT $1, mc.codigo, mc.nombre, mc.unidad_fisica, mc.factor_fisico_kgco2e,
+            mc.factor_gasto_kgco2e_clp1000, mc.palabras_clave, mc.fuente, mc.activo, mc.alcance_ghg,
+            f.organismo, f.documento, f.version_anio
+       FROM motor_categorias mc
+       LEFT JOIN fuentes_metodologicas f ON f.id = mc.fuente_metodologica_id`,
+    [version.id]
+  );
+  return version;
+}
+
+// ---------- Metodología congelada de un informe ----------
+
+// Une las filas de metodología de las versiones que un informe abarca.
+// PURA y exportada para test.
+//
+// Un informe mensual puede abarcar más de una versión (si el motor se
+// editó a mitad de mes). En ese caso NO se elige una y se calla: si una
+// categoría cambió de alcance o de fuente entre versiones, aparecen las
+// dos filas marcadas con su versión, y `mixta` queda en true para que el
+// PDF lo diga. Fusionarlas en silencio sería inventar una metodología
+// que no existió.
+export function fusionarMetodologia(filas) {
+  const versiones = [...new Set((filas || []).map((f) => f.version_id).filter((v) => v != null))]
+    .sort((a, b) => a - b);
+  const porClave = new Map();
+  for (const f of filas || []) {
+    // Dos filas son "la misma metodología" si coinciden en lo que se
+    // imprime: nombre de la categoría, alcance y cita de la fuente.
+    const clave = [f.nombre, f.alcance_ghg, f.fuente_organismo, f.fuente_documento, f.fuente_version_anio].join('\u0000');
+    const previa = porClave.get(clave);
+    if (previa) previa.versiones.push(f.version_id);
+    else porClave.set(clave, { ...f, versiones: [f.version_id] });
+  }
+  const unicas = [...porClave.values()];
+  // Una categoría con más de una entrada distinta = cambió dentro del período.
+  const porNombre = new Map();
+  for (const u of unicas) porNombre.set(u.nombre, (porNombre.get(u.nombre) || 0) + 1);
+  const conflictivas = new Set([...porNombre].filter(([, n]) => n > 1).map(([n]) => n));
+
+  const salida = unicas
+    .filter((u) => u.alcance_ghg)
+    .map((u) => ({
+      // El código va junto al nombre porque el nombre se edita desde el panel
+      // del motor: quien resuelve el alcance de un documento debe poder hacerlo
+      // por la clave estable.
+      //
+      // Ojo con el caso que SÍ importa, que no es el de dos categorías con el
+      // mismo nombre (ahí se funden y queda el código de la primera, y el
+      // llamador cae al respaldo por nombre igual que antes). Es este: si una
+      // categoría CAMBIA DE ALCANCE dentro del período, la clave de arriba las
+      // separa y salen DOS filas con el mismo `codigo`. Quien indexe por código
+      // en un Map se queda con la última en silencio. Por eso `conflictivas`
+      // marca la categoría y el PDF imprime la versión al lado: la tabla de
+      // metodología declara el conflicto en vez de elegir por el lector.
+      codigo: u.codigo,
+      nombre: u.nombre,
+      alcance_ghg: u.alcance_ghg,
+      organismo: u.fuente_organismo,
+      documento: u.fuente_documento,
+      version_anio: u.fuente_version_anio,
+      // Solo se marca la versión cuando hay ambigüedad real; en el caso
+      // normal (una sola metodología por categoría) la línea del PDF
+      // queda idéntica a la de siempre.
+      version_motor: conflictivas.has(u.nombre) ? Math.min(...u.versiones) : null,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es') || (a.version_motor || 0) - (b.version_motor || 0));
+
+  return { alcances: salida, versiones, mixta: conflictivas.size > 0 };
+}
+
+// Lee la metodología congelada de un conjunto de versiones. Devuelve
+// { alcances, versiones, mixta, factores } o null si no hay versión
+// aplicable — en ese caso pdf.js cae al camino en vivo de siempre.
+export async function metodologiaDeVersiones(ids, run) {
+  const limpios = [...new Set((ids || []).map(Number).filter(Number.isInteger))];
+  if (!limpios.length) return null;
+  let rows;
+  try {
+    ({ rows } = await runner(run)(
+      `SELECT version_id, codigo, nombre, alcance_ghg, unidad_fisica, fuente,
+              factor_fisico_kgco2e, factor_gasto_kgco2e_clp1000,
+              fuente_organismo, fuente_documento, fuente_version_anio
+         FROM motor_categorias_version
+        WHERE version_id = ANY($1::int[]) AND activo = true`,
+      [limpios]
+    ));
+  } catch (e) {
+    if (e.code === '42P01') return null;
+    throw e;
+  }
+  if (!rows.length) return null;
+  const { alcances, versiones, mixta } = fusionarMetodologia(rows);
+  return { alcances, versiones, mixta, factores: fusionarFactores(rows) };
+}
+
+// Agrupa los factores congelados por categoría. Un informe mensual puede
+// abarcar dos versiones con factores DISTINTOS para la misma categoría; en
+// ese caso hay que citar las dos, no quedarse con la primera fila que
+// devuelva Postgres —que además no tiene orden garantizado, así que el
+// mismo informe podía imprimir un factor distinto entre descargas—.
+// PURA y exportada para test.
+export function fusionarFactores(filas) {
+  const porCodigo = new Map();
+  for (const r of filas || []) {
+    if (!porCodigo.has(r.codigo)) {
+      porCodigo.set(r.codigo, { codigo: r.codigo, nombre: r.nombre, unidad_fisica: r.unidad_fisica, variantes: [] });
+    }
+    const entrada = porCodigo.get(r.codigo);
+    const valor = Number(r.factor_fisico_kgco2e);
+    const yaEsta = entrada.variantes.find((v) => v.factor === valor);
+    if (yaEsta) yaEsta.versiones.push(r.version_id);
+    else entrada.variantes.push({ factor: valor, versiones: [r.version_id] });
+  }
+  for (const e of porCodigo.values()) {
+    e.variantes.sort((a, b) => Math.min(...a.versiones) - Math.min(...b.versiones));
+  }
+  return porCodigo;
+}

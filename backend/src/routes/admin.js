@@ -1,17 +1,43 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
+import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
-import { query } from '../lib/db.js';
-import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
+import { query, withTx } from '../lib/db.js';
+import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { sendMail, activationEmail } from '../services/mailer.js';
+import { generarPasswordTemporal, crearCuentaEntidad, enviarActivacion, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
+import {
+  PLANTILLA_VERSION, PUNTOS_PENDIENTES, TIPOS, TIPOS_DE, TIPO_POR_DEFECTO, tipoValido,
+  generarNumeroContrato, snapshotCliente, snapshotDe, hashContrato, clausulas, clausulasPendientes,
+} from '../services/contrato.js';
+import { generateContrato, generateInformeCarbono } from '../services/pdf.js';
+import { sendMail } from '../services/mailer.js';
+import { descargarYCalcular, analizarPeriodo, periodosDescargados } from '../services/analisisSiiProveedor.js';
+import { validarCredencialesSii } from '../services/siiProveedor.js';
+import { inventarioCsv, inventarioJson } from '../services/exportInventarioSii.js';
+import { rutValido } from '../services/dte.js';
+import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
+import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
+import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
+import {
+  MOTOR_CLAY, SII_EXCLUIDOS, datosDeDte, admiteDte, itemsDeDte,
+  agruparLineas, resumirImportacion,
+} from '../services/clayCarbono.js';
+import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
+import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
+import { SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
+import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
+import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
+import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
+import { consultarRut } from '../services/baseapi.js';
+import { siiLimiterAdmin } from '../middleware/rateLimit.js';
+import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
-const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 // Todas las rutas de admin requieren sesión.
-router.use(requireAuth);
+router.use(requireAuth, requireHomePanel('sicrep'));
 const adminOnly = requireRole('admin');
 
 // ============================================================
@@ -19,28 +45,92 @@ const adminOnly = requireRole('admin');
 // ============================================================
 router.get('/dashboard', async (req, res, next) => {
   try {
-    const [clientes, sesionesMes, facturasMes, co2eAcum, ping, uso] = await Promise.all([
+    const [
+      clientes, sesionesMes, sesionesMesAnt, facturasMes, facturasMesAnt,
+      co2eAcum, co2eMes, co2eMesAnt, ping, uso, serieSesiones, serieFacturas, actividadReciente,
+    ] = await Promise.all([
       query(`SELECT estado_contrato, count(*)::int AS n FROM clientes GROUP BY estado_contrato`),
       query(`SELECT count(*)::int AS n FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT count(*)::int AS n FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       query(`SELECT count(*)::int AS n FROM facturas WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT count(*)::int AS n FROM facturas WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones`),
+      query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT COALESCE(sum(total_co2e),0)::float AS total FROM sesiones WHERE date_trunc('month', created_at) = date_trunc('month', now()) - interval '1 month'`),
       simpleApi.ping(),
       query(`SELECT count(*)::int AS llamadas, COALESCE(sum(costo_estimado),0)::float AS costo
              FROM simple_api_uso WHERE date_trunc('month', created_at) = date_trunc('month', now())`),
+      query(`SELECT date_trunc('month', created_at) AS mes, count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
+             FROM sesiones WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+      query(`SELECT date_trunc('month', created_at) AS mes, count(*)::int AS n
+             FROM facturas WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+      query(`SELECT a.accion, a.entidad, a.entidad_id, a.created_at, u.email AS usuario_email
+             FROM actividad_log a LEFT JOIN usuarios u ON u.id = a.usuario_id
+             ORDER BY a.created_at DESC LIMIT 6`),
     ]);
     const porEstado = { piloto: 0, activo: 0, vencido: 0 };
     for (const r of clientes.rows) porEstado[r.estado_contrato] = r.n;
+
+    // Serie de los últimos 6 meses (incluido el actual), rellenando con 0
+    // los meses sin datos — para que el gráfico siempre tenga 6 puntos.
+    const mapaSesiones = new Map(serieSesiones.rows.map((r) => [r.mes.toISOString().slice(0, 7), r]));
+    const mapaFacturas = new Map(serieFacturas.rows.map((r) => [r.mes.toISOString().slice(0, 7), r.n]));
+    const serieMensual = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
+      const clave = d.toISOString().slice(0, 7);
+      const s = mapaSesiones.get(clave);
+      serieMensual.push({
+        mes: clave,
+        sesiones: s?.n || 0,
+        co2e: s?.co2e || 0,
+        facturas: mapaFacturas.get(clave) || 0,
+      });
+    }
+
+    // Variación % vs. mes anterior (null si el mes anterior fue 0, para no
+    // mostrar un falso "+infinito%").
+    const variacion = (actual, anterior) => (anterior > 0 ? Math.round(((actual - anterior) / anterior) * 1000) / 10 : null);
+
     res.json({
       clientes_por_estado: porEstado,
       sesiones_mes: sesionesMes.rows[0].n,
+      sesiones_mes_var: variacion(sesionesMes.rows[0].n, sesionesMesAnt.rows[0].n),
       facturas_mes: facturasMes.rows[0].n,
+      facturas_mes_var: variacion(facturasMes.rows[0].n, facturasMesAnt.rows[0].n),
       co2e_acumulado: co2eAcum.rows[0].total,
+      co2e_mes: co2eMes.rows[0].total,
+      co2e_mes_var: variacion(co2eMes.rows[0].total, co2eMesAnt.rows[0].total),
       simple_api: { ...ping, mock: simpleApi.mock },
       consumo_api_mes: uso.rows[0],
+      serie_mensual: serieMensual,
+      actividad_reciente: actividadReciente.rows,
     });
   } catch (err) {
     next(err);
   }
+});
+
+// ============================================================
+// PERFIL — cambio de contraseña del usuario logueado
+// ============================================================
+router.put('/perfil/password', async (req, res, next) => {
+  try {
+    const { actual, nueva } = req.body;
+    if (!actual || !nueva) return res.status(400).json({ error: 'Contraseña actual y nueva son obligatorias.' });
+    if (String(nueva).length < 10) return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 10 caracteres.' });
+
+    const { rows } = await query(`SELECT * FROM usuarios WHERE id = $1`, [req.user.sub]);
+    const user = rows[0];
+    if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    const ok = await bcrypt.compare(actual, user.password_hash || '');
+    if (!ok) return res.status(401).json({ error: 'La contraseña actual no es correcta.' });
+
+    const hash = await bcrypt.hash(nueva, config.bcryptRounds);
+    await query(`UPDATE usuarios SET password_hash = $1, must_reset_password = false WHERE id = $2`, [hash, user.id]);
+    await logActividad({ usuarioId: user.id, accion: 'cambio_password', entidad: 'usuario', entidadId: user.id, ip: req.ip });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 // ============================================================
@@ -53,22 +143,82 @@ router.get('/clientes', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Situación tributaria pública del SII por RUT (vía BaseAPI), para
+// autocompletar el alta de clientes. Va ANTES de las rutas /clientes/:id
+// en orden de lectura, pero Express igual la distingue por el prefijo
+// fijo /clientes/sii/. Apagado limpio (503) si no hay BASEAPI_API_KEY.
+router.get('/clientes/sii/:rut', adminOnly, siiLimiterAdmin, async (req, res, next) => {
+  try {
+    if (!config.baseapi.enabled) {
+      return res.status(503).json({ error: 'Consulta SII no configurada (BASEAPI_API_KEY).' });
+    }
+    const situacion = await consultarRut(req.params.rut);
+    await logActividad({ usuarioId: req.user.sub, accion: 'sii_consulta', entidad: 'cliente', entidadId: null, detalle: { rut: req.params.rut }, ip: req.ip });
+    res.json({ situacion });
+  } catch (err) {
+    if (err.sinRegistro) return res.status(404).json({ error: 'RUT sin registro en el SII.' });
+    if (err.message === 'RUT inválido') return res.status(400).json({ error: 'RUT inválido.' });
+    next(err);
+  }
+});
+
+// Dar de alta una empresa emite además SU CONTRATO, en la misma
+// transacción: una empresa sin contrato no debería poder existir. Sale en
+// estado 'borrador' porque la plantilla todavía tiene puntos pendientes de
+// revisión legal (ver services/contrato.js) — el documento se genera solo,
+// pero no se firma hasta que un abogado cierre esos puntos.
 router.post('/clientes', adminOnly, async (req, res, next) => {
   try {
     const { rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan } = req.body;
     if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre de empresa son obligatorios' });
-    const { rows } = await query(
-      `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan)
-       VALUES ($1,$2,$3,COALESCE($4,'piloto'),$5,$6,$7) RETURNING *`,
-      [rut, nombre_empresa, contacto_email || null, estado_contrato, fecha_inicio || null, fecha_fin || null, plan || 'piloto']
-    );
-    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cliente', entidad: 'cliente', entidadId: rows[0].id, ip: req.ip });
-    res.status(201).json({ cliente: rows[0] });
+
+    const { cliente, contrato } = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO clientes (rut, nombre_empresa, contacto_email, estado_contrato, fecha_inicio, fecha_fin, plan)
+         VALUES ($1,$2,$3,COALESCE($4,'piloto'),$5,$6,$7) RETURNING *`,
+        [rut, nombre_empresa, contacto_email || null, estado_contrato, fecha_inicio || null, fecha_fin || null, plan || 'piloto']
+      );
+      return { cliente: rows[0], contrato: await emitirContrato(client, rows[0], req.body.tipo_contrato) };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_cliente', entidad: 'cliente', entidadId: cliente.id, detalle: { contrato: contrato.numero }, ip: req.ip });
+    res.status(201).json({ cliente, contrato });
   } catch (err) {
     if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un cliente con ese RUT' });
     next(err);
   }
 });
+
+// Inserta el contrato de un cliente dentro de la transacción del llamador.
+// El número es aleatorio; ante una colisión (improbable pero posible) se
+// reintenta en vez de tumbar el alta de la empresa.
+async function emitirContrato(client, entidad, tipoPedido, sujeto = 'cliente') {
+  const permitidos = TIPOS_DE(sujeto);
+  const tipo = tipoValido(tipoPedido) && permitidos.includes(tipoPedido)
+    ? tipoPedido
+    : (sujeto === 'auspiciador' ? 'auspicio' : TIPO_POR_DEFECTO);
+  const datos = snapshotDe(entidad, tipo, sujeto);
+  const columna = sujeto === 'auspiciador' ? 'auspiciador_id' : sujeto === 'proveedor' ? 'proveedor_id' : 'cliente_id';
+  for (let intento = 0; intento < 5; intento += 1) {
+    const numero = generarNumeroContrato();
+    const created_at = new Date().toISOString();
+    const hash = hashContrato({ numero, plantilla_version: PLANTILLA_VERSION, tipo, datos, created_at });
+    try {
+      const { rows } = await client.query(
+        `INSERT INTO contratos (${columna}, numero, plantilla_version, tipo, estado, datos, hash_documento, created_at)
+         VALUES ($1,$2,$3,$4,'borrador',$5,$6,$7) RETURNING *`,
+        [entidad.id, numero, PLANTILLA_VERSION, tipo, JSON.stringify(datos), hash, created_at]
+      );
+      return rows[0];
+    } catch (err) {
+      // 23505 en `numero` = colisión del aleatorio: reintentar. Cualquier
+      // otra violación (p. ej. uq_contratos_vigente) es un error real.
+      if (err.code === '23505' && String(err.constraint || '').includes('numero')) continue;
+      throw err;
+    }
+  }
+  throw new Error('No se pudo generar un número de contrato único');
+}
 
 router.put('/clientes/:id', adminOnly, async (req, res, next) => {
   try {
@@ -97,7 +247,10 @@ router.delete('/clientes/:id', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// CREAR CUENTA: genera usuario + envía link de activación (must_reset_password=true).
+// CREAR CUENTA: el correo no se envía (correo saliente no confiable). Se
+// genera aquí una contraseña temporal que se muestra UNA sola vez en este
+// response; la cuenta queda activa de inmediato con must_reset_password=true
+// (mismo criterio que crearCuentaEntidad de routes/accesos.js).
 router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
   try {
     const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
@@ -107,29 +260,582 @@ router.post('/clientes/:id/crear-cuenta', adminOnly, async (req, res, next) => {
     if (!email) return res.status(400).json({ error: 'Se requiere un correo de contacto' });
 
     const nombre = req.body.nombre || cliente.nombre_empresa;
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
     const { rows: uRows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
-       VALUES ($1,$2,'cliente',$3,'pendiente',true)
-       ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [email, nombre, cliente.id]
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,'cliente',$3,'activo',$4,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id`,
+      [email, nombre, cliente.id, hash]
     );
     if (!uRows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
 
-    const raw = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48h
-    await query(
-      `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
-      [uRows[0].id, hashToken(raw), expira]
-    );
-    const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
-    await sendMail({ to: email, ...activationEmail({ nombre, link }) });
     await logActividad({ usuarioId: req.user.sub, accion: 'crear_cuenta', entidad: 'usuario', entidadId: uRows[0].id, detalle: { email }, ip: req.ip });
 
-    // En modo dev (sin Resend) devolvemos el link para poder probar la activación.
-    const devLink = config.resend.apiKey ? undefined : link;
-    res.status(201).json({ ok: true, usuario_id: uRows[0].id, dev_activation_link: devLink });
+    res.status(201).json({ ok: true, usuario_id: uRows[0].id, email, password });
   } catch (err) { next(err); }
 });
+
+// Consulta los datos de una empresa en Clay para prellenar el alta. Solo
+// LEE: nunca escribe en `clientes`. Quien da de alta decide si acepta lo que
+// viene o corrige — el dato que quede es el que se congela en el contrato,
+// así que no se pisa nada en silencio.
+router.get('/clientes/consultar-rut/:rut', adminOnly, async (req, res, next) => {
+  try {
+    const { datos, limites } = await clayEmpresa(req.params.rut);
+    const nombre = datos?.name || null;
+    if (!nombre) return res.status(404).json({ error: 'Clay no devolvió el nombre de esa empresa' });
+    res.json({
+      empresa: {
+        nombre_empresa: nombre,
+        rut: datos?.dv ? `${datos.rut}-${datos.dv}` : (datos?.rut || null),
+      },
+      solicitudes_restantes: limites.restantes,
+    });
+  } catch (err) {
+    // Que Clay esté apagado, sin token o caído no puede tumbar el panel: el
+    // alta manual sigue siendo el camino principal, esto es una ayuda.
+    if (err.status) return res.status(err.status === 404 ? 404 : 502).json({ error: err.message });
+    return res.status(503).json({ error: err.message });
+  }
+});
+
+// ---------- Importar la contabilidad de carbono desde Clay ----------
+// El flujo de siempre es un documento a la vez. Cuando son cientos de
+// facturas de un período eso no escala, y es exactamente el caso de un
+// cliente con contabilidad ya llevada en Clay: los DTE están ahí,
+// sincronizados desde el SII.
+//
+// Se trae el LIBRO DE COMPRAS del período (lo que la empresa compró = sus
+// emisiones aguas arriba) y se arma una sesión con todas sus facturas,
+// encadenadas contra la misma cadena global que el resto.
+//
+// El método sale POR GASTO: Clay no entrega unidad de medida en el detalle
+// de línea. Cargar el XML del documento sí habilita además el método
+// físico. Se informa en la respuesta, no se esconde.
+router.post('/clientes/:id/importar-clay', adminOnly, async (req, res, next) => {
+  const { desde, hasta } = req.body || {};
+  if (!desde) return res.status(400).json({ error: 'Indica la fecha `desde` (YYYY-MM-DD) del período a importar' });
+
+  try {
+    const { rows: cRows } = await query(`SELECT * FROM clientes WHERE id = $1`, [req.params.id]);
+    const cliente = cRows[0];
+    if (!cliente) return res.status(404).json({ error: 'Cliente no encontrado' });
+
+    // 1. Traer de Clay FUERA de la transacción: la red puede tardar y no
+    //    puede tener bloqueada la fila de cadena_estado mientras tanto —
+    //    ese lock serializa a todos los que estén subiendo documentos.
+    const { datos: dteRes } = await clayDtes({ rut: cliente.rut, recibidos: true, desde, hasta, excluirTipos: SII_EXCLUIDOS, limite: 500 });
+    const documentos = dteRes?.items || (Array.isArray(dteRes) ? dteRes : []);
+    if (!documentos.length) return res.status(404).json({ error: 'Clay no devolvió documentos de compra en ese período' });
+
+    let lineas = [];
+    try {
+      const { datos: prodRes } = await clayProductos({ rut: cliente.rut, recibidos: true, desde, hasta, limite: 500 });
+      lineas = prodRes?.items || (Array.isArray(prodRes) ? prodRes : []);
+    } catch {
+      // Sin detalle de líneas se calcula igual, con un ítem único por el
+      // neto de cada documento. Menos resolución, mismo total.
+    }
+    const porDocumento = agruparLineas(lineas);
+
+    const admitidos = [];
+    const omitidos = [];
+    for (const dte of documentos) {
+      const { admite, motivo } = admiteDte(dte);
+      if (admite) admitidos.push(dte); else omitidos.push({ clay_id: dte?.id, motivo });
+    }
+    if (!admitidos.length) {
+      return res.status(422).json({ error: 'Ningún documento del período entra al cálculo', ...resumirImportacion({ admitidos, omitidos }) });
+    }
+
+    // 2. Calcular y persistir en una transacción, encadenando cada factura.
+    const resultado = await withTx(async (client) => {
+      const categorias = await cargarCategorias((sql) => client.query(sql));
+      const cuentasNaturales = await cargarCuentas((sql) => client.query(sql));
+
+      const { rows: sRows } = await client.query(
+        `INSERT INTO sesiones (rut_cliente, nombre_cliente, email_cliente) VALUES ($1,$2,$3) RETURNING *`,
+        [cliente.rut, cliente.nombre_empresa, cliente.contacto_email || null]
+      );
+      const sesion = sRows[0];
+
+      // Qué documentos ya se importaron antes. Se consulta ANTES de
+      // insertar: si se dejara que reviente el índice único, el error
+      // aborta la transacción completa en Postgres y las facturas
+      // siguientes del lote fallarían todas con "transaction is aborted".
+      // El índice queda igual, como red de seguridad ante una carrera.
+      const idsClay = admitidos.map((d) => d?.id).filter(Boolean);
+      const { rows: yaRows } = await client.query(
+        `SELECT clay_id FROM facturas WHERE clay_id = ANY($1::text[])`, [idsClay]
+      );
+      const yaImportados = new Set(yaRows.map((r) => r.clay_id));
+
+      const { rows: eRows } = await client.query(`SELECT * FROM cadena_estado WHERE id = 1 FOR UPDATE`);
+      let estado = eRows[0];
+      let total = 0;
+      let importadas = 0;
+      let repetidas = 0;
+
+      for (const dte of admitidos) {
+        const d = datosDeDte(dte);
+        if (yaImportados.has(d.clay_id)) { repetidas += 1; continue; }
+        const items = itemsDeDte(dte, porDocumento);
+        if (!items.length) { omitidos.push({ clay_id: d.clay_id, motivo: 'sin ítems calculables' }); continue; }
+
+        // `origen` queda en el valor por defecto ('texto'): sin unidad de
+        // medida el método físico no aplica, y forzar otro origen diría
+        // que sí sin poder sostenerlo.
+        const calc = calcularFactura(items, categorias);
+        const hDoc = hashDocumento({
+          numero_venta: d.numero_venta, rut_emisor: d.rut_emisor, rut_receptor: d.rut_receptor,
+          total_co2e: calc.total_co2e, categoria: calc.categoria, archivo_original: `clay:${d.clay_id}`,
+        });
+        const { hash_cadena: hCad, eslabon } = siguienteEslabon(estado, hDoc);
+
+        const { rows: fRows } = await client.query(
+            `INSERT INTO facturas
+               (sesion_id, numero_venta, archivo_original, rut_emisor, rut_receptor,
+                total_co2e, categoria, categoria_codigo, categoria_origen,
+                status, motor, clay_id,
+                hash_documento, hash_anterior, hash_cadena, eslabon)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'procesada',$10,$11,$12,$13,$14,$15) RETURNING *`,
+            [sesion.id, d.numero_venta, `clay:${d.clay_id}`, d.rut_emisor, d.rut_receptor,
+             calc.total_co2e, calc.categoria, calc.categoria_codigo,
+             // Ver migraciones 077 y 078: sin coincidencia de palabra clave la
+             // categoría es el default del motor y no una clasificación; y sin
+             // ítems que clasificar no es lo mismo que sin coincidencia.
+             calc.categoria_origen,
+             MOTOR_CLAY, d.clay_id,
+             hDoc, estado.ultimo_hash, hCad, eslabon]
+        );
+        const factura = fRows[0];
+
+        estado = { ...estado, ultimo_hash: hCad, n_eslabones: eslabon };
+        for (const it of calc.items) {
+          await client.query(
+            `INSERT INTO line_items (factura_id, descripcion, cantidad, co2e, porcentaje_total, metodo, categoria_codigo)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            // `categoria_codigo` por ítem (migración 080): sin él, reclasificar
+            // una factura mixta reescala también los ítems que sí calzaron.
+            [factura.id, it.descripcion, it.cantidad, it.co2e, it.porcentaje_total, it.metodo || null,
+             it.categoria_codigo || null]
+          );
+        }
+        // Ídem public.js: los ítems viajan en memoria para que la cuenta
+        // física se derive solo del CO2e de esta categoría.
+        await registrarMovimientos({
+          client, factura: { ...factura, items: calc.items },
+          fecha: sesion.fecha, cuentas: cuentasNaturales,
+        });
+        total += Number(calc.total_co2e || 0);
+        importadas += 1;
+      }
+
+      if (!importadas) {
+        const e = new Error('Todos los documentos del período ya estaban importados');
+        e.status = 409; throw e;
+      }
+
+      await client.query(
+        `UPDATE cadena_estado SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1`,
+        [estado.ultimo_hash, estado.n_eslabones]
+      );
+      await client.query(`UPDATE sesiones SET total_co2e = $1 WHERE id = $2`, [total, sesion.id]);
+      return { sesion, importadas, repetidas, total_co2e: total };
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'importar_clay', entidad: 'sesion', entidadId: resultado.sesion.id,
+      detalle: { rut: cliente.rut, desde, hasta, documentos: resultado.importadas }, ip: req.ip,
+    });
+
+    res.status(201).json({
+      sesion_id: resultado.sesion.id,
+      total_co2e: resultado.total_co2e,
+      ya_importados: resultado.repetidas,
+      ...resumirImportacion({ admitidos, omitidos }),
+      documentos: resultado.importadas,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    return next(err);
+  }
+});
+
+// Contrato vigente del cliente. Los clientes dados de alta antes de la
+// migración 043 no tienen contrato: se responde 404 y el panel ofrece
+// generarlo, en vez de fabricar uno en silencio al leer.
+router.get('/clientes/:id/contrato', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Este cliente todavía no tiene contrato' });
+    res.json({ contrato: rows[0], puntos_pendientes: PUNTOS_PENDIENTES });
+  } catch (err) { next(err); }
+});
+
+// Emite el contrato de un cliente que no lo tiene (alta anterior a la
+// migración 043). Si ya hay uno vigente devuelve 409: reemplazarlo es otra
+// operación, no un efecto secundario de pedirlo de nuevo.
+router.post('/clientes/:id/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows: cRows } = await client.query(`SELECT * FROM clientes WHERE id = $1 FOR UPDATE`, [req.params.id]);
+      if (!cRows[0]) { const e = new Error('Cliente no encontrado'); e.status = 404; throw e; }
+      const { rows: yaHay } = await client.query(
+        `SELECT id FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' LIMIT 1`, [req.params.id]
+      );
+      if (yaHay[0]) { const e = new Error('Este cliente ya tiene un contrato vigente'); e.status = 409; throw e; }
+      return emitirContrato(client, cRows[0], req.body?.tipo_contrato);
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_contrato', entidad: 'contrato', entidadId: contrato.id, ip: req.ip });
+    res.status(201).json({ contrato });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/clientes/:id/contrato.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE cliente_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id]
+    );
+    const contrato = rows[0];
+    if (!contrato) return res.status(404).json({ error: 'Este cliente todavía no tiene contrato' });
+    const buf = await pdfDeContrato(contrato);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${contrato.numero}.pdf"`);
+    res.send(buf);
+  } catch (err) { next(err); }
+});
+
+// ---------- Postulaciones de auspicio ----------
+router.get('/solicitudes-auspicio', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'aceptada', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_auspicio s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        ORDER BY s.created_at DESC LIMIT 200`,
+      [estado]
+    );
+    res.json({ solicitudes: rows });
+  } catch (err) { next(err); }
+});
+
+// Aceptar crea el auspiciador y emite sus contratos, todo en la misma
+// transacción: si algo falla, la postulación sigue pendiente en vez de
+// quedar aceptada sin auspiciador detrás.
+router.post('/solicitudes-auspicio/:id/aceptar', adminOnly, async (req, res, next) => {
+  try {
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_auspicio WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Postulación no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta postulación ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+
+      const base = auspiciadorDesdeSolicitud(sol);
+      const { rows: aRows } = await client.query(
+        `INSERT INTO auspiciadores (rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7) RETURNING *`,
+        [base.rut, base.nombre_empresa, base.contacto_email, base.aporta_vehiculo,
+         JSON.stringify(base.vehiculo), req.body?.fecha_inicio || null, req.body?.fecha_fin || null]
+      );
+      const auspiciador = aRows[0];
+
+      const contratos = [await emitirContrato(client, auspiciador, 'auspicio', 'auspiciador')];
+      if (auspiciador.aporta_vehiculo) {
+        contratos.push(await emitirContrato(client, auspiciador, 'comodato', 'auspiciador'));
+      }
+
+      await client.query(
+        `UPDATE solicitudes_auspicio
+            SET estado = 'aceptada', auspiciador_id = $2, resuelta_por = $3, resuelta_at = now()
+          WHERE id = $1`,
+        [sol.id, auspiciador.id, req.user.sub]
+      );
+      return { auspiciador, contratos };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'aceptar_auspicio', entidad: 'auspiciador', entidadId: salida.auspiciador.id, detalle: { solicitud: req.params.id }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    // Ya existía un auspiciador con ese RUT: es un caso real (postuló dos
+    // veces, o se dio de alta a mano antes), no un error del servidor.
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un auspiciador con ese RUT' });
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.post('/solicitudes-auspicio/:id/rechazar', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE solicitudes_auspicio
+          SET estado = 'rechazada', motivo_rechazo = $2, resuelta_por = $3, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, String(req.body?.motivo || '').slice(0, 500) || null, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La postulación no existe o ya fue resuelta' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'rechazar_auspicio', entidad: 'solicitud_auspicio', entidadId: req.params.id, ip: req.ip });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Inscripciones de empresas (formulario público /inscripcion) ----------
+router.get('/solicitudes-inscripcion', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'convertida', 'descartada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_inscripcion s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        ORDER BY s.created_at DESC LIMIT 200`,
+      [estado]
+    );
+    res.json({ solicitudes: rows });
+  } catch (err) { next(err); }
+});
+
+// Convertir crea el prospecto en el pipeline comercial y marca la
+// solicitud, en la misma transacción: si algo falla, la inscripción
+// sigue pendiente en vez de quedar convertida sin prospecto detrás.
+router.post('/solicitudes-inscripcion/:id/convertir', async (req, res, next) => {
+  try {
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_inscripcion WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Inscripción no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta inscripción ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+
+      const base = prospectoDesdeInscripcion(sol);
+      const { rows: pRows } = await client.query(
+        `INSERT INTO prospectos (nombre_empresa, rut, contacto, etapa, origen, notas)
+         VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        [base.nombre_empresa, base.rut, base.contacto, base.etapa, base.origen, base.notas]
+      );
+      const prospecto = pRows[0];
+
+      await client.query(
+        `UPDATE solicitudes_inscripcion
+            SET estado = 'convertida', prospecto_id = $2, resuelta_por = $3, resuelta_at = now()
+          WHERE id = $1`,
+        [sol.id, prospecto.id, req.user.sub]
+      );
+      return { prospecto };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'convertir_inscripcion', entidad: 'prospecto', entidadId: salida.prospecto.id, detalle: { solicitud: req.params.id }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+// Enrolar la empresa de la solicitud y enviarle la invitación por correo,
+// en un solo clic: crea (o reutiliza por RUT) la empresa en `proveedores`,
+// le crea el acceso web y dispara el correo de activación — mismo camino
+// que admin/Enrolar.jsx, pero partiendo de un lead ya calificado en vez de
+// que el admin retipee los datos. Todo en una transacción: si algo falla,
+// la solicitud sigue pendiente.
+router.post('/solicitudes-inscripcion/:id/enrolar', adminOnly, async (req, res, next) => {
+  try {
+    const rutForzado = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `SELECT * FROM solicitudes_inscripcion WHERE id = $1 FOR UPDATE`, [req.params.id]
+      );
+      const sol = rows[0];
+      if (!sol) { const e = new Error('Inscripción no encontrada'); e.status = 404; throw e; }
+      if (sol.estado !== 'pendiente') {
+        const e = new Error(`Esta inscripción ya está ${sol.estado}`); e.status = 409; throw e;
+      }
+      const rut = rutForzado || sol.rut.replace(/[^0-9kK]/g, '').toUpperCase();
+      const conGuion = rut.length >= 7 ? `${rut.slice(0, -1)}-${rut.slice(-1)}` : '';
+      if (!rutValido(conGuion)) { const e = new Error('El RUT de la solicitud no es válido.'); e.status = 400; throw e; }
+
+      let { rows: eRows } = await client.query(`SELECT * FROM proveedores WHERE rut = $1`, [rut]);
+      const yaExistia = Boolean(eRows[0]);
+      if (!eRows[0]) {
+        ({ rows: eRows } = await client.query(
+          `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2) RETURNING *`,
+          [sol.nombre_empresa, rut]
+        ));
+      }
+      const empresa = eRows[0];
+
+      // Acceso web de la empresa (mismo patrón que crearCuentaEntidad, sin
+      // el atajo de recibir req/res: acá el correo viene de la solicitud,
+      // no del body). Si la empresa ya tenía cuenta, no se crea otra ni se
+      // reenvía invitación — se informa para que el admin no se confunda.
+      let acceso = null;
+      const { rows: uExistente } = await client.query(`SELECT id FROM usuarios WHERE proveedor_id = $1`, [empresa.id]);
+      if (!uExistente[0]) {
+        const email = String(sol.contacto_email || '').toLowerCase().trim();
+        const password = generarPasswordTemporal();
+        const hash = await bcrypt.hash(password, config.bcryptRounds);
+        const { rows: uRows } = await client.query(
+          `INSERT INTO usuarios (email, nombre, rol, panel, proveedor_id, nivel_acceso, estado, password_hash, must_reset_password)
+           VALUES ($1,$2,'operador','proveedor',$3,'operador','activo',$4,true)
+           ON CONFLICT (email) DO NOTHING RETURNING id`,
+          [email, sol.contacto_nombre || empresa.nombre_empresa, empresa.id, hash]
+        );
+        if (uRows[0]) {
+          acceso = { usuarioId: uRows[0].id, email, nombre: sol.contacto_nombre || empresa.nombre_empresa };
+        }
+      }
+
+      await client.query(
+        `UPDATE solicitudes_inscripcion SET estado = 'convertida', resuelta_por = $2, resuelta_at = now() WHERE id = $1`,
+        [sol.id, req.user.sub]
+      );
+      return { empresa, yaExistia, acceso, tieneCuentaPrevia: Boolean(uExistente[0]) };
+    });
+
+    // El correo se envía FUERA de la transacción (sendMail hace red; no
+    // debe bloquear el commit ni deshacerlo si la red falla).
+    let correo = null;
+    if (salida.acceso) {
+      correo = await enviarActivacion({
+        usuarioId: salida.acceso.usuarioId, email: salida.acceso.email, nombre: salida.acceso.nombre, panel: 'proveedor',
+      });
+    }
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'enrolar_desde_inscripcion', entidad: 'proveedor',
+      entidadId: salida.empresa.id, detalle: { solicitud: req.params.id, ya_existia: salida.yaExistia }, ip: req.ip,
+    });
+    res.status(201).json({
+      empresa: salida.empresa, ya_existia: salida.yaExistia, tenia_cuenta: salida.tieneCuentaPrevia,
+      correo_enviado: correo?.correoEnviado, dev_activation_link: correo?.dev_activation_link,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.post('/solicitudes-inscripcion/:id/descartar', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `UPDATE solicitudes_inscripcion
+          SET estado = 'descartada', resuelta_por = $2, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La inscripción no existe o ya fue resuelta' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'descartar_inscripcion', entidad: 'solicitud_inscripcion', entidadId: req.params.id, ip: req.ip });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Auspiciadores (SICR3P-LEGAL-01 y 06) ----------
+// Un auspiciador no es un cliente: aporta recursos al programa Ruta SICR3P
+// (vehículo, dinero, difusión) y firma su propio convenio. Se le da de alta
+// con el mismo control que a un cliente — registro, contrato generado y
+// sellado — porque es exactamente lo que se pidió.
+router.get('/auspiciadores', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT a.*, (
+         SELECT json_agg(json_build_object('id', c.id, 'numero', c.numero, 'tipo', c.tipo, 'estado', c.estado))
+           FROM contratos c WHERE c.auspiciador_id = a.id AND c.estado <> 'anulado'
+       ) AS contratos
+       FROM auspiciadores a ORDER BY a.created_at DESC`
+    );
+    res.json({ auspiciadores: rows });
+  } catch (err) { next(err); }
+});
+
+// El alta emite el Convenio Marco; si además aporta vehículo, emite también
+// el comodato. Los dos en la misma transacción que el alta: un auspiciador
+// sin convenio no debería existir.
+router.post('/auspiciadores', adminOnly, async (req, res, next) => {
+  try {
+    const { rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin } = req.body || {};
+    if (!rut || !nombre_empresa) return res.status(400).json({ error: 'RUT y nombre son obligatorios' });
+
+    const salida = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO auspiciadores (rut, nombre_empresa, contacto_email, aporta_vehiculo, vehiculo, fecha_inicio, fecha_fin)
+         VALUES ($1,$2,$3,COALESCE($4,false),COALESCE($5,'{}')::jsonb,$6,$7) RETURNING *`,
+        [rut, nombre_empresa, contacto_email || null, aporta_vehiculo, JSON.stringify(vehiculo || {}), fecha_inicio || null, fecha_fin || null]
+      );
+      const a = rows[0];
+      const contratos = [await emitirContrato(client, a, 'auspicio', 'auspiciador')];
+      if (a.aporta_vehiculo) contratos.push(await emitirContrato(client, a, 'comodato', 'auspiciador'));
+      return { auspiciador: a, contratos };
+    });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_auspiciador', entidad: 'auspiciador', entidadId: salida.auspiciador.id, detalle: { contratos: salida.contratos.map((c) => c.numero) }, ip: req.ip });
+    res.status(201).json(salida);
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ya existe un auspiciador con ese RUT' });
+    next(err);
+  }
+});
+
+// Emite un contrato de auspicio que falte (p. ej. el comodato, si el
+// vehículo se acordó después del alta).
+router.post('/auspiciadores/:id/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows } = await client.query(`SELECT * FROM auspiciadores WHERE id = $1 FOR UPDATE`, [req.params.id]);
+      if (!rows[0]) { const e = new Error('Auspiciador no encontrado'); e.status = 404; throw e; }
+      return emitirContrato(client, rows[0], req.body?.tipo, 'auspiciador');
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_contrato', entidad: 'contrato', entidadId: contrato.id, ip: req.ip });
+    res.status(201).json({ contrato });
+  } catch (err) {
+    if (err.code === '23505') return res.status(409).json({ error: 'Ese contrato ya está vigente para este auspiciador' });
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    next(err);
+  }
+});
+
+router.get('/auspiciadores/:id/contrato.pdf', async (req, res, next) => {
+  try {
+    const tipo = tipoValido(req.query.tipo) ? req.query.tipo : 'auspicio';
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE auspiciador_id = $1 AND tipo = $2 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.id, tipo]
+    );
+    const contrato = rows[0];
+    if (!contrato) return res.status(404).json({ error: 'Ese contrato no existe para este auspiciador' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${contrato.numero}.pdf"`);
+    res.send(await pdfDeContrato(contrato));
+  } catch (err) { next(err); }
+});
+
+// Arma el PDF de un contrato ya emitido, sea de cliente o de auspiciador.
+function pdfDeContrato(contrato) {
+  const meta = TIPOS[contrato.tipo] || TIPOS[TIPO_POR_DEFECTO];
+  return generateContrato({
+    contrato,
+    titulo: meta.titulo.toUpperCase(),
+    codigo: meta.codigo,
+    clausulas: clausulas(contrato.datos, contrato.tipo),
+    pendientes: clausulasPendientes(contrato.datos, contrato.tipo).length ? PUNTOS_PENDIENTES : [],
+  });
+}
 
 // Alerta de contratos por vencer (próximos 30 días) o vencidos.
 router.get('/contratos/alertas', async (req, res, next) => {
@@ -171,7 +877,7 @@ router.get('/sesiones/:id', async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT * FROM sesiones WHERE id = $1`, [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Sesión no encontrada' });
-    const { rows: facturas } = await query(`SELECT * FROM facturas WHERE sesion_id = $1 ORDER BY created_at`, [req.params.id]);
+    const { rows: facturas } = await query(`SELECT * FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at`, [req.params.id]);
     for (const f of facturas) {
       const { rows: items } = await query(`SELECT * FROM line_items WHERE factura_id = $1`, [f.id]);
       f.items = items;
@@ -192,15 +898,81 @@ router.get('/metricas', async (req, res, next) => {
       query(`SELECT to_char(date_trunc('month', created_at),'YYYY-MM') AS mes,
                     count(*)::int AS facturas,
                     COALESCE(sum(total_co2e),0)::float AS co2e
-             FROM facturas GROUP BY 1 ORDER BY 1`),
-      query(`SELECT COALESCE(categoria,'Sin categoría') AS categoria,
+             FROM facturas_vigentes GROUP BY 1 ORDER BY 1`),
+      // El donut agrupa bajo "Sin clasificar" todo lo que no salió de la glosa
+      // real: si el catch-all del motor sumara bajo su propio nombre, el
+      // gráfico mostraría "Servicios" como la mayor fuente de emisiones de la
+      // plataforma sin que nadie lo haya calculado.
+      query(`SELECT CASE WHEN ${SQL_CATEGORIA_ATRIBUIBLE} AND categoria IS NOT NULL
+                         THEN categoria ELSE 'Sin clasificar' END AS categoria,
                     count(*)::int AS n, COALESCE(sum(total_co2e),0)::float AS co2e
-             FROM facturas GROUP BY 1 ORDER BY co2e DESC`),
+             FROM facturas_vigentes GROUP BY 1 ORDER BY co2e DESC`),
     ]);
     res.json({
       co2e_por_cliente: porCliente.rows,
       serie_mensual: serie.rows,
       por_categoria: porCategoria.rows,
+    });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// JUEGO — métricas de "Sube y Suma" (participación, no CO2e evitado:
+// no existe un factor validado para convertir envases a CO2e y no se
+// inventa — la página muestra envases, puntos y km tal cual).
+// ============================================================
+router.get('/juego/resumen', async (req, res, next) => {
+  try {
+    const [
+      totales, reciclajes, trayectos, mixPuntos, porMaterial, porCampana, porPunto, serieEnvases,
+    ] = await Promise.all([
+      query(`SELECT (SELECT count(*)::int FROM jugadores) AS jugadores,
+                    (SELECT count(*)::int FROM puntos_eventos WHERE tipo = 'documento_escaneado') AS documentos,
+                    (SELECT COALESCE(sum(puntos),0)::int FROM puntos_eventos) AS puntos`),
+      query(`SELECT count(*)::int AS entregas, COALESCE(sum(total_envases),0)::int AS envases FROM reciclajes`),
+      query(`SELECT count(*)::int AS cerrados, COALESCE(sum(distancia_m),0)::float AS metros
+             FROM trayectos WHERE llegada_at IS NOT NULL`),
+      query(`SELECT tipo, COALESCE(sum(puntos),0)::int AS puntos FROM puntos_eventos GROUP BY tipo`),
+      // envases es JSONB [{material, cantidad}]: se expande por elemento.
+      query(`SELECT e->>'material' AS material, COALESCE(sum((e->>'cantidad')::int),0)::int AS cantidad
+             FROM reciclajes, jsonb_array_elements(envases) AS e GROUP BY 1 ORDER BY 2 DESC`),
+      query(`SELECT ca.codigo, ca.empresa,
+                    count(DISTINCT j.id)::int AS jugadores,
+                    COALESCE(sum(j.puntos_totales),0)::int AS puntos,
+                    COALESCE((SELECT sum(r.total_envases) FROM reciclajes r
+                              JOIN jugadores j2 ON j2.id = r.jugador_id WHERE j2.codigo_id = ca.id),0)::int AS envases
+             FROM codigos_acceso ca JOIN jugadores j ON j.codigo_id = ca.id
+             WHERE ca.modo_juego = true
+             GROUP BY ca.id, ca.codigo, ca.empresa ORDER BY puntos DESC`),
+      query(`SELECT pl.nombre, count(r.id)::int AS entregas, COALESCE(sum(r.total_envases),0)::int AS envases
+             FROM puntos_limpios pl LEFT JOIN reciclajes r ON r.punto_limpio_id = pl.id
+             GROUP BY pl.id, pl.nombre ORDER BY envases DESC`),
+      query(`SELECT date_trunc('month', created_at) AS mes, COALESCE(sum(total_envases),0)::int AS envases
+             FROM reciclajes WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+    ]);
+
+    // Serie de 6 meses rellenando con 0 (mismo patrón que /dashboard).
+    const mapa = new Map(serieEnvases.rows.map((r) => [r.mes.toISOString().slice(0, 7), r.envases]));
+    const serie = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
+      const clave = d.toISOString().slice(0, 7);
+      serie.push({ mes: clave, envases: mapa.get(clave) || 0 });
+    }
+
+    res.json({
+      jugadores: totales.rows[0].jugadores,
+      documentos_escaneados: totales.rows[0].documentos,
+      puntos_otorgados: totales.rows[0].puntos,
+      entregas_reciclaje: reciclajes.rows[0].entregas,
+      envases_reciclados: reciclajes.rows[0].envases,
+      trayectos_cerrados: trayectos.rows[0].cerrados,
+      km_trayectos: Math.round(trayectos.rows[0].metros / 100) / 10,
+      puntos_por_tipo: mixPuntos.rows,
+      envases_por_material: porMaterial.rows,
+      por_campana: porCampana.rows,
+      por_punto_limpio: porPunto.rows,
+      serie_envases: serie,
     });
   } catch (err) { next(err); }
 });
@@ -274,8 +1046,10 @@ router.get('/simple-api', async (req, res, next) => {
 router.get('/usuarios', adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT u.id, u.email, u.nombre, u.rol, u.estado, u.must_reset_password, u.ultimo_login,
-              u.created_at, c.nombre_empresa AS cliente
+      `SELECT u.id, u.email, u.nombre, u.rol, u.panel, u.estado, u.must_reset_password, u.ultimo_login,
+              u.created_at, c.nombre_empresa AS cliente, u.es_superadmin, u.nivel_acceso,
+              (SELECT count(*) FROM credenciales_webauthn cw WHERE cw.usuario_id = u.id) AS num_llaves_usb,
+              (SELECT count(*) FROM credenciales_archivo ca WHERE ca.usuario_id = u.id AND ca.activo) AS num_llaves_archivo
        FROM usuarios u LEFT JOIN clientes c ON c.id = u.cliente_id
        ORDER BY u.created_at DESC`
     );
@@ -283,42 +1057,380 @@ router.get('/usuarios', adminOnly, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Alta general de usuario para cualquier panel — pantalla única en
+// Usuarios.jsx. Para los 5 paneles externos (puerto/mandante/agencia/
+// trazador/proveedor) delega en crearCuentaEntidad (services/cuentas.js,
+// compartida con las rutas específicas de routes/accesos.js): exige
+// entidad_id y resuelve la FK correspondiente. Para sicrep/aduana_verde
+// sigue el alta directa de siempre. El correo no se envía: se genera aquí
+// una contraseña temporal que se muestra UNA sola vez en este response;
+// la cuenta queda activa de inmediato con must_reset_password=true.
 router.post('/usuarios', adminOnly, async (req, res, next) => {
   try {
-    const { email, nombre, rol, cliente_id } = req.body;
+    const { email, nombre, rol, cliente_id, panel, entidad_id, nivel_acceso } = req.body;
     if (!email || !nombre) return res.status(400).json({ error: 'Email y nombre son obligatorios' });
+
+    const entidadCfg = ENTIDAD_CUENTA_POR_PANEL[panel];
+    if (entidadCfg) {
+      if (!entidad_id) return res.status(400).json({ error: 'Falta elegir la entidad' });
+      const { rows: entidadRows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidad_id]);
+      if (!entidadRows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
+      // Por defecto los paneles de consulta (puerto/mandante/trazador)
+      // nacen en SOLO LECTURA — escribir se otorga a propósito. Agencia y
+      // proveedor nacen operador porque su función central ESCRIBE: la
+      // agencia captura el expediente en terreno (sube documentos) y el
+      // proveedor opera sus propios datos (onboarding, SII, REP, firma).
+      // La elección explícita del admin siempre manda.
+      const nivelPorDefecto = panel === 'proveedor' || panel === 'agencia' ? 'operador' : 'lectura';
+      return crearCuentaEntidad({
+        req, res, panel, columnaFk: entidadCfg.columnaFk, entidadId: entidad_id,
+        nivelAcceso: nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : nivelPorDefecto,
+      });
+    }
+
+    const emailNorm = String(email).toLowerCase();
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
     const { rows } = await query(
-      `INSERT INTO usuarios (email, nombre, rol, cliente_id, estado, must_reset_password)
-       VALUES ($1,$2,COALESCE($3,'operador'),$4,'pendiente',true)
-       ON CONFLICT (email) DO NOTHING RETURNING *`,
-      [String(email).toLowerCase(), nombre, rol, cliente_id || null]
+      `INSERT INTO usuarios (email, nombre, rol, cliente_id, panel, nivel_acceso, estado, password_hash, must_reset_password)
+       VALUES ($1,$2,COALESCE($3,'operador'),$4,COALESCE($5,'sicrep'),$6,'activo',$7,true)
+       ON CONFLICT (email) DO NOTHING RETURNING id, email, nombre, rol`,
+      [emailNorm, nombre, rol, cliente_id || null, panel, nivel_acceso === 'lectura' ? 'lectura' : 'operador', hash]
     );
     if (!rows[0]) return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
-    const raw = crypto.randomBytes(32).toString('hex');
-    const expira = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    await query(
-      `INSERT INTO tokens_password (usuario_id, token_hash, tipo, expira_at) VALUES ($1,$2,'activacion',$3)`,
-      [rows[0].id, hashToken(raw), expira]
-    );
-    const link = `${config.publicAppUrl}/admin/activar?token=${raw}`;
-    await sendMail({ to: rows[0].email, ...activationEmail({ nombre, link }) });
+
     await logActividad({ usuarioId: req.user.sub, accion: 'crear_usuario', entidad: 'usuario', entidadId: rows[0].id, ip: req.ip });
-    const devLink = config.resend.apiKey ? undefined : link;
-    res.status(201).json({ usuario: { id: rows[0].id, email: rows[0].email, nombre, rol: rows[0].rol }, dev_activation_link: devLink });
+
+    res.status(201).json({ usuario: rows[0], password });
+  } catch (err) { next(err); }
+});
+
+// Genera una contraseña temporal NUEVA para un usuario ya existente (deja
+// must_reset_password=true) — reemplaza al antiguo reenvío de correo de
+// activación, que perdió sentido: con el alta ya sin estado 'pendiente' no
+// hay ninguna cuenta "atascada" esperando un enlace. Sirve también como
+// recuperación general, dado que el correo de reset tampoco es confiable.
+router.post('/usuarios/:id/reenviar-activacion', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const password = generarPasswordTemporal();
+    const hash = await bcrypt.hash(password, config.bcryptRounds);
+    await query(`UPDATE usuarios SET password_hash = $1, must_reset_password = true WHERE id = $2`, [hash, usuario.id]);
+    await logActividad({ usuarioId: req.user.sub, accion: 'regenerar_password', entidad: 'usuario', entidadId: usuario.id, ip: req.ip });
+    res.json({ ok: true, password });
   } catch (err) { next(err); }
 });
 
 router.put('/usuarios/:id', adminOnly, async (req, res, next) => {
   try {
-    const { rol, estado, nombre } = req.body;
-    const { rows } = await query(
-      `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre)
-       WHERE id = $1 RETURNING id, email, nombre, rol, estado`,
-      [req.params.id, rol, estado, nombre]
-    );
+    const { rol, estado, nombre, panel, nivel_acceso } = req.body;
+    // es_superadmin: solo un superadmin puede otorgar/quitar la marca a
+    // otra cuenta — nunca auto-promoción vía un admin normal de sicrep.
+    // El CHECK usuarios_superadmin_requiere_sicrep_admin (migración 069)
+    // igual rechaza intentarlo fuera de panel=sicrep/rol=admin.
+    const esSuperadmin = req.user.es_superadmin === true && typeof req.body.es_superadmin === 'boolean'
+      ? req.body.es_superadmin
+      : null;
+    const nivelAcceso = nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : null;
+    let rows;
+    try {
+      ({ rows } = await query(
+        `UPDATE usuarios SET rol = COALESCE($2,rol), estado = COALESCE($3,estado), nombre = COALESCE($4,nombre),
+                panel = COALESCE($5,panel), es_superadmin = COALESCE($6,es_superadmin),
+                nivel_acceso = COALESCE($7,nivel_acceso)
+         WHERE id = $1 RETURNING id, email, nombre, rol, panel, estado, es_superadmin, nivel_acceso`,
+        [req.params.id, rol, estado, nombre, panel, esSuperadmin, nivelAcceso]
+      ));
+    } catch (e) {
+      // 23514 = CHECK. El caso real es bajarle el rol o cambiarle el panel
+      // a un superadmin: la migración 069 exige que siga siendo admin de
+      // sicrep. Sin esto sale un 500 genérico que no explica nada.
+      if (e.code === '23514' && /superadmin/.test(e.constraint || '')) {
+        return res.status(409).json({ error: 'Un superadmin debe seguir siendo admin del panel sicrep. Quítale primero la marca de superadmin.' });
+      }
+      throw e;
+    }
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     await logActividad({ usuarioId: req.user.sub, accion: 'editar_usuario', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
     res.json({ usuario: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// Provisionar una credencial (llave FIDO2 o llave de archivo) sobre una
+// cuenta ajena es equivalente a poder entrar como ella: el admin enrola su
+// propia llave física, o se lleva el token+PIN en claro del response, y
+// después inicia sesión con los privilegios del dueño. Mientras 'admin'
+// era el techo eso daba lo mismo; con la marca es_superadmin (migración
+// 069) por encima, deja de darlo — un admin normal escalaría a superadmin
+// en dos llamadas. Solo un superadmin puede tocar las credenciales de otro.
+async function protegerCredencialesDeSuperadmin(req, res, next) {
+  try {
+    const { rows } = await query(`SELECT es_superadmin FROM usuarios WHERE id = $1`, [req.params.id]);
+    if (rows[0]?.es_superadmin && req.user.es_superadmin !== true) {
+      return res.status(403).json({ error: 'Solo un superadmin puede gestionar las credenciales de otro superadmin' });
+    }
+    next();
+  } catch (err) { next(err); }
+}
+
+// ---------- Llaves USB de huella (WebAuthn/FIDO2) — ver migración 061 ----------
+// El registro lo hace un admin, no el propio usuario (autoservicio queda
+// pendiente, no es parte de esta ronda). El login con la llave ya
+// registrada es público: vive en routes/webauthn.js.
+router.get('/usuarios/:id/webauthn', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre_dispositivo, created_at, last_used_at
+       FROM credenciales_webauthn WHERE usuario_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ llaves: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/webauthn/opciones', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const { rows: existentes } = await query(
+      `SELECT credential_id, transports FROM credenciales_webauthn WHERE usuario_id = $1`,
+      [usuario.id]
+    );
+
+    const options = await generateRegistrationOptions({
+      rpName: config.webauthn.rpName,
+      rpID: config.webauthn.rpID,
+      userName: usuario.email,
+      userID: Buffer.from(usuario.id),
+      attestationType: 'none',
+      authenticatorSelection: { residentKey: 'preferred', userVerification: 'required' },
+      excludeCredentials: existentes.map((c) => ({ id: c.credential_id, transports: c.transports || undefined })),
+    });
+
+    await query(
+      `INSERT INTO webauthn_challenges (usuario_id, tipo, challenge, expires_at)
+       VALUES ($1,'registro',$2,$3)
+       ON CONFLICT (usuario_id, tipo) DO UPDATE SET challenge = EXCLUDED.challenge, expires_at = EXCLUDED.expires_at, created_at = now()`,
+      [usuario.id, options.challenge, new Date(Date.now() + config.webauthn.challengeTtlMs)]
+    );
+
+    res.json(options);
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/webauthn/verificar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const respuesta = req.body.respuesta;
+    const nombreDispositivo = String(req.body.nombre_dispositivo || '').trim() || null;
+    if (!respuesta) return res.status(400).json({ error: 'Falta la respuesta de la llave' });
+
+    const { rows: desafios } = await query(
+      `SELECT * FROM webauthn_challenges WHERE usuario_id = $1 AND tipo = 'registro'`,
+      [usuario.id]
+    );
+    const desafio = desafios[0];
+    if (!desafio || new Date(desafio.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'El desafío expiró, intenta nuevamente' });
+    }
+
+    let verificacion;
+    try {
+      verificacion = await verifyRegistrationResponse({
+        response: respuesta,
+        expectedChallenge: desafio.challenge,
+        expectedOrigin: config.webauthn.origin,
+        expectedRPID: config.webauthn.rpID,
+      });
+    } catch {
+      return res.status(400).json({ error: 'Respuesta de la llave inválida' });
+    }
+    if (!verificacion.verified) return res.status(400).json({ error: 'No se pudo verificar la llave' });
+
+    await query(`DELETE FROM webauthn_challenges WHERE id = $1`, [desafio.id]);
+
+    const { credential, credentialDeviceType, credentialBackedUp } = verificacion.registrationInfo;
+    const { rows: creadas } = await query(
+      `INSERT INTO credenciales_webauthn
+         (usuario_id, credential_id, public_key, counter, device_type, backed_up, transports, nombre_dispositivo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, nombre_dispositivo, created_at`,
+      [
+        usuario.id,
+        credential.id,
+        Buffer.from(credential.publicKey).toString('base64'),
+        credential.counter,
+        credentialDeviceType,
+        credentialBackedUp,
+        JSON.stringify(credential.transports || []),
+        nombreDispositivo,
+      ]
+    );
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'registrar_llave_webauthn', entidad: 'usuario', entidadId: usuario.id, ip: req.ip });
+    res.status(201).json({ credencial: creadas[0] });
+  } catch (err) { next(err); }
+});
+
+router.delete('/usuarios/:id/webauthn/:credencialId', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `DELETE FROM credenciales_webauthn WHERE id = $1 AND usuario_id = $2`,
+      [req.params.credencialId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'eliminar_llave_webauthn', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Llave de archivo (credencial en un .sicr3p-llave) — ver migración 068 ----------
+// Tercera vía de acceso junto a la contraseña y la llave USB de huella:
+// más simple de repartir, y por eso MÁS DÉBIL — un archivo se puede
+// copiar. El PIN que la acompaña se verifica en el servidor (con
+// bloqueo tras varios fallos), nunca cifrando el archivo. El registro
+// también lo hace un admin; el login ya emitido es público y vive en
+// routes/llaveArchivo.js.
+router.get('/usuarios/:id/llaves-archivo', adminOnly, async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, serial, nombre, activo, intentos_fallidos, bloqueado_hasta, created_at, last_used_at
+       FROM credenciales_archivo WHERE usuario_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ llaves: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/llaves-archivo', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, email FROM usuarios WHERE id = $1`, [req.params.id]);
+    const usuario = rows[0];
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    const nombre = String(req.body?.nombre || '').trim() || null;
+    const token = generarToken();
+    const pin = generarPin();
+    const pinHash = await bcrypt.hash(pin, config.bcryptRounds);
+
+    // Reintenta ante una colisión de serial (improbable, 2 bytes de espacio
+    // compartido con tarjetas/credenciales de otro prefijo) en vez de fallar.
+    let creada;
+    for (let intento = 0; intento < 5 && !creada; intento++) {
+      try {
+        const { rows: ins } = await query(
+          `INSERT INTO credenciales_archivo (usuario_id, serial, token_hash, pin_hash, nombre)
+           VALUES ($1,$2,$3,$4,$5) RETURNING id, serial, nombre, created_at`,
+          [usuario.id, generarSerialLlave(), hashToken(token), pinHash, nombre]
+        );
+        creada = ins[0];
+      } catch (e) {
+        if (e.code !== '23505') throw e;
+      }
+    }
+    if (!creada) return res.status(500).json({ error: 'No se pudo generar un serial único, intenta de nuevo' });
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'emitir_llave_archivo', entidad: 'usuario', entidadId: usuario.id, detalle: { serial: creada.serial }, ip: req.ip });
+
+    // El token y el PIN viajan en claro SOLO en esta respuesta — igual que
+    // la clave de una tarjeta de viaje o una credencial de proveedor.
+    res.status(201).json({
+      credencial: creada,
+      pin,
+      archivo: {
+        version: 1,
+        tipo: 'llave-archivo',
+        serial: creada.serial,
+        email: usuario.email,
+        emitida: creada.created_at,
+        token,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/usuarios/:id/llaves-archivo/:credId/revocar', adminOnly, protegerCredencialesDeSuperadmin, async (req, res, next) => {
+  try {
+    const { rowCount } = await query(
+      `UPDATE credenciales_archivo SET activo = false WHERE id = $1 AND usuario_id = $2 AND activo`,
+      [req.params.credId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Llave no encontrada o ya revocada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'revocar_llave_archivo', entidad: 'usuario', entidadId: req.params.id, ip: req.ip });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Entrar a otro panel (superadmin) — ver migración 069 ----------
+// Canjea la sesión de un superadmin por un token de VISTA de otro panel,
+// sin crear ninguna fila nueva en `usuarios` ni aflojar requireHomePanel
+// ni los checks manuales de puerto/mandante/agencia/trazador: el token
+// que se emite ya los cumple tal cual están hoy. `sub` es una cadena
+// sintética (no un UUID de `usuarios`, mismo patrón que el `cliente:`+
+// email del magic link) para que cualquier código que la use para volver
+// a golpear la tabla `usuarios` falle explícito en vez de devolver datos
+// ajenos por error. TTL corto y SIN refresh a propósito: es una vista
+// rápida, no un turno de trabajo — si expira, se vuelve a canjear.
+// aduana_verde no tiene FK propia (sin entrada en ENTIDAD_CUENTA_POR_PANEL,
+// import de services/cuentas.js — el mismo mapa que usa crearCuentaEntidad).
+const PANELES_ENTRAR_A_PANEL = ['aduana_verde', ...Object.keys(ENTIDAD_CUENTA_POR_PANEL)];
+
+router.post('/entrar-a-panel', requireSuperadmin, async (req, res, next) => {
+  try {
+    const panel = String(req.body?.panel || '');
+    if (!PANELES_ENTRAR_A_PANEL.includes(panel)) return res.status(400).json({ error: 'Panel inválido' });
+    const entidadCfg = ENTIDAD_CUENTA_POR_PANEL[panel];
+
+    const fks = { puerto_id: null, mandante_id: null, agencia_id: null, trazador_id: null, proveedor_id: null };
+    if (entidadCfg) {
+      const entidadId = req.body?.entidad_id;
+      if (!entidadId) return res.status(400).json({ error: 'Falta elegir la entidad' });
+      const { rows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidadId]);
+      if (!rows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
+      fks[entidadCfg.columnaFk] = entidadId;
+    }
+
+    const accessToken = jwt.sign(
+      {
+        sub: `imp:${req.user.sub}:${panel}`,
+        imp: true,
+        imp_by: req.user.sub,
+        // aduana_verde es un panel INTERNO (como sicrep): su propio
+        // adminRouter exige rol='admin' (routes/pos.js), igual que
+        // cualquier cuenta real de ese panel — con 'operador' la vista
+        // quedaba en "No autorizado" apenas cargaba. Los 5 paneles
+        // EXTERNOS (puerto/mandante/agencia/trazador/proveedor) no tienen
+        // ese concepto de rol: siempre 'operador', y nivel_acceso abajo es
+        // lo que los deja de solo lectura.
+        rol: panel === 'aduana_verde' ? 'admin' : 'operador',
+        email: req.user.email,
+        panel,
+        // Es una VISTA, no un turno de trabajo: 'lectura' cierra las 2
+        // mutaciones externas (subir documento en agencia, firmar lote en
+        // proveedor) vía requireNivelOperador. Sin esto un superadmin
+        // podría sellar un eslabón en la cadena de custodia CON EL RUT Y LA
+        // RAZÓN SOCIAL del proveedor — el eslabón no distingue quién lo
+        // firmó, y `proveedor_lotes.firmado_at` deja al proveedor real sin
+        // poder firmar. Es exactamente lo que el panel promete impedir.
+        // La única mutación de aduana_verde (PUT /admin/pos/config) exige
+        // este mismo nivel_acceso (ver routes/pos.js).
+        nivel_acceso: 'lectura',
+        ...fks,
+      },
+      config.jwt.accessSecret,
+      { expiresIn: '5m' }
+    );
+
+    await logActividad({ usuarioId: req.user.sub, accion: 'entrar_a_panel', entidad: 'usuario', entidadId: req.user.sub, detalle: { panel, entidad_id: req.body?.entidad_id || null }, ip: req.ip });
+    res.json({ accessToken });
   } catch (err) { next(err); }
 });
 
@@ -334,6 +1446,501 @@ router.get('/actividad', adminOnly, async (req, res, next) => {
     );
     res.json({ actividad: rows });
   } catch (err) { next(err); }
+});
+
+// ---------- Retención de datos personales (Ley 21.719) ----------
+// La ley no pide tener una política de retención: pide poder demostrar
+// que se aplica. Por eso se expone el historial de purgas junto con los
+// plazos vigentes y el inventario de qué se conserva y por qué.
+router.get('/retencion', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.*, u.email AS usuario_email
+         FROM purgas p LEFT JOIN usuarios u ON u.id = p.usuario_id
+        ORDER BY p.created_at DESC LIMIT 50`
+    );
+    res.json({
+      purgas: rows,
+      plazos: PLAZOS,
+      tareas: nombresDeTareas(),
+      retenido_por_ley: retenidoPorLey(),
+      // Los plazos son valores por defecto razonables, no cifras del
+      // texto de la ley. Que quien mire el panel lo sepa.
+      nota_plazos: 'Los plazos son configurables y están pendientes de confirmación legal.',
+    });
+  } catch (err) { next(err); }
+});
+
+// Correrla a mano, sin esperar al temporizador diario.
+router.post('/retencion/purgar', adminOnly, async (req, res, next) => {
+  try {
+    const r = await purgar({ origen: 'manual', usuarioId: req.user.sub });
+    await logActividad({ usuarioId: req.user.sub, accion: 'purgar_datos', entidad: 'retencion', detalle: { filas: r.filas }, ip: req.ip });
+    res.json(r);
+  } catch (err) { next(err); }
+});
+
+// ---------- Derechos del titular (ARCOP) ----------
+router.get('/arcop', async (req, res, next) => {
+  try {
+    const estado = ['pendiente', 'resuelta', 'rechazada'].includes(req.query.estado) ? req.query.estado : null;
+    const { rows } = await query(
+      `SELECT s.*, u.nombre AS resuelta_por_nombre
+         FROM solicitudes_arcop s
+         LEFT JOIN usuarios u ON u.id = s.resuelta_por
+        WHERE ($1::text IS NULL OR s.estado = $1)
+        -- Las pendientes primero y de la más antigua a la más nueva: hay
+        -- un plazo de respuesta y lo que lleva más días esperando es lo
+        -- que primero se pasa de él.
+        ORDER BY (s.estado = 'pendiente') DESC, s.created_at ASC
+        LIMIT 200`,
+      [estado]
+    );
+    res.json({
+      solicitudes: rows.map((s) => ({
+        ...s,
+        dias_esperando: diasEsperando(s.created_at),
+        fuera_de_plazo: s.estado === 'pendiente' && fueraDePlazo(s.created_at),
+      })),
+      plazo_dias: PLAZO_RESPUESTA_DIAS,
+      derechos: ETIQUETA_DERECHO,
+    });
+  } catch (err) { next(err); }
+});
+
+// Qué hay de este titular. Es la respuesta al derecho de ACCESO y, en el
+// mismo contenido, la de PORTABILIDAD — cambia el envase, no el dato.
+//
+// Las tablas se recorren desde el inventario, así que una tabla nueva con
+// datos personales entra sola en cuanto se clasifica (y el test obliga a
+// clasificarla).
+router.get('/arcop/:id/datos', async (req, res, next) => {
+  try {
+    const { rows: sRows } = await query(`SELECT * FROM solicitudes_arcop WHERE id = $1`, [req.params.id]);
+    const sol = sRows[0];
+    if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
+
+    const hallazgos = [];
+    for (const destino of dondeBuscar(sol)) {
+      // Nombres de tabla y columna vienen del inventario, que es código
+      // del repositorio, no de la petición: no hay inyección posible por
+      // acá. Aun así se validan contra el catálogo real de Postgres.
+      const { rows: cols } = await query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1 AND column_name = ANY($2)`,
+        [destino.tabla, destino.columnas]
+      );
+      const columnas = cols.map((c) => c.column_name);
+      if (!columnas.length) continue;
+
+      const where = columnas.map((c, i) => `${c} = $${i + 1}`).join(' OR ');
+      const valores = columnas.map((c) => (/email|correo/i.test(c) ? sol.email : sol.rut));
+      const { rows: filas } = await query(
+        `SELECT * FROM ${destino.tabla} WHERE ${where} LIMIT 500`, valores
+      );
+      hallazgos.push({ tabla: destino.tabla, filas });
+    }
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'arcop_consultar_datos',
+      entidad: 'solicitud_arcop', entidadId: sol.id, ip: req.ip,
+    });
+
+    res.json(armarPaquete({
+      titular: { rut: sol.rut, email: sol.email, nombre: sol.nombre },
+      hallazgos,
+      generadoAt: new Date().toISOString(),
+    }));
+  } catch (err) { next(err); }
+});
+
+// Qué se puede borrar y qué queda retenido, con su fundamento. La
+// pantalla lo muestra ANTES de confirmar una supresión, para que la
+// respuesta al titular salga del sistema y no de la memoria de quien
+// atiende.
+router.get('/arcop/limites-supresion', async (req, res, next) => {
+  try {
+    res.json(limitesDeSupresion());
+  } catch (err) { next(err); }
+});
+
+// Resolver: se registra qué se respondió. NO ejecuta borrados automáticos
+// —cada derecho se atiende con criterio y algunos datos no se pueden
+// eliminar—, pero deja constancia de la respuesta, que es lo que la ley
+// exige poder demostrar.
+router.post('/arcop/:id/resolver', adminOnly, async (req, res, next) => {
+  try {
+    const estado = req.body?.estado === 'rechazada' ? 'rechazada' : 'resuelta';
+    const resolucion = String(req.body?.resolucion || '').trim().slice(0, 4000);
+    if (!resolucion) return res.status(400).json({ error: 'Escribe qué se respondió al titular' });
+
+    const { rows } = await query(
+      `UPDATE solicitudes_arcop
+          SET estado = $2, resolucion = $3, resuelta_por = $4, resuelta_at = now()
+        WHERE id = $1 AND estado = 'pendiente' RETURNING *`,
+      [req.params.id, estado, resolucion, req.user.sub]
+    );
+    if (!rows[0]) return res.status(409).json({ error: 'La solicitud no existe o ya fue resuelta' });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'arcop_resolver', entidad: 'solicitud_arcop',
+      entidadId: req.params.id, detalle: { estado, derecho: rows[0].derecho }, ip: req.ip,
+    });
+    res.json({ solicitud: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- Brechas de seguridad ----------
+// Se llenan a mano: no hay detección automática y fingir que la hay sería
+// peor que no tenerla. Lo que aporta la tabla es la cronología —cuándo
+// ocurrió, cuándo se supo, cuándo se avisó—, que en una brecha es la
+// defensa.
+router.get('/brechas', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT b.*, u.nombre AS registrada_por_nombre
+         FROM brechas_seguridad b
+         LEFT JOIN usuarios u ON u.id = b.registrada_por
+        ORDER BY (b.estado <> 'cerrada') DESC, b.detectada_at DESC LIMIT 200`
+    );
+    res.json({ brechas: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/brechas', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const titulo = String(b.titulo || '').trim().slice(0, 200);
+    const descripcion = String(b.descripcion || '').trim().slice(0, 5000);
+    if (!titulo || !descripcion) {
+      return res.status(400).json({ error: 'Una brecha necesita al menos qué pasó y una descripción' });
+    }
+    const { rows } = await query(
+      `INSERT INTO brechas_seguridad
+         (titulo, descripcion, ocurrida_at, datos_afectados, titulares_afectados, riesgo, registrada_por)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6,'por_evaluar'),$7) RETURNING *`,
+      [titulo, descripcion, b.ocurrida_at || null, b.datos_afectados || null,
+       Number.isFinite(Number(b.titulares_afectados)) ? Number(b.titulares_afectados) : null,
+       b.riesgo, req.user.sub]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'registrar_brecha', entidad: 'brecha', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ brecha: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// Actualizar: riesgo, estado, medidas y las fechas de notificación. Solo
+// se tocan los campos que vienen, para que marcar "ya avisamos a la
+// Agencia" no pise el resto.
+router.put('/brechas/:id', adminOnly, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const { rows } = await query(
+      `UPDATE brechas_seguridad SET
+         riesgo = COALESCE($2, riesgo),
+         estado = COALESCE($3, estado),
+         medidas = COALESCE($4, medidas),
+         datos_afectados = COALESCE($5, datos_afectados),
+         titulares_afectados = COALESCE($6, titulares_afectados),
+         notificada_agencia_at = COALESCE($7, notificada_agencia_at),
+         notificados_titulares_at = COALESCE($8, notificados_titulares_at),
+         motivo_no_notificar = COALESCE($9, motivo_no_notificar),
+         updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, b.riesgo || null, b.estado || null, b.medidas || null,
+       b.datos_afectados || null,
+       Number.isFinite(Number(b.titulares_afectados)) ? Number(b.titulares_afectados) : null,
+       b.notificada_agencia_at || null, b.notificados_titulares_at || null,
+       b.motivo_no_notificar || null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Brecha no encontrada' });
+    await logActividad({ usuarioId: req.user.sub, accion: 'actualizar_brecha', entidad: 'brecha', entidadId: req.params.id, ip: req.ip });
+    res.json({ brecha: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// El registro de actividades de tratamiento, para exportarlo cuando la
+// Agencia lo pida. Sale del mismo inventario que usan la purga y ARCOP,
+// así que no puede quedar desincronizado con el código.
+router.get('/retencion/registro', async (req, res, next) => {
+  try {
+    res.json({
+      generado_at: new Date().toISOString(),
+      responsable: 'sicr3p',
+      tratamientos: Object.entries(INVENTARIO).map(([tabla, e]) => ({ tabla, ...e })),
+    });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// SII central (sección admin "SII"): empresas (proveedores) + Generar.
+// El admin elige una empresa, ingresa las credenciales SII EN EL MOMENTO
+// (por-request: acá NUNCA se guardan — guardar la clave es decisión que
+// solo toma el propio proveedor desde su panel) y genera: descarga los DTE
+// del período, calcula emisiones por documento y devuelve el análisis.
+// ============================================================
+
+// POST /api/admin/sii/sesion — PASO 1 del flujo: iniciar sesión con la API
+// del SII. Valida las credenciales que inician sesión en el SII (RUT +
+// clave tributaria — lo recomendado: los de la EMPRESA, ver
+// deploy/SII-CREDENCIALES.md) contra /sii/auth/validar ANTES de operar.
+// Por-request: acá no se guarda nada — el frontend retiene las credenciales
+// solo en memoria mientras la pantalla está abierta.
+router.post('/sii/sesion', requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    if (!b.rut || !b.password) return res.status(400).json({ error: 'Ingresa el RUT y la clave tributaria.' });
+    let valida;
+    try {
+      valida = await validarCredencialesSii({ rut: b.rut, password: b.password });
+    } catch (e) {
+      if (e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
+    }
+    if (!valida) {
+      return res.status(401).json({ error: 'El SII rechazó esas credenciales: revisa que el RUT y la Clave Tributaria correspondan al mismo contribuyente (lo recomendado: el RUT de la empresa con su propia clave, no la del representante).' });
+    }
+    // Solo el hecho de la validación: NUNCA la clave.
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'sii_sesion_validada', entidad: 'sii',
+      entidadId: null, detalle: { rut: String(b.rut) }, ip: req.ip,
+    });
+    res.json({ ok: true, rut: String(b.rut) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/empresas — proveedores con su estado SII: si tienen
+// credenciales guardadas (solo el hecho, jamás la clave) y qué períodos ya
+// descargaron.
+router.get('/sii/empresas', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.nombre_empresa, p.rut, p.activo,
+              (c.proveedor_id IS NOT NULL) AS tiene_credenciales,
+              COALESCE(d.n_periodos, 0)::int AS n_periodos,
+              d.ultimo_periodo
+       FROM proveedores p
+       LEFT JOIN credenciales_sii_proveedor c ON c.proveedor_id = p.id
+       LEFT JOIN (
+         SELECT proveedor_id, COUNT(DISTINCT periodo) AS n_periodos, MAX(periodo) AS ultimo_periodo
+         FROM dte_proveedor GROUP BY proveedor_id
+       ) d ON d.proveedor_id = p.id
+       ORDER BY p.created_at DESC`
+    );
+    res.json({ empresas: rows });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/sii/empresas — alta rápida de una empresa (proveedor)
+// desde la misma pantalla, para agregar y generar sin pasar por Accesos.
+router.post('/sii/empresas', adminOnly, async (req, res, next) => {
+  try {
+    const nombre = String(req.body?.nombre_empresa || '').trim();
+    const rut = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+    // Módulo 11 también en el servidor: la columna proveedores.rut se
+    // documenta como normalizada y válida (migración 062), y un RUT malo
+    // recién fallaría al descargar.
+    const conGuion = rut.length >= 7 ? `${rut.slice(0, -1)}-${rut.slice(-1)}` : '';
+    if (!nombre || !conGuion || !rutValido(conGuion)) {
+      return res.status(400).json({ error: 'Nombre y RUT válido (módulo 11) son obligatorios.' });
+    }
+    // Si el RUT ya existe NO se renombra en silencio (un typo podría pisar
+    // otra empresa): se devuelve la existente y el frontend lo informa.
+    const { rows } = await query(
+      `INSERT INTO proveedores (nombre_empresa, rut) VALUES ($1,$2)
+       ON CONFLICT (rut) DO NOTHING
+       RETURNING id, nombre_empresa, rut, activo`,
+      [nombre, rut]
+    );
+    if (rows[0]) {
+      await logActividad({
+        usuarioId: req.user.sub, accion: 'sii_crear_empresa', entidad: 'proveedor',
+        entidadId: rows[0].id, detalle: { rut }, ip: req.ip,
+      });
+      return res.status(201).json({ empresa: rows[0] });
+    }
+    const { rows: existentes } = await query(
+      `SELECT id, nombre_empresa, rut, activo FROM proveedores WHERE rut = $1`, [rut]
+    );
+    res.json({ empresa: existentes[0], ya_existia: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/sii/:proveedorId/descargar — { rut, password, periodo }.
+// rut/password = credenciales SII que el admin ingresa (por-request, NO se
+// guardan). El RUT de la empresa consultada SALE de la fila `proveedores`,
+// nunca del body.
+router.post('/sii/:proveedorId/descargar', requireNivelOperador, async (req, res, next) => {
+  const b = req.body || {};
+  try {
+    const { rows } = await query(`SELECT id, rut, activo FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const proveedor = rows[0];
+    if (!proveedor) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    if (!proveedor.activo) return res.status(409).json({ error: 'Empresa inactiva.' });
+    if (!b.password) return res.status(400).json({ error: 'Falta la clave tributaria.' });
+
+    let resultado;
+    try {
+      resultado = await descargarYCalcular({
+        query, withTx,
+        proveedorId: proveedor.id,
+        rutEmpresa: proveedor.rut, // de la fila proveedores, nunca del body
+        rutSii: b.rut,
+        password: b.password,
+        periodo: b.periodo,
+      });
+    } catch (e) {
+      // Solo errores MARCADOS por baseapiSii; lo interno (BD/motor) se
+      // relanza al manejador global → 500 sin filtrar el mensaje.
+      if (e.credenciales || e.entrada) return res.status(400).json({ error: e.message });
+      if (e.fuente) return res.status(502).json({ error: e.message });
+      throw e;
+    }
+
+    // Período y nº de documentos: NUNCA la clave.
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'admin_descarga_sii', entidad: 'dte_proveedor',
+      entidadId: proveedor.id, detalle: { periodo: b.periodo, documentos: resultado.documentos }, ip: req.ip,
+    });
+    res.json({ periodo: b.periodo, documentos: resultado.documentos, analisis: resultado.analisis });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/analisis/:periodo — análisis de lo ya
+// descargado (sin costo, sin clave) + períodos disponibles.
+router.get('/sii/:proveedorId/analisis/:periodo', async (req, res, next) => {
+  try {
+    res.json({
+      analisis: await analizarPeriodo(query, req.params.proveedorId, req.params.periodo),
+      periodos: await periodosDescargados(query, req.params.proveedorId),
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/informe/:periodo.pdf — informe de
+// contabilidad de carbono del período, ya descargado (sin costo, sin clave).
+router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const empresa = rows[0];
+    if (!empresa) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const analisis = await analizarPeriodo(query, empresa.id, req.params.periodo);
+    const pdf = await generateInformeCarbono({ empresa, periodo: req.params.periodo, analisis });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="carbono-${empresa.rut}-${req.params.periodo}.pdf"`);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/inventario/:periodo?formato=csv|json —
+// export entregable del inventario por Alcance GHG y categoría (hermano
+// del informe.pdf, patrón export/alcance3): el archivo que la empresa
+// presenta a procesos externos. Sin costo, sin clave: lee lo descargado.
+router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
+    const empresa = rows[0];
+    if (!empresa) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const analisis = await analizarPeriodo(query, empresa.id, req.params.periodo);
+    if (!analisis.emisiones) {
+      return res.status(404).json({ error: 'Este período no tiene emisiones calculadas: descarga el período primero (o configura el motor).' });
+    }
+    if (req.query.formato === 'csv') {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="inventario-${empresa.rut}-${req.params.periodo}.csv"`);
+      res.send('\uFEFF' + inventarioCsv({ analisis })); // BOM: Excel abre con tildes/ñ correctas
+    } else {
+      res.json(inventarioJson({ empresa, periodo: req.params.periodo, analisis }));
+    }
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'admin_export_inventario_sii', entidad: 'dte_proveedor',
+      entidadId: empresa.id, detalle: { periodo: req.params.periodo, formato: req.query.formato === 'csv' ? 'csv' : 'json' }, ip: req.ip,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/sii/:proveedorId/periodos — solo el selector de períodos.
+router.get('/sii/:proveedorId/periodos', async (req, res, next) => {
+  try {
+    res.json({ periodos: await periodosDescargados(query, req.params.proveedorId) });
+  } catch (err) { next(err); }
+});
+
+// ---------- Contrato de la empresa (proveedor) ----------
+// Mismo documento comercial que ya existe para clientes/auspiciadores
+// (services/contrato.js), ahora también sobre la empresa enrolada en esta
+// sección. GET nunca 404: null cuando aún no tiene contrato, para que el
+// frontend muestre "Emitir" sin depender de un catch.
+router.get('/sii/:proveedorId/contrato', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.proveedorId]
+    );
+    res.json({ contrato: rows[0] || null });
+  } catch (err) { next(err); }
+});
+
+router.post('/sii/:proveedorId/contrato', adminOnly, async (req, res, next) => {
+  try {
+    const contrato = await withTx(async (client) => {
+      const { rows } = await client.query(`SELECT * FROM proveedores WHERE id = $1 FOR UPDATE`, [req.params.proveedorId]);
+      const empresa = rows[0];
+      if (!empresa) return null;
+      const { rows: vigente } = await client.query(
+        `SELECT id FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' LIMIT 1`, [empresa.id]
+      );
+      if (vigente[0]) return { error: 409 };
+      return emitirContrato(client, empresa, req.body?.tipo, 'proveedor');
+    });
+    if (!contrato) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    if (contrato.error === 409) return res.status(409).json({ error: 'Esta empresa ya tiene un contrato vigente.' });
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'emitir_contrato_proveedor', entidad: 'contrato',
+      entidadId: contrato.id, detalle: { proveedor_id: req.params.proveedorId, tipo: contrato.tipo }, ip: req.ip,
+    });
+    res.status(201).json({ contrato });
+  } catch (err) { next(err); }
+});
+
+router.get('/sii/:proveedorId/contrato.pdf', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
+      [req.params.proveedorId]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Esta empresa todavía no tiene contrato.' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="contrato-${rows[0].numero}.pdf"`);
+    res.send(await pdfDeContrato(rows[0]));
+  } catch (err) { next(err); }
+});
+
+// POST /api/admin/correo/prueba { to } — envía un correo de prueba con un
+// enlace, para verificar el sistema de correo (SMTP propio o Resend) y ver
+// por qué transporte salió. Devuelve el transporte usado ('smtp'|'resend'|dev).
+router.post('/correo/prueba', adminOnly, async (req, res, next) => {
+  try {
+    const to = String(req.body?.to || '').trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return res.status(400).json({ error: 'Correo de destino inválido.' });
+    const link = `${config.publicAppUrl}/verificar`;
+    const r = await sendMail({
+      to,
+      subject: 'Prueba de correo · sicr3p',
+      html: `
+        <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+          <h2 style="color:#0f1f2e">Prueba de envío — <b>sicr3p</b></h2>
+          <p>Si ves este correo, el sistema de correo de sicr3p está funcionando.</p>
+          <p>Este es un enlace de prueba (debe ser clickeable):</p>
+          <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Abrir sicr3p</a></p>
+          <p style="color:#64748b;font-size:13px">Correo de prueba enviado desde el panel de administración.</p>
+        </div>`,
+    });
+    await logActividad({ usuarioId: req.user.sub, accion: 'correo_prueba', entidad: 'sistema', detalle: { to, transporte: r?.transport || (r?.dev ? 'dev' : 'desconocido') }, ip: req.ip });
+    res.json({ ok: true, transporte: r?.transport || (r?.dev ? 'dev' : 'desconocido'), id: r?.id || null });
+  } catch (err) {
+    res.status(502).json({ error: `No se pudo enviar: ${err.message}` });
+  }
 });
 
 export default router;

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Manual de uso: paneles /admin y /panel-verde</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">MANUAL DE USO · EQUIPO OPERATIVO</div>
+    <h1>Manual de uso<br>de la plataforma<br>sicr3p</h1>
+    <p class="bajada">Guía operativa completa de los dos paneles de la plataforma — el panel
+    núcleo (<strong>/admin</strong>) y el panel del mostrador presencial (<strong>/panel-verde</strong>) —
+    sección por sección, con pantallazos reales del sistema tal como opera hoy.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. CÓMO USAR ESTE MANUAL -->
+<div class="pagina">
+  <h2>1. Cómo usar este manual</h2>
+
+  <div class="caja-alerta">
+    <strong>Sobre las capturas:</strong> todas las imágenes de este manual son pantallazos
+    reales de la plataforma, tomados en un entorno de prueba con datos de demostración
+    (facturas, lotes y trámites de ejemplo ya cargados en sesiones anteriores). La interfaz
+    es la que opera hoy; los datos visibles no corresponden a un cliente real.
+  </div>
+
+  <p>sicr3p opera con <strong>dos paneles administrativos independientes</strong>, cada uno con
+  su propia cuenta de acceso:</p>
+
+  <table>
+    <tr><th>Panel</th><th>URL</th><th>Para quién</th></tr>
+    <tr>
+      <td><strong>Panel núcleo</strong></td>
+      <td><code>/admin</code></td>
+      <td>Equipo que administra la plataforma completa: clientes, motor de cálculo, Corredor
+      Bioceánico, Capital Natural, usuarios, etc.</td>
+    </tr>
+    <tr>
+      <td><strong>Panel del mostrador</strong></td>
+      <td><code>/panel-verde</code></td>
+      <td>Operadores que atienden trámites presenciales: cargar documentos, declarar REP,
+      cobrar la compensación voluntaria.</td>
+    </tr>
+  </table>
+
+  <p>Una cuenta de un panel <strong>no puede entrar</strong> al otro — el backend valida el
+  panel de la cuenta en cada inicio de sesión. La única excepción es la sección
+  <strong>Capacitación</strong>, disponible igual en ambos paneles, porque los cursos internos
+  son transversales al personal de los dos.</p>
+
+  <h3>1.1 Cómo crear una cuenta nueva</h3>
+  <p>Desde <strong>Usuarios y roles</strong> (panel núcleo) un administrador crea la cuenta
+  indicando correo, nombre, rol (admin/operador) y <strong>panel</strong> (sicrep/aduana_verde).
+  El sistema envía un correo de activación; la persona define su contraseña al primer ingreso.</p>
+
+  <p class="ref">Este manual no cubre el flujo público que ve el cliente final (subir un
+  documento en <code>/cargar</code> y verificarlo en <code>/verificar/:id</code>) — ese
+  recorrido ya está documentado con capturas en el manual comercial de beneficios
+  (<code>docs/comercial/10-manual-beneficios.pdf</code>). El apéndice final de este documento
+  lo resume en una página.</p>
+</div>
+
+<!-- 2. PANEL NÚCLEO — INTRO -->
+<div class="pagina seccion">
+  <h2>2. Panel núcleo — /admin</h2>
+  <p>El panel núcleo reúne toda la operación de la plataforma. El menú lateral tiene 17
+  secciones; cada una se documenta a continuación con su propósito y una captura real.</p>
+</div>
+
+<!-- 2.1 Dashboard -->
+<div class="pagina seccion">
+  <h2>2.1 Dashboard</h2>
+  <p>Pantalla de inicio del panel: t CO2e del mes, sesiones y facturas procesadas, clientes
+  totales, tendencia de los últimos 6 meses, distribución motor propio/externo/cola de
+  revisión, estado de la cadena de integridad pública, actividad reciente y consumo del
+  motor externo.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-dashboard.png" alt="Dashboard del panel núcleo">
+  </div>
+</div>
+
+<!-- 2.2 Clientes -->
+<div class="pagina seccion">
+  <h2>2.2 Clientes y contratos</h2>
+  <p>Alta y gestión de clientes (empresas mandantes): RUT, nombre, estado de contrato
+  (piloto/activo/vencido) y creación de su cuenta de acceso (magic link por correo, sin
+  contraseña).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-clientes.png" alt="Clientes y contratos">
+  </div>
+</div>
+
+<!-- 2.3 Sesiones -->
+<div class="pagina seccion">
+  <h2>2.3 Sesiones e informes</h2>
+  <p>Listado de todos los trámites procesados (sesiones), con acceso directo a su informe
+  PDF, carpeta de evidencia y reenvío del comprobante por correo.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-sesiones.png" alt="Sesiones e informes">
+  </div>
+</div>
+
+<!-- 2.4 Corredor -->
+<div class="pagina seccion">
+  <h2>2.4 Corredor Bioceánico</h2>
+  <p>Gestión de la flota de camiones que cruza el Corredor Bioceánico: viajes activos,
+  puntos de control del trayecto e instrucciones que la Torre de Control envía a cada
+  camión.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-corredor.png" alt="Corredor Bioceánico">
+  </div>
+</div>
+
+<!-- 2.5 Origen -->
+<div class="pagina seccion">
+  <h2>2.5 Pasaporte de Origen</h2>
+  <p>Administración de lotes minerales y su cadena de custodia: composición, país y faena de
+  origen, tarjetas de viaje NFC/QR asociadas y estado de cada lote (abierto/cerrado).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-origen.png" alt="Pasaporte de Origen">
+  </div>
+</div>
+
+<!-- 2.6 Capital Natural -->
+<div class="pagina seccion">
+  <h2>2.6 Capital Natural</h2>
+  <p>Cuentas de Agua, Energía, CO2e, Materiales, Suelo y Biodiversidad: movimientos que se
+  registran automáticamente al procesar cada factura, más movimientos manuales, y el
+  balance en PDF sellado por cuenta.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-capital.png" alt="Capital Natural">
+  </div>
+</div>
+
+<!-- 2.7 Trazabilidad -->
+<div class="pagina seccion">
+  <h2>2.7 Trazabilidad</h2>
+  <p>Consulta la cadena comprador-vendedor de un RUT: a quién le emitió documentos y de
+  quién los recibió, con los montos y categorías involucradas.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-trazabilidad.png" alt="Trazabilidad">
+  </div>
+</div>
+
+<!-- 2.8 Buscar -->
+<div class="pagina seccion">
+  <h2>2.8 Búsqueda</h2>
+  <p>Búsqueda unificada por RUT o texto libre, con los cruces de contrapartes que aparecen
+  al instante. Cada consulta queda registrada en el log de actividad (auditoría de quién
+  consultó qué).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-buscar.png" alt="Búsqueda unificada">
+  </div>
+</div>
+
+<!-- 2.9 Transporte -->
+<div class="pagina seccion">
+  <h2>2.9 Transporte Cat. 7</h2>
+  <p>Modos de transporte y viajes registrados para el cálculo de Alcance 3 · Categoría 7
+  (transporte y distribución), con su factor de emisión asociado.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-transporte.png" alt="Transporte Cat. 7">
+  </div>
+</div>
+
+<!-- 2.10 Accesos -->
+<div class="pagina seccion">
+  <h2>2.10 Accesos externos</h2>
+  <p>Dos mecanismos de acceso externo: <strong>mandantes</strong> con API key (consumen los
+  datos de sus proveedores) y <strong>códigos de acceso con créditos</strong> del mini sitio
+  de prueba (<code>/prueba</code>), con indicador de si el código ya se conectó o no.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-accesos.png" alt="Accesos externos">
+  </div>
+</div>
+
+<!-- 2.11 Métricas -->
+<div class="pagina seccion">
+  <h2>2.11 Métricas</h2>
+  <p>Métricas agregadas de uso de la plataforma a lo largo del tiempo.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-metricas.png" alt="Métricas">
+  </div>
+</div>
+
+<!-- 2.12 Prospectos -->
+<div class="pagina seccion">
+  <h2>2.12 Prospectos</h2>
+  <p>Seguimiento comercial de leads/prospectos que han mostrado interés en la plataforma.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-prospectos.png" alt="Prospectos">
+  </div>
+</div>
+
+<!-- 2.13 Motor propio -->
+<div class="pagina seccion">
+  <h2>2.13 Motor propio</h2>
+  <p>Categorías y factores de emisión propios de sicr3p, sus fuentes metodológicas citables,
+  y estadísticas de clasificación: método físico vs. por gasto, motor propio vs. externo,
+  tasa de rechazo de documentos ilegibles.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-motor-propio.png" alt="Motor propio">
+  </div>
+</div>
+
+<!-- 2.14 Motor externo -->
+<div class="pagina seccion">
+  <h2>2.14 Motor externo</h2>
+  <p>Configuración y consumo del motor de cálculo externo (modo MOCK/real), con el costo
+  estimado del período y el estado de las cuentas piloto/activo/vencido que lo usan.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-motor-externo.png" alt="Motor externo">
+  </div>
+</div>
+
+<!-- 2.15 Usuarios -->
+<div class="pagina seccion">
+  <h2>2.15 Usuarios y roles</h2>
+  <p>Alta y edición de cuentas del panel núcleo y del panel del mostrador: correo, nombre,
+  rol (admin/operador) y panel (sicrep/aduana_verde) — ver sección 1.1.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-usuarios.png" alt="Usuarios y roles">
+  </div>
+</div>
+
+<!-- 2.16 Actividad -->
+<div class="pagina seccion">
+  <h2>2.16 Log de actividad</h2>
+  <p>Auditoría de las acciones administrativas: quién hizo qué y cuándo (altas de cuenta,
+  consultas de búsqueda cruzada, cambios de configuración).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-actividad.png" alt="Log de actividad">
+  </div>
+</div>
+
+<!-- 2.17 Capacitación -->
+<div class="pagina seccion">
+  <h2>2.17 Capacitación</h2>
+  <p>Catálogo de cursos internos de capacitación para el personal de mostrador — disponible
+  igual en ambos paneles (ver sección 4 para el detalle completo del flujo curso →
+  evaluación → constancia).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-capacitacion.png" alt="Capacitación — catálogo">
+  </div>
+</div>
+
+<!-- 3. PANEL MOSTRADOR — INTRO -->
+<div class="pagina seccion">
+  <h2>3. Panel del mostrador — /panel-verde</h2>
+  <p>El panel del mostrador presencial es más acotado: 5 secciones, pensadas para el
+  operador que atiende un trámite de principio a fin.</p>
+</div>
+
+<!-- 3.1 Resumen -->
+<div class="pagina seccion">
+  <h2>3.1 Resumen</h2>
+  <p>KPIs del mostrador: monto y t CO2e compensados, trámites compensados, declaraciones REP
+  registradas y su distribución de reciclabilidad (gráfico de torta), más las últimas
+  declaraciones y compensaciones.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/av-resumen.png" alt="Resumen del mostrador">
+  </div>
+</div>
+
+<!-- 3.2 Cargar documento -->
+<div class="pagina seccion">
+  <h2>3.2 Cargar documento</h2>
+  <p>El corazón del panel: se ingresan RUT, empresa y correo del cliente, se cargan hasta 5
+  documentos (foto o archivo) y el sistema los lee y calcula solo — nada se digita a mano.
+  Si un documento no se puede leer, se rechaza el envío completo y se indica cuál
+  re-escanear. Al terminar, una barra de pasos (<strong>Trámite → REP → Compensación</strong>)
+  guía al operador por la declaración de embalaje y el cobro de la compensación voluntaria,
+  ambos opcionales, antes de entregar el comprobante con QR.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/av-cargar.png" alt="Cargar documento">
+  </div>
+</div>
+
+<!-- 3.3 REP -->
+<div class="pagina seccion">
+  <h2>3.3 REP</h2>
+  <p>Listado de las declaraciones de embalaje (Ley 20.920) ya registradas desde el paso
+  "Cargar documento", con su nivel de reciclabilidad (Alto/Medio/Bajo).</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/av-rep.png" alt="REP">
+  </div>
+</div>
+
+<!-- 3.4 Compensación -->
+<div class="pagina seccion">
+  <h2>3.4 Compensación</h2>
+  <p>Tarifa vigente (CLP por t CO2e) y tipo de cambio configurables, más el listado de
+  compensaciones ya cobradas u omitidas.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/av-compensacion.png" alt="Compensación">
+  </div>
+</div>
+
+<!-- 4. CAPACITACIÓN — DETALLE -->
+<div class="pagina seccion">
+  <h2>4. Capacitación — flujo completo</h2>
+  <p>La Capacitación es el módulo más nuevo de la plataforma, compartido por ambos paneles.
+  Hoy trae 2 cursos sembrados: <strong>"Uso del panel de mostrador"</strong> y
+  <strong>"Fundamentos REP · Ley 20.920"</strong>.</p>
+
+  <h3>4.1 Inscribirse y completar lecciones</h3>
+  <p>Al entrar a un curso, el operador se inscribe con un clic y marca cada lección como
+  vista. Recién cuando TODAS las lecciones quedan completas se habilita el botón
+  "Rendir evaluación".</p>
+
+  <h3>4.2 Evaluación y constancia</h3>
+  <p>La evaluación es de opción múltiple; se aprueba con 70% o más de respuestas correctas.
+  Al aprobar, el sistema emite automáticamente una <strong>constancia de participación</strong>
+  con un serial único (ej. <code>CAP-3AC40E</code>) y un PDF con código QR — descargable de
+  inmediato y verificable públicamente, sin necesidad de iniciar sesión, en
+  <code>sicr3p.cl/constancia/&lt;serial&gt;</code>.</p>
+  <div class="captura" style="max-width:160mm; margin:0 auto;">
+    <img src="img/admin-capacitacion-curso-aprobado.png" alt="Curso aprobado, con lecciones completas">
+  </div>
+
+  <div class="beneficio">
+    <b>Importante:</b> la constancia es de <strong>participación interna</strong>, emitida por
+    sicr3p para su propio personal — nunca se presenta como una certificación acreditada de
+    terceros.
+  </div>
+
+  <div class="captura" style="max-width:120mm; margin:4mm auto 0;">
+    <img src="img/constancia-publica.png" alt="Página pública de verificación de una constancia">
+  </div>
+</div>
+
+<!-- 5. APÉNDICE -->
+<div class="pagina seccion">
+  <h2>5. Apéndice — lo que ve el cliente final</h2>
+  <p>Fuera de los dos paneles, cualquier persona puede subir un documento en
+  <code>/cargar</code> (sin cuenta) y, al terminar, descargar su informe y etiquetas con QR.
+  Escaneando el QR de cualquier documento, cualquiera llega a <code>/verificar/:id</code> y
+  ve el resultado calculado, la cadena de integridad y la declaración REP si existe — sin
+  iniciar sesión. Ese recorrido completo, pantalla por pantalla, está documentado en el
+  <strong>manual comercial de beneficios</strong> (<code>docs/comercial/10-manual-beneficios.pdf</code>).</p>
+
+  <div class="pie-doc">
+    sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl · Manual de uso interno, versión 1.0
+  </div>
+</div>
+
+</body>
+</html>

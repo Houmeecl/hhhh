@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Torre de Control y Tarjeta de Viaje — logística trazable sin GPS</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">CARPETA DE SERVICIO · LOGÍSTICA DEL CORREDOR</div>
+    <h1>Torre de Control y<br>Tarjeta de Viaje</h1>
+    <p class="bajada">Toda tu flota del Corredor Bioceánico en un mapa, sin instalar nada en
+    los camiones: la posición de cada carga es la secuencia de puntos de control sellados por
+    hash que su chofer va registrando con un QR. Menos precisión satelital, mucho más valor
+    probatorio — y costo marginal cero por vehículo.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Agosto 2026</span>
+  </div>
+</div>
+
+<div class="pagina">
+  <h2>1. Posición sin GPS: la idea que lo cambia todo</h2>
+  <p>Un punto GPS dice dónde estuvo un aparato. Un <strong>paso sellado</strong> dice quién
+  declaró el paso, con qué credencial, en qué momento, y encadenado a qué historia previa.
+  Para demostrar una ruta ante un comprador, una aduana o un mandante, lo segundo vale más —
+  y no exige sensores, ni instalación, ni mensualidad por vehículo.</p>
+
+  <table>
+    <tr><th></th><th>GPS tradicional</th><th>Paso sellado sicr3p</th></tr>
+    <tr><td><strong>Hardware</strong></td><td>Equipo por camión + instalación</td><td>El teléfono del chofer</td></tr>
+    <tr><td><strong>Qué prueba</strong></td><td>Dónde estuvo el aparato</td><td>Quién declaró el paso, cuándo, con qué credencial, encadenado por hash</td></tr>
+    <tr><td><strong>Verificable por terceros</strong></td><td>Solo con acceso al proveedor GPS</td><td>Público, con el código del lote, sin cuenta</td></tr>
+    <tr><td><strong>Costo por sumar un camión</strong></td><td>Equipo + plan</td><td>Cero: una credencial QR</td></tr>
+  </table>
+
+  <h2>2. La Tarjeta de Viaje (el lado del chofer)</h2>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Recibe su credencial QR</b> (impresa o en pantalla) con su clave privada — la clave nunca va impresa.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Escanea y registra cada paso</b> por los puntos de control del corredor (Campo Grande → Antofagasta/Mejillones). Cada paso queda sellado en la cadena del lote.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Recibe instrucciones al instante</b>: la torre le indica puerto, puerto seco o estacionamiento, y el aviso aparece en su credencial.</div></div>
+  </div>
+
+  <div class="captura" style="max-width:120mm; margin-left:auto; margin-right:auto;"><img src="img/servicios/pantalla-credencial-viaje.png" alt="Credencial del portador"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">La
+  credencial del portador en el teléfono: pasos sellados e instrucciones de la torre.</p>
+</div>
+
+<div class="pagina">
+  <h2>3. La Torre de Control (el lado del operador)</h2>
+  <p>El operador logístico ve la flota completa sobre el mapa del corredor — cada camión en su
+  último punto sellado, actualizado solo — y comanda: instrucciones operativas que llegan a la
+  credencial del chofer en segundos. Los camiones sin ruta activa esperan en la lista hasta que
+  su chofer registra el primer paso.</p>
+
+  <div class="captura"><img src="img/servicios/pantalla-torre-flota.png" alt="Torre de control con la flota"></div>
+  <p style="font-size:8.5pt; color:#64748b; text-align:center; font-style:italic;">La torre con
+  la flota de demostración sobre la ruta de cuatro países.</p>
+
+  <h2>4. Lo que queda al final del viaje</h2>
+  <p>No un historial de coordenadas: un <strong>expediente sellado</strong> — la cadena de
+  custodia completa del lote, con cada actor, cada paso y cada documento, verificable
+  públicamente con su QR. Es la pieza que alimenta el reporte CBAM, el Alcance 3 del mandante
+  y el pasaporte comercial de la carga.</p>
+
+  <dl>
+    <dt>¿Y si el chofer declara un paso falso?</dt>
+    <dd>El paso queda firmado por SU credencial y sellado con SU identidad — la declaración falsa deja un registro imborrable de quién la hizo. Además el operador ve la secuencia completa: un salto imposible en la ruta se nota de inmediato.</dd>
+    <dt>¿Funciona sin señal?</dt>
+    <dd>El registro del paso necesita conexión momentánea (es una página web, no una app). En los puntos de control del corredor — ciudades y pasos fronterizos — la hay.</dd>
+  </dl>
+
+  <div class="caja-navy" style="margin-top:8mm;">
+    <h4>Contacto</h4>
+    <p style="margin:0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicrep.cl</strong> · www.sicr3p.cl</p>
+  </div>
+
+  <p class="pie-doc">sicr3p — Carpeta de servicio: Torre de Control y Tarjeta de Viaje ·
+  Versión 1.0 · Agosto 2026 · Material informativo comercial. sicr3p no es autoridad ni
+  rastrea vehículos: registra pasos declarados por actores autorizados y sellados por hash.</p>
+</div>
+
+</body>
+</html>

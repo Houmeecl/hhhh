@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libro de Servicios sicr3p — manual completo del sistema</title>
+<link rel="stylesheet" href="libro.css">
+</head>
+<body>
+<div class="libro">
+
+<input type="checkbox" id="menu-toggle" class="menu-toggle">
+<label for="menu-toggle" class="hamburguesa">☰</label>
+
+<nav class="menu">
+  <div class="marca">sicr3p<span class="punto">.</span></div>
+  <div class="tagline">Tu contabilidad, tu trazabilidad.</div>
+  <ol>
+    <li><a href="#portada"><span class="n">—</span>Portada</a></li>
+    <li><a href="#cap-1"><span class="n">1</span>Qué es sicr3p</a></li>
+    <li><a href="#cap-2"><span class="n">2</span>La innovación</a></li>
+    <li><a href="#cap-3"><span class="n">3</span>Cómo funciona por dentro</a></li>
+    <li><a href="#cap-4"><span class="n">4</span>El viaje de una carga</a></li>
+    <li><a href="#cap-5"><span class="n">5</span>Medición de carbono</a></li>
+    <li><a href="#cap-6"><span class="n">6</span>Alcance 3 (Scope 3)</a></li>
+    <li><a href="#cap-7"><span class="n">7</span>CBAM y comercio internacional</a></li>
+    <li><a href="#cap-8"><span class="n">8</span>REP — Ley 20.920</a></li>
+    <li><a href="#cap-9"><span class="n">9</span>Capital Natural</a></li>
+    <li><a href="#cap-10"><span class="n">10</span>Corredor Bioceánico</a></li>
+    <li><a href="#cap-11"><span class="n">11</span>Los 8 paneles por rol</a></li>
+    <li><a href="#cap-12"><span class="n">12</span>Integridad y verificación</a></li>
+    <li><a href="#cap-13"><span class="n">13</span>Cumplimiento y datos</a></li>
+    <li><a href="#cap-14"><span class="n">14</span>Servicios complementarios</a></li>
+    <li><a href="#cap-15"><span class="n">15</span>Catálogo de documentos</a></li>
+  </ol>
+  <a class="pdf-btn" href="libro-servicios-sicr3p.pdf" target="_blank">Descargar en PDF</a>
+</nav>
+
+<main class="paginas">
+
+<!-- PORTADA -->
+<div class="portada" id="portada">
+  <div class="tipo">LIBRO DE SERVICIOS · MANUAL COMPLETO DEL SISTEMA · EDICIÓN 1</div>
+  <h1>sicr3p<br>Todos los servicios,<br>explicados y demostrados.</h1>
+  <p class="bajada">Qué hace cada módulo, cómo funciona por dentro, qué lo hace distinto,
+  y ejemplos reales de cada informe que el sistema genera — desde el cálculo de una factura
+  hasta el export Alcance 3 del GHG Protocol y el expediente sellado de una carga que cruza
+  cuatro países.</p>
+  <div class="edicion">sicr3p SpA · Antofagasta, Chile · Agosto 2026 · contacto@sicrep.cl</div>
+</div>
+
+<div class="caja">
+  <strong>Cómo leer este libro.</strong> Los capítulos 1 a 4 explican la idea, la innovación y
+  la mecánica interna. Los capítulos 5 a 14 son el manual de cada servicio: qué resuelve, cómo
+  se usa paso a paso y qué documento produce, con ejemplos generados por el sistema real. El
+  capítulo 15 es el catálogo completo de documentos. Una advertencia que se repite a propósito:
+  <strong>sicr3p no es certificador, auditor ni autoridad</strong> — registra, estructura y
+  sella declaraciones verificables. Esa honestidad es parte del producto.
+</div>
+
+<!-- CAPÍTULO 1 -->
+<section class="cap" id="cap-1">
+  <div class="cap-head"><span class="num">1</span><h2>Qué es sicr3p</h2></div>
+  <p class="cap-resumen">El problema: la evidencia ambiental de una empresa está regada en papeles de cuatro países. La solución: un solo registro sellado que sirve para todo.</p>
+
+  <p>Toda empresa ya produce, sin saberlo, su contabilidad ambiental: está escondida en sus
+  facturas de electricidad, combustible, transporte y materiales. Y toda carga que cruza el
+  Corredor Bioceánico —de Campo Grande a los puertos de Antofagasta— va dejando un rastro de
+  documentos: packing list, MIC/DTA, certificados de origen, comprobantes de frontera. Hoy ese
+  rastro vive disperso entre correos, carpetas y bodegas de cuatro países, y cuando un
+  comprador europeo, un mandante corporativo o una autoridad pide evidencia, reconstruirlo
+  cuesta semanas.</p>
+
+  <p><strong>sicr3p convierte los documentos que la empresa ya tiene en evidencia ambiental y
+  de trazabilidad verificable por cualquiera.</strong> Se sube el documento (una foto basta),
+  el sistema lo lee, calcula lo que hay que calcular con metodología citada, lo sella en una
+  cadena de integridad pública, y lo deja disponible como informe, pasaporte o export en el
+  formato que cada destinatario exige.</p>
+
+  <div class="figura">
+    <img src="img/pantalla-landing.png" alt="Portada pública de sicr3p">
+    <div class="pie">La portada pública: carga de prueba, verificación de documentos y acceso a todos los paneles.</div>
+  </div>
+
+  <h3>Los tres mundos que atiende</h3>
+  <table>
+    <tr><th>Mundo</th><th>Qué necesita</th><th>Qué le entrega sicr3p</th></tr>
+    <tr><td><strong>Comercio y pymes</strong></td><td>Cumplir REP y responder a mandantes sin equipo técnico.</td><td>Cálculo automático desde la factura, declaración de embalaje, informes mensuales.</td></tr>
+    <tr><td><strong>Mandantes corporativos</strong></td><td>Datos de proveedores para NCG 461, IFRS S2, CDP.</td><td>Panel propio con el CO2e de cada proveedor y exports Alcance 3 y CBAM listos.</td></tr>
+    <tr><td><strong>Exportadores del Corredor</strong></td><td>Demostrar origen, ruta y emisiones ante compradores y aduanas.</td><td>Pasaporte de carga sellado por hash, con todos los actores firmando en la misma cadena.</td></tr>
+  </table>
+
+  <div class="caja">
+    <strong>La frase que ordena todo:</strong> la empresa no paga por una promesa — paga por la
+    <strong>gestión</strong>: cálculo, trazabilidad, informes y verificación pública.
+  </div>
+</section>
+
+<!-- CAPÍTULO 2 -->
+<section class="cap" id="cap-2">
+  <div class="cap-head"><span class="num">2</span><h2>La innovación</h2></div>
+  <p class="cap-resumen">Cinco decisiones de diseño que no existen juntas en ninguna otra plataforma de la región.</p>
+
+  <h3>1 · Posición sin GPS: el paso sellado vale más que el punto satelital</h3>
+  <p>La ubicación de una carga en sicr3p no es una coordenada: es la <strong>secuencia de
+  puntos de control sellados por hash</strong> que los actores autorizados van registrando.
+  Un punto GPS dice dónde estuvo un aparato; un paso sellado dice <strong>quién declaró el
+  paso, con qué credencial, en qué momento y encadenado a qué historia previa</strong>. Es
+  información más pobre en precisión geográfica y mucho más rica en valor probatorio — y no
+  exige instalar nada en el camión: un teléfono con cámara basta.</p>
+
+  <h3>2 · Multi-actor sin hardware</h3>
+  <p>Chofer, agencia de aduana, puerto, proveedor y mandante participan de la misma cadena
+  desde su propio panel, cada uno viendo <strong>solo lo suyo</strong>. La alternativa de
+  mercado (sensores, GPS dedicado, NFC industrial) cuesta por vehículo; aquí el costo marginal
+  de sumar un actor es cero.</p>
+
+  <h3>3 · La confianza no depende de sicr3p</h3>
+  <p>Cada registro queda encadenado criptográficamente al anterior. Alterar, insertar o borrar
+  un eslabón rompe la cadena de forma <strong>matemáticamente detectable por cualquiera</strong>,
+  sin cuenta y sin pedir permiso, en el explorador público <code>/cadena</code>. El sistema
+  está diseñado para que ni siquiera su operador pueda reescribir la historia sin que se note.</p>
+
+  <h3>4 · Cada cifra sabe cómo se calculó</h3>
+  <p>El motor de cálculo está <strong>versionado</strong>: cada resultado queda estampado con
+  la versión de los factores vigentes al momento del cálculo. Si mañana cambia el factor de
+  electricidad, los informes antiguos siguen mostrando el que se usó — exactamente lo que un
+  verificador ISO 14064-3 necesita para reproducir un número años después.</p>
+
+  <h3>5 · Un expediente, cuatro usos</h3>
+  <p>El mismo registro sellado alimenta la declaración REP chilena, el export Alcance 3 del
+  mandante, el reporte CBAM del comprador europeo y el pasaporte comercial público del lote.
+  La trazabilidad se resuelve una vez y responde a todos los marcos a la vez.</p>
+
+  <div class="figura">
+    <img src="img/pantalla-explorador-cadena.png" alt="Explorador público de la cadena de integridad">
+    <div class="pie">El explorador público detectando una alteración en un entorno de prueba: el chip rojo
+    es la promesa de este capítulo en acción — cuando alguien toca la historia, se nota.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 3 -->
+<section class="cap" id="cap-3">
+  <div class="cap-head"><span class="num">3</span><h2>Cómo funciona por dentro</h2></div>
+  <p class="cap-resumen">Del documento al informe en seis etapas, con una regla de oro: la IA lee, pero nunca calcula.</p>
+
+  <h3>El recorrido de un documento</h3>
+  <ol>
+    <li><strong>Entrada.</strong> El usuario sube una foto, un PDF o el XML del DTE (el
+    documento tributario electrónico del SII). Sirve la cámara del teléfono.</li>
+    <li><strong>Lectura.</strong> Si es XML, se parsea directo (el camino más preciso). Si es
+    imagen o PDF escaneado, se extrae el texto (OCR cuando hace falta) y una IA lo estructura:
+    emisor, receptor, ítems, cantidades. Si la IA no está disponible o su respuesta no valida,
+    un motor de reglas toma el relevo automáticamente.</li>
+    <li><strong>Clasificación.</strong> Cada ítem se asigna a una categoría del motor
+    (electricidad, combustible, transporte, materiales…), cada una con su factor de emisión y
+    su fuente citada.</li>
+    <li><strong>Cálculo.</strong> El <strong>motor propio determinista</strong> multiplica
+    cantidad × factor. Este paso es 100% reproducible: mismos datos, mismo resultado, siempre.
+    La IA jamás participa aquí.</li>
+    <li><strong>Sello.</strong> El resultado se encadena por hash al registro anterior de la
+    empresa y a la cadena global del sistema.</li>
+    <li><strong>Salida.</strong> Informe PDF con metodología citada, etiqueta QR, exports, y
+    el registro queda disponible para los cruces (mandante, REP, Capital Natural).</li>
+  </ol>
+
+  <h3>La cadena de hash, con un ejemplo</h3>
+  <p>Cada eslabón guarda: sus datos, un número aleatorio único (nonce), el hash del documento y
+  el <strong>hash del eslabón anterior</strong>. El hash propio se calcula sobre todo eso
+  junto. Si alguien editara la cantidad de un eslabón antiguo, su hash cambiaría; el eslabón
+  siguiente —que guardó el hash original— ya no calzaría, y toda la cadena posterior quedaría
+  inválida a la vista de cualquier verificador. Por eso la única forma de corregir un error es
+  <strong>agregar un eslabón nuevo que lo corrija</strong>, dejando la historia completa a la
+  vista: igual que en contabilidad.</p>
+
+  <div class="caja">
+    <strong>Regla de oro del diseño:</strong> la IA solo <strong>lee y clasifica</strong>
+    (y todo lo que lee queda en cola de revisión humana cuando hay dudas). El número final
+    siempre sale del motor determinista con factores citados y versionados. Un auditor puede
+    rehacer cada cálculo a mano.
+  </div>
+
+  <div class="figura">
+    <img src="img/pantalla-motor-propio.png" alt="Panel del motor propio">
+    <div class="pie">El motor propio en el panel admin: categorías, factores con fuente, y estadística de método físico vs gasto.</div>
+  </div>
+
+  <p>Para el caso borde de documentos sin XML ni texto extraíble existe además un motor externo
+  de respaldo, hoy en modo de reserva: el panel de admin muestra en todo momento qué porcentaje
+  del análisis se resolvió con el motor propio.</p>
+
+  <h3>Tecnología, en una línea</h3>
+  <p>Backend Node.js + PostgreSQL con 62 migraciones idempotentes; frontend React; 592 tests
+  automatizados; sesiones JWT con panel obligatorio por rol; login opcional con llave física
+  FIDO2/WebAuthn; despliegue automatizado con respaldo diario y verificación post-deploy.</p>
+</section>
+
+<!-- CAPÍTULO 4 -->
+<section class="cap" id="cap-4">
+  <div class="cap-head"><span class="num">4</span><h2>El viaje de una carga</h2></div>
+  <p class="cap-resumen">La historia completa de un lote, pantalla por pantalla, con los ocho actores tocando la misma cadena.</p>
+
+  <p><strong>Paso 1 — El admin crea el lote.</strong> Desde Pasaporte de Origen se registra la
+  carga (material, cantidad, origen), se emite su código único <code>LM-AAAA-NNNNNN</code> y
+  nace el eslabón génesis de su cadena.</p>
+  <div class="figura">
+    <img src="img/pantalla-admin-origen.png" alt="Admin: Pasaporte de Origen">
+    <div class="pie">Pasaporte de Origen en el admin: lotes, eslabones, documentos y credenciales.</div>
+  </div>
+
+  <p><strong>Paso 2 — El proveedor firma.</strong> El generador de la carga entra a su panel
+  (puede exigírsele llave física FIDO2) y firma el lote asignado. Su identidad queda sellada
+  como eslabón.</p>
+  <p><strong>Paso 3 — El chofer activa su Tarjeta de Viaje.</strong> Escanea el QR de su
+  credencial, ingresa su clave, y registra el primer paso. Desde ese momento el camión
+  "aparece" en el mapa.</p>
+  <div class="figura">
+    <img src="img/pantalla-credencial-viaje.png" alt="Credencial de viaje del portador">
+    <div class="pie">La credencial del portador: pasos sellados e instrucciones de la torre, en el teléfono.</div>
+  </div>
+
+  <p><strong>Paso 4 — La torre de control acompaña.</strong> El operador ve toda la flota en el
+  mapa del Corredor —cada camión en su último punto sellado— y envía instrucciones (ir a
+  puerto, puerto seco o estacionamiento) que llegan al instante a la credencial del chofer.</p>
+  <div class="figura">
+    <img src="img/pantalla-torre-flota.png" alt="Torre de control: flota">
+    <div class="pie">Torre de control: 16 camiones de la demo sobre la ruta Campo Grande → Antofagasta.</div>
+  </div>
+
+  <p><strong>Paso 5 — La agencia de aduana documenta.</strong> Captura factura, packing list,
+  MIC/DTA, certificados. El <strong>semáforo documental</strong> pasa de rojo a verde según
+  la completitud del expediente.</p>
+  <p><strong>Paso 6 — El puerto consulta.</strong> Al llegar la carga, el puerto ve el tránsito
+  con su cadena de custodia completa y su verificación de integridad — solo de los lotes que
+  pasaron por su punto.</p>
+  <p><strong>Paso 7 — El mandante exporta.</strong> La empresa que contrató el transporte ve el
+  CO2e de sus proveedores y descarga sus exports Alcance 3 y CBAM.</p>
+  <p><strong>Paso 8 — Cualquiera verifica.</strong> El pasaporte público del lote se abre sin
+  cuenta con el código o el QR: eslabones, semáforo, emisiones y estado de integridad.</p>
+  <div class="figura">
+    <img src="img/pantalla-pasaporte-lote.png" alt="Pasaporte público del lote">
+    <div class="pie">El pasaporte público del lote: la cara visible de toda la cadena.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 5 -->
+<section class="cap" id="cap-5">
+  <div class="cap-head"><span class="num">5</span><h2>Medición de carbono</h2></div>
+  <p class="cap-resumen">El servicio fundacional: t CO2e desde el documento real, con fuente citada y sello de integridad.</p>
+
+  <h3>Cómo se usa</h3>
+  <ol>
+    <li>El cliente (o el operador de terreno) sube sus documentos del mes — hasta 5 por envío
+    en el flujo público, sin límite desde los paneles.</li>
+    <li>El sistema calcula al instante y muestra el detalle por ítem con su categoría.</li>
+    <li>Se descarga el informe consolidado en PDF; cada factura puede llevar además su
+    etiqueta con QR de verificación.</li>
+    <li>Mes a mes, el informe mensual consolida todo el período por cliente.</li>
+  </ol>
+
+  <h3>Metodologías por país</h3>
+  <p>Cada país del Corredor tiene su metodología con factores y fuente propios, editables desde
+  el admin. <strong>Chile está validado</strong> (GHG Protocol Scope 3 · ISO 14064-1, factores
+  HuellaChile del MMA, electricidad SEN 2023: 0,2421 kgCO2e/kWh). Argentina, Paraguay y Brasil
+  están cargados como <strong>borrador pendiente de validación</strong> — y el sistema lo dice
+  así, en vez de calcular con cifras no confiables: honestidad antes que cobertura.</p>
+
+  <div class="figura">
+    <img src="img/pantalla-admin-metodologias.png" alt="Metodologías por país">
+    <div class="pie">Metodologías por país en el admin: solo los países activos calculan; los demás guardan traza documental.</div>
+  </div>
+
+  <h3>Los documentos que produce</h3>
+  <div class="dos-figuras">
+    <div class="figura doc">
+      <img src="img/doc-informe-sesion.png" alt="Informe consolidado de sesión">
+      <div class="pie">Informe consolidado de una sesión — muestra oficial con datos ficticios.</div>
+    </div>
+    <div class="figura doc">
+      <img src="img/doc-informe-mensual.png" alt="Informe mensual">
+      <div class="pie">Informe mensual por cliente — generado con datos reales de demostración.</div>
+    </div>
+  </div>
+  <p>El informe declara los alcances GHG de cada categoría con la <strong>fuente congelada de
+  la versión del motor</strong> usada en el cálculo, la declaración REP si existe, y el sello
+  de integridad de la cadena. La etiqueta por factura agrega un QR que lleva a la verificación
+  pública del documento.</p>
+</section>
+
+<!-- CAPÍTULO 6 -->
+<section class="cap" id="cap-6">
+  <div class="cap-head"><span class="num">6</span><h2>Alcance 3 (Scope 3) — GHG Protocol</h2></div>
+  <p class="cap-resumen">Cómo las facturas de los proveedores se convierten en el reporte de cadena de valor del mandante, en las 15 categorías oficiales.</p>
+
+  <p>El Alcance 3 son las emisiones de la <strong>cadena de valor</strong>: todo lo que la
+  empresa no emite directamente (Alcance 1) ni por su electricidad (Alcance 2), pero que
+  ocurre gracias a su actividad — lo que compran, lo que transportan terceros, lo que sus
+  proveedores queman. Es el alcance más difícil de medir y el que los marcos modernos
+  (IFRS S2 del ISSB, NCG 461 de la CMF, CDP) exigen con más fuerza.</p>
+
+  <h3>Cómo lo resuelve sicr3p</h3>
+  <p>Cuando un proveedor procesa sus facturas en sicr3p, cada documento emitido a un mandante
+  queda asociado al RUT receptor. Cada categoría del motor lleva su clasificación
+  <code>Alcance N · Cat. M — descripción</code>. Con eso, el sistema agrega automáticamente
+  por proveedor y por categoría GHG: el mandante obtiene su Alcance 3 <strong>desde documentos
+  reales de sus proveedores, no desde promedios de industria</strong> — y cada fila conserva
+  la fuente del factor con que se calculó.</p>
+
+  <h3>Las 15 categorías del GHG Protocol (WRI/WBCSD)</h3>
+  <table>
+    <tr><th>#</th><th>Categoría</th><th>#</th><th>Categoría</th></tr>
+    <tr><td>1</td><td>Bienes y servicios adquiridos</td><td>9</td><td>Transporte y distribución aguas abajo</td></tr>
+    <tr><td>2</td><td>Bienes de capital</td><td>10</td><td>Procesamiento de productos vendidos</td></tr>
+    <tr><td>3</td><td>Combustibles y energía (no A1/A2)</td><td>11</td><td>Uso de productos vendidos</td></tr>
+    <tr><td>4</td><td>Transporte y distribución aguas arriba</td><td>12</td><td>Fin de vida de productos vendidos</td></tr>
+    <tr><td>5</td><td>Residuos de las operaciones</td><td>13</td><td>Activos arrendados aguas abajo</td></tr>
+    <tr><td>6</td><td>Viajes de negocios</td><td>14</td><td>Franquicias</td></tr>
+    <tr><td>7</td><td>Desplazamiento de empleados</td><td>15</td><td>Inversiones</td></tr>
+    <tr><td>8</td><td>Activos arrendados aguas arriba</td><td></td><td></td></tr>
+  </table>
+
+  <h3>El export, tal como sale</h3>
+  <p>Endpoint <code>GET /api/mandante/export/alcance3?anio=&amp;formato=csv</code> (autenticado
+  por API key del mandante o su sesión de panel). Columnas del CSV:</p>
+  <table>
+    <tr><th>rut_proveedor</th><th>cat.</th><th>categoría GHG Protocol</th><th>descripción motor</th><th>docs</th><th>t CO2e</th><th>fuente del factor</th></tr>
+    <tr><td>78.345.120-4</td><td>3</td><td>Combustibles y energía</td><td>Energía eléctrica</td><td>1</td><td>3,8412</td><td>MMA Chile — HuellaChile (2023)</td></tr>
+    <tr><td>79.218.440-5</td><td>3</td><td>Combustibles y energía</td><td>Combustibles</td><td>1</td><td>3,2160</td><td>IPCC — Guías 2006 (v2)</td></tr>
+  </table>
+  <div class="pie" style="text-align:left; font-size:12.5px; color:var(--gris); font-style:italic; margin-top:-10px;">Filas del export de muestra con datos ficticios (docs/muestras/13-export-alcance3.csv).</div>
+
+  <div class="caja">
+    <strong>Para qué le sirve al mandante:</strong> pegar estas filas directamente en su
+    reporte NCG 461/IFRS S2, con la trazabilidad de que cada tonelada viene de un documento
+    real, calculado con un factor citado, sellado en una cadena verificable. Son
+    <strong>datos de apoyo</strong>: no sustituyen la verificación de tercera parte que el
+    marco del mandante pueda exigir.
+  </div>
+</section>
+
+<!-- CAPÍTULO 7 -->
+<section class="cap" id="cap-7">
+  <div class="cap-head"><span class="num">7</span><h2>CBAM y comercio internacional</h2></div>
+  <p class="cap-resumen">El pasaporte de carbono que la frontera europea ya cobra: emisiones incorporadas por tonelada, con método declarado.</p>
+
+  <p>El CBAM (Reglamento UE 2023/956) obliga al importador europeo a declarar las
+  <strong>emisiones incorporadas</strong> de ciertos productos (hierro, acero, aluminio,
+  cemento, fertilizantes, hidrógeno, electricidad) — y a pagar por ellas. El importador le
+  pide esos datos a su exportador; el exportador, a toda su cadena. Quien no puede
+  demostrarlos con método, paga con los valores por defecto — más caros.</p>
+
+  <h3>Qué entrega sicr3p</h3>
+  <p>Para cada lote con código NC de capítulo CBAM, el sistema arma el reporte con: código NC,
+  emisiones directas e indirectas en t CO2e por tonelada, método de cálculo y qué datos
+  faltan. Sale en PDF (para adjuntar a la negociación) y CSV/JSON (para integrar en el sistema
+  del importador).</p>
+
+  <div class="figura doc">
+    <img src="img/doc-cbam.png" alt="Reporte CBAM">
+    <div class="pie">Reporte CBAM — muestra con datos ficticios.</div>
+  </div>
+
+  <p>La misma familia de exports cubre el <strong>Pasaporte Digital de Producto</strong>
+  (ESPR) y las declaraciones de debida diligencia OCDE para minerales — todos alimentados por
+  el mismo expediente sellado del lote.</p>
+</section>
+
+<!-- CAPÍTULO 8 -->
+<section class="cap" id="cap-8">
+  <div class="cap-head"><span class="num">8</span><h2>REP — Ley 20.920</h2></div>
+  <p class="cap-resumen">La declaración de envases y embalajes, resuelta en el mesón y sellada por hash.</p>
+
+  <p>La Ley REP obliga a productores y comercializadores a declarar los envases y embalajes que
+  ponen en el mercado, con metas de reciclaje crecientes (D.S. 12/2020). Para una pyme sin
+  equipo técnico, eso es una planilla hostil; para sicr3p, es un paso más del mismo flujo.</p>
+
+  <h3>Cómo se usa</h3>
+  <ol>
+    <li>En el panel de terreno, junto con procesar los documentos del cliente, el operador
+    registra el embalaje: peso total y peso reciclable, por material.</li>
+    <li>El servidor calcula el porcentaje reciclable y asigna el nivel (Alto / Medio / Bajo).</li>
+    <li>La declaración queda sellada con hash, con historial de cambios, y aparece en el
+    informe consolidado del cliente y en la etiqueta de la factura.</li>
+  </ol>
+
+  <div class="figura">
+    <img src="img/pantalla-terreno-rep.png" alt="REP en el panel de terreno">
+    <div class="pie">Declaraciones REP en el panel de terreno, con datos reales de demostración.</div>
+  </div>
+
+  <div class="caja alerta">
+    <strong>Límite honesto:</strong> sicr3p registra y respalda la declaración con evidencia
+    sellada. La presentación formal ante el sistema de gestión y el RETC sigue siendo
+    responsabilidad del productor — el sistema le deja el expediente listo.
+  </div>
+
+  <div class="figura doc">
+    <img src="img/doc-etiqueta.png" alt="Etiqueta con QR y declaración de embalaje">
+    <div class="pie">Etiqueta por factura: QR de verificación + declaración de embalaje — muestra con datos ficticios.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 9 -->
+<section class="cap" id="cap-9">
+  <div class="cap-head"><span class="num">9</span><h2>Capital Natural</h2></div>
+  <p class="cap-resumen">El carbono tratado con lógica contable: cuentas, movimientos y un balance que se puede auditar.</p>
+
+  <p>La mayoría de las plataformas tratan las emisiones como una lista. sicr3p las trata como
+  <strong>contabilidad</strong>: existe un plan de cuentas ambientales (carbono, agua, energía,
+  residuos…), cada evento genera un movimiento con cargo y abono, cada movimiento queda
+  hasheado, y el conjunto produce un <strong>Estado de Capital Natural</strong> — el análogo
+  ambiental de un balance financiero.</p>
+
+  <h3>Cómo funciona</h3>
+  <ol>
+    <li>Los cálculos de carbono alimentan automáticamente la cuenta CO2e (el "libro mayor de
+    carbono" espejo).</li>
+    <li>El admin puede registrar movimientos manuales en las demás cuentas (consumo de agua,
+    energía, residuos valorizados), con respaldo documental.</li>
+    <li>Los activos ambientales pueden valorizarse (automático por precio de referencia o
+    manual), quedando el criterio registrado.</li>
+    <li>El balance en PDF muestra saldos por cuenta, movimientos del período y el sello de
+    integridad de cada cadena.</li>
+  </ol>
+
+  <div class="dos-figuras">
+    <div class="figura">
+      <img src="img/pantalla-capital-natural.png" alt="Capital Natural en el admin">
+      <div class="pie">Capital Natural en el admin: cuentas, movimientos y verificación.</div>
+    </div>
+    <div class="figura doc">
+      <img src="img/doc-balance-capital.png" alt="Estado de Capital Natural">
+      <div class="pie">Estado de Capital Natural — generado con datos reales de demostración.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 10 -->
+<section class="cap" id="cap-10">
+  <div class="cap-head"><span class="num">10</span><h2>Corredor Bioceánico</h2></div>
+  <p class="cap-resumen">El módulo insignia: pasaporte de origen, tarjeta de viaje, torre de control y semáforo documental sobre la ruta Campo Grande → Antofagasta.</p>
+
+  <h3>Las piezas</h3>
+  <table>
+    <tr><th>Pieza</th><th>Qué es</th><th>Quién la usa</th></tr>
+    <tr><td><strong>Pasaporte de Origen</strong></td><td>El expediente del lote: eslabones de custodia, documentos, emisiones, declaraciones OCDE/CBAM, balance de masas con tolerancia de merma.</td><td>Admin lo crea; todos lo alimentan; cualquiera lo verifica.</td></tr>
+    <tr><td><strong>Tarjeta de Viaje</strong></td><td>Credencial QR del portador (chofer). Registra pasos por los 14 puntos de control del catálogo, sin GPS ni app.</td><td>El chofer, desde su teléfono.</td></tr>
+    <tr><td><strong>Torre de Control</strong></td><td>Mapa de la flota completa + instrucciones operativas (puerto / puerto seco / estacionamiento) que llegan a la credencial del chofer.</td><td>El operador logístico.</td></tr>
+    <tr><td><strong>Semáforo documental</strong></td><td>Verde/amarillo/rojo según la completitud del expediente aduanero (factura, packing list, MIC/DTA, certificados).</td><td>Agencia lo alimenta; puerto y mandante lo leen.</td></tr>
+  </table>
+
+  <div class="figura">
+    <img src="img/pantalla-torre-lote.png" alt="Torre de control de un lote">
+    <div class="pie">La torre de un lote: pasos sellados, cadena íntegra, y el login del operador para instruir.</div>
+  </div>
+
+  <h3>El expediente sellado</h3>
+  <p>Todo converge en un PDF: el expediente del lote, con cada eslabón, cada documento, el
+  semáforo, las emisiones aportadas y el anclaje a la cadena global. Es el documento que se le
+  muestra a un comprador, a una aduana o a un financista.</p>
+
+  <div class="figura doc">
+    <img src="img/doc-expediente-lote.png" alt="Expediente del lote">
+    <div class="pie">Expediente sellado del lote — muestra oficial con datos ficticios.</div>
+  </div>
+
+  <div class="figura">
+    <img src="img/pantalla-corredor-landing.png" alt="Landing del Corredor">
+    <div class="pie">La landing pública del Corredor: la propuesta para exportadores, transportistas y agencias.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 11 -->
+<section class="cap" id="cap-11">
+  <div class="cap-head"><span class="num">11</span><h2>Los 8 paneles por rol</h2></div>
+  <p class="cap-resumen">Cada actor ve exactamente lo suyo — el aislamiento es una garantía, no una limitación.</p>
+
+  <p>Todos los paneles comparten el mismo login endurecido (contraseña + opcionalmente llave
+  física FIDO2), y el backend filtra cada consulta por la entidad de la sesión: un puerto no
+  puede ver los tránsitos de otro punto, un trazador solo consulta los RUT que se le
+  autorizaron, un proveedor solo firma lo que se le asignó.</p>
+
+  <h3>Admin (núcleo)</h3>
+  <div class="rol-meta"><span>Clientes</span><span>Motor</span><span>Cadena</span><span>Informes</span><span>Accesos</span><span>Todo</span></div>
+  <div class="figura">
+    <img src="img/pantalla-admin-dashboard.png" alt="Dashboard del admin">
+    <div class="pie">Dashboard del admin: t CO2e del mes, serie mensual, actividad.</div>
+  </div>
+
+  <h3>Panel de terreno</h3>
+  <div class="rol-meta"><span>Cargar documentos</span><span>REP</span><span>Compensación</span><span>Capacitación</span><span class="no">No ve: configuración ni otros clientes</span></div>
+  <div class="figura">
+    <img src="img/pantalla-terreno-resumen.png" alt="Panel de terreno">
+    <div class="pie">El panel del operador de mostrador: resumen del día con su distribución.</div>
+  </div>
+
+  <h3>Los cinco paneles externos del Corredor</h3>
+  <div class="dos-figuras">
+    <div class="figura"><img src="img/pantalla-panel-puerto.png" alt="Panel de puerto"><div class="pie"><strong>Puerto</strong> (azul): tránsitos de SU punto, cadena de custodia, expediente.</div></div>
+    <div class="figura"><img src="img/pantalla-panel-mandante.png" alt="Panel de mandante"><div class="pie"><strong>Mandante</strong> (violeta): CO2e por proveedor y exports Alcance 3/CBAM.</div></div>
+    <div class="figura"><img src="img/pantalla-panel-agencia.png" alt="Panel de agencia"><div class="pie"><strong>Agencia</strong> (ámbar): expedientes asignados y captura documental.</div></div>
+    <div class="figura"><img src="img/pantalla-panel-trazador.png" alt="Panel de trazador"><div class="pie"><strong>Trazador</strong> (rojo): cruces solo de los RUT autorizados por el admin.</div></div>
+  </div>
+  <div class="figura">
+    <img src="img/pantalla-panel-proveedor.png" alt="Panel de proveedor">
+    <div class="pie"><strong>Proveedor</strong> (turquesa): firma de lotes asignados, con llave FIDO2 opcional.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 12 -->
+<section class="cap" id="cap-12">
+  <div class="cap-head"><span class="num">12</span><h2>Integridad y verificación pública</h2></div>
+  <p class="cap-resumen">Todo lo importante se puede comprobar sin cuenta, sin permiso y sin confiar en sicr3p.</p>
+
+  <table>
+    <tr><th>Vía</th><th>Qué comprueba</th><th>Cómo</th></tr>
+    <tr><td><code>/verificar/:id</code></td><td>Un informe o factura específica</td><td>QR de la etiqueta o el ID del documento</td></tr>
+    <tr><td><code>/cadena</code></td><td>La cadena global de integridad</td><td>Explorador público, eslabón por eslabón</td></tr>
+    <tr><td><code>/lote/:codigo</code></td><td>El pasaporte completo de una carga</td><td>Código del lote o QR del expediente</td></tr>
+    <tr><td><code>/constancia/:serial</code></td><td>Una constancia de capacitación</td><td>QR impreso en la constancia</td></tr>
+    <tr><td><code>/f/:serial</code></td><td>La credencial de un proveedor o puerto</td><td>QR de la credencial de atestación</td></tr>
+    <tr><td>Sello SVG</td><td>Estado de integridad de una sesión</td><td>Imagen incrustable en sitios del cliente</td></tr>
+  </table>
+
+  <p>La "hoja de comprobación en 30 segundos" de la carpeta del mandante resume el espíritu:
+  cualquier tercero, con un teléfono, puede pasar del papel al registro sellado y confirmar
+  que nada fue alterado desde su emisión.</p>
+</section>
+
+<!-- CAPÍTULO 13 -->
+<section class="cap" id="cap-13">
+  <div class="cap-head"><span class="num">13</span><h2>Cumplimiento y datos</h2></div>
+  <p class="cap-resumen">Ley 21.719 de datos personales incorporada al diseño, y una posición honesta frente a las normas ISO.</p>
+
+  <h3>Datos personales (Ley 21.719)</h3>
+  <ul>
+    <li><strong>Retención con purga automática:</strong> los datos personales vencidos se
+    eliminan por política programada — sin tocar nada encadenado por hash (lo sellado se
+    conserva porque es evidencia, no dato personal disponible).</li>
+    <li><strong>Derechos ARCOP:</strong> cualquier titular puede pedir acceso, rectificación,
+    cancelación, oposición o portabilidad desde <code>/mis-datos</code>; el admin gestiona la
+    bandeja con plazos.</li>
+    <li><strong>Registro de brechas:</strong> procedimiento y panel para documentar incidentes,
+    como exige la ley.</li>
+  </ul>
+
+  <h3>La posición frente a ISO</h3>
+  <div class="caja">
+    <strong>Lo que sicr3p afirma:</strong> los cálculos siguen GHG Protocol e ISO 14064-1 con
+    factores citados (HuellaChile/MMA para Chile) y quedan sellados de forma reproducible.<br>
+    <strong>Lo que sicr3p NO afirma:</strong> sus informes <em>no constituyen una verificación
+    de tercera parte acreditada (ISO 14064-3) ni un certificado oficial</em> — cita textual de
+    los Términos de Servicio. El sistema está construido para <strong>sobrevivir esa
+    auditoría</strong>, no para reemplazarla: si un cliente necesita certificar, contrata al
+    verificador acreditado y le entrega el expediente que sicr3p ya dejó listo.
+  </div>
+
+  <h3>Seguridad</h3>
+  <p>Sesiones JWT por panel, contraseñas bcrypt, llaves físicas FIDO2/WebAuthn opcionales,
+  límite de intentos de login, verificación de configuración al arrancar (el servidor se niega
+  a partir en producción con secretos débiles o datos de demostración activados), respaldos
+  diarios automáticos y log de actividad de todos los cruces sensibles.</p>
+</section>
+
+<!-- CAPÍTULO 14 -->
+<section class="cap" id="cap-14">
+  <div class="cap-head"><span class="num">14</span><h2>Servicios complementarios</h2></div>
+  <p class="cap-resumen">Los módulos que completan la plataforma alrededor del núcleo de medición y trazabilidad.</p>
+
+  <table>
+    <tr><th>Servicio</th><th>Qué hace</th><th>Dónde vive</th></tr>
+    <tr><td><strong>Valorización FIFO/PMP</strong></td><td>Valoriza inventarios de materiales con costeo FIFO o precio medio ponderado, alimentado por los mismos DTE.</td><td>Admin → Valorización</td></tr>
+    <tr><td><strong>Transporte Cat. 7</strong></td><td>Registra transporte contratado (categoría 7 GHG) por tramo y modo, y lo integra a Capital Natural.</td><td>Admin → Transporte</td></tr>
+    <tr><td><strong>Capacitación</strong></td><td>Cursos con quiz, puntaje y <em>constancia</em> verificable por QR (nunca se llama "certificación").</td><td>Admin y terreno → Capacitación</td></tr>
+    <tr><td><strong>Búsqueda por RUT</strong></td><td>Todas las apariciones de un RUT y sus cruces comprador-vendedor: quién le emite, a quién le emite, con cuánto CO2e.</td><td>Admin → Búsqueda</td></tr>
+    <tr><td><strong>Trazabilidad documental</strong></td><td>La cadena comprador-vendedor completa reconstruida desde los documentos procesados.</td><td>Admin → Trazabilidad</td></tr>
+    <tr><td><strong>API de mandantes</strong></td><td>Acceso programático con API key (X-Api-Key) y webhooks de eventos para integrar sicr3p en sistemas del mandante.</td><td>Accesos externos</td></tr>
+    <tr><td><strong>Export analítico</strong></td><td>Conector BigQuery para llevar todo lo procesado a análisis propio del cliente (opcional, apagado por defecto).</td><td>Configuración</td></tr>
+    <tr><td><strong>Compensación voluntaria</strong></td><td>Registro de compensaciones con tarifa referencial visible. Los pagos en línea aún no están habilitados: hoy queda el registro y el compromiso documentado.</td><td>Terreno → Compensación</td></tr>
+    <tr><td><strong>Enlace de acceso</strong></td><td>Acceso del cliente final a sus sesiones e informes por enlace al correo, sin contraseña.</td><td>/ingresar</td></tr>
+  </table>
+
+  <div class="figura">
+    <img src="img/pantalla-capacitacion.png" alt="Módulo de capacitación">
+    <div class="pie">Capacitación: cursos con quiz y constancia verificable.</div>
+  </div>
+</section>
+
+<!-- CAPÍTULO 15 -->
+<section class="cap" id="cap-15">
+  <div class="cap-head"><span class="num">15</span><h2>Catálogo de documentos</h2></div>
+  <p class="cap-resumen">Los once documentos que el sistema genera, con su miniatura real y dónde se obtiene cada uno.</p>
+
+  <div class="doc-item"><img src="img/doc-informe-sesion.png" alt="">
+    <div><h4>1 · Informe consolidado de sesión</h4><p>t CO2e por documento y categoría, alcances GHG con fuente congelada, REP y sello de integridad.</p><div class="ruta">Sesión → Descargar informe · <code>/api/sesiones/:id/informe.pdf</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-informe-mensual.png" alt="">
+    <div><h4>2 · Informe mensual por cliente</h4><p>El período completo del cliente consolidado, con comparativa y detalle.</p><div class="ruta">Admin → Sesiones e informes · <code>/api/admin/informes/mensual.pdf</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-etiqueta.png" alt="">
+    <div><h4>3 · Etiqueta por factura</h4><p>QR de verificación pública + declaración de embalaje, para adherir al documento físico.</p><div class="ruta"><code>/api/facturas/:id/etiqueta.pdf</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-balance-capital.png" alt="">
+    <div><h4>4 · Estado de Capital Natural</h4><p>Balance por cuenta ambiental, movimientos del período, activos valorizados e integridad.</p><div class="ruta">Admin → Capital Natural · <code>/api/admin/capital/balance.pdf</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-expediente-lote.png" alt="">
+    <div><h4>5 · Expediente sellado del lote</h4><p>Eslabones, documentos, semáforo, declaraciones, balance de masas, emisiones y anclaje global.</p><div class="ruta">Pasaporte del lote → Expediente · <code>/api/lote/:codigo/expediente.pdf</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-credencial-tarjeta.png" alt="">
+    <div><h4>6 · Credencial de Tarjeta de Viaje</h4><p>La credencial del portador con su QR; la clave nunca se imprime.</p><div class="ruta">Admin → Origen → Tarjetas · credencial.pdf</div></div></div>
+  <div class="doc-item"><img src="img/doc-cbam.png" alt="">
+    <div><h4>7 · Reporte CBAM</h4><p>Emisiones incorporadas por tonelada (directas/indirectas), método y faltantes, por lote NC.</p><div class="ruta">Panel mandante → Exportar · <code>/api/mandante/export/cbam.pdf</code> (también CSV/JSON)</div></div></div>
+  <div class="doc-item"><img src="img/doc-credencial-proveedor.png" alt="">
+    <div><h4>8 · Credencial de atestación (proveedor/puerto)</h4><p>La credencial con QR para firmar eslabones, en el marco de la Ley 19.799.</p><div class="ruta">Admin → Origen → Credenciales · credencial.pdf</div></div></div>
+  <div class="doc-item"><img src="img/doc-carpeta-mandante.png" alt="">
+    <div><h4>9 · Carpeta de evidencia para el mandante</h4><p>Portada dirigida al mandante, resumen del trámite, grilla de QRs y la hoja de "comprobación en 30 segundos".</p><div class="ruta"><code>/api/sesiones/:id/carpeta.pdf?mandante=</code></div></div></div>
+  <div class="doc-item"><img src="img/doc-constancia.png" alt="">
+    <div><h4>10 · Constancia de capacitación</h4><p>A4 apaisado con QR de verificación pública; siempre "constancia", nunca "certificación".</p><div class="ruta"><code>/api/capacitacion/constancias/:serial.pdf</code></div></div></div>
+  <div class="doc-item"><div style="background:var(--menta);border:1px solid var(--borde);border-radius:8px;min-height:120px;display:flex;align-items:center;justify-content:center;color:var(--verde-oscuro);font-size:12px;text-align:center;padding:10px;">Miniatura omitida:<br>el contrato incluye los<br>datos de las partes</div>
+    <div><h4>11 · Contrato de servicio</h4><p>Contrato multipágina generado desde la ficha del cliente, con marcas de borrador hasta firmarse.</p><div class="ruta">Admin → Clientes · <code>/api/admin/clientes/:id/contrato.pdf</code></div></div></div>
+
+  <p style="margin-top:18px;">Además: <strong>export Alcance 3</strong> (CSV/JSON, cap. 6),
+  <strong>export CBAM</strong> (CSV/JSON), y el <strong>sello SVG</strong> de integridad
+  incrustable. Las miniaturas 2 y 4 fueron generadas por el sistema con datos reales de
+  demostración; el resto son muestras oficiales con datos ficticios. La carpeta del mandante
+  (9) se generó con datos de demostración y un destinatario ficticio.</p>
+
+  <h3>Glosario mínimo</h3>
+  <table>
+    <tr><th>Término</th><th>Significado</th></tr>
+    <tr><td><strong>Lote</strong></td><td>Una carga con identidad propia (código LM-…) y su expediente sellado.</td></tr>
+    <tr><td><strong>Eslabón</strong></td><td>Cada registro encadenado por hash: un actor, una acción, un momento.</td></tr>
+    <tr><td><strong>Tarjeta de viaje</strong></td><td>La credencial QR del chofer que registra pasos por los puntos de control.</td></tr>
+    <tr><td><strong>Semáforo documental</strong></td><td>Verde/amarillo/rojo según la completitud del expediente aduanero.</td></tr>
+    <tr><td><strong>Mandante</strong></td><td>La empresa que exige datos a sus proveedores (y los recibe por su panel o API).</td></tr>
+    <tr><td><strong>Motor propio</strong></td><td>El motor de cálculo determinista de CO2e con factores citados y versionados.</td></tr>
+  </table>
+
+  <h3>Preguntas frecuentes</h3>
+  <p><strong>¿Necesito GPS o algún equipo en el camión?</strong> No. Un teléfono con cámara.
+  La posición es el paso sellado, no un rastreo.</p>
+  <p><strong>¿Los informes sirven para certificarme ISO?</strong> Sirven para
+  <em>prepararte</em>: método citado, cifras reproducibles, cadena auditable. La certificación
+  la emite un verificador acreditado — sicr3p te deja el expediente listo para él.</p>
+  <p><strong>¿Qué pasa si alguien intenta alterar un registro?</strong> La cadena de hash lo
+  delata: el eslabón alterado deja de calzar con el siguiente y la verificación pública falla.</p>
+  <p><strong>¿Mis competidores pueden ver mis datos?</strong> No. Cada panel ve solo su
+  entidad; lo público es únicamente lo que el pasaporte del lote declara como público.</p>
+
+  <p class="firma">Libro de Servicios sicr3p · Edición 1 · Agosto 2026. La versión web es
+  siempre la vigente. Las cifras e imágenes de ejemplo provienen de entornos de demostración.
+  sicr3p no es certificador, auditor ni autoridad.</p>
+</section>
+
+</main>
+</div>
+
+<script>
+// Resalta en el menú el capítulo visible (mejora progresiva; el libro
+// funciona igual sin JS).
+const enlaces = [...document.querySelectorAll('nav.menu a[href^="#"]')];
+const porId = Object.fromEntries(enlaces.map((a) => [a.getAttribute('href').slice(1), a]));
+const obs = new IntersectionObserver((entradas) => {
+  entradas.forEach((en) => {
+    if (en.isIntersecting) {
+      enlaces.forEach((a) => a.classList.remove('activo'));
+      porId[en.target.id]?.classList.add('activo');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+document.querySelectorAll('section.cap, .portada').forEach((s) => obs.observe(s));
+</script>
+</body>
+</html>

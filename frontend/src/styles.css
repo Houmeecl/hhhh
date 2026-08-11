@@ -1,23 +1,106 @@
 /* ============================================================
    sicr3p — sistema de diseño
-   verde #22c55e · navy #1e2a3a · español de Chile
+   verde #28a745 · navy #0f1f2e · español de Chile
    ============================================================ */
 :root {
-  --green: #22c55e;
-  --green-600: #16a34a;
-  --green-50: #ecfdf5;
-  --navy: #1e2a3a;
+  --green: #28a745;
+  --green-600: #218838;
+  --green-50: #eaf6ef;
+  /* Derivados de marca (tints/alphas, no cambian la paleta oficial) */
+  --green-100: #d8ecdf;
+  --green-ring: rgba(40, 167, 69, 0.22);
+  --green-glow: rgba(40, 167, 69, 0.26);
+  --navy: #0f1f2e;
   --navy-700: #334155;
   --gray: #64748b;
   --gray-300: #cbd5e1;
-  --border: #e2e8f0;
+  --border: #e6e9ed;
   --bg: #f8fafc;
   --white: #ffffff;
   --radius: 14px;
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.05);
+  /* Elevaciones: sombras multicapa suaves (xs → lg) */
+  --shadow-xs: 0 1px 2px rgba(15, 31, 46, 0.05);
+  --shadow: 0 1px 2px rgba(15, 31, 46, 0.04), 0 4px 12px rgba(15, 31, 46, 0.05), 0 12px 28px rgba(15, 31, 46, 0.04);
+  --shadow-2: 0 2px 4px rgba(15, 31, 46, 0.05), 0 10px 24px rgba(15, 31, 46, 0.07), 0 24px 48px rgba(15, 31, 46, 0.06);
   --shadow-lg: 0 10px 40px rgba(15, 23, 42, 0.12);
+  --ease: cubic-bezier(0.2, 0.8, 0.3, 1);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Tipografía oficial: Poppins SemiBold para títulos y logotipo */
+  --font-head: 'Poppins', var(--font);
 }
+
+h1, h2, h3, .logo { font-family: var(--font-head); }
+
+/* Tokens del panel de terreno — scope .theme-av, no toca
+   --navy/--green globales (compartidos con la landing pública ni con el
+   panel núcleo). Solo repinta el sidebar del shell admin ya existente,
+   mismo layout. */
+.theme-av .admin-side { background: #0f2e1f; }
+.theme-av .admin-side nav a.active { background: var(--green); color: #fff; }
+
+/* Mismo patrón para los paneles externos con sidebar (puerto/mandante/
+   agencia/trazador): solo repintan el sidebar del shell compartido para
+   diferenciarse entre sí, sin tocar layout. Acentos tomados de la paleta
+   de gráficos ya existente (components/Charts.jsx PALETTE), no colores
+   nuevos. Proveedor no tiene sidebar (shell de una sola pantalla) — su
+   acento se aplica directo en ProveedorApp.jsx. */
+.theme-puerto .admin-side { background: #0c2233; }
+.theme-puerto .admin-side nav a.active { background: #0ea5e9; color: #fff; }
+.theme-mandante .admin-side { background: #1e1b3a; }
+.theme-mandante .admin-side nav a.active { background: #8b5cf6; color: #fff; }
+.theme-agencia .admin-side { background: #2e2410; }
+.theme-agencia .admin-side nav a.active { background: #f59e0b; color: #0f1f2e; }
+.theme-trazador .admin-side { background: #2e1414; }
+.theme-trazador .admin-side nav a.active { background: #ef4444; color: #fff; }
+
+/* Panel Proveedor (/panel-proveedor) — header + tabs, sin sidebar: cuatro
+   pestañas no justifican el drawer de los shells con sidebar (Admin,
+   terreno, Puerto, Mandante, Agencia, Trazador); el flex-wrap del propio
+   header/tabs ya resuelve el móvil, mismo criterio que el header público.
+   --proveedor-accent es la única fuente del teal (antes repetido inline
+   2 veces en este shell). */
+.theme-proveedor { --proveedor-accent: #14b8a6; }
+.proveedor-shell { min-height: 100vh; background: var(--bg); }
+.proveedor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--navy); color: #fff; flex-wrap: wrap; gap: 10px;
+  border-bottom: 3px solid var(--proveedor-accent);
+}
+.proveedor-kicker { font-size: 12px; font-weight: 700; color: var(--proveedor-accent); }
+.proveedor-tabs { background: #fff; border-bottom: 1px solid var(--line); }
+.proveedor-tabs-inner { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
+.proveedor-tab {
+  background: none; border: none; cursor: pointer; padding: 14px 16px;
+  font-size: 14px; font-weight: 600; color: #64748b; text-decoration: none;
+  border-bottom: 3px solid transparent; display: inline-block;
+}
+.proveedor-tab:hover { text-decoration: none; color: var(--navy); }
+.proveedor-tab.active { color: var(--navy); border-bottom-color: var(--proveedor-accent); }
+.proveedor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
+/* "Sube y Suma" (/suma) — app-shell propia con bottom-nav (uso desde el
+   celular en terreno, no un panel de escritorio): NO reusa .admin-shell.
+   Acento propio, distinto de --green (para no confundirse visualmente con
+   la contabilidad de carbono real que puntúa por debajo). */
+.theme-suma { --suma-accent: #0d9488; --suma-accent-dark: #0f2e2b; }
+.game-shell { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+.game-topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 14px 18px; background: var(--suma-accent-dark); color: #fff; position: sticky; top: 0; z-index: 30;
+}
+.game-content { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 16px; padding-bottom: 88px; box-sizing: border-box; min-width: 0; }
+.game-bottomnav {
+  position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff;
+  border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+.game-bottomnav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 0 8px; color: #94a3b8; font-size: 11px; font-weight: 600; text-decoration: none;
+}
+.game-bottomnav a.active { color: var(--suma-accent); }
+.game-level-bar { height: 8px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+.game-level-bar > div { height: 100%; background: var(--suma-accent); border-radius: 99px; }
 
 /* Animaciones de entrada */
 @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
@@ -26,6 +109,14 @@
 .fade-in { animation: fadeIn 0.5s ease both; }
 .d1 { animation-delay: 0.06s; } .d2 { animation-delay: 0.12s; } .d3 { animation-delay: 0.18s; } .d4 { animation-delay: 0.24s; }
 .icon-badge { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Foco accesible por teclado */
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--green); outline-offset: 2px; border-radius: 6px;
+}
+/* Skeleton de carga */
+.skeleton { background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite; border-radius: 8px; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
@@ -51,34 +142,50 @@ a:hover { text-decoration: underline; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   border: none; border-radius: 10px; padding: 12px 22px;
   font-family: var(--font); font-size: 15px; font-weight: 600; cursor: pointer;
-  transition: all 0.15s ease; text-decoration: none;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease),
+    color 0.18s var(--ease), box-shadow 0.18s var(--ease), transform 0.15s var(--ease);
+  text-decoration: none;
 }
-.btn-primary { background: var(--green); color: #fff; }
-.btn-primary:hover { background: var(--green-600); text-decoration: none; }
-.btn-primary:disabled { background: var(--gray-300); cursor: not-allowed; }
+.btn-primary {
+  background: var(--green); color: #fff;
+  box-shadow: 0 1px 2px rgba(15, 31, 46, 0.08), 0 5px 14px var(--green-glow);
+}
+.btn-primary:hover {
+  background: var(--green-600); text-decoration: none; transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(15, 31, 46, 0.08), 0 8px 20px var(--green-glow);
+}
+.btn-primary:disabled { background: var(--gray-300); cursor: not-allowed; box-shadow: none; transform: none; }
 .btn-outline { background: #fff; color: var(--navy); border: 1.5px solid var(--border); }
-.btn-outline:hover { border-color: var(--navy); text-decoration: none; }
+.btn-outline:hover { border-color: var(--green); color: var(--green-600); background: var(--green-50); text-decoration: none; }
 .btn-ghost { background: transparent; color: var(--gray); padding: 8px 12px; }
+.btn-ghost:hover { background: var(--bg); color: var(--navy); text-decoration: none; }
 .btn-sm { padding: 8px 14px; font-size: 13px; }
 .btn-danger { background: #fef2f2; color: #b91c1c; }
 .btn-danger:hover { background: #fee2e2; }
 
 /* ---------- Cards ---------- */
-.card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); transition: box-shadow 0.2s var(--ease); }
 .card-pad { padding: 24px; }
 .btn:active { transform: translateY(1px); }
-.result-card, .stat, .paso .ico { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
-.result-card:hover, .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--gray-300); }
-.paso:hover .ico { transform: translateY(-3px); box-shadow: var(--shadow); border-color: var(--green); color: var(--green-600); }
-.trust-bar { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; padding: 16px 0; border-top: 1px solid var(--border); margin-top: 24px; }
-.trust-bar .item { display: flex; align-items: center; gap: 8px; color: var(--gray); font-size: 13px; font-weight: 600; }
-.trust-bar .item svg { color: var(--green-600); }
+.result-card, .stat { transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease); }
+.result-card:hover, .stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); border-color: var(--gray-300); }
 
 /* ---------- Layout público ---------- */
 .pub-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 22px 40px; border-bottom: 1px solid var(--border); background: #fff;
 }
+.pub-header nav { display: flex; gap: 18px; align-items: center; }
+/* Selector de idioma/mercado del header público, banderas clicables.
+   Sin bordes: no compite con los CTA y no desborda a 375px (el header ya
+   hace wrap en móvil). Opacidad marca cuál está activa sin depender de color. */
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+.lang-switch button {
+  background: none; border: none; padding: 2px 4px; cursor: pointer;
+  font-size: 17px; line-height: 1; border-radius: 6px; opacity: 0.45;
+}
+.lang-switch button:hover { opacity: 0.75; }
+.lang-switch button.on { opacity: 1; background: var(--bg); }
 .pub-footer {
   background: var(--navy); color: #cbd5e1;
   padding: 28px 40px; display: flex; align-items: center; justify-content: space-between;
@@ -86,73 +193,89 @@ a:hover { text-decoration: underline; }
 }
 .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
-/* ---------- Hero landing ---------- */
-.hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 48px; align-items: center; padding: 64px 0; }
-.hero h1 { font-size: 62px; line-height: 1.02; font-weight: 800; letter-spacing: -0.03em; margin: 0 0 20px; color: var(--navy); }
-.hero .lead-green { color: var(--navy); font-size: 24px; font-weight: 700; margin: 0 0 18px; }
-.hero p.sub { color: var(--gray); font-size: 17px; line-height: 1.6; max-width: 460px; margin: 0 0 30px; }
-.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
+/* Tarjeta angosta centrada (Prueba, Ingresar, Acceso, Mis sesiones…) */
+.narrow-page { max-width: 460px; margin: 60px auto; padding: 0 20px; }
 
-.preview-card {
-  background: #fff; border: 1px solid var(--border); border-radius: 18px;
-  box-shadow: var(--shadow-lg); padding: 22px; transform: perspective(1400px) rotateY(-3deg);
-}
+.hero-actions { display: flex; gap: 14px; flex-wrap: wrap; }
 
 /* ---------- Pasos ---------- */
 .pasos { background: var(--bg); padding: 56px 0; }
 .pasos h2 { text-align: center; font-size: 30px; margin: 0 0 40px; }
-.pasos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
-.paso { text-align: center; }
-.paso .ico { width: 64px; height: 64px; border-radius: 16px; background: #fff; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
-.paso h3 { margin: 0 0 8px; font-size: 18px; }
-.paso p { color: var(--gray); font-size: 14px; line-height: 1.5; margin: 0; }
 
 /* ---------- Carga / dropzone ---------- */
 .dropzone {
-  border: 2px dashed var(--green); border-radius: 16px; background: #f0fdf4;
+  border: 2px dashed var(--green); border-radius: 16px; background: #eaf6ef;
   padding: 44px 24px; text-align: center; cursor: pointer; transition: all 0.15s;
 }
-.dropzone.drag { background: #dcfce7; border-color: var(--green-600); }
+.dropzone.drag { background: #d8ecdf; border-color: var(--green-600); }
 .dropzone .cloud { font-size: 40px; }
 .form-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 18px 0; }
+/* Variante de form-row con columnas de ancho fijo para un campo + selects +
+   botón (Trazabilidad → Informe mensual). El colapso a 1fr bajo 900px de
+   .form-row igual aplica (gana por orden en la cascada, misma especificidad). */
+.informe-cols { grid-template-columns: 1fr 130px 150px auto; }
+.trazar-cols { grid-template-columns: 1fr auto; }
+.inventario-cols { grid-template-columns: 1fr 170px auto auto; }
+/* Sin esto, un <input> conserva su ancho mínimo intrínseco del navegador y no
+   se encoge aunque el grid ya haya colapsado a 1 columna en pantallas chicas
+   (mismo problema de fondo que resultado-grid, aplicado a los campos de formulario). */
+.form-row > * { min-width: 0; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
 .field input, .field select, .field textarea {
-  width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px;
+  width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px;
   font-family: var(--font); font-size: 14px; color: var(--navy); background: #fff;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
-.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--green); border-color: var(--green); }
+/* La regla de arriba está escrita para campos de texto: aplicada a una
+   casilla o un radio los estira a todo el ancho y les mete padding. */
+.field input[type="checkbox"], .field input[type="radio"] {
+  width: auto; flex: none; padding: 0; accent-color: var(--green);
+}
+.field input:hover, .field select:hover, .field textarea:hover { border-color: var(--gray-300); }
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: none; border-color: var(--green); box-shadow: 0 0 0 3px var(--green-ring);
+}
 
 .file-list { margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
 .file-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 9px; font-size: 14px; }
 .file-item .rm { color: #b91c1c; cursor: pointer; font-weight: 600; }
 
-/* ---------- Flujo 3 pasos inline ---------- */
-.flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 22px 0; }
-.flow .node { text-align: center; flex: 1; }
-.flow .node .c { width: 52px; height: 52px; border-radius: 50%; background: #f0fdf4; display: flex; align-items: center; justify-content: center; margin: 0 auto 8px; font-size: 22px; }
-.flow .arrow { color: var(--gray-300); font-size: 22px; }
-.flow .node b { display: block; font-size: 13px; }
-.flow .node span { font-size: 11px; color: var(--gray); }
-
 /* ---------- Resultado cards ---------- */
+.resultado-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+.resultado-grid > * { min-width: 0; }
 .result-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+/* Variante de 3 columnas (Verificar). Como clase — nunca inline — para que
+   el colapso a 1 columna bajo 900px siga aplicando. */
+.result-cards.cols-3 { grid-template-columns: repeat(3, 1fr); }
 .result-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
 .result-card .big { font-size: 28px; font-weight: 800; color: var(--green-600); }
 .result-card .big small { font-size: 14px; color: var(--navy); font-weight: 600; }
 .result-card .lbl { font-size: 12px; color: var(--gray); margin-top: 4px; }
 
 /* ---------- Tablas ---------- */
+/* Envolver toda table.data en .table-scroll: en pantallas angostas la tabla
+   se desplaza horizontalmente en vez de forzar scroll en toda la página. */
+.table-scroll { width: 100%; overflow-x: auto; }
 table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
-table.data th { text-align: left; color: var(--gray); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; padding: 10px 12px; border-bottom: 2px solid var(--border); }
-table.data td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-table.data tr:hover td { background: var(--bg); }
+table.data th {
+  text-align: left; color: var(--gray); font-size: 11.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  padding: 10px 12px; border-bottom: 1px solid var(--gray-300);
+}
+table.data td { padding: 11px 12px; border-bottom: 1px solid var(--border); }
+table.data tbody tr { transition: background 0.12s var(--ease); }
+table.data tr:hover td { background: #f3f8f5; }
 .num { font-variant-numeric: tabular-nums; text-align: right; }
 
-.badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-.badge-green { background: var(--green-50); color: var(--green-600); }
-.badge-gray { background: #f1f5f9; color: var(--gray); }
-.badge-amber { background: #fffbeb; color: #b45309; }
-.badge-red { background: #fef2f2; color: #b91c1c; }
+.badge {
+  display: inline-block; padding: 4px 11px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; line-height: 1.4; letter-spacing: 0.01em;
+}
+.badge-green { background: var(--green-50); color: var(--green-600); box-shadow: inset 0 0 0 1px rgba(40, 167, 69, 0.18); }
+.badge-gray { background: #f1f5f9; color: var(--gray); box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.14); }
+.badge-yellow { background: #fff8e6; color: #b45309; box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.16); }
+.badge-amber { background: #fffbeb; color: #b45309; box-shadow: inset 0 0 0 1px rgba(180, 83, 9, 0.16); }
+.badge-red { background: #fef2f2; color: #b91c1c; box-shadow: inset 0 0 0 1px rgba(185, 28, 28, 0.14); }
 
 /* ---------- Etiqueta preview ---------- */
 .etq {
@@ -167,15 +290,31 @@ table.data tr:hover td { background: var(--bg); }
 .admin-side { width: 240px; background: var(--navy); color: #cbd5e1; display: flex; flex-direction: column; position: fixed; height: 100vh; }
 .admin-side .brand { padding: 22px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
 .admin-side nav { padding: 12px 10px; flex: 1; overflow-y: auto; }
+/* Título de sección del menú admin (agrupa las 23 entradas por uso). */
+.admin-side nav .nav-sec { padding: 14px 14px 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
+.admin-side nav > div:first-child .nav-sec { padding-top: 2px; }
 .admin-side nav a { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 9px; color: #cbd5e1; font-size: 14px; font-weight: 500; margin-bottom: 2px; }
 .admin-side nav a:hover { background: rgba(255,255,255,0.06); text-decoration: none; }
 .admin-side nav a.active { background: var(--green); color: #fff; }
 .admin-side .foot { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 13px; }
 .admin-main { margin-left: 240px; flex: 1; padding: 28px 36px; }
+.admin-side { transition: transform 0.25s ease; z-index: 60; }
+.admin-topbar { display: none; }
+.admin-overlay { display: none; }
 .admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 .admin-head h1 { margin: 0; font-size: 26px; }
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+.two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+/* Columna de formulario/lateral + contenido — usado en varias páginas admin
+   (Accesos, Transporte, Trazabilidad, Capital Natural). Sin esto colapsaba
+   a un desborde horizontal bajo ~900px porque la columna angosta exige un
+   mínimo de 280px+ que no cabe junto al contenido en pantallas chicas. */
+.form-content-grid { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 20px; align-items: start; }
+/* Los propios hijos del grid (ítem 1: form, ítem 2: tabla/contenido) también
+   necesitan min-width:0 — si no, cada uno conserva el ancho de su contenido
+   interno y sigue desbordando aunque el grid ya haya colapsado a 1 columna. */
+.two-col-grid > *, .form-content-grid > * { min-width: 0; }
 .stat { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
 .stat .n { font-size: 30px; font-weight: 800; color: var(--navy); }
 .stat .n.green { color: var(--green-600); }
@@ -186,9 +325,9 @@ table.data tr:hover td { background: var(--bg); }
   position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center;
   padding: 24px; overflow: hidden;
   background:
-    radial-gradient(1100px 600px at 80% -10%, rgba(34,197,94,0.28), transparent 60%),
+    radial-gradient(1100px 600px at 80% -10%, rgba(40,167,69,0.28), transparent 60%),
     radial-gradient(900px 700px at 10% 110%, rgba(14,165,233,0.18), transparent 55%),
-    linear-gradient(160deg, #0f1720 0%, #1e2a3a 45%, #223247 100%);
+    linear-gradient(160deg, #0f1720 0%, #0f1f2e 45%, #223247 100%);
 }
 .login-wrap::before {
   content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.5;
@@ -199,7 +338,6 @@ table.data tr:hover td { background: var(--bg); }
   -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 75%);
   mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 75%);
 }
-.login-wrap .glow { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.5; }
 .login-card {
   position: relative; z-index: 2; width: 100%; max-width: 430px;
   background: rgba(255,255,255,0.96); backdrop-filter: blur(14px);
@@ -209,7 +347,7 @@ table.data tr:hover td { background: var(--bg); }
 .login-card h2 { margin: 0 0 20px; }
 .login-badges { position: relative; z-index: 2; display: flex; gap: 14px; justify-content: center; margin-top: 18px; color: #cbd5e1; font-size: 12px; flex-wrap: wrap; }
 .login-badges .b { display: flex; align-items: center; gap: 6px; }
-.login-badges .b svg { color: #22c55e; }
+.login-badges .b svg { color: #28a745; }
 
 .toast { position: fixed; bottom: 24px; right: 24px; background: var(--navy); color: #fff; padding: 14px 20px; border-radius: 10px; box-shadow: var(--shadow-lg); z-index: 100; font-size: 14px; }
 .toast.err { background: #b91c1c; }
@@ -225,10 +363,828 @@ table.data tr:hover td { background: var(--bg); }
 .progress-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .progress-bar > div { height: 100%; background: var(--green); transition: width 0.4s; }
 
+/* ---------- Caja de resultado (REP/compensación en /panel-verde) ---------- */
+.result-box { background: var(--bg); border-radius: 10px; padding: 14px 16px; }
+
+/* ---------- Captura por cámara (Dropzone) ---------- */
+.capture-actions { display: none; gap: 10px; justify-content: center; margin-top: 14px; }
+.capture-actions .btn { flex: 1; max-width: 220px; }
+
+/* ---------- Secuencia de envío (carga con energía) ---------- */
+.send-sequence { text-align: center; padding: 6px 0; }
+.send-check-pop { animation: checkPop 0.3s ease; }
+@keyframes checkPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.send-done { animation: fadeUp 0.4s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .send-check-pop, .send-done { animation: none; }
+}
+
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; }
-  .hero h1 { font-size: 44px; }
-  .pasos-grid, .form-row, .result-cards { grid-template-columns: 1fr; }
-  .admin-side { display: none; }
-  .admin-main { margin-left: 0; padding: 18px; }
+  .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
+  .admin-head { flex-wrap: wrap; gap: 10px; }
+
+  /* Admin: barra superior + menú lateral deslizante (drawer).
+     admin-shell pasa a columna: admin-topbar (sticky, en flujo) queda arriba
+     y admin-main abajo a ancho completo, en vez de quedar lado a lado como
+     ítems de una fila flex (bug: forzaba scroll horizontal en el panel). */
+  .admin-shell { flex-direction: column; }
+  .admin-topbar {
+    display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 40;
+    padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--border);
+  }
+  .hamburger { border: 1px solid var(--border); background: #fff; border-radius: 9px; padding: 7px 9px; cursor: pointer; color: var(--navy); display: inline-flex; }
+  .admin-side { transform: translateX(-100%); box-shadow: var(--shadow-lg); }
+  .admin-side.open { transform: translateX(0); }
+  .admin-overlay { display: block; position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 50; }
+  .admin-main { margin-left: 0; padding: 18px; min-width: 0; }
+}
+
+@media (max-width: 640px) {
+  .pub-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
+  /* El nav (idiomas + CTA) también puede quebrar línea: cero desborde a 375px */
+  .pub-header nav { gap: 10px; flex-wrap: wrap; }
+  .pub-footer { padding: 20px 16px; flex-direction: column; align-items: flex-start; text-align: left; }
+  .narrow-page { margin: 28px auto; padding: 0 14px; }
+  .dropzone { padding: 28px 16px; }
+  .capture-actions { display: flex; flex-direction: column; }
+  .capture-actions .btn { max-width: none; }
+  .file-item { flex-wrap: wrap; gap: 6px; padding: 9px 12px; font-size: 13px; }
+}
+
+/* En dispositivos táctiles (aunque el viewport sea ancho) también se ofrece "Tomar foto". */
+@media (pointer: coarse) {
+  .capture-actions { display: flex; }
+}
+
+/* ============================================================
+   Bloques .av-* nacidos en la landing del canal presencial. Esa página ya
+   no existe (su contenido se plegó en la portada), pero estas clases sí:
+   las usan la portada (/) y la landing del Corredor (/corredor).
+   ============================================================ */
+
+/* Franja "terminal físico": diagrama del flujo sobre fondo navy con grilla */
+.av-terminal {
+  position: relative; overflow: hidden; padding: 60px 0; color: #e2e8f0;
+  background:
+    radial-gradient(900px 500px at 78% -18%, rgba(40, 167, 69, 0.26), transparent 60%),
+    linear-gradient(160deg, #0f1720 0%, #0f1f2e 55%, #17293b 100%);
+}
+.av-terminal::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.45;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 25%, transparent 78%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 25%, transparent 78%);
+}
+.av-terminal .container { position: relative; z-index: 1; }
+.av-term-label {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.9); margin: 0 0 10px;
+}
+/* Punto LED del eyebrow. Sin ancestro a propósito: la regla vivía dentro
+   de .av-term-label y en .av2-eyebrow (portada y /corredor) el <span> se
+   renderizaba con tamaño cero — el punto verde no se veía en ninguna de
+   las dos portadas. */
+.av-led {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--green);
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.9); flex: none;
+}
+.av-terminal h2 { color: #fff; text-align: center; font-size: 28px; margin: 0 0 8px; }
+.av-term-sub { text-align: center; color: #94a3b8; font-size: 14px; max-width: 520px; margin: 0 auto 36px; line-height: 1.6; }
+
+.av-flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 10px; align-items: stretch; }
+.av-flow > * { min-width: 0; }
+.av-flow-node {
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.13);
+  border-radius: 14px; padding: 20px 14px; text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.av-flow-node:hover { transform: translateY(-3px); border-color: rgba(40,167,69,0.65); background: rgba(40,167,69,0.09); }
+.av-flow-node .av-ico {
+  width: 46px; height: 46px; border-radius: 12px; margin: 0 auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(40, 167, 69, 0.16); border: 1px solid rgba(40, 167, 69, 0.35); color: #6ee7a0;
+}
+.av-flow-node b { display: block; color: #fff; font-size: 14px; margin-bottom: 5px; font-family: var(--font-head); }
+.av-flow-node span { display: block; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+.av-flow-arrow { display: flex; align-items: center; justify-content: center; color: rgba(110, 231, 160, 0.75); }
+
+/* "La cuenta es corta": tarifa con número grande + mini stats (patrón stat-card) */
+.av-cuenta-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; align-items: stretch; }
+.av-cuenta-grid > * { min-width: 0; }
+.av-stat {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px 20px; text-align: center;
+  display: flex; flex-direction: column; justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.av-stat:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: var(--green); }
+.av-stat .n { font-family: var(--font-head); font-size: 40px; font-weight: 700; line-height: 1; color: var(--green-600); font-variant-numeric: tabular-nums; }
+.av-stat .l { color: var(--gray); font-size: 13px; line-height: 1.5; margin-top: 8px; }
+.av-tarifa {
+  background: linear-gradient(160deg, var(--green-50) 0%, #fff 70%);
+  border-color: rgba(40, 167, 69, 0.35); text-align: left; align-items: flex-start;
+}
+.av-tarifa .n { font-size: 54px; letter-spacing: -0.02em; }
+.av-tarifa .l { font-size: 14px; color: var(--navy-700); max-width: 340px; }
+.av-tarifa .av-nota { font-size: 12px; color: var(--gray); margin-top: 10px; }
+
+/* Hover suave para cards de contenido (REP, cierre) */
+.av-card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease; }
+.av-card-hover:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); border-color: var(--green); }
+
+/* Responsive .av-* (colapsos bajo 900px; verificado a 375px sin desborde) */
+@media (max-width: 900px) {
+  .av-flow { grid-template-columns: 1fr; gap: 6px; }
+  .av-flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+  .av-cuenta-grid { grid-template-columns: 1fr 1fr; }
+  .av-tarifa { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) {
+  .av-stat .n { font-size: 32px; }
+  .av-tarifa .n { font-size: 44px; }
+  .av-terminal { padding: 44px 0; }
+}
+
+/* ============================================================
+   Pulido de landings públicos (solo aditivo: clases nuevas)
+   ============================================================ */
+
+/* Ritmo vertical consistente entre secciones (56–72px). Usar en un <section>
+   envolvente, NUNCA junto a .container en el mismo elemento (ambas fijan el
+   shorthand padding y esta ganaría, borrando los 24px laterales). */
+.sec-pad { padding: 64px 0; }
+.sec-alt { background: var(--bg); }
+/* Encabezado de sección: título + bajada. Existe porque las landings
+   repetían estos mismos valores inline en cada bloque (fontSize 30 /
+   maxWidth 520 / margin '0 auto 32px'); no hay tokens de escala
+   tipográfica todavía, así que esta clase es el mínimo para no repetirlos. */
+.sec-head { text-align: center; font-size: 30px; margin: 0 0 10px; }
+.sec-head-sub {
+  text-align: center; color: var(--gray); font-size: 15px;
+  line-height: 1.6; max-width: 520px; margin: 0 auto 32px;
+}
+
+/* Franja de números vivos de la plataforma (landing principal). Solo datos
+   reales de GET /api/publico/cadena; si el fetch falla no se renderiza. */
+.live-strip {
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, var(--green-50) 0%, #fff 62%);
+}
+.live-strip-inner {
+  display: flex; align-items: center; justify-content: center; gap: 10px 30px;
+  flex-wrap: wrap; padding: 15px 0; font-size: 13px; font-weight: 600; color: var(--gray);
+}
+.live-strip-inner .item { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.live-strip-inner .item svg { color: var(--green-600); flex: none; }
+.live-strip-inner .n {
+  font-family: var(--font-head); font-weight: 700; font-size: 19px; line-height: 1;
+  color: var(--green-600); font-variant-numeric: tabular-nums;
+}
+.live-strip-inner .hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 500;
+  background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px;
+}
+
+/* CTA flotante móvil del landing principal: oculta por defecto; solo existe
+   visualmente bajo 640px y entra cuando el hero salió de pantalla. */
+.mobile-cta { display: none; }
+
+@media (max-width: 640px) {
+  .sec-pad { padding: 44px 0; }
+  .mobile-cta {
+    display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 80;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.95);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.08);
+    transform: translateY(110%); transition: transform 0.25s ease;
+  }
+  .mobile-cta.show { transform: translateY(0); }
+  .mobile-cta .btn { width: 100%; }
+}
+
+/* Accesibilidad: sin deslizamiento del CTA flotante */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-cta { transition: none; }
+}
+
+/* ---------- Pasaporte Digital de Producto (/pasaporte/:id) ---------- */
+.pasaporte-doc { max-width: 800px; margin: 0 auto; border-top: 4px solid var(--green); }
+.pasaporte-sec {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.pasaporte-sec h3 {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pasaporte-sec h3::before {
+  content: ''; width: 4px; height: 14px; border-radius: 2px;
+  background: var(--green); flex: none;
+}
+
+/* Encabezado tipo documento: kicker de marca + título + código héroe + QR */
+.pas-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 20px; flex-wrap: wrap;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 18px;
+}
+.pas-head > * { min-width: 0; }
+.pas-kicker {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gray);
+}
+.pas-kicker::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); flex: none;
+}
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.pas-code {
+  display: inline-block; max-width: 100%; overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.02em; color: var(--navy);
+  background: var(--green-50); border: 1px solid rgba(40, 167, 69, 0.28);
+  border-radius: 8px; padding: 4px 12px;
+}
+.pas-qr {
+  display: inline-block; background: #fff; border: 1px solid var(--border);
+  border-radius: 14px; padding: 10px; box-shadow: var(--shadow-xs);
+}
+.pas-qr img { display: block; border-radius: 6px; }
+
+/* Cifra protagonista (t CO2e incorporado) */
+.pas-big {
+  font-family: var(--font-head); font-size: 34px; font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1; color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grilla de datos etiqueta/valor dentro de secciones */
+.pas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; font-size: 14px; }
+.pas-grid > * { min-width: 0; overflow-wrap: anywhere; }
+.pas-lbl {
+  display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--gray); margin-bottom: 2px;
+}
+
+/* Cifras de hash: bloque monoespaciado que nunca desborda */
+.pas-hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; color: var(--navy-700); word-break: break-all;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; margin: 4px 0 10px;
+}
+
+/* Cadena de custodia: eslabones como nodos conectados */
+.tl { display: grid; gap: 14px; }
+.tl-item { position: relative; padding-left: 26px; font-size: 13px; min-width: 0; }
+.tl-item::before {
+  content: ''; position: absolute; left: 0; top: 3px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--green);
+  box-shadow: 0 0 0 3px var(--green-50);
+}
+.tl-item::after {
+  content: ''; position: absolute; left: 5px; top: 21px; bottom: -14px;
+  width: 2px; border-radius: 1px;
+  background: linear-gradient(var(--green-100), var(--border));
+}
+.tl-item:last-child::after { display: none; }
+
+@media (max-width: 640px) {
+  .pas-grid { grid-template-columns: 1fr; }
+  .pas-big { font-size: 28px; }
+}
+
+/* Impresión: el pasaporte se guarda como PDF desde el navegador */
+@media print {
+  header, footer, nav, .no-print { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none !important; border: 1px solid #d1d5db; }
+  .pasaporte-doc { border-top: 4px solid #28a745; }
+  .pasaporte-sec { background: #fff; border-color: #d1d5db; break-inside: avoid; }
+  .pas-qr { box-shadow: none; }
+  .tl-item::before { box-shadow: none; }
+}
+
+/* ============================================================
+   Torre de control (/torre/:codigo) — mapa Leaflet + panel lateral.
+   ============================================================ */
+.torre-page { padding: 28px 24px 10px; max-width: 1280px; }
+.torre-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.torre-titulo { margin: 6px 0 6px; font-size: 26px; }
+.torre-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.torre-mapa {
+  height: 62vh;
+  min-height: 380px;
+  border-radius: 14px;
+  border: 1px solid var(--borde, #e6e9ed);
+  box-shadow: 0 8px 24px rgba(15, 31, 46, 0.08);
+  z-index: 0; /* que los popups de Leaflet no tapen el header sticky */
+}
+.torre-panel { min-width: 0; }
+
+/* Marcador del camión: emoji sobre círculo de marca; el movimiento entre
+   puntos se anima con transition sobre el transform que pone Leaflet. */
+.torre-camion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 2px solid #28a745;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(15, 31, 46, 0.3);
+  transition: transform 0.9s ease;
+}
+.leaflet-zoom-anim .torre-camion { transition: none; }
+
+/* Banner de instrucción (torre y credencial del portador). */
+.torre-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fff8e6;
+  border: 1px solid #f2d9a5;
+  border-left: 4px solid #d97706;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+}
+.torre-banner-icono { font-size: 20px; line-height: 1.2; }
+.torre-banner-titulo { font-weight: 700; color: #92400e; }
+
+/* Variante roja: camión sin avance por más tiempo del umbral alto (ver
+   HORAS_ALERTA_ROJA en lib/corredor.js). Misma forma que el banner ámbar
+   por defecto — solo cambia el color, para que se lea como "más urgente"
+   sin aprender un componente nuevo. */
+.torre-banner-rojo { background: #fef2f2; border-color: #fecaca; border-left-color: #dc2626; }
+.torre-banner-rojo .torre-banner-titulo { color: #991b1b; }
+
+/* Marca "retrocedió" en el timeline de pasos: aviso, no error — el punto
+   pudo ser un desvío real del camión. */
+.torre-retroceso { font-size: 11px; font-weight: 700; color: #b45309; }
+
+.torre-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--borde, #eef1f4);
+}
+.torre-msg:last-child { border-bottom: none; }
+
+@media (max-width: 900px) {
+  .torre-layout { grid-template-columns: 1fr; }
+  .torre-mapa { height: 48vh; min-height: 300px; }
+}
+
+/* Selector de destino del operador (puerto / puerto seco / estacionamiento). */
+.torre-dest { display: flex; gap: 6px; flex-wrap: wrap; }
+.torre-dest-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1.5px solid var(--borde, #d1d5db);
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+}
+.torre-dest-btn.activo {
+  border-color: #28a745;
+  background: #eaf6ef;
+  color: #218838;
+}
+
+/* Marcador de camión en la vista de flota: emoji + etiqueta con el código. */
+.torre-camion-flota {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+.torre-camion-flota .torre-camion-emoji {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 2px solid #28a745;
+  border-radius: 50%;
+  box-shadow: 0 4px 14px rgba(15, 31, 46, 0.3);
+}
+.torre-camion-flota .torre-camion-tag {
+  font-size: 10px;
+  font-weight: 800;
+  font-family: monospace;
+  background: #0f1f2e;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(15, 31, 46, 0.25);
+}
+
+/* ============================================================
+   Sistema visual .av2-* de las landings públicas — estilo producto
+   moderno: hero oscuro con brillos, bento de entregables, captura del
+   Pasaporte Digital y aparición al hacer scroll. Lo comparten la
+   portada (/) y /corredor.
+   ============================================================ */
+.av2-hero {
+  position: relative;
+  background:
+    radial-gradient(760px 460px at 82% 6%, rgba(40, 167, 69, 0.26), transparent 62%),
+    radial-gradient(600px 400px at 6% 94%, rgba(40, 167, 69, 0.14), transparent 60%),
+    radial-gradient(900px 520px at 50% -12%, rgba(59, 98, 134, 0.32), transparent 65%),
+    linear-gradient(165deg, #0b1826 0%, #14293c 48%, #102638 78%, #0b1826 100%);
+  color: #fff;
+  overflow: hidden;
+}
+.av2-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(75% 75% at 50% 40%, #000 30%, transparent 100%);
+  pointer-events: none;
+}
+.av2-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 40px;
+  align-items: center;
+  padding: 72px 0 84px;
+}
+.av2-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #b9e8c6;
+  background: rgba(40, 167, 69, 0.14);
+  border: 1px solid rgba(40, 167, 69, 0.45);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.av2-h1 { font-size: 56px; line-height: 1.02; letter-spacing: -0.03em; margin: 18px 0 8px; color: #fff; }
+.av2-t2 { font-size: 24px; font-weight: 700; margin: 0 0 14px; color: #e2e8f0; font-family: var(--font-head); }
+.av2-grad {
+  background: linear-gradient(90deg, #4ade80, #28a745 60%, #b9e8c6);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.av2-sub { color: #94a3b8; font-size: 16px; line-height: 1.65; max-width: 460px; margin: 0 0 26px; }
+.av2-btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.av2-btn-ghost:hover { background: rgba(255, 255, 255, 0.12); color: #fff; text-decoration: none; }
+.av2-trust { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+.av2-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+.av2-trust svg { color: #4ade80; }
+
+/* Mock del Pasaporte Digital (hero y sección resultado) */
+.av2-pas-wrap { display: flex; justify-content: flex-end; position: relative; }
+/* Glow verde suave detrás del pasaporte flotante (solo se nota sobre
+   fondos oscuros; gradiente estático, sin animación) */
+.av2-pas-wrap::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(420px, 80vw);
+  height: min(420px, 80vw);
+  transform: translate(-50%, -50%);
+  background: radial-gradient(closest-side, rgba(40, 167, 69, 0.3), rgba(40, 167, 69, 0.08) 55%, transparent 72%);
+  pointer-events: none;
+}
+.av2-pas-card {
+  position: relative;
+  z-index: 1;
+  width: min(340px, 100%);
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-top: 4px solid var(--green);
+  border-radius: 18px;
+  padding: 22px 24px;
+  color: var(--navy);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.25);
+  transform: rotate(2.5deg);
+  animation: av2Flotar 7s ease-in-out infinite;
+  text-align: left;
+}
+@keyframes av2Flotar {
+  0%, 100% { transform: rotate(2.5deg) translateY(0); }
+  50% { transform: rotate(1.6deg) translateY(-10px); }
+}
+.av2-pas-kicker { font-size: 10.5px; font-weight: 800; letter-spacing: 0.16em; color: var(--green-600); }
+.av2-pas-emp { font-size: 20px; font-weight: 800; margin: 6px 0 12px; font-family: var(--font-head); }
+.av2-pas-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.av2-pas-grid b { display: block; font-size: 15px; }
+.av2-pas-grid small { font-size: 10px; color: var(--gray); font-weight: 600; }
+.av2-pas-l { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--gray); text-transform: uppercase; }
+.av2-pas-qr { display: flex; justify-content: center; padding: 8px 0 4px; }
+.av2-pas-qr svg { border: 1px solid var(--border); border-radius: 8px; }
+.av2-pas-hash { text-align: center; font-family: monospace; font-size: 11px; color: var(--gray); margin: 6px 0 10px; }
+.av2-pas-chip {
+  display: block;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--green-600);
+  background: var(--green-50);
+  border: 1px solid var(--green-100);
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+/* Bento de entregables: cada card ahora lleva una captura real de la
+   pantalla que describe (media) arriba y un acento de color propio (borde
+   superior + tinte del ícono) — mismo radio/sombra que el resto del sitio,
+   solo con más jerarquía visual. `align-items: start` a propósito: las
+   imágenes tienen alturas naturales distintas (algunas son capturas
+   panorámicas cortas, otras más altas) y forzar `stretch` dejaría huecos
+   raros bajo el texto de las cards más cortas. */
+.av2-bento { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+.av2-bento-3 { grid-template-columns: repeat(3, 1fr); }
+.av2-bento-card {
+  background: #fff;
+  border: 1px solid rgba(15, 31, 46, 0.08);
+  border-top: 4px solid var(--green-600);
+  border-radius: 18px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(15, 31, 46, 0.04),
+    0 6px 18px rgba(15, 31, 46, 0.05);
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+.av2-bento-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(40, 167, 69, 0.35);
+  box-shadow:
+    0 1px 2px rgba(15, 31, 46, 0.05),
+    0 8px 16px rgba(15, 31, 46, 0.07),
+    0 22px 48px rgba(15, 31, 46, 0.1);
+}
+.av2-bento-card h3 { margin: 12px 0 6px; font-size: 17px; }
+.av2-bento-card p { margin: 0; color: var(--gray); font-size: 13.5px; line-height: 1.6; }
+.av2-bento-body { padding: 20px 26px 24px; }
+.av2-bento-ico {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--green-600);
+  background: var(--green-50);
+  border: 1px solid var(--green-100);
+}
+
+/* Captura real de la pantalla que ilustra la card: ocupa el ancho completo,
+   sin recortar (el alto lo da la imagen misma) — así ninguna imagen se
+   deforma ni pierde el detalle que la hace "real" y no un mockup. El chip
+   de honestidad va DEBAJO de la imagen (nunca superpuesto): igual criterio
+   que .av2-pas-shot en el hero — superponerlo tapaba contenido real de la
+   captura (badges, botones) en las cards más ajustadas. */
+.av2-bento-media { line-height: 0; background: var(--bg); }
+.av2-bento-media img { display: block; width: 100%; height: auto; }
+.av2-bento-chip {
+  display: block;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--green-600);
+  background: var(--green-50);
+  border-bottom: 1px solid var(--green-100);
+  padding: 6px 10px;
+}
+
+/* Acentos de color por card: mismo borde superior (por ahora en la card,
+   no en el <img>) + tinte a juego en el ícono. Todos los tonos ya existen
+   en la paleta del sitio (variables de :root, o los mismos hex que usan
+   los badges/el panel de terreno) — no se agregó ningún color nuevo. */
+.av2-bento-acc-green { border-top-color: var(--green-600); }
+.av2-bento-acc-green .av2-bento-ico { color: var(--green-600); background: var(--green-50); border-color: var(--green-100); }
+
+.av2-bento-acc-navy { border-top-color: var(--navy-700); }
+.av2-bento-acc-navy .av2-bento-ico { color: var(--navy-700); background: #f2f9ff; border-color: #dce7f2; }
+
+.av2-bento-acc-amber { border-top-color: #d97706; }
+.av2-bento-acc-amber .av2-bento-ico { color: #92400e; background: #fff8e6; border-color: #f2d9a5; }
+
+/* Verde oscuro del panel de terreno (mismo tono que .theme-av .admin-side):
+   se reutiliza a propósito para la card de "Atención en terreno", que
+   ilustra justo ese panel. */
+.av2-bento-acc-deep { border-top-color: #0f2e1f; }
+.av2-bento-acc-deep .av2-bento-ico { color: #0f2e1f; background: var(--green-50); border-color: var(--green-100); }
+
+.av2-bento-a { background: linear-gradient(150deg, #ffffff 55%, var(--green-50)); }
+.av2-bento-b { background: linear-gradient(330deg, #ffffff 55%, #f2f9ff); }
+
+/* Sección "el resultado: tu Pasaporte Digital" (fondo navy) */
+.av2-pasaporte {
+  background:
+    radial-gradient(560px 360px at 88% 20%, rgba(40, 167, 69, 0.18), transparent 60%),
+    var(--navy);
+}
+.av2-pas-secgrid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center; }
+.av2-pas-pasos { list-style: none; margin: 18px 0 24px; padding: 0; display: grid; gap: 10px; }
+.av2-pas-pasos li { display: flex; align-items: center; gap: 12px; color: #e2e8f0; font-size: 14.5px; font-weight: 600; }
+.av2-pas-pasos-centro { justify-items: center; margin: 18px auto 24px; max-width: 460px; }
+.av2-pas-pasos-centro li { justify-content: flex-start; width: 100%; }
+.av2-pas-pasos li span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+/* Aparición al hacer scroll */
+.av2-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s var(--ease), transform 0.6s var(--ease); }
+.av2-reveal.on { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .av2-reveal { opacity: 1; transform: none; transition: none; }
+  .av2-pas-card { animation: none; }
+  .av2-bento-card { transition: none; }
+  .av2-bento-card:hover { transform: none; }
+}
+
+/* Landing: tarjeta destacada del Corredor Bioceánico */
+.land-corr {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 32px;
+  align-items: center;
+  padding: 36px 40px;
+  border-radius: 20px;
+  color: #fff;
+  background:
+    radial-gradient(480px 300px at 85% 15%, rgba(40, 167, 69, 0.22), transparent 60%),
+    var(--navy);
+}
+.land-corr-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #4ade80;
+}
+.land-corr-titulo { margin: 10px 0 8px; font-size: 26px; color: #fff; }
+.land-corr-sub { margin: 0; color: #94a3b8; font-size: 14.5px; line-height: 1.65; }
+.land-corr-lado { display: flex; flex-direction: column; gap: 16px; align-items: flex-start; }
+.land-corr-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.land-corr-chips span {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 7px 12px;
+  border-radius: 999px;
+}
+@media (max-width: 900px) {
+  .land-corr { grid-template-columns: 1fr; padding: 28px 22px; }
+}
+
+@media (max-width: 900px) {
+  .av2-hero-grid { grid-template-columns: 1fr; padding: 48px 0 56px; }
+  .av2-h1 { font-size: 40px; }
+  .av2-t2 { font-size: 20px; }
+  .av2-pas-wrap { justify-content: center; }
+  .av2-pas-card { transform: rotate(0); }
+  .av2-bento { grid-template-columns: 1fr; }
+  .av2-pas-secgrid { grid-template-columns: 1fr; }
+}
+
+/* Pasaporte real embebido en el hero/sección resultado (av2-pas-shot):
+   la tarjeta pasa a ser un marco fino para la captura, sin el padding
+   interno del mock anterior; el chip queda pegado abajo, fuera de la
+   imagen, para no taparla. */
+.av2-pas-shot { padding: 0; overflow: hidden; }
+.av2-pas-shot img { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: cover; object-position: top; }
+.av2-pas-shot .av2-pas-chip { margin: 10px 14px 14px; border-radius: 0 0 10px 10px; }
+
+/* Preguntas frecuentes: acordeón nativo <details>, sin JS. */
+.av2-faq { display: grid; gap: 10px; }
+.av2-faq-item {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.av2-faq-item summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--navy);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.av2-faq-item summary::-webkit-details-marker { display: none; }
+.av2-faq-item summary::after {
+  content: '+';
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--green-600);
+  transition: transform 0.2s var(--ease);
+}
+.av2-faq-item[open] summary::after { transform: rotate(45deg); }
+.av2-faq-item p { margin: 12px 0 0; color: var(--gray); font-size: 14px; line-height: 1.65; }
+
+/* ============================================================
+   Landing del Corredor Bioceánico (/corredor) — captura real de la
+   Torre de Control en el hero, y de la Tarjeta de Viaje más abajo.
+   ============================================================ */
+.cor-shot {
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35), 0 6px 18px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.cor-shot img { display: block; width: 100%; height: auto; }
+.cor-shot-chip {
+  display: block;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #b9e8c6;
+  background: rgba(40, 167, 69, 0.16);
+  border-top: 1px solid rgba(40, 167, 69, 0.35);
+  padding: 8px 10px;
+}
+.cor-tarjeta-shot {
+  max-width: 300px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  border: 1px solid var(--border);
+}
+.cor-tarjeta-shot img { display: block; width: 100%; height: auto; }
+@media (max-width: 900px) {
+  .cor-tarjeta-shot { max-width: 240px; margin: 0 auto; }
 }

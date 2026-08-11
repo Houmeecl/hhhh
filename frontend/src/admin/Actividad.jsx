@@ -9,6 +9,7 @@ export default function Actividad() {
     <div>
       <div className="admin-head"><h1>Log de actividad</h1></div>
       <div className="card">
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Entidad</th><th>IP</th></tr></thead>
           <tbody>
@@ -24,6 +25,7 @@ export default function Actividad() {
             {items.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin actividad registrada.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

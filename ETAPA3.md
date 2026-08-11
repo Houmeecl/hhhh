@@ -1,0 +1,254 @@
+# ETAPA 3 — Hoja de ruta
+
+Lo pendiente después de la Etapa 2. Todos estos ítems dependen de **servicios externos,
+credenciales o decisiones comerciales** que no se pueden resolver desde el repositorio;
+por eso quedan documentados y no implementados.
+
+Las ideas de internacionalización evaluadas (CBAM, ISO 14083/GLEC, ISSB, HuellaChile,
+superficies multilingües, tarifa dual) están desarrolladas con su aval, base y esfuerzo
+en `docs/IDEAS-INTERNACIONAL.md`; aquí solo se registran las filas accionables.
+
+## 1. Integraciones oficiales
+
+| Ítem | Qué falta | Prerrequisito |
+|------|-----------|---------------|
+| Conexión SII / RCV | **✅ Implementado.** Situación tributaria pública por RUT vía BaseAPI (api.baseapi.cl) para autocompletar formularios (`services/baseapi.js`). El RCV (compras/ventas por período) también está implementado: la empresa conecta su RUT/clave tributaria desde su propio panel (`panel-proveedor/AnalisisSii.jsx`) contra un proveedor intercambiable (`SII_PROVEEDOR=baseapi\|simpleapi\|apigateway`, `services/siiProveedor.js`) — BaseAPI trae el XML del DTE recibido y habilita el método físico de cálculo en compras; SimpleAPI y apigateway.cl no exponen ese detalle, así que sus compras se calculan por método de gasto. La clave tributaria **se persiste cifrada (AES-256-GCM, `services/cripto.js`) solo si la empresa opta explícitamente por guardarla** (con opción de borrarla en cualquier momento); nunca en texto plano, nunca en logs ni en mensajes de error. | — |
+| Perú — SUNAT (mercado de trazabilidad) | **En placeholder a propósito, hasta tener el dominio.** Hoy Perú existe SOLO como variante de mercado del idioma español (`pe` en `lib/i18n.js`): cambia RUT→**RUC** y CLP→**soles**, y nada más. Lo que NO tiene, y no debe insinuar que tiene: (a) integración con **SUNAT** —el equivalente peruano del SII—, que exigiría un adaptador nuevo detrás de `services/siiProveedor.js` y además romper supuestos cableados más abajo (el RUC son 11 dígitos sin el dígito verificador del RUT, y el modelo documental no es el DTE/RCV chileno, que es lo que normalizan `baseapiSii.js` y la tabla `dte_proveedor`); (b) factores peruanos: el motor calcula con los chilenos y el sello del landing lo dice — "Factores HuellaChile" —, después de que se sacara una atribución a "Huella de Carbono Perú (MINAM)" que ningún documento del repo respaldaba; (c) **Corredor Bioceánico**, excluido por decisión del usuario: Perú es mercado de trazabilidad, y además la ruta Brasil-Paraguay-Argentina-Chile no pasa por ahí, así que las claves `cor.*` no se adaptan. | Dominio propio del mercado peruano. Recién entonces: investigar qué expone SUNAT y por qué vía (directo o agregador, como se resolvió en Chile con `SII_PROVEEDOR`), y decidir alcance. La **clave SOL de SUNAT llevaría el mismo trato que la del SII**: cifrada AES-256-GCM, solo si la empresa opta explícitamente, nunca en logs ni en mensajes de error. |
+| Validación de firma DTE | Verificación criptográfica de la firma y consulta de estado en el SII. | El verificador local (estructura, módulo 11, totales) ya está en `services/dte.js`; falta la parte en línea. |
+| Factores oficiales AR/PY/BR | Reemplazar los borradores del Corredor Bioceánico por fuentes oficiales por país. | Convenios/fuentes (SIRENE-BR, etc.). Las metodologías por país con toggle ya existen. |
+| Conexión a aduanas | Validar en línea declaraciones (DIN/SIM/SOFIA/Siscomex) y estados de despacho. | La carga de documentos aduaneros reales + MIC/DTA como traza ya existe en el Corredor. **"Aduana verde" (integración automática en línea) queda excluida del alcance en todas las etapas** (decisión de negocio). |
+| Expediente HuellaChile (MMA) | Export "expediente" con el formato del programa para que un CLIENTE postule al reconocimiento de cuantificación — el MMA reconoce al cliente, nunca a sicr3p ni a través de sicr3p. La base metodológica ya está citada en el repo: fuentes `mma_huellachile` y `cen_sen` en `fuentes_metodologicas` (migración 018) y el factor SEN vinculado a la categoría de electricidad. | Cliente real que quiera postular + registro en la plataforma del programa (vía Ventanilla Única RETC) + instructivo vigente descargado (incluida la eventual verificación que el programa exija — validar requisitos). |
+| Mostrador presencial sicr3p (oficinas físicas, distinto de la fila anterior) | **Hecho v1: landing pública (`/aduana-verde`) + terminal POS (`/pos`) + gestión de terminales en el admin.** Modelo tomado de los repos de referencia del usuario: patrón VecinoXpress/NotaryPro (el terminal es un dispositivo que se conecta con serial+clave — tabla `pos_terminales`, `POST /api/pos/auth` — captura y cobra; la plataforma reconoce y calcula) y lógica REP de SICREP Ley 20.920 (declaración de embalajes por componentes → % reciclabilidad Alto/Medio/Bajo, verificación pública en recepción vía `GET /api/verificar/:id`). Modelo de cobro definido por el usuario: **lo que se paga en el terminal es la compensación del CO2 calculado** (t CO2e × tarifa referencial CLP 5.000/t, ancla impuesto verde US$5/t, editable y marcada "referencial — validar"). El cálculo es real (flujo público + motor propio para DTE); **el pago sigue simulado** hasta tener credenciales VirtualPos. No requiere ni incluye la integración en línea con aduanas de la fila anterior (sigue excluida). **[ACTUALIZACIÓN 2026-07-27: terminal físico `/pos` descontinuado — el mostrador opera vía `/panel-verde` con operador logueado; REP y compensación de esta fila ahora viven en `CargarAv.jsx`]** **[ACTUALIZACIÓN 2026-07-28: la landing `/aduana-verde` se eliminó y la ruta redirige a `/` — su contenido útil se plegó en la portada; el canal se llama **terreno** en todo el copy visible]** | Para pasar de v1 a operación real: credenciales VirtualPos (cobro efectivo), definición de tarifa comercial de compensación, y direcciones/franquicia de las oficinas. |
+
+### Revisión manual de clasificación — por qué no contradice "sin corrección manual"
+
+Este proyecto decidió que **no existe corrección manual de datos de factura**: nadie edita
+un monto, un RUT, un folio ni una glosa leída del documento. Esa decisión sigue en pie.
+
+La bandeja de revisión (migraciones 078 y 079, `services/ajustesClasificacion.js`) hace algo
+distinto: asigna una **categoría** que el motor no pudo inferir, cuando ninguna palabra clave
+calzó con la glosa (`sin_coincidencia`) o cuando no quedó ítem que clasificar
+(`sin_categoria`). No lee el documento de nuevo — el archivo original **no se guarda ni se
+muestra**; el operador clasifica con la glosa de los ítems que el motor ya extrajo.
+
+Tres cosas que lo mantienen defendible:
+
+1. **El documento sellado no se toca.** `facturas.hash_documento` incluye la categoría y el
+   CO2e, así que editar la fila rompería la cadena que verifica el QR público. La
+   reclasificación es un asiento nuevo, append-only, con **su propia cadena de hash** — mismo
+   patrón que Capital Natural (029) y las declaraciones de embalaje (028). La factura original
+   verifica exactamente igual que antes, y hay un test que lo prueba.
+2. **El CO2e se recalcula, y por el mismo método.** Dejar el número del catch-all bajo una
+   etiqueta nueva sería peor que no clasificar: el número y su rótulo dirían cosas distintas.
+   Se aplica el factor de gasto de la categoría elegida, tomado de la **misma versión del
+   motor** con que se calculó el documento. Si no consta el factor original no se recalcula:
+   se rechaza, antes que deducir un monto inventado.
+3. **Se declara.** El origen queda como `'operador'` —atribuible, o sea gana alcance GHG— pero
+   el informe consolidado dice cuántos documentos clasificó una persona y no el motor, en una
+   nota aparte de la de los no atribuibles; y la verificación pública por QR y el pasaporte
+   —ambos sin autenticación— muestran la categoría y el CO2e ORIGINALES junto al motivo del
+   ajuste, porque el sello que exhiben cubre ese cálculo original. Una categoría asignada a
+   mano no puede leerse como una que dedujo el motor.
+
+**Pendiente**: la verificación de la cadena de ajustes (`GET /admin/motor-propio/revision/
+cadena/verificar`) está tras autenticación de admin, así que hoy el cliente ve declarado el
+ajuste pero no puede verificar esa cadena por su cuenta. Falta el equivalente público de
+`/api/cadena`.
+
+Lo que la bandeja **no** admite: los documentos que el motor **sí** clasificó (eso se arregla
+en el panel de categorías, que versiona el cambio para todos y no de a uno) y los de
+procedencia no registrada (`categoria_origen` NULL), que no se reinterpretan hacia atrás.
+
+### Uso real sin placeholder (2026-08) — inventario y cierre por fases
+
+Auditoría explícita de qué bloquea usar sicr3p con un cliente que paga, **sin placeholders**.
+La mayor parte de lo que falta no es código (precio, abogado, razón social, credenciales de
+terceros — ver la tabla al final de este documento); esto documenta la parte que sí lo era.
+
+- **Fase 1 — hecha.** Un documento que el motor propio no podía leer, con `MOTOR_EXTERNO=on` y
+  `MOCK_SIMPLE=true` (los dos eran el default de fábrica, y `deploy/instalar-vps.sh` los
+  escribía así en el `.env` de producción), se enrutaba al motor externo en modo simulado:
+  `services/simpleApi.js` genera el CO2e con un PRNG (ítems de una lista fija, cantidades y
+  monto al azar, hasta un RUT emisor falso). Ese número entraba a `facturas`, **quedaba sellado
+  en la cadena de hash** y se imprimía en el informe firmado del cliente — indistinguible de un
+  cálculo real. Cerrado así: `MOCK_SIMPLE=true` pasa de advertencia a **fatal** en
+  `lib/verificarProduccion.js` (aborta el arranque en producción, junto a los secretos JWT,
+  `SII_CRED_KEY` y `SEED_DEMO`); el default de `config.js` cambia de `true` a `false`;
+  `instalar-vps.sh` genera `MOTOR_EXTERNO=off` y `SII_CRED_KEY` (esta última faltaba del todo
+  en el instalador — sin ella el arranque en producción ya era fatal por otra razón, así que
+  toda instalación limpia quedaba en crash-loop). Con el motor externo apagado, el 422 de
+  `routes/public.js` para un documento ilegible ahora sugiere subir el XML del DTE en vez de
+  ser un error seco, porque deja de ser un caso de borde y pasa a ser el camino principal para
+  lo que el motor propio no lee.
+- **Fase 2 — hecha.** El cobro de compensación es 100% simulado (sin pasarela conectada ni
+  socio ambiental formalizado — ver la fila "Cobro real VirtualPos" y "Bonos de carbono" más
+  abajo): `routes/pos.js` sumaba `monto_clp` de compensaciones en estado `'simulado'` y eso se
+  pintaba como **"Compensación acumulada (CLP)"**, un KPI de dinero recaudado que nunca entró,
+  junto a cifras reales de REP sin distinción visual en `admin-av/ResumenAv.jsx`. Cerrado así:
+  flag nuevo `COMPENSACION_HABILITADA` (default `false`, `config.compensacionHabilitada`),
+  expuesto en `GET /api/pos/config` como `compensacion_habilitada`; mientras esté en `false`,
+  el frontend **oculta** el paso de cobro y sus métricas en las tres superficies que lo
+  mostraban (`admin-av/CargarAv.jsx`: paso 3 y el componente `CompensacionCobro`;
+  `admin-av/ResumenAv.jsx`: las 3 tarjetas de estadística y "Últimas compensaciones";
+  `admin/Dashboard.jsx`: la tarjeta ya rotulada "Compensación (simulada)"; y `AdminAvApp.jsx`:
+  el ítem "Compensación" del menú lateral y su ruta, que si no también quedaban accesibles
+  para configurar la tarifa de un módulo que el resto del panel ya escondía). No se borró nada:
+  la tabla, los estados del CHECK y el servicio quedan intactos para cuando haya pasarela real
+  — se activa con una variable de entorno, sin migración. El copy del landing (`lib/i18n.js`)
+  ya era honesto sobre que la compensación es simulada; se revisó y se dejó sin cambios.
+- **Fase 3 — hecha.** Infraestructura que podía tumbar el servicio o perder datos sin que nadie
+  lo notara. `GET /api/health` respondía `ok:true` sin tocar la base: si Postgres caía después
+  del arranque, el auto-deploy (`deploy/actualizar.sh`) seguía viendo verde y no disparaba
+  rollback, y el monitoreo externo veía "sano" con el 100% de las peticiones reales en 500.
+  Ahora hace un `SELECT 1` con plazo de 2 s (`backend/src/lib/health.js`, `estaSano()`
+  inyectable para el test) y responde 503 si la BD no contesta a tiempo. `deploy/respaldo.sh`
+  podaba solo `sicr3p-*.sql.gz` (el respaldo diario, cron 03:00) pero `deploy/actualizar.sh`
+  genera además `pre-deploy-*.sql.gz` en cada deploy (uno por commit, cron cada 30 min) con un
+  patrón de nombre distinto — esos archivos nunca se borraban solos y podían llenar el disco sin
+  aviso; ahora se podan con retención de 5 días y el script deja una advertencia en el log si el
+  disco supera 85%. `SII_CRED_KEY` faltante en el instalador ya se había resuelto en Fase 1.
+  Nuevo `deploy/restaurar.sh`: modo ensayo (default, restaura en una base descartable y compara
+  conteos contra la real, sin tocarla) y modo `--reemplazar` (destructivo, para recuperación real
+  — pide escribir la palabra exacta y toma un respaldo de seguridad de lo que haya antes de
+  borrar nada). **Ensayado en local el 2026-08-08** contra un dump real (77 tablas, 133 filas de
+  `facturas` coinciden con el original en ambos modos) — el ensayo contra el Postgres del VPS
+  real sigue pendiente porque esta sesión no tiene acceso a él. La copia off-site de los
+  respaldos (hoy viven en el mismo disco que la base) también queda pendiente: requiere elegir y
+  pagar un destino, documentado en `deploy/AUTODEPLOY.md`.
+- **Fase 4 — hecha.** Degradación silenciosa. Sin SMTP propio ni `RESEND_API_KEY` los correos
+  solo se escribían en el log — se caen la activación de cuenta, el magic link y "¿olvidaste tu
+  contraseña?", así que no se puede dar de alta un cliente real; era advertencia, ahora es
+  **fatal** en producción (`lib/verificarProduccion.js`), igual que `MOCK_SIMPLE` en Fase 1.
+  Confirmado con el usuario que el VPS ya usa el SMTP propio (Poste.io), así que esto no
+  interrumpe el servicio en marcha. `deploy/smoke-e2e.mjs` no probaba ningún login: se agregó un
+  check de nivel lectura (siempre activo, sin credenciales que guardar en el VPS) que manda un
+  login con credenciales inexistentes y exige 401/429 en vez de 500 — detecta un login roto por
+  secretos mal generados o la tabla `usuarios` inaccesible, que antes solo se notaba cuando un
+  cliente real intentaba entrar. El nivel de **escritura** del smoke (sube una factura de prueba
+  real) ya existía y estaba bien resuelto en código, pero seguía sin poder activarse porque
+  `SICR3P_SMOKE_CODIGO` no tenía ningún código creado — se documentaron en
+  `deploy/AUTODEPLOY.md` los 3 pasos manuales para activarlo (crear el código permanente en
+  Accesos → Códigos, exportar las dos variables de entorno en el cron del VPS, confirmar
+  corriendo el smoke a mano una vez). El manejador de errores central logueaba solo
+  `err.message`: ahora agrega el stack completo y `método + ruta` (el cliente sigue recibiendo el
+  mismo mensaje genérico). Se agregaron los timeouts que faltaban: `headersTimeout`/
+  `requestTimeout` en el servidor HTTP (mitiga slowloris sin cortar uploads reales de hasta
+  5 documentos de 15 MB) y `connectionTimeoutMillis` en el pool de Postgres (antes, con las 10
+  conexiones del pool ocupadas, una petición nueva esperaba para siempre en vez de fallar rápido
+  con un error claro).
+- **Fase 5 — hecha (segunda ronda de diligencia, migración 081).** Retoma exactamente donde
+  quedó la migración 075: de las 4 fuentes que seguían con nota "hay edición más nueva, falta
+  confirmar" (`defra_2024`, `mma_huellachile`, `cen_sen`, `glec_v3`), **ninguna se promovió** —
+  el entorno de investigación de esta sesión no tiene acceso a la mayoría de los dominios
+  primarios (gov.uk, ipcc.ch, los `.gob.cl` de HuellaChile/CEN), así que las cifras nuevas
+  encontradas son de fuentes secundarias sin verificar y quedan documentadas como tales en cada
+  fuente, no usadas para nada. Único hallazgo verificado de primera mano (GLEC v3.1/v3.2,
+  descargados sin paywall): el factor de contenedores ya no se publica en kg/t-km sino en
+  g CO2e/TEU-km — un problema de unidad, no solo de vigencia, anotado en la categoría
+  `maritimo_contenedor` para que la próxima actualización no compare peras con manzanas. También
+  se investigó si existe una base de factores por gasto (spend-based/EEIO) citable para Chile:
+  EXIOBASE no cubre Chile como país individual (queda en "Rest of Americas") y el único estudio
+  chileno encontrado (Banco Central, Estudio Nº 135, base 2017) es agregado por sector y no está
+  mapeado a las categorías del motor — se generalizó la declaración de "proxy interno sin cita
+  externa" a la única categoría que no la tenía (`materiales`; el resto ya la traía desde
+  `031_higiene_metodologica.sql`). Sigue pendiente que un admin con acceso directo a esos
+  dominios descargue y confirme las 4 ediciones nuevas antes de promoverlas.
+- **Fase 5, tercera ronda — hecha (migración 085).** La red volvió a bloquear la apertura de
+  primera mano (12/12 dominios oficiales rechazados esta vez), así que **de nuevo ninguna
+  promoción** — pero la ronda dejó cuatro cierres reales: (1) `defra_2024` ahora cita la
+  edición vigente (DESNZ 2026, publicada 11-jun-2026, URL en la fila) con los desfases de
+  vuelos anotados; (2) **corrección de etiqueta en `vuelo_corto`/`vuelo_largo`**: decían "sin
+  forzamiento radiativo" pero los valores calzan con los factores CON forzamiento de DEFRA
+  2021-2024 (la etiqueta "sin" era aritméticamente imposible) — error de rotulación visible
+  en informes, corregido sin tocar los números; (3) primera diligencia de `transporte_modos`
+  (Cat. 7): los 5 factores pasan de "Referencial — validar" a citas concretas (DEFRA/DESNZ
+  2026, con tren ~-13% y bus ~+42% de desfase anotados; `camioneta` declarada proxy interno
+  sin análogo DEFRA); (4) cierre conceptual de `ipcc_2006_v2` (material del TFI indexado: el
+  Refinamiento 2019 no toca los factores de combustión que usa el motor). También se cubrió
+  el hueco de test de la 081 (la segunda ronda se aplicó sin auditoría de idempotencia;
+  `metodologiasDiligencia.test.js` ahora audita 075+081+085). **Pendiente humano explícito
+  (~15 min con navegador normal)**: abrir 4 URLs que la fila de cada fuente deja exactas —
+  planilla DESNZ 2026 (gov.uk — al abrirla, confirmar también la fila exacta de vuelos:
+  economy vs average passenger), PDF CEN 2024 (coordinador.cl), PDF HuellaChile v3
+  (huellachile.mma.gob.cl, candidata Nº1: su factor indexado 0,2421 ya coincide con el motor)
+  y el índice del Refinamiento 2019 (ipcc.ch) — y promover desde el panel Motor propio →
+  Fuentes, que congela versión solo. No corresponde una cuarta ronda automática.
+- **Fase 6 — pendiente**: cabos sueltos de código que ya se
+  sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de admin,
+  `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key de
+  mandante, versionado de `SII_CRED_KEY`, control de migraciones aplicadas, código muerto).
+
+### Informe entregable por Alcances 1/2/3 — hecho, y lo que queda fuera
+
+Pedido del usuario ("para entregar a HuellaChile u otras… el informe debe ser
+completo, con detalle de Alcances 1/2/3"). Lo construido: (1) la tabla
+"Emisiones por alcance (GHG Protocol)" ahora también en el informe del flujo
+público de facturas (`generateReport`), con el adaptador
+`filasDesdeFacturas` que traduce el vocabulario de `facturas` y declara el
+saldo "sin registro de la fuente de su categoría" con causa propia; (2) el
+desglose por categoría DENTRO de cada alcance, en ambos PDFs; (3) el export
+entregable `GET …/sii/:id/inventario/:periodo?formato=csv|json` (admin y
+panel proveedor): una fila por categoría con alcance, categoría canónica
+GHG Protocol (A3), método físico/gasto y fuente del factor citada desde el
+snapshot congelado de la versión del motor, con pie de saldo por causa;
+(4) la sección "Límites y exclusiones declaradas" del informe SII (cobertura
+documental, A2 solo location-based, sin gases individuales, sin año base) y
+el aviso de rol: insumo para procesos externos — HuellaChile reconoce a la
+empresa titular, nunca a sicr3p ni a través de sicr3p.
+
+**Fuera de alcance, documentado (no construido)**: el expediente HuellaChile
+completo (fila propia arriba en Integraciones oficiales — exige cliente real
+y Ventanilla Única RETC), Alcance 2 dual market-based, desglose por gas
+individual (CO2/CH4/N2O), año base y recálculo, y datos de actividad
+medidos de A1/A2 (litros/kWh de fuente propia que no consten en documentos).
+Son los siguientes pasos naturales del inventario cuando exista el cliente
+que los exija.
+
+## 2. Producto y datos
+
+| Ítem | Qué falta | Base ya construida |
+|------|-----------|--------------------|
+| Benchmarking sectorial | Comparación anónima contra pares del sector. | Requiere masa crítica de clientes (datos del piloto/concurso). Valorización FIFO/PMP y Transporte Cat. 7 ya quedaron implementados en Etapa 2. |
+| Valorización automática del capital natural | **Hecho, mecanismo**: `cuentas_naturales.precio_clp_unidad` + `precio_fuente` (editable en "Plan de cuentas"); si un activo no tiene `valor_clp` manual, se calcula solo (extensión × precio) y queda marcado "auto" en la tabla y el PDF (`services/capitalNatural.valorizarActivo`). Sin seed: no se inventan precios sombra/ESVD sin fuente citada por el admin — el campo parte vacío. Falta: cargar precios reales (ESVD, tasación, etc.) por cuenta, decisión de negocio/dato externo, no de código. | Módulo Capital Natural completo (cuentas, activos, balance PDF). |
+| OCR propio | Leer guías, manifiestos y contratos que el motor externo no procesa. | Estados `traza`/`pendiente_motor` del Corredor ya lo contemplan. |
+| Soporte PCAF (Partnership for Carbon Accounting Financials) | PCAF es el estándar que usan bancos/inversionistas para medir "emisiones financiadas" de su cartera de crédito e inversión (no las emisiones operacionales de una empresa, que es lo que mide sicr3p hoy con GHG Protocol Corporate Standard). Investigado: BancoEstado ya lo adoptó en Chile para su cartera; +40 instituciones en LatAm lo usan desde 2015. **No es una extensión del modelo actual** — requeriría una entidad nueva "cartera/portafolio" con instrumentos financieros, cálculo de "attribution factor" (deuda/patrimonio outstanding vs. valor de la empresa financiada) y un tipo de informe nuevo; Capital Natural y `motor_categorias` no son reutilizables para esto (están diseñados para consumo operacional propio, no para carteras de terceros). Prioridad baja: sin demanda real hoy (ningún cliente de sicr3p es una institución financiera); se retoma si aparece un cliente banco/fondo real. | Ninguno construido — solo investigado. |
+| CBAM — base de datos por embarque (Reglamento UE 2023/956) | Captura estructurada por embarque (código NC, masa, emisiones directas e indirectas del proceso) + export para el importador UE + metodología CBAM oficial descargada y citada en `fuentes_metodologicas`. Aplica solo a los sectores del Anexo I (hierro/acero, aluminio, cemento, fertilizantes, hidrógeno, electricidad — el cobre NO está hoy); reporte transitorio desde oct-2023 y régimen definitivo desde 2026 (la simplificación UE 2025 agregó umbral de minimis y movió la compra de certificados a 2027 — validar texto consolidado). **sicr3p entrega la BASE trazable; la declaración CBAM oficial la presenta el importador UE.** Requiere un exportador real de esos sectores (gancho probable: hidrógeno verde). | Motor propio con factores citados + cadena de hash + comprobante verificable multilingüe + Corredor (MIC/DTA) para la traza del embarque. |
+| Emisiones por envío ISO 14083 / GLEC v3 (corredor bioceánico) | t-km reales por envío (masa y distancia — el MIC/DTA trae parte del dato) y factores por modo carretero/ferroviario/fluvial desde el GLEC v3 descargado; subir la fuente `glec_v3` a `validada_oficial` recién entonces. Hoy solo existe el factor marítimo-contenedor citado (referencial — validar) y, sin t-km, el motor cae al método por gasto. | Módulo Corredor (metodologías por país CL/AR/PY/BR en borrador con toggle) + fuente `glec_v3` en `fuentes_metodologicas` + categoría `maritimo_contenedor` del motor. |
+| Datos de Alcance 3 para ISSB IFRS S2 / NCG 461 (CMF) | Export agregado por período y proveedor con desglose por alcance y categoría GHG y fuentes citadas (CSV/JSON), citable en la memoria del mandante; mapeo explícito a las 15 categorías de Alcance 3. Validar el estado de adopción de IFRS S1/S2 por la CMF antes de afirmarlo a un cliente. Mismo prerrequisito que el portal del mandante: feedback de un mandante real usando la API. | API mandantes v2 (permisos finos + webhooks) + `alcance_ghg` por categoría del motor + informes PDF con alcances (patrón defensivo `fetchAlcancesGHG`). |
+| Bonos de carbono y compensación (vía socio externo) | sicr3p mide y traza emisiones, pero **no puede emitir bonos de carbono por sí solo**: un bono requiere un proyecto de reducción/captura verificado por un tercero acreditado (VVB) y registrado en un registro reconocido (Verra/VCS, Gold Standard, MMA Chile) — ver aviso visible en la página de resultado público y **impreso en los PDF de informe** (informe consolidado, informe de carbono del período, Estado de Capital Natural y carpeta del mandante), junto al sello de integridad hash — la constante `AVISO_NO_VERIFICACION` de `services/pdf.js`, con test de regresión en `test/informeCarbono.test.js`. Modelo de negocio propuesto (usuario, pendiente de formalizar): **Kontax** — brazo de contabilidad ambiental de una fundación — sería el socio acreditado para PCAF y emisión de bonos; cuando se cobra el certificado sicr3p, ese ingreso se destina a compensación dentro del ecosistema de la fundación. Falta definir: rol técnico exacto de Kontax (¿reciben un export de datos? ¿tienen API?), mecanismo de cobro del certificado y de derivación de fondos, y el acuerdo comercial/legal entre sicr3p y la fundación. No resoluble desde el código hasta tener esas definiciones. | Cadena de hash (integridad) y motor propio (datos reales por documento) ya dan una base de datos trazable y auditable para entregarle a un socio verificador si se define el flujo. |
+
+## 3. Plataforma
+
+| Ítem | Qué falta | Prerrequisito |
+|------|-----------|---------------|
+| Motor de cálculo propio | **Hecho para TODOS los formatos** (`services/motorPropio.js` + `extractorTexto.js`): DTE XML (motor `propio`), PDF con capa de texto y OCR (imagen/escaneado/HEIC) leídos **con IA primero** (`services/analisisIA.js`, Anthropic Claude — motor `propio_ia`) y con el parser de reglas como respaldo automático (`propio_texto`/`propio_ocr`) si la IA no está configurada, falla, o no valida. La IA SOLO extrae y clasifica (folio, RUTs, ítems, tipo de documento); el cálculo de CO2e sigue siendo 100% del motor propio determinista. Lo irresoluble ya no tiene que salir a terceros: con `MOTOR_EXTERNO=off` el envío se **rechaza en el momento** (HTTP 422, registrado en la bitácora de rechazos) y se pide reescanear — desde 7dc5c8d no existe corrección manual de datos de factura (los orígenes históricos `revision`/`propio_revisado` solo persisten como conteo en estadísticas). Motivación original del retiro del motor externo: due diligence detectó licencia amplia sobre "Customer Data" y tope de responsabilidad de solo €1.000. **Camino de retiro definitivo documentado en deploy/AUTODEPLOY.md**: cuando el % de independencia del panel sea ~100 sostenido, `MOTOR_EXTERNO=off` + eliminar `SIMPLE_API_KEY` + baja del contrato. Binarios del VPS: `apt install -y tesseract-ocr tesseract-ocr-spa poppler-utils libheif-examples`; IA: `ANTHROPIC_API_KEY` en `backend/.env`. **Tope de gasto**: la IA tiene un presupuesto diario en pesos (`ANALISIS_IA_PRESUPUESTO_DIARIO_CLP=20000` en el `.env`, día calendario de Santiago; sin definir usa 20.000 CLP, en 0 la IA queda apagada) calculado sobre `analisis_ia_uso`, porque `POST /api/sesiones` lo puede disparar cualquiera con un código de acceso y cada archivo cuesta hasta tres llamadas. Al superarlo los documentos se leen con el parser de reglas: **degradación para los que el parser sabe leer, no para todos** — el documento que solo la IA podía leer termina en 422 (con `MOTOR_EXTERNO=off`) o se va al motor externo, que no tiene tope. El 422 en ese caso dice que puede no ser culpa del documento, en vez de pedir reescanear. El panel del motor muestra "gasto de hoy / tope" y avisa cuando se alcanzó. Complementos del mismo cambio: la validez y los créditos del código se verifican **antes** de la pre-lectura (antes recién dentro de la transacción, o sea después de pagar el OCR y la IA), y `cargaLimiter` acota la ráfaga a 60 envíos por IP por hora (`middleware/rateLimit.js`). | `facturas.motor` con 7 orígenes (migración 033) + % de independencia con desglose en el admin + bitácora de rechazos (`documentos_rechazados`, migración 030) + uso/costo de IA (`analisis_ia_uso`, migración 033). |
+| Integración BigQuery | **Conector implementado** (`services/bigquery.js` + `backend/bigquery/schema.sql`): todo lo escaneado se exporta al activar `BIGQUERY_EXPORT=true`. Falta: crear el proyecto GCP, el dataset y la cuenta de servicio, y validar en producción. | Proyecto GCP con facturación. |
+| Búsqueda a gran escala (Elasticsearch) | La búsqueda por RUT con cruces ya funciona sobre PostgreSQL (`pg_trgm`, endpoint `/api/admin/buscar`). Migrar el backend de búsqueda a Elasticsearch/OpenSearch recién cuando el volumen lo exija — la API y el frontend no cambian. | Volumen de datos que lo justifique. |
+| API para mineras mandantes v2 | **Hecho: permisos finos + webhooks.** Tabla `mandante_proveedores` (lista blanca opcional por RUT proveedor, gestionable desde "Accesos externos → Gestionar"; sin filas = comportamiento actual sin cambios) y `mandantes.webhook_url` (notifica POST no bloqueante en cada sesión nueva, con bloqueo básico de URLs internas/localhost). Falta: portal del mandante (login propio, UI dedicada) — se mantiene fuera de alcance hasta tener feedback real de mandantes usando la v1/v2, tal como ya advertía este ítem. | Feedback de mandantes reales usando la v1/v2 antes de construir el portal. |
+| Cobro real VirtualPos en el POS del mostrador | Reemplazar el pago simulado del terminal por VirtualPos (Andes Tecnología). **Investigado (2026-07)**: usar la **API v3** (`POST https://api.virtualpos.cl/v3/payment/`, JSON; la v2 de GitHub es legacy por querystring); confirmación del pago SIEMPRE por **webhook al `callback_url` (POST con `uuid`) + re-consulta autenticada del Payment** — nunca por el retorno del navegador (el webhook se envía aunque el cliente cierre el navegador, clave en mostrador); firma JWT (RFC 7519) con `secret_key`; guardar ≥1 año uuid/fecha/monto/código de autorización. **Patrón recomendado para la tablet**: el backend crea el pago → la tablet muestra `url_redirect` como QR → el cliente paga en su propio teléfono → la tablet hace polling al backend por el estado del uuid. Sandbox NO autoservicio: se pide a soporte@virtualpos.cl (back-office `virtualpos-sandbox.com`, tarjetas de prueba VISA 4051 8856 0044 6623 aprueba / MC 5186 0595 5959 0568 rechaza). Tarifas publicadas referenciales: débito 1,49% / crédito 1,89% + IVA — validar. Al construir: patrón `MOCK_VIRTUALPOS=true` por defecto (igual que `MOCK_SIMPLE`), credenciales solo en `.env`. **[ACTUALIZACIÓN 2026-07-27: el terminal físico se descontinuó — de construirse, este cobro real iría en el paso de compensación de `CargarAv.jsx` (`/panel-verde`), no en una tablet dedicada]** | Cuenta sandbox (correo a soporte@virtualpos.cl) y luego credenciales productivas. El usuario confirmó "aún no" — no construir hasta que lo pida. |
+| Pasaporte Digital de Producto | **Hecho** (`/pasaporte/:id` + `GET /api/pasaporte/:id` + QR propio `qr.png`): página pública sin login que consolida por documento la identificación (titular/RUT/categoría + clasificación GHG), emisiones con método de cálculo, declaración REP, compensación (CLP + USD server-side vía `montoUsdDesdeClp`), hitos de trazabilidad reales y la cadena de hash con verificación de eslabón. i18n es/en/pt, imprimible (guardar como PDF), enlazada desde `/verificar/:id`. Espejo del módulo "Pasaporte Digital REP" de SICREP2000 adaptado al modelo de datos sicr3p: la inmutabilidad la da la cadena SHA-256 propia (no blockchain externa) y no muestra scores de certificación porque sicr3p no es certificadora — si algún día se porta el módulo de certificación completo de SICREP (evaluación, auditores, comité), es un proyecto aparte. | — |
+| Pasaporte de Origen (trazabilidad multi-eslabón estilo Minespider — generalizado a 3 tipos, migración 023) | **Ya NO es solo minería**: el módulo tiene tres tipos de pasaporte independientes con su propio catálogo de rubros y roles — `documental` (**Corredor Bioceánico**: trazabilidad de la carga/documentos por tramos — origen, transporte, depósito, frontera, puerto, destino; vinculable a `documentos_corredor` MIC/DTA), `producto` (**ciudad → mostrador sicr3p**: comercios de cualquier rubro — alimentos, bebidas, textil, embalajes, manufactura, químicos; roles productor→proveedor→comercio→punto sicr3p→comprador; **deliberadamente sin nada de cobre/minería**), y `mineral` (lo original, cátodos/concentrado de cobre, litio, oro). El checklist OECD Due Diligence de minerales SOLO aparece en pasaportes `mineral` (`resumenNormativo` devuelve `oecd: null` en los otros dos, por honestidad); CBAM y DPP siguen aplicando a los tres. Título del pasaporte público y del expediente PDF cambian según el tipo. 5 tests nuevos de tipos (223 en total). | Feedback real del Corredor y de un comercio piloto del mostrador sicr3p. |
+| Pasaporte de Origen — MVP original (mineral) | **Hecho el MVP** (migración 021 + `services/pasaporteOrigen.js` + `/api/admin/origen` + pasaporte público `/lote/:codigo` con QR e i18n es/en/pt): lotes minerales con cadena de custodia mina→planta→refinería→exportador→comprador, **cadena de hash propia POR LOTE** (primitivas de `cadenaHash.js`, append-only, lock por fila), divulgación selectiva por eslabón (publico/cadena/privado, con nonce en el preimage y RUT enmascarado en público), eslabones anclables a **DTE reales** (factura_id + advertencia si el RUT no calza), balance de masas con alerta de merma, y alineación normativa honesta: checklist OECD DDG 5 pasos + Anexo II (`lote_declaraciones`), datos CBAM-ready (NC, emisiones incorporadas directas/indirectas t CO2e/t, método; `cbamAplicable` dice solo que el cobre no está en el Anexo I vigente) y formato DPP/ESPR. 18 tests nuevos. **Ruta sin GPS — HECHO con la Tarjeta de Viaje (migración 022, docs/TARJETA-VIAJE.md)**: la credencial viaja CON la carga (la carga no puede ser obligada a pasar por puntos fijos). **Credencial VIRTUAL con QR — sin chip, costo cero por unidad** (`generateCredencialTarjeta`: PDF tamaño tarjeta descargable desde el admin y compartible por WhatsApp; la página `/v/{serial}` muestra su propio QR y actúa como credencial viva en el teléfono; NFC físico y pases Apple/Google Wallet quedan documentados como opción futura con sus costos reales). Tarjeta (`tarjetas_viaje`, serial `TV-XXXX`, clave bcrypt del portador entregada una sola vez) resuelta en `/v/{serial}`: cualquiera que la lea VE el pasaporte (sin registro anónimo, por decisión de diseño); el portador con clave registra pasos (`POST /api/tarjeta/auth` + `/paso`, rol JWT `tarjeta`) que entran sellados como eslabones `transporte` con punto de control — la ruta es la secuencia de pasos con hash, sin GPS. Al **cerrar** el lote su hash final se **ancla en la cadena global** (`cadena_anclajes` comparte la secuencia de `cadena_estado`; las verificaciones globales leen la UNIÓN facturas+anclajes) y el **expediente PDF sellado** (`GET /api/lote/:codigo/expediente.pdf`, `generateExpedienteLote`) se imprime y archiva junto a la tarjeta como respaldo físico verificable por QR. Falta (fase 3): autocompletar eslabón desde factura, `GET /api/mandante/lotes` (nivel `cadena` con X-Api-Key), export CSV "paquete due diligence", carga CSV/API de eslabones, EPCIS 2.0, splits de lote padre→hijos, validación del UID físico en la lectura NFC (hoy es registro informativo). | Feedback de un lote real de un cliente minero. |
+| El Libro del proyecto | **Hecho** (`docs/libro/`): el proyecto completo como libro navegable — 13 capítulos con menú lateral (CSS puro + realce por IntersectionObserver), diseño de marca (libro.css, imprimible A4 con menú oculto), PDF generado (`el-libro-sicr3p.pdf`) y servido por nginx en `/docs/libro/` (`servir-docs.sh` reescrito con inserción idempotente por bloque, cubre configs ya parchadas). Incluye el capítulo 12 "Opinión del autor": evaluación honesta con fortalezas (verificabilidad pública, honestidad como activo, integración carbono+REP+origen, costo marginal ~0), riesgos (cero ventas, operación unipersonal, ancho vs foco, pendientes humanos) y recomendaciones priorizadas (congelar features hasta 1 cliente real, cuña de entrada = mostrador sicr3p en comercios, cerrar checklist humano, segundo par de manos antes que financiamiento grande). La versión web es la vigente; se actualiza con el proyecto. | — |
+| App de tablet (PWA del terminal de mostrador) | **Hecho** (frontend/public/): manifest con `start_url /pos` (la app instalable ES el terminal; el sitio sigue siendo sitio), íconos del isotipo rasterizados (192/512 + maskable), service worker mínimo a mano (network-first en navegaciones con fallback a caché, stale-while-revalidate solo en /assets e /icons, **JAMÁS cachea /api** — server-authoritative; skipWaiting+claim para que cada deploy reemplace la versión), registro solo en producción, y **Wake Lock** en PosTerminal.jsx (la tablet no se duerme con sesión de terminal activa; fallo silencioso sin soporte). **Prerequisito real: HTTPS** — la instalación PWA exige dominio + certbot (`instalar-vps.sh app.sicr3p.cl`); por IP/HTTP el terminal sigue funcionando en navegador, sin instalación. **[ACTUALIZACIÓN 2026-07-27: el terminal físico `/pos` y `docs/TABLET.md` se descontinuaron — el mostrador opera vía `/panel-verde`, instalable con `manifest-terreno.webmanifest` (`start_url: /panel-verde`)]** | Dominio apuntado + certbot (decisión del operador). |
+| Carpeta física para el mandante | **Hecho** (`generateCarpetaMandante` en pdf.js + `GET /api/sesiones/:id/carpeta.pdf?mandante=`): las mineras y grandes empresas piden la evidencia EN PAPEL — la carpeta es el PDF único imprimible del trámite: portada dirigida al mandante (nombre saneado vía `sanearNombreMandante`, solo texto de portada, jamás persistido), resumen con tarjetas (t CO2e, documentos, REP), grilla de documentos con **QR de verificación individual** (2×3 por página), declaración REP con componentes, y la **hoja de comprobación en 30 segundos** para el receptor (pasos + sello de integridad con hash impreso). Botón "Imprimir carpeta" con campo de mandante en el comprobante del POS + botón en /resultado. De paso se corrigió un bug real: `bufferDoc()` llamado al inicio en `generateExpedienteLote` cerraba el PDF antes de dibujar (expedientes salían vacíos) — ahora ambos generan al final, verificado con prueba de humo sintética (33KB con REP / 16KB sin). | Impresora en el punto (cualquier WiFi/USB). |
+| Torre de Control (demo Corredor: mapa vivo + mensajes al camión) | **Hecho** (`/torre/:codigo` + migración 024 + `docs/TORRE-DE-CONTROL.md`): mapa real OpenStreetMap (Leaflet, chunk lazy de 158 KB que no pesa en el bundle público) con el corredor Campo Grande→Antofagasta; el **camión avanza cuando el portador escanea el QR y registra un paso** — sin GPS: la posición es el último punto de control sellado en la cadena del lote (catálogo de 14 puntos referenciales en `frontend/src/lib/corredor.js`, `datos.punto_id` saneado en el servidor). La **torre** (credencial de terminal, rol `pos`, vía `POST /api/torre/mensaje`) envía instrucciones **"puerto seco" / "puerto"** que el portador ve en su credencial `/v/:serial` (polling; los mensajes son append-only en `torre_mensajes` y NO entran en la cadena de hash — operación ≠ custodia). **v2 (migración 025): vista de FLOTA en `/torre`** — todos los camiones activos en un solo mapa (solo operadores con credencial; endpoint `GET /api/torre/flota` rol `pos`), cada camión con su código colgando del ícono; un camión SIN pasos no se dibuja y **aparece cuando el chofer activa la tarjeta con su primer paso**. Tercer destino de instrucción: **`estacionamiento` con zona obligatoria** (`validarMensajeTorre`, ej. "Zona E-3, La Negra") que el chofer ve en el banner de su credencial. Botón admin "Crear demo" arma todo en un clic: ahora **3 camiones** (dos ya en movimiento en Mariscal Estigarribia y Susques, el tercero sin ruta para el efecto "aparece al activar") + terminal torre que los comanda a todos, claves mostradas una sola vez. De paso se corrigió un bug real: los pasos de tarjeta con país CL nunca se podían registrar (`validarEslabon` exigía RUT a todo actor chileno; ahora el rol `transporte` queda exento — la identidad la da la clave de la tarjeta — y si el RUT viene se valida módulo 11 igual). E2E completo verificado en local (Postgres real, migraciones 001→024): demo → 2 pasos QR → mensaje → instrucción en credencial → negativos 400/401/403/404 → cadena íntegra. 227 tests. | Internet en el dispositivo que mira la torre (mosaicos OSM). |
+| Sistema de correo (buzones + transaccional) | **Definido y documentado (decisión 2026-07): Zoho Mail gratuito** para los buzones humanos (contacto@, postmaster@) + **Resend** para el transaccional de la plataforma (`services/mailer.js` ya integrado, hoy en modo consola sin clave). Nuevo verificador de solo lectura `deploy/verificar-correo.sh <dominio>`: interroga el DNS real y reporta ✓/✗ de MX (distingue camino Zoho / Poste.io autoalojado), SPF (detecta el error clásico de DOS `v=spf1`), DKIM Zoho y Resend, DMARC y verificación Zoho, con resumen "Faltan: …". `deploy/WEBMAIL.md` reordenado Zoho-first (§7 camino recomendado, §6.1 activar Resend) y `ORDEN-DE-EJECUCION.md` §3 reescrito como checklist de 30 min con los registros exactos para DonWeb. Poste.io autoalojado queda como camino B de soberanía (solo ahí aplica el ticket rDNS/puerto 25 a DonWeb). | Pendiente humano: crear la cuenta Zoho, pegar los registros DNS en DonWeb y correr `bash deploy/verificar-correo.sh sicr3p.cl` hasta ver todo ✓. |
+| Login con llave USB (WebAuthn/FIDO2) | **Fase 1 hecha**: login sin contraseña con una llave FIDO2 con sensor biométrico (YubiKey Bio, Kensington VeriMark, Feitian BioPass — hardware estándar, sin fabricar nada propio); migración 061 (`credenciales_webauthn`/`webauthn_challenges`), `routes/webauthn.js` (login público, mismo shape que `/auth/login`), registro/baja de llaves desde `admin/Usuarios.jsx` (solo admin). El verificador biométrico se valida dentro de la llave; el servidor nunca lo recibe, solo una firma. **Fase 2 descartada de esta ronda por decisión de alcance**: un companion nativo corriendo en segundo plano mientras la llave está conectada, haciendo cálculos/sincronización offline — es un proyecto de semanas (empaquetado de escritorio, firma de código, qué calcula sin conexión al backend/Postgres) que necesita su propia sesión de diseño; no se implementó nada de eso. | Fase 2: definir sistema operativo objetivo, qué calcula offline, y cómo se distribuye/actualiza el companion. |
+| Llave de archivo (arranque Etapa 3) | **Hecho**: tercera vía de login junto a la contraseña y la llave FIDO2 — un archivo `.sicr3p-llave` (token de 48 bytes, sin cifrar a propósito) que el admin emite y el usuario guarda en cualquier pendrive, más un PIN de 6 dígitos generado por el sistema. Ambos viajan UNA sola vez, igual que la clave de una tarjeta de viaje. El PIN se verifica en el SERVIDOR (bcrypt + bloqueo de 15 min tras 5 fallos) — no cifrando el archivo, que se rompería offline en segundos. Es, y se dice así en toda la UI, **la vía más débil de las tres**: un archivo se puede copiar. Migración 068 (`credenciales_archivo`), `routes/llaveArchivo.js` (login público en `/api/auth/llave-archivo`, mismo shape que `/auth/login`), emisión/revocación desde `admin/Usuarios.jsx` (solo admin; revocación permanente — para "cambiar el PIN" se revoca y se emite otra). | Extenderla a los logins por panel (`PanelLogin.jsx`) si hay feedback real; hoy solo vive en el acceso único `/ingresar`. |
+| Superadmin multi-panel + roles reales en los paneles externos | **Hecho**: los 7 paneles siguen aislados igual que antes — lo que cambia es que una cuenta marcada `es_superadmin` (columna nueva, migración 069, con CHECK que exige `panel='sicrep'` Y `rol='admin'`) puede pedir una **vista de solo lectura** de cualquier otro panel desde el sidebar del admin. `POST /api/admin/entrar-a-panel` valida que la entidad exista y esté activa, y emite un **JWT sintético** de 5 minutos **sin refresh**: `sub` es `imp:<id>:<panel>` (una cadena, no un UUID de `usuarios`, igual que el `cliente:` del magic link) y `nivel_acceso` es **`lectura`** — la vista NO puede firmar un lote ni subir un documento, porque eso sellaría un eslabón en la cadena de custodia con el RUT del actor real. Todo el cruce se logra emitiendo un token que **ya cumple** `requireHomePanel` y los 4 chequeos manuales de puerto/mandante/agencia/trazador: ninguno se aflojó. `GET /api/auth/me` responde desde el payload cuando la sesión es de vista, `PUT /api/auth/password` la rechaza, `actividad_log` registra al superadmin REAL con `via: 'vista_superadmin'`, y un admin normal **no** puede emitir credenciales (llave FIDO2 o de archivo) sobre una cuenta superadmin — sin ese guard escalaba en dos llamadas. Segunda mitad: columna `nivel_acceso` (`lectura`|`operador`, migración 070) que restringe de verdad **las 2 únicas mutaciones que existen hoy** fuera de sicrep/terreno (subir documento en Agencia, firmar lote en Proveedor); en puerto/mandante/trazador el campo existe por consistencia y **hoy no tiene efecto práctico** — no es trabajo a medias, esos paneles son 100% de lectura. `admin/Usuarios.jsx` pasa a ser la única pantalla de cuentas de las 7 áreas (filtro por panel, alta de cuentas externas con selector de entidad); `Accesos.jsx` sigue gestionando las entidades de negocio. **El admin inicial del seed nace como superadmin** — es la única cuenta de una instalación nueva; para marcar otra, un superadmin usa el botón de `Usuarios.jsx`. | Feedback de uso real: si la vista de 5 minutos resulta corta, el TTL es el parámetro a mover (no el `nivel_acceso`). |
+| Auto-registro de clientes | Alta de cuentas sin admin. | Decisión comercial + flujo de pago. |
+| TNFD LEAP completo | Evaluación de dependencias e impactos en naturaleza (Locate-Evaluate-Assess-Prepare). | Módulo Capital Natural como fuente de datos. |
+| Ley REP real desde el proveedor (sin POS) | **Hecho** (migración 087 + `services/repProveedor.js` + `routes/repProveedor.js` en `/api/panel-proveedor/rep` + pestaña "Ley REP" en el panel de la empresa): la declaración REP deja de depender del terminal de mostrador — el productor obligado por la Ley 20.920 es la EMPRESA, y ahora declara desde su propio panel (teléfono en terreno incluido). Flujo: catálogo de productos (`productos_proveedor`, composición del envase de UNA unidad, misma fórmula server-side de `services/rep.js` — no hay dos fórmulas), sube su factura de venta como **evidencia** (foto/PDF/XML, BYTEA + sha256) y la "pega" a sus productos con unidades → **kilos de envases puestos en el mercado por MATERIAL y período** (`ventas_rep`, items como SNAPSHOT: editar el producto no reescribe lo vendido), que es exactamente lo que se declara en RETC/SGR. Incluye umbral de exención Art. 25 (300 kg/año, nota referencial) y aviso fijo: el resumen es **insumo** — la declaración formal ante el MMA la hace la empresa, sicr3p no declara ni certifica. **Decisión deliberada**: REP NO exige contrato vigente (a diferencia del SII) — es una obligación legal de la empresa, no un servicio contratado; no se le pone peaje a cumplir la ley. Tablas clasificadas en el inventario de datos (NO_PERSONAL con motivo). 6 tests de servicio. **Fuera de alcance (siguientes pasos honestos)**: integración/export directo a Ventanilla Única RETC, metas y ecomodulación por sistema de gestión (GRANSIC), otros productos prioritarios (neumáticos, aceites, pilas, AEE), y pre-llenado de la venta leyendo la factura con el motor propio (hoy el vínculo factura→productos es manual a propósito: es una declaración de la empresa, no una inferencia). | Feedback de una empresa real declarando un período completo; decisión sobre leer la factura con el motor para sugerir líneas. |
+
+## Backlog técnico heredado
+
+- Empaque `.exe`/binario de la edición portátil (`pkg` aún no soporta `node:sqlite`).
+- Cifrado total de la base del portátil en reposo (hoy: clave SII cifrada + candado).
+- Pase dedicado de accesibilidad (WCAG) y responsividad fina del panel admin.
+
+## Criterio de entrada a Etapa 3
+
+Cerrar primero: piloto con clientes reales (códigos de fundador del pre-lanzamiento),
+verificación del motor externo en el VPS (`backend/scripts/verificar-simple.js` con
+`MOCK_SIMPLE=false`) y despliegue productivo (README → "Despliegue en VPS").

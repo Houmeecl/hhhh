@@ -8,7 +8,7 @@ export default function SimpleApi() {
 
   return (
     <div>
-      <div className="admin-head"><h1>Motor externo (Simple)</h1></div>
+      <div className="admin-head"><h1>Motor externo</h1></div>
 
       <div className="stat-grid" style={{ marginBottom: 20 }}>
         <div className="stat">
@@ -24,6 +24,7 @@ export default function SimpleApi() {
 
       <div className="card card-pad">
         <h3 style={{ marginTop: 0 }}>Consumo por endpoint</h3>
+        <div className="table-scroll">
         <table className="data">
           <thead><tr><th>Endpoint</th><th>Método</th><th className="num">Llamadas</th><th className="num">Latencia prom.</th><th className="num">Costo estimado</th></tr></thead>
           <tbody>
@@ -39,10 +40,11 @@ export default function SimpleApi() {
             {d.por_endpoint.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin llamadas registradas.</td></tr>}
           </tbody>
         </table>
+        </div>
       </div>
 
       <p className="muted" style={{ fontSize: 13, marginTop: 14 }}>
-        La clave del motor externo vive solo en el backend. Para pasar a producción: <code>MOCK_SIMPLE=false</code> + una <code>SIMPLE_API_KEY</code> real.
+        La clave del motor externo vive solo en el backend. Para pasar a producción, actívala y desactiva el modo simulado en la configuración del servidor.
       </p>
     </div>
   );

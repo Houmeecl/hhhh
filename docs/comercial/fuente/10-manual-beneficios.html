@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>sicr3p — Manual de beneficios: recorrido end-to-end</title>
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="marca">sicr3p<span class="punto">.</span> <span style="font-weight:400; font-size:10pt; color:#94a3b8;">— Tu contabilidad, tu trazabilidad.</span></div>
+  <div>
+    <div class="tipo-doc">MANUAL DE BENEFICIOS · RECORRIDO END-TO-END</div>
+    <h1>De la factura al<br>Pasaporte Digital,<br>pantalla por pantalla</h1>
+    <p class="bajada">Este manual muestra la plataforma real, tal como la ve tu cliente y tu
+    operador — sin mockups. Cada pantalla trae al lado el beneficio concreto que entrega.
+    Dos recorridos completos: el comercio que atiende en la atención en terreno de sicr3p,
+    y la carga que cruza el Corredor Bioceánico.</p>
+  </div>
+  <div class="pie">
+    <span>sicr3p SpA · Antofagasta, Chile · contacto@sicrep.cl</span>
+    <span>Versión 1.0 · Julio 2026</span>
+  </div>
+</div>
+
+<!-- 1. QUÉ VAS A VER -->
+<div class="pagina">
+  <h2>1. Qué vas a ver en este manual</h2>
+
+  <div class="caja-alerta">
+    <strong>Sobre las capturas:</strong> todas las imágenes de este manual son pantallazos
+    reales de la plataforma, tomados en un entorno de demostración con datos ficticios
+    ("Comercial Andina SpA", lotes y camiones de prueba). La interfaz es la que opera hoy;
+    los datos de ejemplo no corresponden a un cliente real.
+  </div>
+
+  <p>Dos recorridos, uno por sección, cada pantalla con su beneficio:</p>
+
+  <table>
+    <tr><th>Recorrido</th><th>De dónde a dónde</th><th>Para quién</th></tr>
+    <tr>
+      <td><strong>A. El comercio en la atención en terreno</strong></td>
+      <td>Llega con una factura → sale con cálculo, declaración REP, Pasaporte Digital y
+      comprobante QR — comprobables por cualquiera, en segundos.</td>
+      <td>Pymes, comercios, proveedores de mandantes.</td>
+    </tr>
+    <tr>
+      <td><strong>B. El Corredor Bioceánico</strong></td>
+      <td>Un lote nace con su credencial → viaja por 4 países registrando pasos sellados →
+      la Torre de Control lo sigue en vivo → llega con su historia completa verificable.</td>
+      <td>Generadores de carga, transporte, depósitos, terminales.</td>
+    </tr>
+  </table>
+
+  <h3>1.1 El hilo conductor de todo el manual</h3>
+  <p>Cada pantalla de este documento resuelve la misma pregunta que hace cualquier cliente:
+  <em>"¿y cómo sé que esto es verdad?"</em>. La respuesta es siempre la misma — un código
+  QR que lleva a una página pública, sin cuenta ni permiso, respaldada por una cadena de
+  hash de solo-agregado. Ese hilo aparece marcado con el ícono <span class="badge badge-green">✓ verificable</span>
+  en cada pantalla donde corresponde.</p>
+
+  <p class="ref">Estado real de la plataforma: en pre-lanzamiento. El terminal, los pasaportes,
+  la Tarjeta de Viaje y la Torre de Control ya están operativos; la red física de operadores en terreno
+  presenciales está en formación (sección 9 detalla cómo sumarse como piloto fundador).</p>
+</div>
+
+<!-- 2. PUNTO DE PARTIDA: LA VITRINA PÚBLICA (2a) -->
+<div class="pagina seccion">
+  <h2>2. El punto de partida: la vitrina de sicr3p, en línea y en terreno</h2>
+  <p>Antes de cualquier trámite, el cliente ve el sitio. <strong>sicr3p</strong> es una sola
+  identidad para toda su oferta: la plataforma online y la atención en terreno hablan el
+  mismo idioma, con el mismo motor y la misma trazabilidad por dentro.</p>
+
+  <div class="captura" style="max-width:150mm; margin-left:auto; margin-right:auto;">
+    <img src="img/manual/01-landing-sicr3p.png" alt="Landing de sicr3p">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> el sitio de sicr3p es la vitrina de la plataforma completa — lo primero
+    que ve un mandante, un exportador o un socio antes de confiar en el servicio.
+  </div>
+</div>
+
+<!-- 2b -->
+<div class="pagina seccion">
+  <h2>2. El punto de partida (continuación) — la portada pública</h2>
+
+  <div class="captura" style="max-width:150mm; margin-left:auto; margin-right:auto;">
+    <img src="img/manual/02-portada.png" alt="Portada pública de sicr3p">
+  </div>
+  <p style="font-size:8.5pt; color:#94a3b8; text-align:center; margin-top:2mm;"><em>Captura
+  histórica, tomada antes de unificar todo bajo una sola marca — el diseño y el recorrido
+  descritos siguen vigentes.</em></p>
+  <div class="beneficio">
+    <b>Beneficio:</b> la portada usa una sola identidad de sicr3p,
+    con el Pasaporte Digital como protagonista del hero — el comercio entiende en 5 segundos
+    qué se lleva de una visita, sin leer letra chica.
+  </div>
+</div>
+
+<!-- 3.I EN EL TERMINAL — LLEGAR Y CONECTAR -->
+<div class="pagina seccion">
+  <h2>3. En el terminal (I) — llegar y conectar</h2>
+  <p>El panel de terreno es un <strong>dispositivo registrado</strong> (como un POS de
+  tarjetas): entra con un ID y una clave propios, así cada trámite queda asociado a su punto
+  de atención.</p>
+
+  <div class="dos-col">
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/03-pos-inicio.png" alt="Pantalla de inicio del terminal"></div>
+      <div class="beneficio"><b>Beneficio:</b> dos puertas claras — atender un trámite o
+      verificar un documento en portería — sin menús escondidos.</div>
+    </div>
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/04-pos-conexion.png" alt="Pantalla de conexión del terminal"></div>
+      <div class="beneficio"><b>Beneficio:</b> login por dispositivo, no por persona — el
+      operador cambia de turno sin compartir contraseñas personales.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3.II DATOS Y CAPTURA -->
+<div class="pagina seccion">
+  <h2>3. En el terminal (II) — datos del cliente y captura</h2>
+  <p>Una <strong>barra de pasos</strong> acompaña todo el trámite: el operador siempre sabe
+  en qué paso va y cuánto falta — sin adivinar.</p>
+
+  <div class="dos-col">
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/05-pos-cliente.png" alt="Datos del cliente con barra de pasos"></div>
+      <div class="beneficio"><b>Beneficio:</b> solo 3 campos obligatorios a la vista; el
+      código de acceso con créditos queda plegado — nadie se pierde en un campo que no usa.</div>
+    </div>
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/06-pos-captura.png" alt="Captura de documentos: foto o XML/PDF"></div>
+      <div class="beneficio"><b>Beneficio:</b> foto con la cámara de la tablet o carga de
+      XML/PDF — hasta 5 documentos por trámite, sin instalar nada.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3.III RESULTADO Y COBRO -->
+<div class="pagina seccion">
+  <h2>3. En el terminal (III) — el resultado y el cobro</h2>
+  <p>El cálculo lo hace <strong>el servidor</strong>, nunca la tablet: el operador no puede
+  alterar una cifra aunque quisiera.</p>
+
+  <div class="dos-col">
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/07-pos-resultado.png" alt="Resultado del cálculo, ítem por ítem"></div>
+      <div class="beneficio"><b>Beneficio:</b> el detalle ítem por ítem con % del total — el
+      cliente ve de dónde sale cada cifra, no solo un número final.</div>
+    </div>
+    <div>
+      <div class="captura captura-tablet"><img src="img/manual/08-pos-cobro.png" alt="Compensación voluntaria del CO2 calculado"></div>
+      <div class="beneficio"><b>Beneficio:</b> tarifa oficial visible y compensación siempre
+      <strong>voluntaria</strong> — hoy en modalidad simulada, sin pasarela real, mientras se
+      formaliza el socio ambiental.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3.IV LA ENTREGA -->
+<div class="pagina seccion">
+  <h2>3. En el terminal (IV) — la entrega</h2>
+  <p>La pantalla final ya no es una lista de 8 botones al mismo nivel: separa lo que el
+  cliente <strong>se lleva</strong> de lo que es accesorio.</p>
+
+  <div class="captura captura-tablet" style="max-width:80mm; margin:0 auto;">
+    <img src="img/manual/09-pos-comprobante.png" alt="Comprobante final: QR, carpeta e informe">
+  </div>
+  <div class="beneficio" style="max-width:120mm; margin:3mm auto 0;">
+    <b>Beneficio:</b> el QR de verificación y el botón "Imprimir carpeta" quedan al frente;
+    correo, sello e informe PDF se pliegan en "Más opciones". El equipo de terreno cierra el trámite
+    en dos toques, no en diez.
+  </div>
+</div>
+
+<!-- 4. PASAPORTE DIGITAL -->
+<div class="pagina seccion">
+  <h2>4. Lo que el cliente se lleva: el Pasaporte Digital</h2>
+  <p>Cada documento procesado genera esta página — pública, sin cuenta, sin clave. El QR del
+  comprobante lleva directo aquí.</p>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/10-pasaporte-digital.png" alt="Pasaporte Digital de Producto público">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> emisiones, declaración REP y estado de la cadena de integridad en una
+    sola pantalla <span class="badge badge-green">✓ verificable</span>. Formato alineado al
+    Pasaporte Digital de Producto europeo (ESPR): el mismo tipo de dato que la UE exigirá por
+    categorías de producto en los próximos años.
+  </div>
+</div>
+
+<!-- 5. COMPROBACIÓN PÚBLICA (5a) -->
+<div class="pagina seccion">
+  <h2>5. Comprobación pública, sin pedir permiso</h2>
+  <p>El mandante, el comprador o cualquier tercero pueden comprobar por su cuenta — no
+  tienen que confiar en la palabra de nadie, incluida la de sicr3p.</p>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/11-verificar.png" alt="Página pública de verificación de un documento">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> confirma en una vista si el documento es válido y si su eslabón en la
+    cadena está intacto — el dato que un auditor o un mandante pide primero.
+  </div>
+</div>
+
+<!-- 5b -->
+<div class="pagina seccion">
+  <h2>5. Comprobación pública (continuación) — la cadena completa</h2>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/12-cadena.png" alt="Explorador público de la cadena de integridad">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> el estado completo de la cadena pública de sicr3p, a la vista de
+    cualquiera, todo el tiempo — nadie, ni sicr3p, puede alterar un registro pasado sin que
+    la cadena deje de cuadrar.
+  </div>
+</div>
+
+<!-- 6. TARJETA DE VIAJE -->
+<div class="pagina seccion">
+  <h2>6. El Corredor Bioceánico — la credencial que viaja con la carga</h2>
+  <p>Aquí empieza el segundo recorrido. Un lote de carga que cruza Brasil, Paraguay,
+  Argentina y Chile nace con esta credencial: un QR, sin chip, sin costo por unidad.</p>
+
+  <div class="dos-col" style="align-items:center;">
+    <div class="captura captura-movil"><img src="img/manual/16-tarjeta-viaje.png" alt="Tarjeta de Viaje: credencial del portador con QR"></div>
+    <div>
+      <p style="margin-top:0;">La tarjeta se comparte por WhatsApp o se imprime. Cualquiera
+      que la escanee <strong>ve</strong> el pasaporte del lote; solo el portador con su clave
+      <strong>registra pasos</strong> en ruta.</p>
+      <div class="beneficio">
+        <b>Beneficio:</b> reemplaza el GPS caro por una secuencia de pasos sellados con hash
+        en puntos de control conocidos — la ruta queda probada sin hardware ni integración
+        de sistemas.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 7. TORRE DE CONTROL — FLOTA -->
+<div class="pagina seccion">
+  <h2>7. La Torre de Control — toda la flota, un mapa</h2>
+  <p>El operador logístico entra con su credencial y ve, en un mapa real (OpenStreetMap),
+  todos los camiones activos del corredor a la vez.</p>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/13-torre-flota.png" alt="Torre de Control: vista de flota con múltiples camiones">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> un camión aparece en el mapa recién cuando su chofer activa la tarjeta
+    con el primer paso — cero configuración previa. La torre puede enviarle instrucciones a
+    cada chofer: ir a puerto, a puerto seco, o a una zona de estacionamiento designada, que
+    ve al instante en su credencial.
+  </div>
+</div>
+
+<!-- 8. LOTE: RUTA Y PASAPORTE (8a) -->
+<div class="pagina seccion">
+  <h2>8. Cada lote, su historia — ruta y pasaporte</h2>
+  <p>Desde la vista de flota se abre la torre de <strong>ese</strong> lote: su ruta propia,
+  sellada paso a paso.</p>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/14-torre-lote.png" alt="Torre de Control de un lote específico">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> la línea de tiempo de pasos y la ruta verde son la prueba de recorrido
+    — sin GPS, sin rastreo de personas, solo pasos declarados por actores autorizados.
+  </div>
+</div>
+
+<!-- 8b -->
+<div class="pagina seccion">
+  <h2>8. Cada lote, su historia (continuación) — el pasaporte del lote</h2>
+
+  <div class="captura" style="max-width:150mm; margin:0 auto;">
+    <img src="img/manual/15-pasaporte-origen-lote.png" alt="Pasaporte de Origen documental del lote, página pública">
+  </div>
+  <div class="beneficio">
+    <b>Beneficio:</b> el Pasaporte de Trazabilidad Documental del lote — cadena de custodia
+    con divulgación selectiva por eslabón — <span class="badge badge-green">✓ verificable</span>
+    por el comprador al final del viaje, igual que el Pasaporte Digital del comercio.
+  </div>
+</div>
+
+<!-- 9. RESUMEN DE BENEFICIOS -->
+<div class="pagina seccion">
+  <h2>9. Resumen de beneficios</h2>
+  <table>
+    <tr><th>Pantalla</th><th>Beneficio en una frase</th></tr>
+    <tr><td>Landing sicr3p / atención en terreno</td><td>Misma identidad en ambos canales, sin letra chica escondida.</td></tr>
+    <tr><td>Terminal — barra de pasos</td><td>El operador nunca se pierde en un trámite de 5 pasos.</td></tr>
+    <tr><td>Terminal — resultado y cobro</td><td>Cálculo del servidor, tarifa oficial visible, compensación siempre voluntaria.</td></tr>
+    <tr><td>Terminal — entrega</td><td>QR e imprimir carpeta al frente; el resto, un toque más allá.</td></tr>
+    <tr><td>Pasaporte Digital</td><td>Emisiones + REP + cadena en una pantalla pública, alineada al DPP europeo.</td></tr>
+    <tr><td>Verificación y cadena</td><td>Cualquiera comprueba sin pedir permiso ni crear cuenta.</td></tr>
+    <tr><td>Tarjeta de Viaje</td><td>Credencial QR sin costo por unidad, sin hardware.</td></tr>
+    <tr><td>Torre de Control (flota y lote)</td><td>La ruta completa del corredor, en vivo, sin GPS.</td></tr>
+  </table>
+</div>
+
+<!-- 10. CÓMO EMPEZAR -->
+<div class="pagina seccion">
+  <h2>10. Cómo empezar</h2>
+  <div class="flujo">
+    <div class="paso"><div class="num">1</div><div class="txt"><b>Escríbenos.</b> Un correo a
+    contacto@sicrep.cl contando tu caso: comercio, exportación, corredor o mandante.</div></div>
+    <div class="paso"><div class="num">2</div><div class="txt"><b>Prueba con tus propios
+    documentos.</b> En la misma sesión ves tu cálculo, tu declaración y tu QR funcionando —
+    con tus datos reales, no una demo genérica.</div></div>
+    <div class="paso"><div class="num">3</div><div class="txt"><b>Súmate como piloto
+    fundador.</b> Durante el pre-lanzamiento, sin costo de licencias. Tarifas por trámite o
+    por lote se conversan después, con datos reales del piloto en la mano.</div></div>
+  </div>
+
+  <div class="caja-navy">
+    <h4>Contacto</h4>
+    <p style="margin:2mm 0 0; text-align:left;">sicr3p SpA · Antofagasta, Chile<br>
+    <strong>contacto@sicrep.cl</strong> · www.sicr3p.cl</p>
+  </div>
+
+  <p class="ref">Todas las pantallas de este manual corresponden a funcionalidad ya construida
+  y operativa en la plataforma — no a un plan de desarrollo futuro.</p>
+</div>
+
+<!-- CIERRE -->
+<div class="pagina seccion">
+  <h2>Lo que sicr3p no es — honestidad por diseño</h2>
+  <ul>
+    <li><strong>No es un certificador ni un verificador acreditado.</strong> Estructura y
+    sella registros <em>alineados a</em> marcos existentes (GHG Protocol, ISO 14064-1, Ley
+    20.920, ESPR/DPP), siempre citando la fuente.</li>
+    <li><strong>No es una autoridad.</strong> La atención en terreno es un canal de atención
+    de sicr3p, sin relación con el Servicio Nacional de Aduanas.</li>
+    <li><strong>No vende bonos de carbono.</strong> La compensación es voluntaria, a tarifa
+    referencial, y hoy opera en modalidad simulada, sin pasarela de pago real.</li>
+    <li><strong>No usa blockchain especulativa.</strong> La cadena de integridad es una cadena
+    de hash propia, de solo-agregado, verificable públicamente.</li>
+  </ul>
+
+  <p class="pie-doc">sicr3p — Manual de beneficios · Versión 1.0 · Julio 2026 · Documento
+  informativo. Las capturas provienen de un entorno de demostración con datos ficticios.
+  sicr3p SpA no es certificador, auditor, verificador acreditado ni autoridad pública; registra
+  y estructura declaraciones y documentos verificables de sus usuarios, con integridad
+  respaldada por una cadena de hash pública de solo-agregado.</p>
+</div>
+
+</body>
+</html>

@@ -12,7 +12,7 @@ export async function qrDataUrl(facturaId) {
     errorCorrectionLevel: 'M',
     margin: 1,
     width: 320,
-    color: { dark: '#1e2a3a', light: '#ffffff' },
+    color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }
 
@@ -22,6 +22,54 @@ export async function qrBuffer(facturaId) {
     errorCorrectionLevel: 'M',
     margin: 1,
     width: 320,
-    color: { dark: '#1e2a3a', light: '#ffffff' },
+    color: { dark: '#0f1f2e', light: '#ffffff' },
+  });
+}
+
+// URL pública del Pasaporte Digital de Producto de una factura.
+export function pasaporteUrl(facturaId) {
+  return `${config.publicAppUrl}/pasaporte/${facturaId}`;
+}
+
+// URL pública del Pasaporte de Origen de un lote mineral.
+export function loteUrl(codigo) {
+  return `${config.publicAppUrl}/lote/${codigo}`;
+}
+
+// URL pública de la tarjeta de viaje (credencial virtual con QR).
+export function tarjetaUrl(serial) {
+  return `${config.publicAppUrl}/v/${serial}`;
+}
+
+// URL pública de verificación de una constancia de capacitación.
+export function constanciaUrl(serial) {
+  return `${config.publicAppUrl}/constancia/${serial}`;
+}
+
+// URL pública de verificación de un canje de constancia de "Sube y Suma".
+export function constanciaJuegoUrl(serial) {
+  return `${config.publicAppUrl}/suma/constancia/${serial}`;
+}
+
+// URL de la pantalla Reciclar de "Sube y Suma" con el punto limpio
+// pre-seleccionado — es lo que codifica el cartel QR del punto.
+export function reciclarUrl(token) {
+  return `${config.publicAppUrl}/suma/reciclar?punto=${encodeURIComponent(token)}`;
+}
+
+// URL pública de la credencial de firma del proveedor (atestación).
+export function firmaProveedorUrl(serial) {
+  return `${config.publicAppUrl}/f/${serial}`;
+}
+
+// Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
+// `width` opcional: 320 para embeber en PDF/pantalla, más grande (ej.
+// 1024) para carteles imprimibles como el del punto limpio.
+export async function qrBufferDe(url, width = 320) {
+  return QRCode.toBuffer(url, {
+    errorCorrectionLevel: 'M',
+    margin: 1,
+    width,
+    color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }
