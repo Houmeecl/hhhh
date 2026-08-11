@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
 import { api, authProveedor } from '../api.js';
 import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
@@ -8,15 +8,26 @@ import AnalisisSii from './AnalisisSii.jsx';
 import Rep from './Rep.jsx';
 import MisDatos from './MisDatos.jsx';
 
-// Shell mínimo, sin sidebar: tres pestañas alcanzan. Arranca en la
-// contabilidad de carbono (SII) porque es lo que trae acá a toda empresa
-// enrolada; firmar lotes es un encargo puntual de unas pocas, y aterrizar en
-// "Lotes por firmar" les mostraba una tabla vacía como primera pantalla.
+// Shell mínimo, sin sidebar: cuatro pestañas alcanzan. Cada una es una
+// ruta real (NavLink + <Routes> anidadas) — mismo patrón que los otros 7
+// shells del proyecto (admin, terreno, puerto, mandante, agencia,
+// trazador, Sube y Suma): antes eran useState('sii')+onClick, sin URL
+// propia por pestaña ni soporte de atrás/adelante del navegador.
+// Arranca en la contabilidad de carbono (SII, ruta índice) porque es lo
+// que trae acá a toda empresa enrolada; firmar lotes es un encargo
+// puntual de unas pocas, y aterrizar en "Lotes por firmar" les mostraba
+// una tabla vacía como primera pantalla.
+const TABS = [
+  { to: '/panel-proveedor', end: true, label: 'Compras y ventas (SII)' },
+  { to: '/panel-proveedor/rep', label: 'Ley REP' },
+  { to: '/panel-proveedor/lotes', label: 'Lotes por firmar' },
+  { to: '/panel-proveedor/datos', label: 'Datos de la empresa' },
+];
+
 export default function ProveedorApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [vista, setVista] = useState('sii'); // 'lotes' | 'sii' | 'datos'
   const [onboarding, setOnboarding] = useState(null); // null=sin saber, true=falta completar
   const [contratoVigente, setContratoVigente] = useState(null); // null=sin saber; se resuelve junto con onboarding
 
@@ -64,15 +75,11 @@ export default function ProveedorApp() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '14px 24px', background: 'var(--navy)', color: '#fff', flexWrap: 'wrap', gap: 10,
-        borderBottom: '3px solid #14b8a6',
-      }}>
+    <div className="proveedor-shell theme-proveedor">
+      <div className="proveedor-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Logo size={22} light />
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#14b8a6' }}>Panel de la empresa</div>
+          <div className="proveedor-kicker">Panel de la empresa</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>
@@ -84,7 +91,7 @@ export default function ProveedorApp() {
       </div>
 
       {onboarding ? (
-        <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
+        <main className="proveedor-main">
           <MisDatos onboarding onListo={() => {
             setOnboarding(false);
             api.proveedorPerfil().then((p) => setContratoVigente(Boolean(p.contrato_vigente))).catch(() => setContratoVigente(false));
@@ -104,27 +111,24 @@ export default function ProveedorApp() {
         </main>
       ) : (
         <>
-          <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
-            <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {[['sii', 'Compras y ventas (SII)'], ['rep', 'Ley REP'], ['lotes', 'Lotes por firmar'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
-                <button key={k} onClick={() => setVista(k)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',
-                    fontSize: 14, fontWeight: 600,
-                    color: vista === k ? 'var(--navy)' : '#64748b',
-                    borderBottom: vista === k ? '3px solid #14b8a6' : '3px solid transparent',
-                  }}>
-                  {label}
-                </button>
+          <div className="proveedor-tabs">
+            <div className="proveedor-tabs-inner">
+              {TABS.map((t) => (
+                <NavLink key={t.to} to={t.to} end={t.end} className={({ isActive }) => `proveedor-tab ${isActive ? 'active' : ''}`}>
+                  {t.label}
+                </NavLink>
               ))}
             </div>
           </div>
 
-          <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
-            {vista === 'lotes' && <LotesPorFirmar />}
-            {vista === 'sii' && <AnalisisSii />}
-            {vista === 'rep' && <Rep />}
-            {vista === 'datos' && <MisDatos />}
+          <main className="proveedor-main">
+            <Routes>
+              <Route index element={<AnalisisSii />} />
+              <Route path="rep" element={<Rep />} />
+              <Route path="lotes" element={<LotesPorFirmar />} />
+              <Route path="datos" element={<MisDatos />} />
+              <Route path="*" element={<Navigate to="/panel-proveedor" replace />} />
+            </Routes>
           </main>
         </>
       )}

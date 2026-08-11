@@ -57,15 +57,18 @@ export default function PublicLayout({ children }) {
         <Logo size={22} light />
         <span>SICR3P SpA · Antofagasta, Chile</span>
         <span>
-          <a href="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</a>
+          {/* Link de react-router (SPA), no <a href>: rutas internas del
+              mismo sitio no deben recargar la página completa — el header
+              de arriba ya navega así, el footer tiene que hacer lo mismo. */}
+          <Link to="/cadena" style={{ color: 'inherit' }}>{t('layout.cadena')}</Link>
           {' · '}
-          <a href="/inscripcion" style={{ color: 'inherit' }}>{t('layout.inscribete')}</a>
+          <Link to="/inscripcion" style={{ color: 'inherit' }}>{t('layout.inscribete')}</Link>
           {' · '}
           {/* Descubribilidad del ejercicio de derechos (Ley 21.719): el
               titular tiene que poder encontrar /mis-datos sin conocer la URL. */}
-          <a href="/mis-datos" style={{ color: 'inherit' }}>{t('layout.mis_datos')}</a>
+          <Link to="/mis-datos" style={{ color: 'inherit' }}>{t('layout.mis_datos')}</Link>
           {' · '}
-          <a href="/auspicio" style={{ color: 'inherit' }}>{t('layout.auspicio')}</a>
+          <Link to="/auspicio" style={{ color: 'inherit' }}>{t('layout.auspicio')}</Link>
           {' · '}{t('layout.tagline')} · www.sicr3p.cl
         </span>
 

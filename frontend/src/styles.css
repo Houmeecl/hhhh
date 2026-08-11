@@ -53,6 +53,31 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
 .theme-trazador .admin-side { background: #2e1414; }
 .theme-trazador .admin-side nav a.active { background: #ef4444; color: #fff; }
 
+/* Panel Proveedor (/panel-proveedor) — header + tabs, sin sidebar: cuatro
+   pestañas no justifican el drawer de los shells con sidebar (Admin,
+   terreno, Puerto, Mandante, Agencia, Trazador); el flex-wrap del propio
+   header/tabs ya resuelve el móvil, mismo criterio que el header público.
+   --proveedor-accent es la única fuente del teal (antes repetido inline
+   2 veces en este shell). */
+.theme-proveedor { --proveedor-accent: #14b8a6; }
+.proveedor-shell { min-height: 100vh; background: var(--bg); }
+.proveedor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--navy); color: #fff; flex-wrap: wrap; gap: 10px;
+  border-bottom: 3px solid var(--proveedor-accent);
+}
+.proveedor-kicker { font-size: 12px; font-weight: 700; color: var(--proveedor-accent); }
+.proveedor-tabs { background: #fff; border-bottom: 1px solid var(--line); }
+.proveedor-tabs-inner { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
+.proveedor-tab {
+  background: none; border: none; cursor: pointer; padding: 14px 16px;
+  font-size: 14px; font-weight: 600; color: #64748b; text-decoration: none;
+  border-bottom: 3px solid transparent; display: inline-block;
+}
+.proveedor-tab:hover { text-decoration: none; color: var(--navy); }
+.proveedor-tab.active { color: var(--navy); border-bottom-color: var(--proveedor-accent); }
+.proveedor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
 /* "Sube y Suma" (/suma) — app-shell propia con bottom-nav (uso desde el
    celular en terreno, no un panel de escritorio): NO reusa .admin-shell.
    Acento propio, distinto de --green (para no confundirse visualmente con
