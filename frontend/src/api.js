@@ -189,9 +189,29 @@ export const api = {
   loteMensajes: (codigo) => request(`/lote/${codigo}/mensajes`),
   posAuth: (b) => request('/pos/auth', { method: 'POST', body: b }),
   torreFlota: async (token) => {
-    const res = await fetch('/api/torre/flota', { headers: { Authorization: `Bearer ${token}` } });
+    const headers = { Authorization: `Bearer ${token}` };
+    if (api._etagFlota) headers['If-None-Match'] = api._etagFlota;
+    const res = await fetch('/api/torre/flota', { headers });
+    if (res.status === 304) {
+      return null; // sin cambios, retener estado anterior
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Error al cargar la flota');
+    const etag = res.headers.get('ETag');
+    if (etag) api._etagFlota = etag;
+    return data;
+  },
+  torreKpis: async (token) => {
+    const headers = { Authorization: `Bearer ${token}` };
+    if (api._etagKpis) headers['If-None-Match'] = api._etagKpis;
+    const res = await fetch('/api/torre/kpis', { headers });
+    if (res.status === 304) {
+      return null; // sin cambios, retener estado anterior
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Error al cargar los indicadores');
+    const etag = res.headers.get('ETag');
+    if (etag) api._etagKpis = etag;
     return data;
   },
   torreMensaje: async (token, b) => {
@@ -214,6 +234,8 @@ export const api = {
     if (!res.ok) throw new Error(data.error || 'Error al registrar el paso');
     return data;
   },
+  _etagFlota: null,
+  _etagKpis: null,
 
   // --- Pasaporte de Origen (admin) ---
   origenCatalogo: () => request('/admin/origen/catalogo', { authed: true }),
@@ -422,6 +444,10 @@ export const api = {
 
   // Corredor Bioceánico
   corredorMetodologias: () => request('/admin/corredor/metodologias', { authed: true }),
+  // Puntos de control del corredor (tabla puntos_corredor, migración 093).
+  corredorPuntos: () => request('/admin/corredor/puntos', { authed: true }),
+  corredorCrearPunto: (b) => request('/admin/corredor/puntos', { method: 'POST', body: b, authed: true }),
+  corredorEditarPunto: (id, b) => request(`/admin/corredor/puntos/${id}`, { method: 'PUT', body: b, authed: true }),
   guardarMetodologia: (pais, b) => request(`/admin/corredor/metodologias/${pais}`, { method: 'PUT', body: b, authed: true }),
   corredorDocumentos: () => request('/admin/corredor/documentos', { authed: true }),
   subirDocumentoCorredor: (formData) => request('/admin/corredor/documentos', { method: 'POST', body: formData, formData: true, authed: true }),

@@ -14,6 +14,7 @@ import { inventarioCsv, inventarioJson } from '../services/exportInventarioSii.j
 import { cifrar, descifrar, cifradoDisponible } from '../services/cripto.js';
 import { normalizarRut as normalizarRutLocal } from '../services/mandante.js';
 import { qrBufferDe, puntoControlUrl } from '../services/qr.js';
+import { idsCorredor } from '../services/catalogoCorredor.js';
 import {
   ROLES,
   TIPOS,
@@ -33,7 +34,6 @@ import {
   generarSerialTarjeta,
   hashAnclajeLote,
   sanearPuntoId,
-  PUNTOS_CORREDOR_IDS,
   generarSerialCredencialProveedor,
   validarIdentidadProveedor,
   loteAdmiteRol,
@@ -265,8 +265,10 @@ async function anexarEslabonTx(client, lote, b) {
   // real, el eslabón igual se guarda (append-only, nunca se rechaza por
   // esto) pero se avisa — mismo patrón no bloqueante que la advertencia
   // de RUT que no calza con el DTE/documento vinculado, más abajo.
+  // El catálogo vive en la tabla puntos_corredor (093) con fallback al
+  // array estático — un punto agregado desde el panel se acepta sin deploy.
   const puntoIdDeclarado = b.datos?.punto_id;
-  if (puntoIdDeclarado && !PUNTOS_CORREDOR_IDS.includes(puntoIdDeclarado)) {
+  if (puntoIdDeclarado && !(await idsCorredor()).includes(puntoIdDeclarado)) {
     advertencias.push(`El punto de control '${puntoIdDeclarado}' no está en el catálogo del corredor.`);
   }
 
@@ -1000,7 +1002,7 @@ router.get('/catalogo', (req, res) => {
 router.get('/corredor/:puntoId/qr.png', adminOnly, async (req, res, next) => {
   try {
     const puntoId = String(req.params.puntoId || '');
-    if (!PUNTOS_CORREDOR_IDS.includes(puntoId)) {
+    if (!(await idsCorredor()).includes(puntoId)) {
       return res.status(404).json({ error: 'Punto de control no encontrado' });
     }
     res.type('png').send(await qrBufferDe(puntoControlUrl(puntoId), 1024));

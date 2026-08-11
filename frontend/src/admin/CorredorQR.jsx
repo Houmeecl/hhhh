@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 
 // Carteles QR imprimibles de los puntos de control del Corredor
 // Bioceánico — el portador de la Tarjeta de Viaje los escanea en terreno
@@ -13,6 +14,9 @@ import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 export default function CorredorQR() {
   const [qrs, setQrs] = useState({});
   const [error, setError] = useState('');
+  // `version` como dependencia: los puntos agregados desde el panel
+  // (tabla puntos_corredor) obtienen su cartel sin deploy.
+  const version = useCatalogoCorredor();
 
   useEffect(() => {
     let vivo = true;
@@ -25,7 +29,7 @@ export default function CorredorQR() {
       } catch { if (vivo) setError('No se pudieron generar todos los QR.'); }
     }));
     return () => { vivo = false; urls.forEach((u) => URL.revokeObjectURL(u)); };
-  }, []);
+  }, [version]);
 
   return (
     <div>

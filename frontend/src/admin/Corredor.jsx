@@ -41,14 +41,135 @@ export default function Corredor() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
         <button className={`btn btn-sm ${tab === 'metodologias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('metodologias')}>Metodologías por país</button>
         <button className={`btn btn-sm ${tab === 'documentos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('documentos')}>Documentos</button>
+        <button className={`btn btn-sm ${tab === 'puntos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puntos')}>Puntos de control</button>
       </div>
 
-      {tab === 'metodologias' ? <Metodologias flash={flash} /> : <Documentos flash={flash} />}
+      {tab === 'metodologias' && <Metodologias flash={flash} />}
+      {tab === 'documentos' && <Documentos flash={flash} />}
+      {tab === 'puntos' && <PuntosControl flash={flash} />}
 
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
+    </div>
+  );
+}
+
+// Catálogo de puntos de control del corredor (tabla puntos_corredor,
+// migración 093). Antes vivía hardcodeado: agregar un punto requería un
+// deploy. El id (slug) es la identidad sellada en los eslabones y NO es
+// editable; tampoco hay eliminar — un punto que sale de servicio se
+// desactiva y su id queda reservado (los pasos históricos lo referencian).
+const PUNTO_VACIO = { id: '', nombre: '', pais: 'CL', lat: '', lng: '', orden: '', es_frontera: false, activo: true };
+
+function PuntosControl({ flash }) {
+  const [items, setItems] = useState(null);
+  const [modal, setModal] = useState(null); // {esNuevo, ...punto} | null
+  const [guardando, setGuardando] = useState(false);
+
+  const cargar = () => api.corredorPuntos().then((r) => setItems(r.puntos)).catch((e) => flash(e.message, true));
+  useEffect(() => { cargar(); }, []);
+
+  async function guardar() {
+    setGuardando(true);
+    try {
+      const body = {
+        ...modal,
+        lat: parseFloat(modal.lat), lng: parseFloat(modal.lng), orden: parseInt(modal.orden, 10),
+      };
+      if (modal.esNuevo) await api.corredorCrearPunto(body);
+      else await api.corredorEditarPunto(modal.id, body);
+      setModal(null); cargar();
+      flash('Punto guardado — aparece en el mapa, el selector del portador y los carteles QR sin deploy.');
+    } catch (e) { flash(e.message, true); }
+    finally { setGuardando(false); }
+  }
+
+  async function alternarActivo(p) {
+    try {
+      await api.corredorEditarPunto(p.id, { ...p, activo: !p.activo });
+      cargar();
+      flash(p.activo
+        ? 'Punto desactivado — sale del catálogo pero su historial queda intacto.'
+        : 'Punto reactivado.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="card">
+      <div style={{ padding: '14px 16px 0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <b>Puntos de control del corredor</b>
+        <span className="muted" style={{ fontSize: 13 }}>
+          orden = posición a lo largo del corredor (0 = Campo Grande) · el id no se puede cambiar ni eliminar
+        </span>
+        <button className="btn btn-sm btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setModal({ ...PUNTO_VACIO, esNuevo: true })}>
+          + Nuevo punto
+        </button>
+      </div>
+      <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Orden</th><th>Punto</th><th>País</th><th>Coordenadas</th><th>Frontera</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {(items || []).map((p) => (
+              <tr key={p.id} style={p.activo ? {} : { opacity: 0.55 }}>
+                <td>{p.orden}</td>
+                <td><b>{p.nombre}</b><div className="muted mono" style={{ fontSize: 11 }}>{p.id}</div></td>
+                <td>{PAISES[p.pais] || p.pais}</td>
+                <td className="muted" style={{ fontSize: 12 }}>{fmt(p.lat, 4)}, {fmt(p.lng, 4)}</td>
+                <td>{p.es_frontera ? <span className="badge badge-amber">Frontera</span> : <span className="muted">—</span>}</td>
+                <td>{p.activo ? <span className="badge badge-green">Activo</span> : <span className="badge badge-gray">Inactivo</span>}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setModal({ ...p, esNuevo: false })}>Editar</button>{' '}
+                  <button className="btn btn-ghost btn-sm" onClick={() => alternarActivo(p)}>{p.activo ? 'Desactivar' : 'Reactivar'}</button>
+                </td>
+              </tr>
+            ))}
+            {items && items.length === 0 && (
+              <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 24 }}>Sin puntos — corre las migraciones para sembrar los 14 fundacionales.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {modal && (
+        <div className="modal-bg" onClick={(e) => e.target.className === 'modal-bg' && setModal(null)}>
+          <div className="modal">
+            <h2 style={{ marginTop: 0 }}>{modal.esNuevo ? 'Nuevo punto de control' : `Editar — ${modal.nombre}`}</h2>
+            {modal.esNuevo && (
+              <div className="field"><label>Id (slug — no se podrá cambiar)</label>
+                <input value={modal.id} placeholder="bascula-km-45"
+                  onChange={(e) => setModal({ ...modal, id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') })} /></div>
+            )}
+            <div className="form-row" style={{ gridTemplateColumns: '2fr 1fr' }}>
+              <div className="field"><label>Nombre</label>
+                <input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} /></div>
+              <div className="field"><label>País</label>
+                <select value={modal.pais} onChange={(e) => setModal({ ...modal, pais: e.target.value })}>
+                  {Object.entries(PAISES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select></div>
+            </div>
+            <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+              <div className="field"><label>Latitud</label>
+                <input inputMode="decimal" value={modal.lat} placeholder="-23.2358" onChange={(e) => setModal({ ...modal, lat: e.target.value })} /></div>
+              <div className="field"><label>Longitud</label>
+                <input inputMode="decimal" value={modal.lng} placeholder="-67.0333" onChange={(e) => setModal({ ...modal, lng: e.target.value })} /></div>
+              <div className="field"><label>Orden en el corredor</label>
+                <input inputMode="numeric" value={modal.orden} placeholder="8" onChange={(e) => setModal({ ...modal, orden: e.target.value.replace(/\D/g, '') })} /></div>
+            </div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', marginBottom: 14 }}>
+              <input type="checkbox" checked={!!modal.es_frontera} onChange={(e) => setModal({ ...modal, es_frontera: e.target.checked })} />
+              Es paso fronterizo (la torre puede dirigir camiones a él como "frontera")
+            </label>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={guardar} disabled={guardando}>
+                {guardando ? <span className="spinner" /> : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

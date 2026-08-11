@@ -11,6 +11,15 @@
 // lo sanea. Si un paso llega con texto libre, puntoDe() intenta calzar
 // el nombre normalizado; si no calza, el paso vale igual (queda en la
 // línea de tiempo) pero no mueve el camión.
+//
+// Desde la migración 093 el catálogo VIVO está en la tabla
+// puntos_corredor y llega vía GET /api/corredor/puntos
+// (lib/useCatalogoCorredor.js llama setCatalogo() al recibirlo). Este
+// array estático es el ESTADO INICIAL y el RESPALDO si el fetch falla:
+// sin red se ve exactamente lo de siempre. IMPORTANTE: setCatalogo muta
+// los arrays IN PLACE — los importadores conservan la referencia — y
+// este módulo sigue siendo puro (sin React ni fetch) porque los tests
+// de node:test lo importan directo.
 // ============================================================
 
 export const PUNTOS_CORREDOR = [
@@ -77,8 +86,6 @@ export function etiquetaInstruccion(m, t) {
   return m.zona ? `${base} · ${m.zona}` : base;
 }
 
-const porId = new Map(PUNTOS_CORREDOR.map((p) => [p.id, p]));
-
 // Normaliza texto libre a slug comparable ("Paso de Jama " → "paso-de-jama").
 export function normalizarPunto(texto) {
   return String(texto || '')
@@ -88,7 +95,45 @@ export function normalizarPunto(texto) {
     .replace(/^-+|-+$/g, '');
 }
 
-const porNombre = new Map(PUNTOS_CORREDOR.map((p) => [normalizarPunto(p.nombre), p]));
+// Índices derivados del catálogo — recomputables porque el catálogo puede
+// cambiar en runtime (setCatalogo). Siempre consistentes con los arrays.
+let porId, porNombre, indicePorId;
+function recomputarIndices() {
+  porId = new Map(PUNTOS_CORREDOR.map((p) => [p.id, p]));
+  porNombre = new Map(PUNTOS_CORREDOR.map((p) => [normalizarPunto(p.nombre), p]));
+  indicePorId = new Map(PUNTOS_CORREDOR.map((p, i) => [p.id, i]));
+}
+recomputarIndices();
+
+// ---------- Catálogo dinámico (tabla puntos_corredor, migración 093) ----------
+
+const suscriptores = new Set();
+
+// Reemplaza el catálogo completo en runtime. Muta los arrays exportados
+// IN PLACE (los importadores conservan la referencia) y recomputa los
+// índices. `puntos` viene de GET /api/corredor/puntos ya ordenado por
+// `orden`; si la forma no calza, se ignora en silencio (queda el estático
+// — nunca se degrada el catálogo por una respuesta rara).
+export function setCatalogo(puntos) {
+  if (!Array.isArray(puntos) || puntos.length === 0) return false;
+  const validos = puntos.every((p) => p && typeof p.id === 'string' && p.id
+    && typeof p.nombre === 'string' && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
+  if (!validos) return false;
+  PUNTOS_CORREDOR.splice(0, PUNTOS_CORREDOR.length, ...puntos.map((p) => ({
+    id: p.id, nombre: p.nombre, pais: p.pais || '', lat: Number(p.lat), lng: Number(p.lng),
+  })));
+  PUNTOS_FRONTERA.splice(0, PUNTOS_FRONTERA.length,
+    ...puntos.filter((p) => p.es_frontera).map((p) => p.id));
+  recomputarIndices();
+  for (const fn of suscriptores) { try { fn(); } catch { /* un suscriptor roto no frena al resto */ } }
+  return true;
+}
+
+// Para el hook de React (useCatalogoCorredor.js) — sin React acá.
+export function suscribirCatalogo(fn) {
+  suscriptores.add(fn);
+  return () => suscriptores.delete(fn);
+}
 
 // Ubica el punto del catálogo de un eslabón: primero por datos.punto_id,
 // después por el nombre normalizado de datos.punto_control. null = no
@@ -111,8 +156,6 @@ export function puntoDe(eslabon) {
 // Torre de control — alertas operativas (puramente informativas: nunca
 // bloquean el registro de un paso, solo llaman la atención del operador).
 // ============================================================
-
-const indicePorId = new Map(PUNTOS_CORREDOR.map((p, i) => [p.id, i]));
 
 // Umbrales de "sin avance" en horas. El corredor no tiene horario fijo
 // (depende de fronteras, clima, descansos del conductor), así que son
@@ -145,6 +188,24 @@ export function estadoAvance(horas) {
 export function textoDuracion(horas) {
   if (horas == null) return '';
   return horas < 48 ? `${Math.round(horas)}h` : `${Math.round(horas / 24)}d`;
+}
+
+// Resumen de la flota para las cards KPI del tablero (/torre): conteos
+// derivados del MISMO array y las MISMAS funciones que colorean los
+// marcadores del mapa — cards y mapa nunca se contradicen. `flota` es la
+// respuesta de GET /api/torre/flota; `ahoraMs` inyectable para tests.
+export function resumenFlota(flota, ahoraMs = Date.now()) {
+  const r = { total: 0, en_ruta: 0, ambar: 0, rojo: 0, sin_posicion: 0 };
+  for (const c of flota || []) {
+    r.total += 1;
+    const p = c.ultimo_paso ? puntoDe({ datos: c.ultimo_paso }) : null;
+    if (!p) { r.sin_posicion += 1; continue; }
+    const estado = estadoAvance(horasSinAvance(c.ultimo_paso.creado, ahoraMs));
+    if (estado === 'rojo') r.rojo += 1;
+    else if (estado === 'ambar') r.ambar += 1;
+    else r.en_ruta += 1;
+  }
+  return r;
 }
 
 // Detecta pasos que RETROCEDEN en el catálogo del corredor: dado un

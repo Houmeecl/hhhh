@@ -10,6 +10,7 @@ import {
   PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, puntoDestinoDe, etiquetaInstruccion,
   horasSinAvance, estadoAvance, textoDuracion, pasosRetrocedidos,
 } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 
 // ============================================================
 // Torre de Control — /torre/:codigo
@@ -29,12 +30,12 @@ const POLL_MS = 5000;
 export default function Torre() {
   const { codigo } = useParams();
   const { t } = useIdioma();
+  const versionCatalogo = useCatalogoCorredor();
   const [data, setData] = useState(null);
   const [mensajes, setMensajes] = useState([]);
   const [error, setError] = useState('');
 
   const cargar = useCallback(async () => {
-    if (document.hidden) return; // pestaña oculta: no gastar red
     try {
       const [d, m] = await Promise.all([
         api.lotePublico(codigo),
@@ -46,12 +47,27 @@ export default function Torre() {
     } catch (e) {
       if (!data) setError(e.message);
     }
-  }, [codigo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [codigo, data]);
 
   useEffect(() => {
     cargar();
-    const timer = setInterval(cargar, POLL_MS);
-    return () => clearInterval(timer);
+    // Intervalo adaptativo: 5s visible, 30s oculto + refresh inmediato al volver
+    let timer;
+    const actualizarIntervalo = () => {
+      clearInterval(timer);
+      const intervalo = document.hidden ? 30000 : POLL_MS;
+      timer = setInterval(cargar, intervalo);
+    };
+    actualizarIntervalo();
+    const handleVisibility = () => {
+      actualizarIntervalo();
+      if (!document.hidden) cargar(); // refresh inmediato al volver
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [cargar]);
 
   // ---------- Mapa ----------
@@ -63,6 +79,9 @@ export default function Torre() {
   const puntosRef = useRef({});     // id -> circleMarker
   const ultimoIdRef = useRef(null); // último punto donde estuvo el camión
 
+  const baseRef = useRef(null);     // capa del trazado base + puntos (se redibuja si cambia el catálogo)
+  const encuadradoRef = useRef(false);
+
   useEffect(() => {
     if (!divRef.current || mapaRef.current) return;
     const mapa = L.map(divRef.current, { scrollWheelZoom: true, zoomControl: true });
@@ -71,30 +90,44 @@ export default function Torre() {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(mapa);
 
-    // Trazado base del corredor (referencial) + puntos de control.
-    const coords = PUNTOS_CORREDOR.map((p) => [p.lat, p.lng]);
-    L.polyline(coords, { color: '#94a3b8', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(mapa);
-    for (const p of PUNTOS_CORREDOR) {
-      const c = L.circleMarker([p.lat, p.lng], {
-        radius: 6, color: '#0f1f2e', weight: 2, fillColor: '#ffffff', fillOpacity: 1,
-      }).addTo(mapa);
-      c.bindPopup(`<strong>${p.nombre}</strong><br>${p.pais}`);
-      puntosRef.current[p.id] = c;
-    }
-
     // Polilínea de la ruta real (pasos sellados) y camión.
     rutaRef.current = L.polyline([], { color: '#28a745', weight: 4, opacity: 0.9 }).addTo(mapa);
-    camionRef.current = L.marker(coords[0], {
+    camionRef.current = L.marker([PUNTOS_CORREDOR[0].lat, PUNTOS_CORREDOR[0].lng], {
       icon: L.divIcon({ className: 'torre-camion', html: TRUCK_MARKER_SVG, iconSize: [38, 38], iconAnchor: [19, 19] }),
       opacity: 0,
       zIndexOffset: 1000,
       keyboard: false,
     }).addTo(mapa);
 
-    mapa.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
     mapaRef.current = mapa;
     return () => { mapa.remove(); mapaRef.current = null; };
   }, []);
+
+  // Trazado base del corredor (referencial) + puntos de control — en su
+  // propio effect con `version` como dependencia: si el catálogo cambió
+  // en runtime (tabla puntos_corredor), se redibuja sin recrear el mapa.
+  // El encuadre inicial solo la primera vez (no moverle el mapa al
+  // operador por una edición de catálogo).
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa) return;
+    if (baseRef.current) { baseRef.current.remove(); puntosRef.current = {}; }
+    const capa = L.layerGroup().addTo(mapa);
+    const coords = PUNTOS_CORREDOR.map((p) => [p.lat, p.lng]);
+    L.polyline(coords, { color: '#94a3b8', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(capa);
+    for (const p of PUNTOS_CORREDOR) {
+      const c = L.circleMarker([p.lat, p.lng], {
+        radius: 6, color: '#0f1f2e', weight: 2, fillColor: '#ffffff', fillOpacity: 1,
+      }).addTo(capa);
+      c.bindPopup(`<strong>${p.nombre}</strong><br>${p.pais}`);
+      puntosRef.current[p.id] = c;
+    }
+    baseRef.current = capa;
+    if (!encuadradoRef.current) {
+      mapa.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
+      encuadradoRef.current = true;
+    }
+  }, [versionCatalogo]);
 
   // Recolocar camión / ruta / destino cuando llegan datos nuevos.
   useEffect(() => {

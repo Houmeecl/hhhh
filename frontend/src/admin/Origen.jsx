@@ -4,6 +4,7 @@ import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 import Dropzone from '../components/Dropzone.jsx';
 
 // ============================================================
@@ -930,6 +931,7 @@ function AsignarProveedor({ lote, abierto, flash }) {
 // resolviendo por /f/:serial para siempre, sin cambios.
 function CredencialesProveedor({ lote, rol, abierto, flash }) {
   const labels = ROL_CREDENCIAL_LABELS[rol] || ROL_CREDENCIAL_LABELS.proveedor;
+  useCatalogoCorredor(); // el select de punto del Corredor refleja el catálogo vivo
   const [items, setItems] = useState(null);
   const [rut, setRut] = useState('');
   const [nombreEmpresa, setNombreEmpresa] = useState('');

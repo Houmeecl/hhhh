@@ -5,6 +5,7 @@ import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 import { PUNTOS_CORREDOR, etiquetaInstruccion } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 import { useEscanerQR, idPuntoDesdeQr } from '../lib/qrScan.js';
 import { encolarPaso, listarPendientes, quitarPendiente, esErrorDeConexion } from '../lib/pasoOffline.js';
 
@@ -17,6 +18,7 @@ import { encolarPaso, listarPendientes, quitarPendiente, esErrorDeConexion } fro
 export default function TarjetaViaje() {
   const { serial } = useParams();
   const { t } = useIdioma();
+  useCatalogoCorredor(); // el select de puntos refleja el catálogo vivo (re-render vía version)
   const [info, setInfo] = useState(null);
   const [error, setError] = useState('');
   // Formulario del portador

@@ -5,7 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
-import { PUNTOS_CORREDOR, puntoDe, etiquetaInstruccion, horasSinAvance, estadoAvance, textoDuracion } from '../lib/corredor.js';
+import { PUNTOS_CORREDOR, puntoDe, etiquetaInstruccion, horasSinAvance, estadoAvance, textoDuracion, resumenFlota } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 import { Icon, TRUCK_MARKER_SVG } from '../components/icons.jsx';
 
 // ============================================================
@@ -23,15 +24,17 @@ const POLL_MS = 5000;
 
 export default function TorreFlota() {
   const { t } = useIdioma();
+  const versionCatalogo = useCatalogoCorredor();
   const [token, setToken] = useState(null);
   const [nombre, setNombre] = useState('');
   const [flota, setFlota] = useState(null);
+  const [kpis, setKpis] = useState(null); // agregados lentos (tramos/retrocesos), poll propio 60 s
 
   const cargar = useCallback(async () => {
-    if (!token || document.hidden) return;
+    if (!token) return;
     try {
       const r = await api.torreFlota(token);
-      setFlota(r.flota || []);
+      if (r !== null) setFlota(r.flota || []); // null = 304 sin cambios, retener estado
     } catch (e) {
       if (/token|sesión|autoriza/i.test(e.message)) { setToken(null); setFlota(null); }
     }
@@ -40,14 +43,64 @@ export default function TorreFlota() {
   useEffect(() => {
     if (!token) return;
     cargar();
-    const timer = setInterval(cargar, POLL_MS);
-    return () => clearInterval(timer);
+    // Intervalo adaptativo: 5s visible, 30s oculto + refresh inmediato al volver
+    let timer;
+    const actualizarIntervalo = () => {
+      clearInterval(timer);
+      const intervalo = document.hidden ? 30000 : POLL_MS;
+      timer = setInterval(cargar, intervalo);
+    };
+    actualizarIntervalo();
+    const handleVisibility = () => {
+      actualizarIntervalo();
+      if (!document.hidden) cargar(); // refresh inmediato al volver
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [token, cargar]);
+
+  // KPIs lentos (tramos/retrocesos): poll propio de 60 s — el backend
+  // igual los cachea 60 s. Si falla, simplemente no se muestran.
+  // Intervalo adaptativo: 60s visible, 180s oculto (KPIs cambian lentamente).
+  useEffect(() => {
+    if (!token) return;
+    let vivo = true;
+    const cargarKpis = async () => {
+      try {
+        const k = await api.torreKpis(token);
+        if (vivo && k !== null) setKpis(k); // null = 304 sin cambios
+      } catch { /* fallo silencioso */ }
+    };
+    cargarKpis();
+    let timer;
+    const actualizarIntervalo = () => {
+      clearInterval(timer);
+      const intervalo = document.hidden ? 180000 : 60000;
+      timer = setInterval(cargarKpis, intervalo);
+    };
+    actualizarIntervalo();
+    const handleVisibility = () => {
+      actualizarIntervalo();
+      if (!document.hidden) cargarKpis(); // refresh inmediato al volver
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      vivo = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [token]);
 
   // ---------- Mapa ----------
   const divRef = useRef(null);
   const mapaRef = useRef(null);
   const camionesRef = useRef(new Map()); // codigo -> marcador
+
+  const baseRef = useRef(null);        // capa del trazado base + puntos
+  const encuadradoRef = useRef(false); // encuadre inicial una sola vez
 
   useEffect(() => {
     if (!divRef.current || mapaRef.current || !token) return;
@@ -56,16 +109,31 @@ export default function TorreFlota() {
       maxZoom: 18,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(mapa);
+    mapaRef.current = mapa;
+    encuadradoRef.current = false;
+    return () => { mapa.remove(); mapaRef.current = null; baseRef.current = null; camionesRef.current = new Map(); };
+  }, [token]);
+
+  // Trazado base + puntos de control: effect propio con el catálogo como
+  // dependencia — si el admin agrega/edita un punto (tabla puntos_corredor),
+  // se redibuja sin recrear el mapa ni mover el encuadre del operador.
+  useEffect(() => {
+    const mapa = mapaRef.current;
+    if (!mapa) return;
+    if (baseRef.current) baseRef.current.remove();
+    const capa = L.layerGroup().addTo(mapa);
     const coords = PUNTOS_CORREDOR.map((p) => [p.lat, p.lng]);
-    L.polyline(coords, { color: '#94a3b8', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(mapa);
+    L.polyline(coords, { color: '#94a3b8', weight: 2, dashArray: '6 6', opacity: 0.8 }).addTo(capa);
     for (const p of PUNTOS_CORREDOR) {
       L.circleMarker([p.lat, p.lng], { radius: 5, color: '#0f1f2e', weight: 2, fillColor: '#fff', fillOpacity: 1 })
-        .addTo(mapa).bindPopup(`<strong>${p.nombre}</strong><br>${p.pais}`);
+        .addTo(capa).bindPopup(`<strong>${p.nombre}</strong><br>${p.pais}`);
     }
-    mapa.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
-    mapaRef.current = mapa;
-    return () => { mapa.remove(); mapaRef.current = null; camionesRef.current = new Map(); };
-  }, [token]);
+    baseRef.current = capa;
+    if (!encuadradoRef.current) {
+      mapa.fitBounds(L.latLngBounds(coords), { padding: [30, 30] });
+      encuadradoRef.current = true;
+    }
+  }, [token, versionCatalogo]);
 
   // Colocar/actualizar un marcador por camión con posición conocida.
   useEffect(() => {
@@ -122,6 +190,58 @@ export default function TorreFlota() {
             <p className="muted" style={{ fontSize: 12, margin: '0 0 10px' }}>
               ✓ {t('torre.conectado')}: {nombre} · {flota ? `${flota.length} ${t('torre.camiones')}` : '…'}
             </p>
+
+            {/* KPIs de la operación: el conteo sale del MISMO array que
+                colorea los marcadores (resumenFlota) — cards y mapa nunca
+                se contradicen. Colapsable en móvil vía <details>. */}
+            {flota && (
+              <details open style={{ marginBottom: 12 }}>
+                <summary className="muted" style={{ fontSize: 12, cursor: 'pointer', marginBottom: 6 }}>
+                  {t('torre.kpi.titulo')}
+                </summary>
+                {(() => {
+                  const r = resumenFlota(flota);
+                  const card = (valor, etiqueta, color) => (
+                    <div className="card" style={{ padding: '10px 14px', minWidth: 110, flex: '1 1 110px' }}>
+                      <div style={{ fontSize: 22, fontWeight: 800, color }}>{valor}</div>
+                      <div className="muted" style={{ fontSize: 11 }}>{etiqueta}</div>
+                    </div>
+                  );
+                  return (
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {card(r.en_ruta, t('torre.kpi.en_ruta'), 'var(--green-600)')}
+                      {card(r.ambar, t('torre.kpi.ambar'), '#d97706')}
+                      {card(r.rojo, t('torre.kpi.rojo'), '#dc2626')}
+                      {card(r.sin_posicion, t('torre.kpi.sin_pos'), 'var(--gray)')}
+                      {kpis && card(kpis.retrocesos_30d.n, t('torre.kpi.retrocesos'), kpis.retrocesos_30d.n > 0 ? '#d97706' : 'var(--gray)')}
+                    </div>
+                  );
+                })()}
+                {kpis && (
+                  <div className="card" style={{ padding: '10px 14px', marginTop: 10 }}>
+                    <div className="muted" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>
+                      {t('torre.kpi.tramos')}
+                    </div>
+                    {kpis.tramos.length === 0 ? (
+                      <p className="muted" style={{ fontSize: 12, margin: 0 }}>{t('torre.kpi.sin_datos')}</p>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                        {kpis.tramos.map((tr) => {
+                          const nDesde = puntoDe({ datos: { punto_id: tr.desde } })?.nombre || tr.desde;
+                          const nHasta = puntoDe({ datos: { punto_id: tr.hasta } })?.nombre || tr.hasta;
+                          return (
+                            <div key={`${tr.desde}-${tr.hasta}`} style={{ fontSize: 12 }}>
+                              <b>{nDesde} → {nHasta}</b>
+                              <span className="muted"> · {tr.horas_promedio} {t('torre.kpi.horas')} · {tr.n} {t('torre.kpi.pasos_n')}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </details>
+            )}
             <div className="torre-layout">
               <div>
                 <div ref={divRef} className="torre-mapa" />

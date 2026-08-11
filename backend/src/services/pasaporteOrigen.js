@@ -460,11 +460,14 @@ export const DESTINOS_TORRE = ['puerto_seco', 'puerto', 'estacionamiento', 'fron
 // catálogo que PUNTOS_CORREDOR en frontend/src/lib/corredor.js).
 export const PUNTOS_FRONTERA = ['ponta-pora', 'pozo-hondo', 'paso-de-jama'];
 
-// Ids de los 14 puntos de control del Corredor (mismo catálogo completo
-// que PUNTOS_CORREDOR en frontend/src/lib/corredor.js — solo los ids, sin
-// coordenadas: el backend no dibuja el mapa, solo valida). Un test de
-// sincronía (backend/test/corredorSync.test.js) garantiza que este array
-// coincida exactamente con el del frontend.
+// Ids de los 14 puntos FUNDACIONALES del Corredor (mismo catálogo que
+// PUNTOS_CORREDOR en frontend/src/lib/corredor.js — solo los ids, sin
+// coordenadas: el backend no dibuja el mapa, solo valida). Desde la
+// migración 093 el catálogo VIVO está en la tabla puntos_corredor
+// (services/catalogoCorredor.js); este array queda como FALLBACK si la
+// tabla no aporta y como semilla de la migración. Un test de sincronía
+// (backend/test/pasaporteOrigen.test.js) garantiza que coincida con el
+// array del frontend, y otro (catalogoCorredor.test.js) con el seed.
 export const PUNTOS_CORREDOR_IDS = [
   'campo-grande', 'ponta-pora', 'loma-plata', 'mariscal-estigarribia',
   'pozo-hondo', 'tartagal', 'jujuy', 'susques', 'paso-de-jama',
@@ -478,17 +481,20 @@ export function destinoTorreValido(d) {
 
 // Valida el mensaje completo de la torre: destino del catálogo y, si es
 // estacionamiento o frontera, zona obligatoria (¿a cuál zona/paso mando
-// al chofer si no?). Frontera exige uno de los 3 pasos conocidos;
+// al chofer si no?). Frontera exige uno de los pasos conocidos;
 // estacionamiento acepta texto libre (nombres de zona varían por planta).
 // Devuelve la zona/nota ya saneadas para insertar.
-export function validarMensajeTorre({ destino, zona, nota } = {}) {
+// `fronteras` es inyectable: torre.js le pasa fronterasCorredor() (la
+// tabla puntos_corredor, migración 093) y el default estático mantiene
+// esta función PURA y testeable sin BD.
+export function validarMensajeTorre({ destino, zona, nota } = {}, fronteras = PUNTOS_FRONTERA) {
   if (!destinoTorreValido(destino)) {
     return { ok: false, error: `Destino inválido. Uno de: ${DESTINOS_TORRE.join(', ')}.` };
   }
   const notaLimpia = String(nota || '').trim().slice(0, 200) || null;
   if (destino === 'frontera') {
-    if (!PUNTOS_FRONTERA.includes(zona)) {
-      return { ok: false, error: `Para frontera debes indicar el paso: ${PUNTOS_FRONTERA.join(', ')}.` };
+    if (!fronteras.includes(zona)) {
+      return { ok: false, error: `Para frontera debes indicar el paso: ${fronteras.join(', ')}.` };
     }
     return { ok: true, destino, zona, nota: notaLimpia };
   }

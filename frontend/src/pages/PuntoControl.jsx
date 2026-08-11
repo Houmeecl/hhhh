@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import { useCatalogoCorredor } from '../lib/useCatalogoCorredor.js';
 
 // Página informativa del QR físico de un punto de control del Corredor
 // Bioceánico (cartel impreso en el puerto/frontera/estacionamiento). El
@@ -11,6 +12,7 @@ import { PUNTOS_CORREDOR } from '../lib/corredor.js';
 // teléfono fuera de la app — no debe romper nada, solo explicar qué es.
 export default function PuntoControl() {
   const { puntoId } = useParams();
+  useCatalogoCorredor(); // reconoce puntos agregados desde el panel (sin deploy)
   const punto = PUNTOS_CORREDOR.find((p) => p.id === puntoId);
 
   return (

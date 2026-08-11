@@ -35,6 +35,7 @@ import { siiLimiter, cargaLimiter, leadLimiter } from '../middleware/rateLimit.j
 import { presupuestoIA } from '../services/analisisIA.js';
 import { categoriaParaMostrar, alcanceAtribuible } from '../services/categoriaPresentacion.js';
 import { calcularPuntosPorFactura, otorgarPuntos, evaluarMisionesContador } from '../services/juego.js';
+import { puntosCorredor } from '../services/catalogoCorredor.js';
 
 const router = express.Router();
 
@@ -1757,6 +1758,17 @@ router.get('/juego/constancias/:serial([A-Za-z0-9-]+)/qr.png', async (req, res, 
 // Público: quien tiene el código del lote ya ve su pasaporte; la torre
 // /torre/{codigo} pollea esto para pintar el historial. No expone RUT
 // ni datos comerciales — solo destino, nota corta, emisor y fecha.
+// Catálogo de puntos del corredor para el mapa de la torre y el flujo
+// del portador — público porque las coordenadas ya lo son (se dibujan en
+// la torre pública de cada lote). El frontend tiene su propio catálogo
+// estático como respaldo: si esta respuesta falla, no pasa nada.
+router.get('/corredor/puntos', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ puntos: await puntosCorredor() });
+  } catch (err) { next(err); }
+});
+
 router.get('/lote/:codigo/mensajes', async (req, res, next) => {
   try {
     const { rows: lRows } = await query(

@@ -91,3 +91,41 @@ test('pasosRetrocedidos: un eslabón sin punto reconocible no rompe la secuencia
 test('pasosRetrocedidos: catálogo del corredor cubre el tramo Brasil→Chile completo (14 puntos)', () => {
   assert.equal(PUNTOS_CORREDOR.length, 14);
 });
+
+// ---------- Catálogo dinámico (setCatalogo, migración 093) ----------
+
+test('setCatalogo: un punto agregado en runtime es reconocido por puntoDe/pasosRetrocedidos y se puede restaurar', async () => {
+  const { setCatalogo, PUNTOS_CORREDOR, PUNTOS_FRONTERA, puntoDe, pasosRetrocedidos } =
+    await import('../../frontend/src/lib/corredor.js');
+  const respaldo = PUNTOS_CORREDOR.map((p) => ({ ...p }));
+  const fronterasRespaldo = [...PUNTOS_FRONTERA];
+
+  const conExtra = [
+    ...respaldo.map((p, i) => ({ ...p, orden: i, es_frontera: fronterasRespaldo.includes(p.id) })),
+    { id: 'punto-nuevo-test', nombre: 'Punto Nuevo', pais: 'CL', lat: -23.2, lng: -69.5, orden: respaldo.length, es_frontera: false },
+  ];
+  assert.equal(setCatalogo(conExtra), true);
+  assert.equal(PUNTOS_CORREDOR.length, respaldo.length + 1);
+  assert.equal(puntoDe({ datos: { punto_id: 'punto-nuevo-test' } })?.nombre, 'Punto Nuevo');
+  // El punto nuevo (último del corredor) participa de la detección de retrocesos.
+  const retro = pasosRetrocedidos([
+    { eslabon: 1, datos: { punto_id: 'punto-nuevo-test' } },
+    { eslabon: 2, datos: { punto_id: 'campo-grande' } },
+  ]);
+  assert.ok(retro.has(2));
+
+  // Restaurar el estático para no contaminar otros tests.
+  assert.equal(setCatalogo(respaldo.map((p, i) => ({ ...p, orden: i, es_frontera: fronterasRespaldo.includes(p.id) }))), true);
+  assert.equal(PUNTOS_CORREDOR.length, respaldo.length);
+  assert.deepEqual([...PUNTOS_FRONTERA].sort(), [...fronterasRespaldo].sort());
+});
+
+test('setCatalogo: entrada inválida se ignora (queda el catálogo vigente)', async () => {
+  const { setCatalogo, PUNTOS_CORREDOR } = await import('../../frontend/src/lib/corredor.js');
+  const n = PUNTOS_CORREDOR.length;
+  assert.equal(setCatalogo([]), false);
+  assert.equal(setCatalogo(null), false);
+  assert.equal(setCatalogo([{ id: '', nombre: 'x', lat: 1, lng: 1 }]), false);
+  assert.equal(setCatalogo([{ id: 'ok', nombre: 'x', lat: 'no-numero', lng: 1 }]), false);
+  assert.equal(PUNTOS_CORREDOR.length, n);
+});

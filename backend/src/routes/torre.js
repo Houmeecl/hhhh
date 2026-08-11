@@ -1,7 +1,9 @@
 import express from 'express';
+import crypto from 'crypto';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, logActividad } from '../middleware/auth.js';
 import { validarMensajeTorre } from '../services/pasaporteOrigen.js';
+import { fronterasCorredor } from '../services/catalogoCorredor.js';
 
 // ============================================================
 // Router de la TORRE DE CONTROL — montado en /api/torre. La torre se
@@ -20,7 +22,8 @@ export const torreRouter = express.Router();
 torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
     const b = req.body || {};
-    const val = validarMensajeTorre(b);
+    // Fronteras desde la tabla puntos_corredor (093), con fallback estático.
+    const val = validarMensajeTorre(b, await fronterasCorredor());
     if (!val.ok) return res.status(400).json({ error: val.error });
 
     const codigo = String(b.codigo_lote || '').trim().toUpperCase();
@@ -60,6 +63,93 @@ torreRouter.post('/mensaje', requireAuth, requireRole('pos'), async (req, res, n
 // esta lista con los umbrales de alerta). Los que aún no tienen ningún
 // paso reconocible van al final (NULLS LAST): el frontend ya los separa
 // en su propia sección "sin posición".
+// GET /api/torre/kpis — agregados de la operación para el tablero de
+// flota. Todo se calcula desde los eslabones REALES (append-only) contra
+// el `orden` de la tabla puntos_corredor; si no hay datos suficientes se
+// devuelve n=0 y el frontend dice "sin datos aún" — nunca un número
+// inventado. Cache in-memory 60 s: son agregados lentos (pasos de camión
+// distan horas), no posición en vivo.
+//  - tramos: horas promedio entre pares CONSECUTIVOS del corredor
+//    (orden destino = orden origen + 1, últimos 90 días). Saltos de
+//    varios puntos y retrocesos NO cuentan como tramo.
+//  - retrocesos_30d: pasos cuyo punto retrocede respecto del máximo
+//    histórico de su lote (misma semántica que pasosRetrocedidos() del
+//    frontend), contados en los últimos 30 días.
+let kpisCache = { data: null, ts: 0 };
+const KPIS_TTL_MS = 60 * 1000;
+
+// Para los tests (los agregados cambian entre casos sin esperar el TTL).
+export function invalidarCacheKpis() {
+  kpisCache = { data: null, ts: 0 };
+}
+
+torreRouter.get('/kpis', requireAuth, requireRole('pos'), async (req, res, next) => {
+  try {
+    const ahora = Date.now();
+    if (kpisCache.data && ahora - kpisCache.ts < KPIS_TTL_MS) {
+      const etag = `"${crypto.createHash('sha1').update(JSON.stringify(kpisCache.data)).digest('hex')}"`;
+      if (req.headers['if-none-match'] === etag) {
+        return res.status(304).end();
+      }
+      res.set('ETag', etag);
+      return res.json(kpisCache.data);
+    }
+    // El JOIN va contra TODA la tabla (también puntos inactivos): los
+    // pasos históricos en un punto desactivado siguen siendo medibles.
+    const { rows: tramos } = await query(
+      `WITH pasos AS (
+         SELECT e.lote_id, e.eslabon, e.created_at, pc.orden, pc.id AS punto_id
+           FROM lote_eslabones e
+           JOIN puntos_corredor pc ON pc.id = e.datos->>'punto_id'
+       ), con_prev AS (
+         SELECT lote_id, created_at, orden, punto_id,
+                LAG(orden)      OVER w AS orden_prev,
+                LAG(punto_id)   OVER w AS punto_prev,
+                LAG(created_at) OVER w AS creado_prev
+           FROM pasos
+         WINDOW w AS (PARTITION BY lote_id ORDER BY eslabon)
+       )
+       SELECT punto_prev AS desde, punto_id AS hasta, orden_prev AS orden,
+              round(avg(EXTRACT(EPOCH FROM created_at - creado_prev)) / 3600, 1) AS horas_promedio,
+              count(*)::int AS n
+         FROM con_prev
+        WHERE orden = orden_prev + 1
+          AND created_at > creado_prev
+          AND created_at > now() - interval '90 days'
+        GROUP BY punto_prev, punto_id, orden_prev
+        ORDER BY orden_prev`
+    );
+    const { rows: retro } = await query(
+      `WITH pasos AS (
+         SELECT e.lote_id, e.eslabon, e.created_at, pc.orden
+           FROM lote_eslabones e
+           JOIN puntos_corredor pc ON pc.id = e.datos->>'punto_id'
+       ), con_max AS (
+         SELECT lote_id, created_at, orden,
+                MAX(orden) OVER (PARTITION BY lote_id ORDER BY eslabon
+                                 ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) AS max_prev
+           FROM pasos
+       )
+       SELECT count(*)::int AS n, count(DISTINCT lote_id)::int AS lotes
+         FROM con_max
+        WHERE max_prev IS NOT NULL AND orden < max_prev
+          AND created_at > now() - interval '30 days'`
+    );
+    const data = {
+      tramos: tramos.map((t) => ({
+        desde: t.desde, hasta: t.hasta,
+        horas_promedio: Number(t.horas_promedio), n: t.n,
+      })),
+      retrocesos_30d: { n: retro[0]?.n || 0, lotes: retro[0]?.lotes || 0 },
+      generado: new Date().toISOString(),
+    };
+    kpisCache = { data, ts: ahora };
+    const etag = `"${crypto.createHash('sha1').update(JSON.stringify(data)).digest('hex')}"`;
+    res.set('ETag', etag);
+    res.json(data);
+  } catch (err) { next(err); }
+});
+
 torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next) => {
   try {
     const { rows } = await query(
@@ -88,6 +178,12 @@ torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next
                   ORDER BY e.eslabon DESC LIMIT 1) ASC NULLS LAST
        LIMIT 100`
     );
-    res.json({ flota: rows });
+    const data = { flota: rows };
+    const etag = `"${crypto.createHash('sha1').update(JSON.stringify(data)).digest('hex')}"`;
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
+    res.set('ETag', etag);
+    res.json(data);
   } catch (err) { next(err); }
 });

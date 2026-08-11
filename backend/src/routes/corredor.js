@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActivida
 import { simpleApi } from '../services/simpleApi.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { bigquery } from '../services/bigquery.js';
+import { invalidarCacheCatalogo } from '../services/catalogoCorredor.js';
 
 const router = express.Router();
 router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('corredor'));
@@ -166,6 +167,93 @@ router.post('/documentos', adminOnly, upload.single('archivo'), async (req, res,
 
     // Export al data warehouse (no bloqueante; apagado por defecto).
     bigquery.exportDocumentoCorredor(result);
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// PUNTOS DE CONTROL DEL CORREDOR (tabla puntos_corredor, migración 093)
+// El catálogo que antes vivía hardcodeado: el admin agrega o corrige un
+// punto acá y aparece en el mapa de la torre, el select del portador y
+// los carteles QR sin deploy. Reglas duras:
+//  - El id (slug) NO es editable y NO hay DELETE: los eslabones sellados
+//    referencian datos.punto_id — un punto que sale de servicio se marca
+//    activo=false y su id queda reservado para siempre.
+//  - Toda escritura invalida el cache del catálogo (services/
+//    catalogoCorredor.js) para que el propio proceso lo vea al tiro.
+// ============================================================
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
+const PAISES_CORREDOR = ['BR', 'PY', 'AR', 'CL'];
+
+function validarPunto(b, { esNuevo }) {
+  const errores = [];
+  const id = String(b.id || '').trim();
+  if (esNuevo && !SLUG_RE.test(id)) errores.push('El id debe ser un slug (minúsculas, números y guiones, 3-40 caracteres).');
+  const nombre = String(b.nombre || '').trim().slice(0, 120);
+  if (!nombre) errores.push('Falta el nombre del punto.');
+  const pais = String(b.pais || '').toUpperCase();
+  if (!PAISES_CORREDOR.includes(pais)) errores.push(`El país debe ser uno de: ${PAISES_CORREDOR.join(', ')}.`);
+  const lat = Number(b.lat); const lng = Number(b.lng);
+  if (!Number.isFinite(lat) || lat < -60 || lat > 0) errores.push('Latitud fuera de rango para el corredor.');
+  if (!Number.isFinite(lng) || lng < -80 || lng > -40) errores.push('Longitud fuera de rango para el corredor.');
+  const orden = Number(b.orden);
+  if (!Number.isInteger(orden) || orden < 0 || orden > 999) errores.push('El orden debe ser un entero entre 0 y 999.');
+  return { ok: errores.length === 0, error: errores.join(' '), datos: { id, nombre, pais, lat, lng, orden, es_frontera: b.es_frontera === true } };
+}
+
+// Lista completa (incluidos inactivos — el admin necesita verlos para reactivar).
+router.get('/puntos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre, pais, lat, lng, orden, es_frontera, activo, created_at
+         FROM puntos_corredor ORDER BY orden`
+    );
+    res.json({ puntos: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/puntos', adminOnly, async (req, res, next) => {
+  try {
+    const val = validarPunto(req.body || {}, { esNuevo: true });
+    if (!val.ok) return res.status(400).json({ error: val.error });
+    const d = val.datos;
+    const { rows } = await query(
+      `INSERT INTO puntos_corredor (id, nombre, pais, lat, lng, orden, es_frontera)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (id) DO NOTHING
+       RETURNING *`,
+      [d.id, d.nombre, d.pais, d.lat, d.lng, d.orden, d.es_frontera]
+    );
+    if (!rows[0]) return res.status(409).json({ error: `Ya existe un punto con el id '${d.id}' (puede estar inactivo).` });
+    invalidarCacheCatalogo();
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'punto_corredor_crear', entidad: 'punto_corredor',
+      detalle: { id: d.id, nombre: d.nombre }, ip: req.ip,
+    });
+    res.status(201).json({ punto: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// Edita nombre/país/coordenadas/orden/frontera/activo — nunca el id.
+router.put('/puntos/:id', adminOnly, async (req, res, next) => {
+  try {
+    const val = validarPunto({ ...req.body, id: req.params.id }, { esNuevo: false });
+    if (!val.ok) return res.status(400).json({ error: val.error });
+    const d = val.datos;
+    const { rows } = await query(
+      `UPDATE puntos_corredor
+          SET nombre = $2, pais = $3, lat = $4, lng = $5, orden = $6,
+              es_frontera = $7, activo = $8
+        WHERE id = $1 RETURNING *`,
+      [req.params.id, d.nombre, d.pais, d.lat, d.lng, d.orden, d.es_frontera, req.body.activo !== false]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Punto no encontrado' });
+    invalidarCacheCatalogo();
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'punto_corredor_editar', entidad: 'punto_corredor',
+      detalle: { id: req.params.id, activo: rows[0].activo }, ip: req.ip,
+    });
+    res.json({ punto: rows[0] });
   } catch (err) { next(err); }
 });
 

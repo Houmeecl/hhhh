@@ -122,6 +122,41 @@ test('GET /admin/origen/corredor/:puntoId/qr.png sin token → 401', { skip: SAL
   assert.equal(res.status, 401);
 });
 
+// ---------- Catálogo dinámico (tabla puntos_corredor, migración 093) ----------
+
+test('un punto agregado en la tabla se acepta como punto_id y tiene cartel QR — sin deploy', { skip: SALTO_PROD }, async () => {
+  const { invalidarCacheCatalogo } = await import('../src/services/catalogoCorredor.js');
+  await query(`INSERT INTO puntos_corredor (id, nombre, pais, lat, lng, orden)
+               VALUES ('punto-quince-e2e', 'Punto Quince', 'CL', -23.5, -70.0, 950)
+               ON CONFLICT (id) DO UPDATE SET activo = true`);
+  invalidarCacheCatalogo();
+
+  // 1. El QR del punto nuevo responde 200 (antes: 404 porque el id no
+  //    estaba en el array estático).
+  const resQr = await fetch(`${baseUrl}/api/admin/origen/corredor/punto-quince-e2e/qr.png`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  assert.equal(resQr.status, 200);
+
+  // 2. Un paso declarado en ese punto NO genera la advertencia de
+  //    "no está en el catálogo".
+  const resAuth = await fetch(`${baseUrl}/api/tarjeta/auth`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serial: camionEnRuta.tarjeta.serial, clave: camionEnRuta.tarjeta.clave }),
+  });
+  const { token } = await resAuth.json();
+  const resPaso = await fetch(`${baseUrl}/api/tarjeta/paso`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ punto_control: 'Punto Quince', punto_id: 'punto-quince-e2e', pais: 'CL' }),
+  });
+  assert.equal(resPaso.status, 201);
+  const body = await resPaso.json();
+  assert.ok(!body.advertencias.some((a) => a.includes('catálogo')));
+
+  await query(`DELETE FROM puntos_corredor WHERE id = 'punto-quince-e2e'`); // limpieza del test
+  invalidarCacheCatalogo();
+});
+
 // ---------- POST /api/tarjeta/paso ----------
 
 test('POST /api/tarjeta/paso con punto_id fuera del catálogo: se guarda igual, con advertencia', { skip: SALTO_PROD }, async () => {
