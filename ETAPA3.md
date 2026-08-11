@@ -153,6 +153,26 @@ terceros — ver la tabla al final de este documento); esto documenta la parte q
   externa" a la única categoría que no la tenía (`materiales`; el resto ya la traía desde
   `031_higiene_metodologica.sql`). Sigue pendiente que un admin con acceso directo a esos
   dominios descargue y confirme las 4 ediciones nuevas antes de promoverlas.
+- **Fase 5, tercera ronda — hecha (migración 085).** La red volvió a bloquear la apertura de
+  primera mano (12/12 dominios oficiales rechazados esta vez), así que **de nuevo ninguna
+  promoción** — pero la ronda dejó cuatro cierres reales: (1) `defra_2024` ahora cita la
+  edición vigente (DESNZ 2026, publicada 11-jun-2026, URL en la fila) con los desfases de
+  vuelos anotados; (2) **corrección de etiqueta en `vuelo_corto`/`vuelo_largo`**: decían "sin
+  forzamiento radiativo" pero los valores calzan con los factores CON forzamiento de DEFRA
+  2021-2024 (la etiqueta "sin" era aritméticamente imposible) — error de rotulación visible
+  en informes, corregido sin tocar los números; (3) primera diligencia de `transporte_modos`
+  (Cat. 7): los 5 factores pasan de "Referencial — validar" a citas concretas (DEFRA/DESNZ
+  2026, con tren ~-13% y bus ~+42% de desfase anotados; `camioneta` declarada proxy interno
+  sin análogo DEFRA); (4) cierre conceptual de `ipcc_2006_v2` (material del TFI indexado: el
+  Refinamiento 2019 no toca los factores de combustión que usa el motor). También se cubrió
+  el hueco de test de la 081 (la segunda ronda se aplicó sin auditoría de idempotencia;
+  `metodologiasDiligencia.test.js` ahora audita 075+081+085). **Pendiente humano explícito
+  (~15 min con navegador normal)**: abrir 4 URLs que la fila de cada fuente deja exactas —
+  planilla DESNZ 2026 (gov.uk — al abrirla, confirmar también la fila exacta de vuelos:
+  economy vs average passenger), PDF CEN 2024 (coordinador.cl), PDF HuellaChile v3
+  (huellachile.mma.gob.cl, candidata Nº1: su factor indexado 0,2421 ya coincide con el motor)
+  y el índice del Refinamiento 2019 (ipcc.ch) — y promover desde el panel Motor propio →
+  Fuentes, que congela versión solo. No corresponde una cuarta ronda automática.
 - **Fase 6 — pendiente**: cabos sueltos de código que ya se
   sabía que quedaban así (cadena de ajustes no verificable por el cliente sin sesión de admin,
   `demo-torre` sin flag de entorno, `puedeEmitirse()` sin llamador, rotación de API key de
