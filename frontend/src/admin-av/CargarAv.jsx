@@ -157,6 +157,11 @@ export default function CargarAv() {
               No se pudo enviar el correo. Puedes reintentar o entregar el informe descargado.
             </div>
           )}
+          {resultado.aviso && (
+            <div className="badge badge-amber" style={{ display: 'block', padding: '10px 14px', marginTop: 10 }}>
+              {resultado.aviso}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', margin: '0 0 4px' }}>

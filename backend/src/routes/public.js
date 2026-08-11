@@ -17,7 +17,7 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
 import { versionVigente } from '../services/motorVersiones.js';
-import { leerDocumento, filaRechazo } from '../services/lecturaDocumento.js';
+import { leerDocumento, filaRechazo, rutReceptorNoCalza } from '../services/lecturaDocumento.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { contrapartesDeRut } from '../services/trazabilidad.js';
 import { hashDocumento, hashCadena, eslabonValido, verificarCadenaCompleta, siguienteEslabon } from '../services/cadenaHash.js';
@@ -234,7 +234,10 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
   try {
     const { rut, empresa, email } = req.body;
     let codigo = req.body.codigo ? String(req.body.codigo).trim() : null;
-    const files = req.files || [];
+    // `let`: si un documento viene emitido a OTRO RUT, se excluye del envío
+    // (junto con su lectura) y el resto sigue su curso — ver el bloque
+    // 'rut_no_calza' del pre-pass más abajo.
+    let files = req.files || [];
 
     if (!rut || !empresa || !email) {
       return res.status(400).json({ error: 'Faltan datos: RUT, empresa y email son obligatorios.' });
@@ -309,7 +312,7 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     // segundos por archivo y antes corría con la fila de cadena_estado
     // bloqueada, serializando todos los envíos concurrentes. Ahora el lock
     // se toma recién con las lecturas ya resueltas.
-    const lecturas = [];
+    let lecturas = [];
     for (const file of files) {
       // El RUT del formulario es la identidad del trámite (no un dato de
       // factura): si aparece en el documento, ancla quién es el receptor.
@@ -363,6 +366,37 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
           // habilita el método físico) antes que solo pedir otro escaneo.
           : `No pudimos leer automáticamente ${plural ? 'estos documentos' : `"${nombres[0]}"`}${plural ? `: ${nombres.map((n) => `"${n}"`).join(', ')}` : ''}. Si tienes el XML del documento tributario, súbelo: trae el detalle exacto. Si no, vuelve a escanear${plural ? 'los' : 'lo'} (buena luz, sin cortes) y carga el envío de nuevo.`;
       return res.status(422).json({ error, rechazados: nombres });
+    }
+
+    // Documento emitido a OTRO RUT que el del titular: se rechaza SOLO el
+    // documento culpable — los demás siguen su curso (el informe presenta
+    // solo lo que calza; el envío no muere completo). Sin esta regla, una
+    // factura ajena se asimilaba y contaminaba el total de la sesión, la
+    // cadena de hash, Capital Natural, el inventario, BigQuery, el informe
+    // y el webhook del mandante. El predicado da beneficio de la duda: sin
+    // receptor detectable, o con receptor que no pasa módulo 11 (basura de
+    // OCR), NO se rechaza (ver rutReceptorNoCalza en lecturaDocumento.js).
+    const indicesNoCalza = lecturas
+      .map((l, i) => (rutReceptorNoCalza(l, rut) ? i : -1))
+      .filter((i) => i >= 0);
+    let rechazadosRut = [];
+    if (indicesNoCalza.length > 0) {
+      await registrarRechazos(
+        indicesNoCalza.map((i) => filaRechazo(files[i], lecturas[i], rut, 'rut_no_calza'))
+      );
+      rechazadosRut = indicesNoCalza.map((i) => files[i].originalname);
+      const plural = rechazadosRut.length > 1;
+      if (indicesNoCalza.length === files.length) {
+        // Todos los documentos son de otro RUT: no hay nada que procesar.
+        return res.status(422).json({
+          error: `${plural ? 'Estos documentos están emitidos' : `"${rechazadosRut[0]}" está emitido`} a un RUT distinto de ${rut}, así que no ${plural ? 'se incorporan' : 'se incorpora'} al inventario de esta empresa. Revisa que el RUT ingresado sea el de la empresa que recibió ${plural ? 'los documentos' : 'el documento'}.`,
+          rechazados: rechazadosRut,
+        });
+      }
+      // Excluir los culpables y seguir con el resto del envío.
+      const fuera = new Set(indicesNoCalza);
+      files = files.filter((_, i) => !fuera.has(i));
+      lecturas = lecturas.filter((_, i) => !fuera.has(i));
     }
 
     const result = await withTx(async (client) => {
@@ -620,6 +654,13 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     const facturas = await hydrateFacturas(result.id);
     res.status(201).json({
       sesion: result, facturas,
+      // Rechazo PARCIAL por RUT que no calza: la sesión se creó con los
+      // documentos que sí calzan; acá se informa cuáles quedaron fuera y
+      // por qué (el frontend los marca y muestra el aviso).
+      ...(rechazadosRut.length > 0 ? {
+        rechazados: rechazadosRut,
+        aviso: `${rechazadosRut.length > 1 ? `${rechazadosRut.length} documentos quedaron fuera por estar emitidos` : `"${rechazadosRut[0]}" quedó fuera por estar emitido`} a un RUT distinto de ${rut}: el informe presenta solo lo que calza con la empresa titular.`,
+      } : {}),
       // Presente solo si la carga la hizo un jugador de "Sube y Suma" —
       // el frontend normal simplemente ignora este campo.
       ...(jugador ? { juego: { puntos_ganados: puntosGanados } } : {}),

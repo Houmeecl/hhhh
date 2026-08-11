@@ -53,7 +53,9 @@ export default function Escanear() {
       if (perfil?.codigo) fd.append('codigo', perfil.codigo);
       files.forEach((f) => fd.append('archivos', f));
       const r = await api.jugadorCrearSesion(fd);
-      setResultado({ puntos: r.juego?.puntos_ganados ?? 0, sesionId: r.sesion.id, nFacturas: r.facturas.length });
+      // `aviso` llega solo si algún documento quedó fuera por estar emitido
+      // a otro RUT (rechazo parcial): se puntúa lo que sí calzó.
+      setResultado({ puntos: r.juego?.puntos_ganados ?? 0, sesionId: r.sesion.id, nFacturas: r.facturas.length, aviso: r.aviso || '' });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -69,6 +71,11 @@ export default function Escanear() {
         <p className="muted" style={{ fontSize: 14 }}>
           {resultado.nFacturas} documento{resultado.nFacturas > 1 ? 's' : ''} procesado{resultado.nFacturas > 1 ? 's' : ''}.
         </p>
+        {resultado.aviso && (
+          <div className="badge badge-amber" style={{ display: 'block', padding: '10px 14px', marginTop: 8, textAlign: 'left' }}>
+            {resultado.aviso}
+          </div>
+        )}
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 10 }} onClick={() => nav('/suma')}>
           Volver al inicio
         </button>

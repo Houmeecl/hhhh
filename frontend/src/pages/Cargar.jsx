@@ -16,7 +16,8 @@ export default function Cargar() {
   const [error, setError] = useState('');
   const [procesando, setProcesando] = useState(false);
   const [progreso, setProgreso] = useState(0);
-  const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'
+  const [estados, setEstados] = useState([]); // estado por factura: 'pendiente'|'procesando'|'listo'|'rechazado'
+  const [aviso, setAviso] = useState(''); // rechazo parcial: documentos emitidos a otro RUT
   const [codigoInfo, setCodigoInfo] = useState(null); // código de acceso con créditos (mini sitio)
   const [bump, setBump] = useState(false); // pulso del contador al completar un documento
 
@@ -103,11 +104,15 @@ export default function Cargar() {
       fd.append('email', form.email);
       if (codigoInfo) fd.append('codigo', codigoInfo.codigo);
       files.forEach((f) => fd.append('archivos', f));
-      const { sesion } = await api.crearSesion(fd);
+      const { sesion, rechazados = [], aviso: avisoRut } = await api.crearSesion(fd);
       clearInterval(timer);
-      setEstados(files.map(() => 'listo'));
+      // Rechazo PARCIAL: el backend creó la sesión con lo que calza y
+      // devuelve los nombres emitidos a otro RUT — se marcan y se da
+      // tiempo a leer el aviso antes de pasar al informe.
+      setEstados(files.map((f) => (rechazados.includes(f.name) ? 'rechazado' : 'listo')));
       setProgreso(100);
-      setTimeout(() => nav(`/resultado/${sesion.id}`), 900);
+      if (avisoRut) setAviso(avisoRut);
+      setTimeout(() => nav(`/resultado/${sesion.id}`), rechazados.length > 0 ? 4500 : 900);
     } catch (e) {
       clearInterval(timer);
       setError(e.message);
@@ -142,6 +147,7 @@ export default function Cargar() {
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><Icon.Doc size={16} /> {f.name} <span className="muted">· {(f.size / 1024).toFixed(0)} KB</span></span>
                     {procesando ? (
                       st === 'listo' ? <span className="badge badge-green send-check-pop"><Icon.Check size={12} /> Listo</span>
+                      : st === 'rechazado' ? <span className="badge badge-red">Emitida a otro RUT — no incluida</span>
                       : st === 'procesando' ? <span className="badge badge-amber"><span className="spinner dark" style={{ width: 12, height: 12, verticalAlign: 'middle' }} /> Procesando…</span>
                       : <span className="badge badge-gray">En espera</span>
                     ) : (
@@ -178,6 +184,7 @@ export default function Cargar() {
           </div>
 
           {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{error}</div>}
+          {aviso && <div className="badge badge-amber" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{aviso}</div>}
 
           {procesando ? (
             <div className="send-sequence">

@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { leerDocumento, filaRechazo, sha256Hex } from '../src/services/lecturaDocumento.js';
+import { leerDocumento, filaRechazo, sha256Hex, rutReceptorNoCalza } from '../src/services/lecturaDocumento.js';
 import { ocrDisponible } from '../src/services/extractorTexto.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -273,4 +273,77 @@ test('con IA disponible: un ítem con monto absurdo sigue disparando el tope (mi
   const r = await leerDocumento(fs.readFileSync(FIXTURE_PDF), 'factura.pdf', { analizarIA });
   assert.equal(r.tipo, 'rechazo');
   assert.equal(r.motivo, 'monto_fuera_de_rango');
+});
+
+// ---------- rutReceptorNoCalza (migración 086) ----------
+// El documento emitido a OTRO RUT se rechaza SOLO con evidencia firme:
+// receptor propio del documento, que pasa módulo 11 y no calza con el
+// titular. Todo lo demás es beneficio de la duda (se asimila como hoy).
+
+test('rutReceptorNoCalza: receptor del XML igual al titular (con puntos/guión) → calza', () => {
+  const lectura = { tipo: 'xml', dte: { rut_receptor: '11111111-1' } };
+  assert.equal(rutReceptorNoCalza(lectura, '11.111.111-1'), false);
+});
+
+test('rutReceptorNoCalza: receptor del XML distinto del titular → no calza', () => {
+  const lectura = { tipo: 'xml', dte: { rut_receptor: '11111111-1' } };
+  assert.equal(rutReceptorNoCalza(lectura, '76.123.456-0'), true);
+});
+
+test('rutReceptorNoCalza: receptor de texto distinto del titular → no calza', () => {
+  const lectura = { tipo: 'texto', textoParseado: { rut_receptor: '76520943-9' } };
+  assert.equal(rutReceptorNoCalza(lectura, '78345120-4'), true);
+});
+
+test('rutReceptorNoCalza: K mayúscula/minúscula y formato no importan', () => {
+  const lectura = { tipo: 'texto', textoParseado: { rut_receptor: '76.222.089-k' } };
+  assert.equal(rutReceptorNoCalza(lectura, '76222089K'), false);
+});
+
+test('rutReceptorNoCalza: sin receptor detectable → beneficio de la duda', () => {
+  assert.equal(rutReceptorNoCalza({ tipo: 'xml', dte: { rut_receptor: null } }, '11111111-1'), false);
+  assert.equal(rutReceptorNoCalza({ tipo: 'texto', textoParseado: {} }, '11111111-1'), false);
+  assert.equal(rutReceptorNoCalza({ tipo: 'sin_senal', etapa: 'pdf_ocr' }, '11111111-1'), false);
+  assert.equal(rutReceptorNoCalza(null, '11111111-1'), false);
+});
+
+test('rutReceptorNoCalza: receptor que no pasa módulo 11 (basura de OCR) → beneficio de la duda', () => {
+  const lectura = { tipo: 'texto', textoParseado: { rut_receptor: '11111111-2' } };
+  assert.equal(rutReceptorNoCalza(lectura, '76123456-0'), false);
+  // Muy corto o muy largo tampoco cuenta como evidencia.
+  assert.equal(rutReceptorNoCalza({ tipo: 'texto', textoParseado: { rut_receptor: '12-4' } }, '76123456-0'), false);
+});
+
+test('rutReceptorNoCalza: sin RUT titular no hay con qué comparar → false', () => {
+  const lectura = { tipo: 'xml', dte: { rut_receptor: '11111111-1' } };
+  assert.equal(rutReceptorNoCalza(lectura, ''), false);
+  assert.equal(rutReceptorNoCalza(lectura, null), false);
+});
+
+test('rutReceptorNoCalza: titular como EMISOR en camino de texto → posible swap de la IA, no rechaza', () => {
+  // La IA no recibe el anclaje del RUT esperado: puede invertir emisor y
+  // receptor en una factura legítima. Si el titular figura en CUALQUIERA
+  // de los dos campos, el documento calza.
+  const lectura = { tipo: 'texto', textoParseado: { rut_emisor: '78345120-4', rut_receptor: '76123456-0' } };
+  assert.equal(rutReceptorNoCalza(lectura, '78.345.120-4'), false);
+  // Pero si el titular no aparece en ninguno, sí se rechaza.
+  assert.equal(rutReceptorNoCalza(lectura, '76520943-9'), true);
+});
+
+test('rutReceptorNoCalza: XML sin ítems (sin_senal con dte) conserva la evidencia del receptor', () => {
+  // Un XML ajeno sin ítems iba al motor externo y se asimilaba igual:
+  // la lectura es 'sin_senal' pero el dte trae RUTRecep — evidencia firme.
+  const lectura = { tipo: 'sin_senal', etapa: 'xml', dte: { rut_receptor: '76520943-9' } };
+  assert.equal(rutReceptorNoCalza(lectura, '78345120-4'), true);
+  assert.equal(rutReceptorNoCalza(lectura, '76.520.943-9'), false); // el propio titular calza
+  // sin_senal SIN dte (PDF ilegible): sin evidencia, no se rechaza.
+  assert.equal(rutReceptorNoCalza({ tipo: 'sin_senal', etapa: 'pdf_ocr' }, '78345120-4'), false);
+});
+
+test('rutReceptorNoCalza: en XML el emisor NO da beneficio de la duda (campos estructurados)', () => {
+  // RUTEmisor/RUTRecep son tags del DTE, no una adivinanza posicional: si
+  // el receptor del XML es otro, el documento es ajeno aunque el titular
+  // figure como emisor (una venta propia no es un gasto del titular).
+  const lectura = { tipo: 'xml', dte: { rut_emisor: '78345120-4', rut_receptor: '76520943-9' } };
+  assert.equal(rutReceptorNoCalza(lectura, '78345120-4'), true);
 });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { parseDte } from './dte.js';
+import { parseDte, rutValido } from './dte.js';
+import { normalizarRut } from './mandante.js';
 import {
   extraerTextoPdf, extraerTextoImagenBuffer, ocrDisponible,
   extraerTextoPdfEscaneado, extraerTextoHeicBuffer,
@@ -159,6 +160,49 @@ export async function leerDocumento(buffer, nombreArchivo, { rutReceptorEsperado
     // Cualquier falla de extracción → sin señal; el llamador decide.
   }
   return { tipo: 'sin_senal', etapa };
+}
+
+// ¿El documento está emitido a OTRO RUT que el del titular del envío?
+// Devuelve true SOLO cuando hay evidencia firme: el documento trae un
+// rut_receptor propio, que pasa módulo 11, y que normalizado NO coincide
+// con el RUT del formulario. Sin receptor detectable, o con un receptor
+// ilegible (basura de OCR que no pasa módulo 11), devuelve false —
+// beneficio de la duda, el documento se asimila como siempre (evita
+// falsos rechazos por mala lectura).
+//
+// Nota: en el camino de texto la asignación emisor/receptor puede venir
+// invertida por el layout (facturaTexto.js la corrige solo si el RUT
+// esperado aparece en el documento) — no importa para esta regla: si
+// NINGUNO de los RUT del documento es el del titular, el que quede en
+// rut_receptor será el de un tercero válido y el rechazo es correcto
+// igual.
+export function rutReceptorNoCalza(lectura, rutTitular) {
+  if (!rutTitular) return false;
+  // El XML es la evidencia más firme y también llega en lecturas
+  // 'sin_senal' (XML sin ítems conserva el dte para el motor externo):
+  // sin leerlo ahí, un XML ajeno sin ítems se asimilaba igual con el
+  // motor externo activo — el mismo bug reportado, por una rendija.
+  const receptor = (lectura?.tipo === 'xml' || lectura?.tipo === 'sin_senal')
+    ? lectura?.dte?.rut_receptor
+    : lectura?.tipo === 'texto'
+      ? lectura.textoParseado?.rut_receptor
+      : null; // 'rechazo': ya quedó fuera por su propio motivo
+  if (!receptor) return false;
+  const norm = normalizarRut(receptor);
+  if (norm.length < 7 || norm.length > 9) return false;
+  if (!rutValido(`${norm.slice(0, -1)}-${norm.slice(-1)}`)) return false;
+  const titular = normalizarRut(rutTitular);
+  // Camino de texto/IA: emisor y receptor pueden venir INTERCAMBIADOS
+  // (el anclaje de facturaTexto.js solo corrige el swap si el RUT
+  // esperado aparece; la IA no recibe esa pista). Si el titular figura
+  // como EMISOR, lo probable es el swap, no un documento ajeno —
+  // beneficio de la duda. En XML no aplica: RUTEmisor/RUTRecep son
+  // campos estructurados del DTE, no una adivinanza posicional.
+  if (lectura?.tipo === 'texto') {
+    const emisor = normalizarRut(lectura.textoParseado?.rut_emisor || '');
+    if (emisor && emisor === titular) return false;
+  }
+  return norm !== titular;
 }
 
 // Fila lista para insertar en documentos_rechazados (sin el binario:
