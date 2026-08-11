@@ -8,6 +8,9 @@ import { api, clienteAuth } from '../api.js';
 
 const MAX = 5;
 const OK_EXT = /\.(pdf|xml|jpe?g|png|heic)$/i;
+// Debe calzar con el límite duro del backend (public.js: multer `fileSize`).
+const MAX_MB = 15;
+const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 export default function Cargar() {
   const nav = useNavigate();
@@ -47,20 +50,35 @@ export default function Cargar() {
   // Con código, el tope es el menor entre 5 y los créditos restantes.
   const maxEfectivo = codigoInfo ? Math.min(MAX, codigoInfo.creditos_restantes) : MAX;
 
+  // Valida formato y peso ANTES de subir — antes solo el formato se
+  // revisaba acá; el peso se descubría recién cuando el backend rechazaba
+  // el archivo YA subido entero, con la espera de la subida completa de
+  // por medio para nada. Junta todos los problemas encontrados (formato +
+  // peso + cupo) en un solo aviso en vez de que uno pise al otro.
   function addFiles(list) {
-    setError('');
-    const incoming = Array.from(list).filter((f) => OK_EXT.test(f.name));
-    const rejected = Array.from(list).length - incoming.length;
-    if (rejected > 0) setError('Algunos archivos no tienen un formato permitido (PDF, XML, JPG, PNG).');
-    const combined = [...files, ...incoming];
+    const all = Array.from(list);
+    const invalidos = all.filter((f) => !OK_EXT.test(f.name));
+    const pesados = all.filter((f) => OK_EXT.test(f.name) && f.size > MAX_BYTES);
+    const validos = all.filter((f) => OK_EXT.test(f.name) && f.size <= MAX_BYTES);
+
+    const avisos = [];
+    if (invalidos.length > 0) {
+      avisos.push(`Formato no permitido (${invalidos.map((f) => f.name).join(', ')}). Solo PDF, XML, JPG, PNG o HEIC.`);
+    }
+    if (pesados.length > 0) {
+      avisos.push(`Muy pesado, máx. ${MAX_MB} MB (${pesados.map((f) => f.name).join(', ')}).`);
+    }
+
+    const combined = [...files, ...validos];
     if (combined.length > maxEfectivo) {
-      setError(codigoInfo && maxEfectivo < MAX
+      avisos.push(codigoInfo && maxEfectivo < MAX
         ? `Tu código tiene ${maxEfectivo} crédito${maxEfectivo === 1 ? '' : 's'} disponibles.`
         : 'Puedes cargar hasta 5 facturas por envío. Contáctanos para más.');
       setFiles(combined.slice(0, maxEfectivo));
     } else {
       setFiles(combined);
     }
+    setError(avisos.join(' '));
   }
 
   const rutValido = form.rut === '' || validarRut(form.rut);
@@ -115,7 +133,13 @@ export default function Cargar() {
       setTimeout(() => nav(`/resultado/${sesion.id}`), rechazados.length > 0 ? 4500 : 900);
     } catch (e) {
       clearInterval(timer);
-      setError(e.message);
+      // e.message ya trae el motivo puntual del backend (RUT no calza,
+      // formato rechazado, etc.) salvo cuando el fetch ni siquiera llegó a
+      // responder (sin conexión, servidor caído) — ahí el navegador tira un
+      // "Failed to fetch" en inglés que no le dice nada al usuario.
+      setError(e.name === 'TypeError' || e.message === 'Failed to fetch'
+        ? 'No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.'
+        : e.message);
       setProcesando(false);
     }
   }
@@ -136,7 +160,12 @@ export default function Cargar() {
         )}
 
         <div className="card card-pad" style={{ marginTop: 20 }}>
-          {!procesando && <Dropzone onFiles={addFiles} />}
+          {!procesando && (
+            <Dropzone
+              onFiles={addFiles}
+              hint={`Formatos permitidos: PDF, XML, JPG, PNG o HEIC · máx. ${MAX_MB} MB por archivo`}
+            />
+          )}
 
           {files.length > 0 && (
             <div className="file-list">
@@ -183,8 +212,18 @@ export default function Cargar() {
             </div>
           </div>
 
-          {error && <div className="badge badge-red" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{error}</div>}
-          {aviso && <div className="badge badge-amber" style={{ display: 'block', padding: '10px 14px', marginBottom: 14 }}>{aviso}</div>}
+          {error && (
+            <div className="badge badge-red" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', marginBottom: 14 }}>
+              <span style={{ flexShrink: 0, marginTop: 1 }}><Icon.Alert size={16} /></span>
+              <span>{error}</span>
+            </div>
+          )}
+          {aviso && (
+            <div className="badge badge-amber" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', marginBottom: 14 }}>
+              <span style={{ flexShrink: 0, marginTop: 1 }}><Icon.Info size={16} /></span>
+              <span>{aviso}</span>
+            </div>
+          )}
 
           {procesando ? (
             <div className="send-sequence">
