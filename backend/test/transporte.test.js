@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { calcularCo2eViaje, resumenTransporte } from '../src/services/transporte.js';
+import { calcularCo2eViaje, resumenTransporte, validarViaje } from '../src/services/transporte.js';
 
 test('calcularCo2eViaje aplica la fórmula km × tramos × pasajeros × factor / 1000', () => {
   // 100 km, 1 tramo, 1 pasajero, factor 0.1 kgCO2e/pkm → 100*1*1*0.1/1000 = 0.01 t
@@ -86,4 +86,57 @@ test('resumenTransporte: lista vacía no revienta', () => {
   assert.equal(r.total.n_viajes, 0);
   assert.deepEqual(r.por_modo, []);
   assert.deepEqual(r.por_periodo, []);
+});
+
+// ============================================================
+// validarViaje — la validación autoritativa que comparten la ruta del
+// admin y la del proveedor. Un typo acá no es cosmético: el CO2e se
+// sella como cargo en la cuenta de carbono del Capital Natural.
+// ============================================================
+
+const CUERPO_OK = { modo: 'bus', origen: 'Antofagasta', destino: 'Calama', km: '215', pasajeros: '40', ida_vuelta: true };
+
+test('validarViaje: cuerpo válido normaliza tipos (km número, pasajeros entero, ida_vuelta bool)', () => {
+  const r = validarViaje(CUERPO_OK);
+  assert.equal(r.error, undefined);
+  assert.equal(r.datos.km, 215);
+  assert.equal(r.datos.pasajeros, 40);
+  assert.equal(r.datos.ida_vuelta, true);
+  assert.equal(r.datos.fecha, null);
+});
+
+test('validarViaje: km negativo, cero o no numérico es 400, no un 500 del CHECK de Postgres', () => {
+  assert.ok(validarViaje({ ...CUERPO_OK, km: '-5' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, km: '0' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, km: 'abc' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, km: Infinity }).error);
+});
+
+test('validarViaje: tope de cordura en km — un typo de miles no entra al inventario', () => {
+  assert.ok(validarViaje({ ...CUERPO_OK, km: '2150000' }).error);
+  assert.equal(validarViaje({ ...CUERPO_OK, km: '19999' }).error, undefined);
+});
+
+test('validarViaje: pasajeros debe ser entero positivo acotado; vacío vale 1', () => {
+  assert.equal(validarViaje({ ...CUERPO_OK, pasajeros: '' }).datos.pasajeros, 1);
+  assert.equal(validarViaje({ ...CUERPO_OK, pasajeros: undefined }).datos.pasajeros, 1);
+  assert.ok(validarViaje({ ...CUERPO_OK, pasajeros: '0' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, pasajeros: '-3' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, pasajeros: '2.5' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, pasajeros: '99999' }).error);
+});
+
+test('validarViaje: fecha futura se rechaza (margen 1 día por zona horaria), formato AAAA-MM-DD', () => {
+  const mananaMas2 = new Date(Date.now() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  assert.ok(validarViaje({ ...CUERPO_OK, fecha: mananaMas2 }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, fecha: '15-06-2026' }).error);
+  assert.equal(validarViaje({ ...CUERPO_OK, fecha: '2026-06-15' }).error, undefined);
+  assert.equal(validarViaje({ ...CUERPO_OK, fecha: '2026-06-15' }).datos.fecha, '2026-06-15');
+});
+
+test('validarViaje: origen/destino obligatorios, con tope de largo; notas se recortan a 500', () => {
+  assert.ok(validarViaje({ ...CUERPO_OK, origen: '  ' }).error);
+  assert.ok(validarViaje({ ...CUERPO_OK, destino: 'x'.repeat(121) }).error);
+  const r = validarViaje({ ...CUERPO_OK, notas: 'n'.repeat(600) });
+  assert.equal(r.datos.notas.length, 500);
 });

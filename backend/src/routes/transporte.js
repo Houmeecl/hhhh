@@ -1,7 +1,8 @@
 import express from 'express';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, logActividad } from '../middleware/auth.js';
-import { calcularCo2eViaje } from '../services/transporte.js';
+import { calcularCo2eViaje, validarViaje } from '../services/transporte.js';
+import { rutValido } from '../services/dte.js';
 
 // ============================================================
 // Transporte de personal — GHG Protocol Categoría 7.
@@ -71,20 +72,34 @@ router.get('/viajes', async (req, res, next) => {
 
 router.post('/viajes', adminOnly, async (req, res, next) => {
   try {
-    const { rut_cliente, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, notas } = req.body;
-    if (!modo || !origen || !destino || !Number(km)) {
-      return res.status(400).json({ error: 'Modo, origen, destino y km son obligatorios.' });
+    // Validación autoritativa compartida con la ruta del proveedor
+    // (validarViaje, services/transporte.js, con tests): km > 0 con tope
+    // de cordura, pasajeros entero positivo acotado, fecha no futura,
+    // origen/destino con largo máximo. Antes `!Number(km)` dejaba pasar
+    // un km NEGATIVO hasta el CHECK de Postgres (error 500 en vez de un
+    // 400 claro) y un typo tipo "2150000" entraba directo al inventario.
+    const v = validarViaje(req.body);
+    if (v.error) return res.status(400).json({ error: v.error });
+    const { modo, fecha, origen, destino, km, pasajeros: pax, ida_vuelta, notas } = v.datos;
+
+    // RUT del cliente (opcional): si viene, debe pasar módulo 11 — hasta
+    // ahora solo se formateaba en el frontend, sin validar el dígito
+    // verificador en ninguna parte, y un RUT mal tecleado quedaba pegado
+    // a los viajes (y a las búsquedas por RUT que filtran sobre él).
+    const rutCliente = req.body.rut_cliente ? String(req.body.rut_cliente).trim() : null;
+    if (rutCliente && !rutValido(rutCliente)) {
+      return res.status(400).json({ error: 'El RUT del cliente no es válido — revisa el dígito verificador.' });
     }
+
     const { rows: mRows } = await query(`SELECT * FROM transporte_modos WHERE codigo = $1`, [modo]);
     if (!mRows[0]) return res.status(400).json({ error: 'Modo de transporte desconocido.' });
 
-    const pax = Math.max(1, Number(pasajeros) || 1);
-    const co2e = calcularCo2eViaje({ km, pasajeros, ida_vuelta, factor_kgco2e_pkm: mRows[0].factor_kgco2e_pkm });
+    const co2e = calcularCo2eViaje({ km, pasajeros: pax, ida_vuelta, factor_kgco2e_pkm: mRows[0].factor_kgco2e_pkm });
 
     const { rows } = await query(
       `INSERT INTO transporte_viajes (rut_cliente, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas)
        VALUES ($1,COALESCE($2::date,CURRENT_DATE),$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
-      [rut_cliente || null, fecha || null, modo, origen, destino, Number(km), pax, Boolean(ida_vuelta), co2e, notas || null]
+      [rutCliente, fecha, modo, origen, destino, km, pax, ida_vuelta, co2e, notas]
     );
 
     // Capital Natural: el traslado carga la cuenta de carbono (si está activa).
@@ -93,7 +108,9 @@ router.post('/viajes', adminOnly, async (req, res, next) => {
       await query(
         `INSERT INTO movimientos_naturales (cuenta_codigo, fecha, glosa, cantidad, unidad, tipo, origen)
          VALUES ('CO2E', COALESCE($1::date,CURRENT_DATE), $2, $3, 'tCO2e', 'cargo', 'manual')`,
-        [fecha || null, `Transporte personal — ${origen} → ${destino}`, co2e]
+        // '->' y no '→': la glosa se imprime en el balance de Capital
+        // Natural (services/pdf.js, fuente Courier/WinAnsi sin ese glifo).
+        [fecha, `Transporte personal — ${origen} -> ${destino}`, co2e]
       );
     }
 

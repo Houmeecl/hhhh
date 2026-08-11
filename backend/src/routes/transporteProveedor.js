@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { query } from '../lib/db.js';
 import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
-import { calcularCo2eViaje, resumenTransporte } from '../services/transporte.js';
+import { calcularCo2eViaje, resumenTransporte, validarViaje } from '../services/transporte.js';
 import { generateInformeTransporte } from '../services/pdf.js';
 
 // ============================================================
@@ -82,15 +82,18 @@ router.get('/viajes', async (req, res, next) => {
 // multipart: archivo (opcional) + modo/fecha/origen/destino/km/pasajeros/ida_vuelta/notas.
 router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, next) => {
   try {
-    const { modo, fecha, origen, destino, km, pasajeros, ida_vuelta, notas } = req.body;
-    if (!modo || !origen || !destino || !Number(km)) {
-      return res.status(400).json({ error: 'Modo, origen, destino y km son obligatorios.' });
-    }
+    // Validación autoritativa en el servidor (validarViaje, con tests):
+    // km > 0 y con tope de cordura, pasajeros entero positivo acotado,
+    // fecha no futura, origen/destino con largo máximo. El frontend
+    // restringe los inputs pero esto es lo que de verdad protege el
+    // inventario — un typo acá se sella como cargo en Capital Natural.
+    const v = validarViaje(req.body);
+    if (v.error) return res.status(400).json({ error: v.error });
+    const { modo, fecha, origen, destino, km, pasajeros: pax, ida_vuelta: idaVuelta, notas } = v.datos;
+
     const { rows: mRows } = await query(`SELECT * FROM transporte_modos WHERE codigo = $1`, [modo]);
     if (!mRows[0]) return res.status(400).json({ error: 'Modo de transporte desconocido.' });
 
-    const pax = Math.max(1, Number(pasajeros) || 1);
-    const idaVuelta = ida_vuelta === 'true' || ida_vuelta === true;
     const co2e = calcularCo2eViaje({ km, pasajeros: pax, ida_vuelta: idaVuelta, factor_kgco2e_pkm: mRows[0].factor_kgco2e_pkm });
 
     const ext = req.file ? (req.file.originalname.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase() : null;
@@ -101,7 +104,7 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
        VALUES ($1,COALESCE($2::date,CURRENT_DATE),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
        RETURNING id, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas, archivo_nombre, created_at`,
       [
-        req.user.proveedor_id, fecha || null, modo, origen, destino, Number(km), pax, idaVuelta, co2e, notas || null,
+        req.user.proveedor_id, fecha, modo, origen, destino, km, pax, idaVuelta, co2e, notas,
         req.file ? req.file.buffer : null,
         req.file ? req.file.originalname.slice(0, 200) : null,
         ext,
@@ -119,13 +122,13 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
          VALUES ('CO2E', COALESCE($1::date,CURRENT_DATE), $2, $3, 'tCO2e', 'cargo', 'manual')`,
         // '->' y no '→': la glosa termina impresa en el balance de Capital
         // Natural (services/pdf.js, fuente Courier/WinAnsi sin ese glifo).
-        [fecha || null, `Transporte personal — ${origen} -> ${destino}`, co2e]
+        [fecha, `Transporte personal — ${origen} -> ${destino}`, co2e]
       );
     }
 
     await logActividad({
       usuarioId: req.user.sub, accion: 'proveedor_viaje_registrar', entidad: 'transporte_viaje',
-      entidadId: rows[0].id, detalle: { modo, km: Number(km), co2e }, ip: req.ip,
+      entidadId: rows[0].id, detalle: { modo, km, co2e }, ip: req.ip,
     });
     res.status(201).json({ viaje: { ...rows[0], modo_nombre: mRows[0].nombre } });
   } catch (err) { next(err); }
