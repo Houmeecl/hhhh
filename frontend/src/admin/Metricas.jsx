@@ -1,20 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt } from '../api.js';
-import { Donut, Sparkbars } from '../components/Charts.jsx';
+import { Donut, Sparkbars, Bar } from '../components/Charts.jsx';
 import { SkeletonCards } from '../components/Skeleton.jsx';
-
-// Barra horizontal simple (sin librerías externas).
-function Bar({ value, max, label, right }) {
-  const pct = max > 0 ? Math.max(3, (value / max) * 100) : 0;
-  return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
-        <span>{label}</span><span className="muted">{right}</span>
-      </div>
-      <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
-    </div>
-  );
-}
 
 export default function Metricas() {
   const [m, setM] = useState(null);

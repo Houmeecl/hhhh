@@ -91,3 +91,17 @@ export function Sparkbars({ values = [], height = 48, color = '#28a745' }) {
     </div>
   );
 }
+
+// Barra horizontal simple (sin librerías externas) — usada por Métricas y
+// por la página del juego.
+export function Bar({ value, max, label, right }) {
+  const pct = max > 0 ? Math.max(3, (value / max) * 100) : 0;
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 3 }}>
+        <span>{label}</span><span className="muted">{right}</span>
+      </div>
+      <div className="progress-bar"><div style={{ width: `${pct}%` }} /></div>
+    </div>
+  );
+}

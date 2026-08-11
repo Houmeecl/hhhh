@@ -309,6 +309,7 @@ export const api = {
   sesiones: (qs = '') => request(`/admin/sesiones${qs}`, { authed: true }),
   sesionAdmin: (id) => request(`/admin/sesiones/${id}`, { authed: true }),
   metricas: () => request('/admin/metricas', { authed: true }),
+  adminJuegoResumen: () => request('/admin/juego/resumen', { authed: true }),
   prospectos: () => request('/admin/prospectos', { authed: true }),
   crearProspecto: (b) => request('/admin/prospectos', { method: 'POST', body: b, authed: true }),
   editarProspecto: (id, b) => request(`/admin/prospectos/${id}`, { method: 'PUT', body: b, authed: true }),

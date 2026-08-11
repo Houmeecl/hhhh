@@ -221,17 +221,22 @@ router.get('/ranking', async (req, res, next) => {
   try {
     const jugador = await jugadorDe(req);
     if (!jugador) return res.status(404).json({ error: 'Jugador no encontrado' });
+    // El orden del ranking sigue siendo SOLO por puntos; los envases son
+    // una columna informativa (subconsulta escalar para no multiplicar
+    // filas — un LEFT JOIN plano rompería row_number() y el LIMIT).
     const { rows } = await query(
-      `SELECT id, nombre, email, puntos_totales,
-              row_number() OVER (ORDER BY puntos_totales DESC, created_at ASC) AS posicion
-       FROM jugadores WHERE codigo_id = $1
-       ORDER BY puntos_totales DESC, created_at ASC LIMIT 20`,
+      `SELECT j.id, j.nombre, j.email, j.puntos_totales,
+              COALESCE((SELECT SUM(r.total_envases) FROM reciclajes r WHERE r.jugador_id = j.id), 0)::int AS envases_reciclados,
+              row_number() OVER (ORDER BY j.puntos_totales DESC, j.created_at ASC) AS posicion
+       FROM jugadores j WHERE j.codigo_id = $1
+       ORDER BY j.puntos_totales DESC, j.created_at ASC LIMIT 20`,
       [jugador.codigo_id]
     );
     const ranking = rows.map((r) => ({
       posicion: Number(r.posicion),
       nombre: r.nombre || enmascararEmail(r.email),
       puntos_totales: r.puntos_totales,
+      envases_reciclados: r.envases_reciclados,
       tu: r.id === jugador.id,
     }));
     res.json({ ranking });

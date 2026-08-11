@@ -8,6 +8,7 @@ import Dashboard from './Dashboard.jsx';
 import Clientes from './Clientes.jsx';
 import Sesiones from './Sesiones.jsx';
 import Metricas from './Metricas.jsx';
+import Juego from './Juego.jsx';
 import Prospectos from './Prospectos.jsx';
 import SimpleApi from './SimpleApi.jsx';
 import Usuarios from './Usuarios.jsx';
@@ -42,6 +43,7 @@ const NAV = [
   { to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
   { to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
   { to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
+  { to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
   { to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
   { to: '/admin/motor-propio', ico: Icon.Cog, label: 'Motor propio' },
   { to: '/admin/motor', ico: Icon.Plug, label: 'Motor externo' },
@@ -207,6 +209,7 @@ export default function AdminApp() {
           <Route path="transporte" element={<Transporte />} />
           <Route path="accesos" element={<Accesos />} />
           <Route path="metricas" element={<Metricas />} />
+          <Route path="juego" element={<Juego />} />
           <Route path="prospectos" element={<Prospectos />} />
           <Route path="motor-propio" element={<MotorPropio />} />
           <Route path="motor" element={<SimpleApi />} />

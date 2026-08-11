@@ -916,6 +916,67 @@ router.get('/metricas', async (req, res, next) => {
 });
 
 // ============================================================
+// JUEGO — métricas de "Sube y Suma" (participación, no CO2e evitado:
+// no existe un factor validado para convertir envases a CO2e y no se
+// inventa — la página muestra envases, puntos y km tal cual).
+// ============================================================
+router.get('/juego/resumen', async (req, res, next) => {
+  try {
+    const [
+      totales, reciclajes, trayectos, mixPuntos, porMaterial, porCampana, porPunto, serieEnvases,
+    ] = await Promise.all([
+      query(`SELECT (SELECT count(*)::int FROM jugadores) AS jugadores,
+                    (SELECT count(*)::int FROM puntos_eventos WHERE tipo = 'documento_escaneado') AS documentos,
+                    (SELECT COALESCE(sum(puntos),0)::int FROM puntos_eventos) AS puntos`),
+      query(`SELECT count(*)::int AS entregas, COALESCE(sum(total_envases),0)::int AS envases FROM reciclajes`),
+      query(`SELECT count(*)::int AS cerrados, COALESCE(sum(distancia_m),0)::float AS metros
+             FROM trayectos WHERE llegada_at IS NOT NULL`),
+      query(`SELECT tipo, COALESCE(sum(puntos),0)::int AS puntos FROM puntos_eventos GROUP BY tipo`),
+      // envases es JSONB [{material, cantidad}]: se expande por elemento.
+      query(`SELECT e->>'material' AS material, COALESCE(sum((e->>'cantidad')::int),0)::int AS cantidad
+             FROM reciclajes, jsonb_array_elements(envases) AS e GROUP BY 1 ORDER BY 2 DESC`),
+      query(`SELECT ca.codigo, ca.empresa,
+                    count(DISTINCT j.id)::int AS jugadores,
+                    COALESCE(sum(j.puntos_totales),0)::int AS puntos,
+                    COALESCE((SELECT sum(r.total_envases) FROM reciclajes r
+                              JOIN jugadores j2 ON j2.id = r.jugador_id WHERE j2.codigo_id = ca.id),0)::int AS envases
+             FROM codigos_acceso ca JOIN jugadores j ON j.codigo_id = ca.id
+             WHERE ca.modo_juego = true
+             GROUP BY ca.id, ca.codigo, ca.empresa ORDER BY puntos DESC`),
+      query(`SELECT pl.nombre, count(r.id)::int AS entregas, COALESCE(sum(r.total_envases),0)::int AS envases
+             FROM puntos_limpios pl LEFT JOIN reciclajes r ON r.punto_limpio_id = pl.id
+             GROUP BY pl.id, pl.nombre ORDER BY envases DESC`),
+      query(`SELECT date_trunc('month', created_at) AS mes, COALESCE(sum(total_envases),0)::int AS envases
+             FROM reciclajes WHERE created_at >= date_trunc('month', now()) - interval '5 months' GROUP BY 1`),
+    ]);
+
+    // Serie de 6 meses rellenando con 0 (mismo patrón que /dashboard).
+    const mapa = new Map(serieEnvases.rows.map((r) => [r.mes.toISOString().slice(0, 7), r.envases]));
+    const serie = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
+      const clave = d.toISOString().slice(0, 7);
+      serie.push({ mes: clave, envases: mapa.get(clave) || 0 });
+    }
+
+    res.json({
+      jugadores: totales.rows[0].jugadores,
+      documentos_escaneados: totales.rows[0].documentos,
+      puntos_otorgados: totales.rows[0].puntos,
+      entregas_reciclaje: reciclajes.rows[0].entregas,
+      envases_reciclados: reciclajes.rows[0].envases,
+      trayectos_cerrados: trayectos.rows[0].cerrados,
+      km_trayectos: Math.round(trayectos.rows[0].metros / 100) / 10,
+      puntos_por_tipo: mixPuntos.rows,
+      envases_por_material: porMaterial.rows,
+      por_campana: porCampana.rows,
+      por_punto_limpio: porPunto.rows,
+      serie_envases: serie,
+    });
+  } catch (err) { next(err); }
+});
+
+// ============================================================
 // PROSPECTOS (pipeline comercial)
 // ============================================================
 router.get('/prospectos', async (req, res, next) => {

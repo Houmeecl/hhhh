@@ -91,7 +91,7 @@ export default function Reciclar() {
   if (!token) {
     return (
       <div className="card card-pad" style={{ textAlign: 'center' }}>
-        <div style={{ color: 'var(--suma-accent)' }}><Icon.Leaf size={40} /></div>
+        <div style={{ color: 'var(--suma-accent)' }}><Icon.Recycle size={40} /></div>
         <h2 style={{ margin: '10px 0 6px', fontSize: 18 }}>Reciclar en punto limpio</h2>
         <p className="muted" style={{ fontSize: 14 }}>
           Escanea el código QR del cartel en el punto limpio para registrar tu entrega de envases y sumar puntos.

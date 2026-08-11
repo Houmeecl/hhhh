@@ -58,11 +58,14 @@ export default function Misiones() {
                 <tr key={r.posicion} style={r.tu ? { fontWeight: 700, background: 'rgba(13,148,136,0.08)' } : undefined}>
                   <td style={{ width: 32 }}>{r.posicion}</td>
                   <td>{r.nombre}{r.tu && <span className="muted" style={{ fontWeight: 400 }}> (tú)</span>}</td>
+                  <td className="num muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {r.envases_reciclados > 0 && <><Icon.Recycle size={12} /> {fmtInt(r.envases_reciclados)}</>}
+                  </td>
                   <td className="num">{fmtInt(r.puntos_totales)} pts</td>
                 </tr>
               ))}
               {ranking.length === 0 && (
-                <tr><td className="muted">Aún no hay jugadores en el ranking.</td></tr>
+                <tr><td colSpan={4} className="muted">Aún no hay jugadores en el ranking.</td></tr>
               )}
             </tbody>
           </table>

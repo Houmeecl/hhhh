@@ -75,6 +75,16 @@ export const Icon = {
   Leaf: ({ size = 22 }) => base(size, <>
     <path d="M20 4S8 4 5 12c-1.5 4 1 7 5 7 8 0 10-11 10-15Z" /><path d="M5 19S8 12 15 9" />
   </>),
+  // Triángulo de flechas de reciclaje (tres tramos con punta de flecha).
+  Recycle: ({ size = 22 }) => base(size, <>
+    <path d="M7 19H4.8a1.8 1.8 0 0 1-1.55-2.7l2.1-3.6" />
+    <path d="m14 16-3 3 3 3" />
+    <path d="M7 19h6" />
+    <path d="m5.3 12.8 2.3-4 1.1 4.1" />
+    <path d="m7.6 8.8 1.7-3a1.8 1.8 0 0 1 3.1 0l1.9 3.3" />
+    <path d="M18.4 12.4 16.3 8.7 20.4 9" />
+    <path d="m16.3 8.7 2.9 5a1.8 1.8 0 0 1-1.55 2.7H16" />
+  </>),
   Download: ({ size = 22 }) => base(size, <>
     <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
     <path d="M12 3v12M12 15l-4-4M12 15l4-4" />
