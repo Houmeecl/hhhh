@@ -5,6 +5,7 @@ import { api, authProveedor } from '../api.js';
 import CambiarPasswordObligatorio from '../components/CambiarPasswordObligatorio.jsx';
 import LotesPorFirmar from './LotesPorFirmar.jsx';
 import AnalisisSii from './AnalisisSii.jsx';
+import Rep from './Rep.jsx';
 import MisDatos from './MisDatos.jsx';
 
 // Shell mínimo, sin sidebar: tres pestañas alcanzan. Arranca en la
@@ -105,7 +106,7 @@ export default function ProveedorApp() {
         <>
           <div style={{ background: '#fff', borderBottom: '1px solid var(--line)' }}>
             <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 20px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {[['sii', 'Compras y ventas (SII)'], ['lotes', 'Lotes por firmar'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
+              {[['sii', 'Compras y ventas (SII)'], ['rep', 'Ley REP'], ['lotes', 'Lotes por firmar'], ['datos', 'Datos de la empresa']].map(([k, label]) => (
                 <button key={k} onClick={() => setVista(k)}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', padding: '14px 16px',
@@ -122,6 +123,7 @@ export default function ProveedorApp() {
           <main style={{ maxWidth: 1000, margin: '0 auto', padding: '28px 20px' }}>
             {vista === 'lotes' && <LotesPorFirmar />}
             {vista === 'sii' && <AnalisisSii />}
+            {vista === 'rep' && <Rep />}
             {vista === 'datos' && <MisDatos />}
           </main>
         </>

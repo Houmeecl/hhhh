@@ -181,6 +181,29 @@ export const INVENTARIO = {
     retencion: null,
     motivoSinPurga: 'Encadenada.',
   },
+  productos_proveedor: {
+    clasificacion: NO_PERSONAL,
+    columnas: [],
+    nota: 'El escáner marca `nombre`, pero es el nombre del PRODUCTO ("Botella 1L"), no de una '
+      + 'persona. La empresa dueña del catálogo está en `proveedores`, no acá.',
+    finalidad: 'Catálogo de productos con la composición de su envase para la declaración REP.',
+    base: BASE.LEY,
+    cadena: CADENA.NINGUNA,
+    retencion: null,
+    motivoSinPurga: 'Las ventas REP lo referencian por snapshot; se desactiva, no se borra.',
+  },
+  ventas_rep: {
+    clasificacion: NO_PERSONAL,
+    columnas: [],
+    nota: 'El escáner marca `archivo_nombre`, pero es el nombre del ARCHIVO subido. El archivo '
+      + 'mismo (la factura como evidencia) puede contener RUT de empresas — mismo criterio que '
+      + '`facturas`: documento tributario guardado por mandato del titular que lo subió.',
+    finalidad: 'Evidencia de venta y kilos de envases puestos en el mercado (declaración REP, Ley 20.920).',
+    base: BASE.LEY,
+    cadena: CADENA.NINGUNA,
+    retencion: null,
+    motivoSinPurga: 'Es el respaldo de lo que la empresa declara en RETC/SGR.',
+  },
   contratos: {
     clasificacion: PERSONAL,
     columnas: ['datos'],

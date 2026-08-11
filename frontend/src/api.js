@@ -576,6 +576,14 @@ export const api = {
   // Inventario por Alcance GHG (CSV entregable a procesos externos).
   descargarProveedorInventarioSiiCsv: (periodo) =>
     descargarAuth(`/api/panel-proveedor/sii/inventario/${periodo}?formato=csv`, authProveedor, `inventario-${periodo}.csv`),
+  // --- Ley REP (20.920): catálogo de productos + ventas con evidencia ---
+  proveedorRepProductos: () => request('/panel-proveedor/rep/productos', { authedProveedor: true }),
+  proveedorRepCrearProducto: (body) => request('/panel-proveedor/rep/productos', { method: 'POST', body, authedProveedor: true }),
+  proveedorRepEditarProducto: (id, body) => request(`/panel-proveedor/rep/productos/${id}`, { method: 'PUT', body, authedProveedor: true }),
+  proveedorRepVentas: () => request('/panel-proveedor/rep/ventas', { authedProveedor: true }),
+  proveedorRepRegistrarVenta: (formData) => request('/panel-proveedor/rep/ventas', { method: 'POST', body: formData, formData: true, authedProveedor: true }),
+  proveedorRepDescargarEvidencia: (id, nombre) =>
+    descargarAuth(`/api/panel-proveedor/rep/ventas/${id}/archivo`, authProveedor, nombre || 'factura'),
 };
 
 async function abrirPdfAuth(url, store = auth) {

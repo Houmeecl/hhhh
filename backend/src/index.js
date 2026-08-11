@@ -31,6 +31,7 @@ import puertoRoutes from './routes/puerto.js';
 import agenciaRoutes from './routes/agencia.js';
 import trazadorRoutes from './routes/trazador.js';
 import juegoRoutes from './routes/juego.js';
+import repProveedorRoutes from './routes/repProveedor.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 import { iniciarPurgaAutomatica } from './services/retencion.js';
 
@@ -94,6 +95,9 @@ app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
 app.use('/api/torre', apiLimiter, torreRouter);
 app.use('/api/firma-proveedor', apiLimiter, firmaProveedorRouter);
 app.use('/api/panel-proveedor', apiLimiter, proveedorPanelRouter);
+// Ley REP del propio proveedor (productos + ventas): router aparte para no
+// seguir engordando origen.js — misma autenticación de panel 'proveedor'.
+app.use('/api/panel-proveedor/rep', apiLimiter, repProveedorRoutes);
 app.use('/api/admin/capacitacion', capacitacionRoutes);
 app.use('/api/admin/apl', aplRoutes);
 app.use('/api/juego', apiLimiter, juegoRoutes);
