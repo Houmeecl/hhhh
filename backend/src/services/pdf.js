@@ -121,7 +121,7 @@ export function citaFuente({ organismo, documento, version_anio } = {}) {
 // cálculo. El camino correcto es metodologiaDeVersiones() a partir de
 // facturas.motor_version_id (migración 051); acá solo se cae cuando las
 // facturas no traen versión (datos anteriores al versionado).
-async function fetchAlcancesGHG() {
+export async function fetchAlcancesGHG() {
   try {
     const { rows } = await query(
       `SELECT mc.codigo, mc.nombre, mc.alcance_ghg, f.organismo, f.documento, f.version_anio

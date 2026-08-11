@@ -4,7 +4,8 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
-import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso } from '../services/pdf.js';
+import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso, fetchAlcancesGHG } from '../services/pdf.js';
+import { agregarPorAlcance, filasDesdeFacturas } from '../services/alcanceGhg.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl, constanciaJuegoUrl } from '../services/qr.js';
 import { montoUsdDesdeClp } from '../services/compensacion.js';
 import {
@@ -16,7 +17,7 @@ import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
-import { versionVigente } from '../services/motorVersiones.js';
+import { versionVigente, metodologiaDeVersiones } from '../services/motorVersiones.js';
 import { leerDocumento, filaRechazo, rutReceptorNoCalza } from '../services/lecturaDocumento.js';
 import { normalizarRut, dispararWebhook } from '../services/mandante.js';
 import { contrapartesDeRut } from '../services/trazabilidad.js';
@@ -1059,11 +1060,21 @@ router.get('/sesiones/:id', async (req, res, next) => {
       `SELECT * FROM compensaciones WHERE sesion_id = $1`,
       [req.params.id]
     );
+    // Mismo desglose "Emisiones por alcance (GHG Protocol)" que ya se arma
+    // para el informe PDF descargable de esta sesión (generateReport, ver
+    // services/pdf.js) — antes solo vivía en el PDF; se resuelve una vez
+    // acá y se expone también en el JSON para que Resultado.jsx lo muestre
+    // sin forzar la descarga. Metodología CONGELADA por versión del motor
+    // cuando las facturas la traen (no lee el catálogo vigente).
+    const metodologia = await metodologiaDeVersiones(facturas.map((f) => f.motor_version_id));
+    const alcancesGhgCatalogo = metodologia?.alcances ?? await fetchAlcancesGHG();
+    const alcances_ghg = agregarPorAlcance(filasDesdeFacturas(facturas, alcancesGhgCatalogo));
     res.json({
       sesion: rows[0],
       facturas,
       declaracion_embalaje: dRows[0] || null,
       compensacion: cRows[0] || null,
+      alcances_ghg,
     });
   } catch (err) {
     next(err);

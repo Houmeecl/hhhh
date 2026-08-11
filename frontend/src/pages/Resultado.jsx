@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
-import { Donut } from '../components/Charts.jsx';
+import { Donut, Bar } from '../components/Charts.jsx';
 import DeclaracionEmbalaje from '../components/DeclaracionEmbalaje.jsx';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 
@@ -146,7 +146,7 @@ export default function Resultado() {
   if (error) return <PublicLayout><div className="container" style={{ padding: 60 }}><h2>{error}</h2><Link to="/cargar">Volver a cargar</Link></div></PublicLayout>;
   if (!data) return <PublicLayout><div className="container" style={{ padding: 60 }}><span className="spinner dark" /> Cargando…</div></PublicLayout>;
 
-  const { sesion, facturas } = data;
+  const { sesion, facturas, alcances_ghg } = data;
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
   // Solo las categorías que el motor dedujo de la glosa real del documento:
   // el catch-all no es una clasificación y no puede contarse como tal en la
@@ -222,6 +222,44 @@ export default function Resultado() {
             <div className="card card-pad" style={{ marginTop: 8 }}>
               <h3 style={{ margin: '0 0 12px' }}>Distribución por categoría</h3>
               <Donut data={porCategoria} unit="t CO2e" />
+            </div>
+          )}
+
+          {/* Emisiones por alcance GHG Protocol — mismo desglose del informe
+              PDF descargable, ahora visible sin forzar la descarga. Solo se
+              atribuye alcance a lo que salió de la glosa real del documento
+              (ver services/alcanceGhg.js); el resto queda aparte, sin
+              esconder su CO2e del total. */}
+          {alcances_ghg && (alcances_ghg.alcances.length > 0 || alcances_ghg.sin_clasificar.n_documentos > 0) && (
+            <div className="card card-pad" style={{ marginTop: 8 }}>
+              <h3 style={{ margin: '0 0 4px' }}>Emisiones por alcance (GHG Protocol)</h3>
+              <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 14 }}>
+                Alcance 1: emisiones directas · Alcance 2: energía comprada · Alcance 3: cadena de valor.
+              </p>
+              {[1, 2, 3].map((n) => {
+                const a = alcances_ghg.alcances.find((x) => x.alcance === n);
+                if (!a) return null;
+                return (
+                  <Bar
+                    key={n}
+                    value={a.tco2e}
+                    max={sesion.total_co2e}
+                    label={`Alcance ${n}`}
+                    right={`${fmt(a.tco2e, 3)} t CO2e · ${a.n_documentos} doc.`}
+                  />
+                );
+              })}
+              {alcances_ghg.sin_clasificar.n_documentos > 0 && (
+                <Bar
+                  value={alcances_ghg.sin_clasificar.tco2e}
+                  max={sesion.total_co2e}
+                  label="Sin alcance atribuido"
+                  right={`${fmt(alcances_ghg.sin_clasificar.tco2e, 3)} t CO2e · ${alcances_ghg.sin_clasificar.n_documentos} doc.`}
+                />
+              )}
+              <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+                El detalle por categoría de cada alcance está en el PDF de informe.
+              </p>
             </div>
           )}
 
