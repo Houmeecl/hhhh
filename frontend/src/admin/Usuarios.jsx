@@ -299,7 +299,15 @@ export default function Usuarios({ yo }) {
               <div className="field"><label>Nombre</label><input value={modal.nombre} onChange={(e) => setModal({ ...modal, nombre: e.target.value })} /></div>
               <div className="field"><label>Email</label><input value={modal.email} onChange={(e) => setModal({ ...modal, email: e.target.value })} /></div>
               <div className="field"><label>Panel</label>
-                <select value={modal.panel} onChange={(e) => setModal({ ...modal, panel: e.target.value, entidad_id: '' })}>
+                {/* Al cambiar de panel, el nivel parte en el default lógico:
+                    consulta (puerto/mandante/trazador) → solo lectura;
+                    agencia y proveedor → operador, porque su función central
+                    escribe (capturar expediente / operar sus propios datos).
+                    El admin puede cambiarlo. */}
+                <select value={modal.panel} onChange={(e) => setModal({
+                  ...modal, panel: e.target.value, entidad_id: '',
+                  nivel_acceso: ['proveedor', 'agencia', ...PANELES_INTERNOS].includes(e.target.value) ? 'operador' : 'lectura',
+                })}>
                   {TODOS_PANELES.map((p) => <option key={p} value={p}>{PANEL_LABEL[p]}</option>)}
                 </select>
               </div>
@@ -318,9 +326,14 @@ export default function Usuarios({ yo }) {
               {cfgExterno && (
                 <div className="field"><label>Nivel de acceso</label>
                   <select value={modal.nivel_acceso} onChange={(e) => setModal({ ...modal, nivel_acceso: e.target.value })}>
-                    <option value="operador">operador (puede escribir)</option>
                     <option value="lectura">solo lectura</option>
+                    <option value="operador">operador (puede escribir)</option>
                   </select>
+                  {!['proveedor', 'agencia'].includes(modal.panel) && modal.nivel_acceso === 'lectura' && (
+                    <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>
+                      Los paneles de consulta parten en solo lectura; sube a operador solo si esta cuenta debe escribir.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

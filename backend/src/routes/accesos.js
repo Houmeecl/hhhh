@@ -37,8 +37,13 @@ router.get('/mandantes', async (req, res, next) => {
 
 // Acceso web propio del mandante (panel /panel-mandante) — distinto de la
 // API key (X-Api-Key, integración de sistemas): esto es un login humano.
+// Nace en SOLO LECTURA (igual que puerto y trazador): son paneles de
+// consulta — escribir se otorga a propósito desde «Usuarios y roles».
+// Agencia y proveedor son distintos: la agencia CAPTURA el expediente en
+// terreno (sube documentos, ver agencia.js) y el proveedor opera sus
+// propios datos (onboarding, SII, REP, firma) — ambos nacen operador.
 router.post('/mandantes/:id/crear-cuenta', adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'mandante', columnaFk: 'mandante_id', entidadId: req.params.id }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'mandante', columnaFk: 'mandante_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
 router.post('/mandantes', adminOnly, async (req, res, next) => {
@@ -135,7 +140,7 @@ router.get('/puertos', async (req, res, next) => {
 // Acceso web propio del puerto (panel /panel-puerto) — distinto de la API
 // key (X-Api-Key, integración de sistemas): esto es un login humano.
 router.post('/puertos/:id/crear-cuenta', adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'puerto', columnaFk: 'puerto_id', entidadId: req.params.id }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'puerto', columnaFk: 'puerto_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
 router.post('/puertos', adminOnly, async (req, res, next) => {
@@ -242,7 +247,7 @@ router.get('/trazadores', async (req, res, next) => {
 
 // Acceso web propio del trazador (panel /panel-trazador).
 router.post('/trazadores/:id/crear-cuenta', adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
 );
 
 // Genera (o rota) la API key del trazador — se muestra UNA sola vez. Solo

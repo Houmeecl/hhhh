@@ -1075,9 +1075,16 @@ router.post('/usuarios', adminOnly, async (req, res, next) => {
       if (!entidad_id) return res.status(400).json({ error: 'Falta elegir la entidad' });
       const { rows: entidadRows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidad_id]);
       if (!entidadRows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
+      // Por defecto los paneles de consulta (puerto/mandante/trazador)
+      // nacen en SOLO LECTURA — escribir se otorga a propósito. Agencia y
+      // proveedor nacen operador porque su función central ESCRIBE: la
+      // agencia captura el expediente en terreno (sube documentos) y el
+      // proveedor opera sus propios datos (onboarding, SII, REP, firma).
+      // La elección explícita del admin siempre manda.
+      const nivelPorDefecto = panel === 'proveedor' || panel === 'agencia' ? 'operador' : 'lectura';
       return crearCuentaEntidad({
         req, res, panel, columnaFk: entidadCfg.columnaFk, entidadId: entidad_id,
-        nivelAcceso: nivel_acceso === 'lectura' ? 'lectura' : 'operador',
+        nivelAcceso: nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : nivelPorDefecto,
       });
     }
 
