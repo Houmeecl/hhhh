@@ -333,6 +333,36 @@ export const INVENTARIO = {
     finalidad: 'Catálogo de recompensas de la campaña gamificada.', base: null, cadena: CADENA.NINGUNA, retencion: null,
     motivoSinPurga: 'No contiene datos personales.',
   },
+  puntos_limpios: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: '"Sube y Suma": `nombre`, `direccion` y `lat`/`lng` describen un lugar de entrega de '
+      + 'envases de la empresa (ej. "Punto limpio casino central"), no a una persona.',
+    finalidad: 'Catálogo de puntos limpios de la campaña de reciclaje, con su cartel QR.',
+    base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'No contiene datos personales.',
+  },
+  reciclajes: {
+    clasificacion: PERSONAL,
+    columnas: ['lat', 'lng'],
+    nota: '"Sube y Suma": `lat`/`lng` es la ubicación puntual del jugador al registrar su entrega '
+      + 'de envases — una lectura por registro, tomada con su permiso de ubicación, nunca rastreo '
+      + 'continuo. La foto de los envases NO se guarda: solo el conteo validado.',
+    finalidad: 'Confirmar que la entrega ocurrió en el punto limpio (cercanía) y llevar el puntaje.',
+    base: BASE.CONSENTIMIENTO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Mientras el código de campaña esté activo.',
+  },
+  trayectos: {
+    clasificacion: PERSONAL,
+    columnas: ['salida_lat', 'salida_lng', 'llegada_lat', 'llegada_lng'],
+    nota: '"Sube y Suma": coordenadas de salida y llegada del trayecto del jugador — dos lecturas '
+      + 'puntuales con su permiso de ubicación, nunca rastreo continuo. Solo se usa para calcular '
+      + 'la distancia del traslado; los puntos no dependen de la coordenada.',
+    finalidad: 'Calcular la distancia del traslado del jugador a la campaña.',
+    base: BASE.CONSENTIMIENTO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Mientras el código de campaña esté activo.',
+  },
   propuestas_factores: {
     clasificacion: NO_PERSONAL, columnas: [],
     nota: 'Factores propuestos por la IA y su fuente. `resuelta_por` es una FK '

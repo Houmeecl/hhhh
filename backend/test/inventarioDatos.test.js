@@ -12,8 +12,10 @@ const MIGRACIONES = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrati
 
 // Nombres de columna que delatan un dato de persona. Deliberadamente
 // amplio: prefiere marcar de más y obligar a decidir, antes que dejar
-// pasar una tabla sin clasificar.
-const COLUMNA_PERSONAL = /(email|correo|rut|nombre|contacto|conductor|portador|telefono|direccion|domicilio|representante)|^ip$|_ip$/i;
+// pasar una tabla sin clasificar. Las coordenadas GPS entran acá: la
+// ubicación puntual de una persona (reciclajes, trayectos) es dato
+// personal aunque la columna se llame solo "lat"/"lng".
+const COLUMNA_PERSONAL = /(email|correo|rut|nombre|contacto|conductor|portador|telefono|direccion|domicilio|representante)|^ip$|_ip$|^(salida_|llegada_)?(lat|lng)$/i;
 const TIPO = /^(\w+)\s+(TEXT|UUID|BOOLEAN|INT|BIGINT|NUMERIC|DATE|TIMESTAMPTZ|JSONB|BYTEA)/i;
 
 // Lee las migraciones y devuelve tabla -> columnas candidatas. Misma

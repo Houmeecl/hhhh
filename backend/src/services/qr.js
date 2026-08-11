@@ -51,17 +51,25 @@ export function constanciaJuegoUrl(serial) {
   return `${config.publicAppUrl}/suma/constancia/${serial}`;
 }
 
+// URL de la pantalla Reciclar de "Sube y Suma" con el punto limpio
+// pre-seleccionado — es lo que codifica el cartel QR del punto.
+export function reciclarUrl(token) {
+  return `${config.publicAppUrl}/suma/reciclar?punto=${encodeURIComponent(token)}`;
+}
+
 // URL pública de la credencial de firma del proveedor (atestación).
 export function firmaProveedorUrl(serial) {
   return `${config.publicAppUrl}/f/${serial}`;
 }
 
 // Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
-export async function qrBufferDe(url) {
+// `width` opcional: 320 para embeber en PDF/pantalla, más grande (ej.
+// 1024) para carteles imprimibles como el del punto limpio.
+export async function qrBufferDe(url, width = 320) {
   return QRCode.toBuffer(url, {
     errorCorrectionLevel: 'M',
     margin: 1,
-    width: 320,
+    width,
     color: { dark: '#0f1f2e', light: '#ffffff' },
   });
 }

@@ -11,6 +11,22 @@ const MODOS = [
   { valor: 'otro', label: 'Otro', ico: Icon.Truck },
 ];
 
+// Ubicación del teléfono (obligatoria): con la coordenada de salida y la
+// de llegada el backend calcula la distancia del traslado. Solo se usa
+// para eso — no hay rastreo continuo, es una lectura por marca.
+function obtenerUbicacion() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) { reject(new Error('sin_geo')); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => reject(new Error('denegado')),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  });
+}
+
+const ERROR_GPS = 'Activa la ubicación para registrar el trayecto.';
+
 // Marca la hora de salida y de llegada del trayecto usado para venir a
 // escanear/entregar documentos, con puntos extra para medios de bajo
 // carbono — coherente con lo que el resto de sicr3p ya mide (transporte
@@ -31,7 +47,9 @@ export default function Trayecto() {
   async function marcarSalida() {
     setError(''); setCargando(true);
     try {
-      const r = await api.jugadorTrayectoSalida(modo);
+      const gps = await obtenerUbicacion().catch(() => null);
+      if (!gps) { setError(ERROR_GPS); return; }
+      const r = await api.jugadorTrayectoSalida(modo, gps.lat, gps.lng);
       setActivo(r.trayecto);
       sessionStorage.setItem('sicr3p_suma_trayecto', JSON.stringify(r.trayecto));
     } catch (e) { setError(e.message); }
@@ -41,7 +59,9 @@ export default function Trayecto() {
   async function marcarLlegada() {
     setError(''); setCargando(true);
     try {
-      const r = await api.jugadorTrayectoLlegada(activo.id);
+      const gps = await obtenerUbicacion().catch(() => null);
+      if (!gps) { setError(ERROR_GPS); return; }
+      const r = await api.jugadorTrayectoLlegada(activo.id, gps.lat, gps.lng);
       setResultado(r.trayecto);
       setActivo(null);
       sessionStorage.removeItem('sicr3p_suma_trayecto');
@@ -54,7 +74,12 @@ export default function Trayecto() {
       <div className="card card-pad" style={{ textAlign: 'center' }}>
         <div style={{ color: 'var(--suma-accent)' }}><Icon.CheckCircle size={40} /></div>
         <div style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>+{resultado.puntos} puntos</div>
-        <p className="muted" style={{ fontSize: 14 }}>Trayecto registrado.</p>
+        <p className="muted" style={{ fontSize: 14 }}>
+          Trayecto registrado.
+          {resultado.distancia_m != null && (
+            <> Distancia recorrida: {(Number(resultado.distancia_m) / 1000).toLocaleString('es-CL', { maximumFractionDigits: 1 })} km.</>
+          )}
+        </p>
         <button className="btn btn-primary" style={{ width: '100%', marginTop: 10 }} onClick={() => setResultado(null)}>
           Registrar otro trayecto
         </button>
@@ -66,7 +91,8 @@ export default function Trayecto() {
     <div>
       <h1 style={{ fontSize: 20, margin: '0 0 4px' }}>Trayecto</h1>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-        Marca cuándo saliste y cuándo llegaste. Caminar, bicicleta o transporte público suman más puntos.
+        Marca cuándo saliste y cuándo llegaste. Caminar, bicicleta o transporte público suman más
+        puntos. Tu ubicación se usa solo para calcular la distancia del traslado.
       </p>
 
       <div className="card card-pad">

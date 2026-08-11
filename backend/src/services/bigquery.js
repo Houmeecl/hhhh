@@ -180,6 +180,7 @@ export function rowPuntosEvento(evento) {
     factura_id: evento.factura_id || null,
     mision_id: evento.mision_id || null,
     trayecto_id: evento.trayecto_id || null,
+    reciclaje_id: evento.reciclaje_id || null,
     created_at: new Date(evento.created_at || Date.now()).toISOString(),
   };
 }
@@ -204,7 +205,29 @@ export function rowTrayecto(trayecto) {
     llegada_at: trayecto.llegada_at ? new Date(trayecto.llegada_at).toISOString() : null,
     modo_transporte: trayecto.modo_transporte || null,
     puntos: Number(trayecto.puntos || 0),
+    salida_lat: trayecto.salida_lat != null ? Number(trayecto.salida_lat) : null,
+    salida_lng: trayecto.salida_lng != null ? Number(trayecto.salida_lng) : null,
+    llegada_lat: trayecto.llegada_lat != null ? Number(trayecto.llegada_lat) : null,
+    llegada_lng: trayecto.llegada_lng != null ? Number(trayecto.llegada_lng) : null,
+    distancia_m: trayecto.distancia_m != null ? Number(trayecto.distancia_m) : null,
     created_at: new Date(trayecto.created_at || Date.now()).toISOString(),
+  };
+}
+
+// Entrega de envases en un punto limpio — el JSONB `envases` viaja como
+// string JSON, igual que `componentes` en las declaraciones de embalaje.
+export function rowReciclaje(r) {
+  return {
+    id: r.id,
+    jugador_id: r.jugador_id,
+    punto_limpio_id: r.punto_limpio_id,
+    lat: Number(r.lat),
+    lng: Number(r.lng),
+    distancia_m: r.distancia_m != null ? Number(r.distancia_m) : null,
+    envases: JSON.stringify(typeof r.envases === 'string' ? JSON.parse(r.envases) : (r.envases || [])),
+    total_envases: Number(r.total_envases || 0),
+    puntos: Number(r.puntos || 0),
+    created_at: new Date(r.created_at || Date.now()).toISOString(),
   };
 }
 
@@ -286,5 +309,10 @@ export const bigquery = {
   // abierto no se exporta, no aporta nada analizable todavía.
   exportTrayecto(trayecto) {
     return exportar('trayectos', [rowTrayecto(trayecto)]);
+  },
+
+  // Entrega de envases validada en un punto limpio.
+  exportReciclaje(r) {
+    return exportar('reciclajes', [rowReciclaje(r)]);
   },
 };

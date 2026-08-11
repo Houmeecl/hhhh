@@ -20,7 +20,15 @@ export default function Acceso() {
     if (!token) { setError('Falta el token de acceso.'); return; }
     api.verificarMagic(token)
       .then((r) => {
-        if (r.rol === 'jugador') { authSuma.set(r.token); nav('/suma', { replace: true }); return; }
+        if (r.rol === 'jugador') {
+          authSuma.set(r.token);
+          // Si el login partió desde un QR (ej. cartel de un punto limpio),
+          // se vuelve a esa pantalla en vez del inicio del juego.
+          const destino = sessionStorage.getItem('sicr3p_suma_destino');
+          sessionStorage.removeItem('sicr3p_suma_destino');
+          nav(destino && destino.startsWith('/suma/') ? destino : '/suma', { replace: true });
+          return;
+        }
         clienteAuth.set(r.token, r.email); nav('/mis-sesiones', { replace: true });
       })
       .catch((e) => setError(e.message));

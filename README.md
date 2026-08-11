@@ -325,7 +325,8 @@ la misma API se puede respaldar con Elasticsearch/OpenSearch sin cambiar el fron
 
 Todo lo que se escanea (facturas + ítems del flujo público y documentos del Corredor),
 más los cruces de datos auditados y la capa de gamificación de Sube y Suma (puntaje,
-canjes y trayectos), se puede replicar a **BigQuery** para análisis y cruces a gran escala:
+canjes, trayectos y reciclajes), se puede replicar a **BigQuery** para análisis y
+cruces a gran escala:
 
 1. Crea el dataset con `backend/bigquery/schema.sql` (región `southamerica-west1`,
    RUT normalizados, particionado por fecha y clusterizado por RUT).
@@ -384,8 +385,20 @@ de créditos que arriba: 1 crédito = 1 factura, la campaña también tiene un c
   usado para llegar a escanear, con puntos extra para medios de bajo carbono
   (caminando, bicicleta, transporte público).
 - Panel de impacto (`/suma/impacto`): muestra el CO2e real detrás de los puntos
-  del jugador (suma del `total_co2e` de sus documentos escaneados) — nunca dice
-  "huella" ni "certificación", aclara que es un resumen de su participación.
+  del jugador (suma del `total_co2e` de sus documentos escaneados y sus envases
+  reciclados) — nunca dice "huella" ni "certificación", aclara que es un
+  resumen de su participación.
+- Reciclaje en punto limpio (`/suma/reciclar`): el admin crea **puntos limpios**
+  (panel → "Accesos externos" → "Puntos limpios") y pega su cartel QR en el lugar.
+  El jugador escanea el QR, fotografía los envases que entrega (PET, vidrio,
+  latas, tetra) y la IA los cuenta — la foto **no se guarda**, solo el conteo
+  validado. GPS obligatorio: con coordenadas cargadas, el registro exige estar
+  cerca del punto. Si la foto no se reconoce se pide tomar otra — nunca hay
+  declaración manual de cantidades. Topes anti-abuso: 3 registros por jugador
+  al día y máximo 30 envases puntuables por foto.
+- El GPS también es obligatorio en Trayecto: con la coordenada de salida y la
+  de llegada se calcula la distancia del traslado (solo informativa — los
+  puntos del trayecto no dependen de ella).
 
 ### API para mandantes
 

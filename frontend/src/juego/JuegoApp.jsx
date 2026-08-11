@@ -8,6 +8,7 @@ import Trayecto from './Trayecto.jsx';
 import Misiones from './Misiones.jsx';
 import Recompensas from './Recompensas.jsx';
 import Impacto from './Impacto.jsx';
+import Reciclar from './Reciclar.jsx';
 
 // "Sube y Suma" es su propia app instalable (PWA), distinta del panel
 // núcleo — mismo service worker (sw.js), solo cambia el manifest mientras
@@ -42,7 +43,13 @@ export default function JuegoApp() {
   // contador del encabezado tiene que reflejarlo apenas vuelve a Inicio u
   // otra pestaña, sin depender de un refresco completo de la página.
   useEffect(() => {
-    if (!authSuma.access) { nav('/suma/login', { replace: true }); return; }
+    if (!authSuma.access) {
+      // El QR de un punto limpio puede llegar sin sesión: se guarda el
+      // destino para que Acceso.jsx vuelva acá después del magic link.
+      sessionStorage.setItem('sicr3p_suma_destino', location.pathname + location.search);
+      nav('/suma/login', { replace: true });
+      return;
+    }
     let vigente = true;
     api.jugadorPerfil()
       .then((d) => { if (vigente) { setJugador(d.jugador); setChecking(false); } })
@@ -92,6 +99,7 @@ export default function JuegoApp() {
           <Route path="misiones" element={<Misiones />} />
           <Route path="recompensas" element={<Recompensas />} />
           <Route path="impacto" element={<Impacto />} />
+          <Route path="reciclar" element={<Reciclar />} />
           <Route path="*" element={<Navigate to="/suma" replace />} />
         </Routes>
       </div>

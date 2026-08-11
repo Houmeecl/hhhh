@@ -414,6 +414,12 @@ export const api = {
   codigos: () => request('/admin/accesos/codigos', { authed: true }),
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
+  // Puntos limpios ("Sube y Suma" — reciclaje de envases con cartel QR).
+  accesosPuntosLimpios: () => request('/admin/accesos/puntos-limpios', { authed: true }),
+  accesosCrearPuntoLimpio: (b) => request('/admin/accesos/puntos-limpios', { method: 'POST', body: b, authed: true }),
+  accesosEditarPuntoLimpio: (id, b) => request(`/admin/accesos/puntos-limpios/${id}`, { method: 'PUT', body: b, authed: true }),
+  accesosCartelPuntoLimpio: (id, nombre) =>
+    descargarAuth(`/api/admin/accesos/puntos-limpios/${id}/qr.png`, auth, `punto-limpio-${(nombre || 'cartel').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.png`),
   accesosTrazadores: () => request('/admin/accesos/trazadores', { authed: true }),
   accesosCrearTrazador: (nombre) => request('/admin/accesos/trazadores', { method: 'POST', body: { nombre }, authed: true }),
   accesosEditarTrazador: (id, b) => request(`/admin/accesos/trazadores/${id}`, { method: 'PUT', body: b, authed: true }),
@@ -475,9 +481,15 @@ export const api = {
   jugadorRanking: () => request('/juego/ranking', { authedSuma: true }),
   jugadorRecompensas: () => request('/juego/recompensas', { authedSuma: true }),
   jugadorCanjear: (id) => request(`/juego/recompensas/${id}/canjear`, { method: 'POST', authedSuma: true }),
-  jugadorTrayectoSalida: (modo_transporte) =>
-    request('/juego/trayecto/salida', { method: 'POST', body: { modo_transporte }, authedSuma: true }),
-  jugadorTrayectoLlegada: (id) => request(`/juego/trayecto/${id}/llegada`, { method: 'POST', authedSuma: true }),
+  // GPS obligatorio en ambos pasos del trayecto: con las dos coordenadas
+  // el backend calcula la distancia del traslado (solo informativa).
+  jugadorTrayectoSalida: (modo_transporte, lat, lng) =>
+    request('/juego/trayecto/salida', { method: 'POST', body: { modo_transporte, lat, lng }, authedSuma: true }),
+  jugadorTrayectoLlegada: (id, lat, lng) =>
+    request(`/juego/trayecto/${id}/llegada`, { method: 'POST', body: { lat, lng }, authedSuma: true }),
+  // Reciclaje en punto limpio: el QR del cartel trae el token del punto.
+  jugadorPuntoLimpio: (token) => request(`/juego/puntos-limpios/${encodeURIComponent(token)}`, { authedSuma: true }),
+  jugadorReciclar: (formData) => request('/juego/reciclajes', { method: 'POST', body: formData, formData: true, authedSuma: true }),
   // Mismo POST /sesiones de siempre (el motor propio real) — solo cambia la
   // credencial adjunta (el jugador, no un cliente ni el panel de terreno).
   jugadorCrearSesion: (formData) => request('/sesiones', { method: 'POST', body: formData, formData: true, authedSuma: true }),

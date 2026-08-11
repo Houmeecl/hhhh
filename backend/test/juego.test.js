@@ -179,7 +179,7 @@ test('evaluarMisionesContador completa la misión al alcanzar la meta, otorga su
 test('impactoDeJugador: sin eventos devuelve ceros', { skip: SALTO_PROD }, async () => {
   const jugadorId = await crearJugadorDePrueba();
   const r = await impactoDeJugador(jugadorId);
-  assert.deepEqual(r, { documentos: 0, co2e_total: 0 });
+  assert.deepEqual(r, { documentos: 0, co2e_total: 0, entregas_reciclaje: 0, envases_reciclados: 0 });
 });
 
 test('impactoDeJugador: suma el total_co2e de las facturas ligadas a sus eventos "documento_escaneado"', { skip: SALTO_PROD }, async () => {
@@ -217,7 +217,7 @@ test('impactoDeJugador: nunca mezcla el CO2e de otro jugador', { skip: SALTO_PRO
     await otorgarPuntos(client, { jugadorId: jugadorA, tipo: 'documento_escaneado', puntos: 10, facturaId: factura.id });
   });
   const impactoB = await impactoDeJugador(jugadorB);
-  assert.deepEqual(impactoB, { documentos: 0, co2e_total: 0 });
+  assert.deepEqual(impactoB, { documentos: 0, co2e_total: 0, entregas_reciclaje: 0, envases_reciclados: 0 });
 });
 
 test('runMigrations es idempotente: correrla otra vez no duplica misiones/recompensas de Sube y Suma', { skip: SALTO_PROD }, async () => {

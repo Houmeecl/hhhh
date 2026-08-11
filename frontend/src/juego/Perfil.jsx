@@ -54,6 +54,10 @@ export default function Perfil() {
           <div style={{ color: 'var(--suma-accent)' }}><Icon.Leaf size={26} /></div>
           <div style={{ fontWeight: 700, marginTop: 6, fontSize: 13 }}>Impacto</div>
         </Link>
+        <Link to="/suma/reciclar" className="card card-pad" style={{ textAlign: 'center' }}>
+          <div style={{ color: 'var(--suma-accent)' }}><Icon.Target size={26} /></div>
+          <div style={{ fontWeight: 700, marginTop: 6, fontSize: 13 }}>Reciclar</div>
+        </Link>
       </div>
 
       {activas.length > 0 && (

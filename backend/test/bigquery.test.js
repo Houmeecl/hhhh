@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, rowCompensacion,
-  rowPuntosEvento, rowCanje, rowTrayecto, bigquery,
+  rowPuntosEvento, rowCanje, rowTrayecto, rowReciclaje, bigquery,
 } from '../src/services/bigquery.js';
 
 test('rowFactura normaliza RUT y tipos para el warehouse', () => {
@@ -204,5 +204,58 @@ test('rowTrayecto tolera un trayecto sin cerrar (llegada_at null)', () => {
 
 test('exportTrayecto apagado es no-op silencioso', async () => {
   const res = await bigquery.exportTrayecto({ id: 't3', jugador_id: 'j3', salida_at: new Date(), puntos: 10 });
+  assert.equal(res, false);
+});
+
+test('rowPuntosEvento incluye reciclaje_id cuando el evento lo trae', () => {
+  const row = rowPuntosEvento({ id: 'e4', jugador_id: 'j1', tipo: 'envase_reciclado', puntos: 6, reciclaje_id: 'r1' });
+  assert.equal(row.reciclaje_id, 'r1');
+  const sinRec = rowPuntosEvento({ id: 'e5', jugador_id: 'j1', tipo: 'documento_escaneado', puntos: 10 });
+  assert.equal(sinRec.reciclaje_id, null);
+});
+
+test('rowTrayecto mapea GPS y distancia (y tolera trayectos antiguos sin coordenadas)', () => {
+  const row = rowTrayecto({
+    id: 't4', jugador_id: 'j1', salida_at: '2026-08-10T08:00:00Z', llegada_at: '2026-08-10T08:30:00Z',
+    modo_transporte: 'bicicleta', puntos: 30,
+    salida_lat: '-33.45', salida_lng: '-70.66', llegada_lat: '-33.44', llegada_lng: '-70.65', distancia_m: '1450',
+  });
+  assert.equal(row.salida_lat, -33.45);
+  assert.equal(row.llegada_lng, -70.65);
+  assert.equal(row.distancia_m, 1450);
+  const viejo = rowTrayecto({ id: 't5', jugador_id: 'j1', salida_at: '2026-08-10T08:00:00Z', puntos: 0 });
+  assert.equal(viejo.salida_lat, null);
+  assert.equal(viejo.distancia_m, null);
+});
+
+test('rowReciclaje mapea la entrega completa (envases como JSON string)', () => {
+  const row = rowReciclaje({
+    id: 'r1', jugador_id: 'j1', punto_limpio_id: 'pl1',
+    lat: '-33.4501', lng: '-70.6601', distancia_m: '15',
+    envases: [{ material: 'pet', cantidad: 3 }], total_envases: 3, puntos: 6,
+    created_at: '2026-08-10T12:00:00Z',
+  });
+  assert.equal(row.lat, -33.4501);
+  assert.equal(row.distancia_m, 15);
+  assert.equal(JSON.parse(row.envases)[0].material, 'pet');
+  assert.equal(row.total_envases, 3);
+  assert.equal(row.puntos, 6);
+  assert.equal(row.created_at, '2026-08-10T12:00:00.000Z');
+});
+
+test('rowReciclaje tolera envases ya serializado (JSONB de pg llega como objeto o string)', () => {
+  const row = rowReciclaje({
+    id: 'r2', jugador_id: 'j1', punto_limpio_id: 'pl1', lat: -33, lng: -70,
+    envases: '[{"material":"lata","cantidad":2}]', total_envases: 2, puntos: 4,
+  });
+  assert.equal(JSON.parse(row.envases)[0].cantidad, 2);
+  assert.equal(row.distancia_m, null);
+});
+
+test('exportReciclaje apagado es no-op silencioso', async () => {
+  const res = await bigquery.exportReciclaje({
+    id: 'r3', jugador_id: 'j3', punto_limpio_id: 'pl1', lat: -33, lng: -70,
+    envases: [], total_envases: 0, puntos: 0,
+  });
   assert.equal(res, false);
 });

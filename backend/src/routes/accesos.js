@@ -5,6 +5,7 @@ import { requireAuth, requireRole, requireHomePanel, logActividad } from '../mid
 import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandante.js';
 import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
 import { crearCuentaEntidad, enviarActivacion } from '../services/cuentas.js';
+import { qrBufferDe, reciclarUrl } from '../services/qr.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -494,6 +495,82 @@ router.put('/codigos/:id', adminOnly, async (req, res, next) => {
     );
     if (!rows[0]) return res.status(404).json({ error: 'Código no encontrado' });
     res.json({ codigo: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- PUNTOS LIMPIOS ("Sube y Suma" — reciclaje de envases) ----------
+// Lugares de entrega de envases con cartel QR imprimible. codigo_id NULL =
+// el punto vale para todas las campañas; con valor, solo para los jugadores
+// de esa campaña. lat/lng opcionales: con coordenadas el registro exige
+// cercanía; sin ellas, solo el QR.
+
+// Coordenadas del formulario admin: vienen en pareja o no vienen.
+function parLatLng(lat, lng) {
+  if (lat == null || lat === '' || lng == null || lng === '') return { lat: null, lng: null };
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) return null;
+  return { lat: la, lng: ln };
+}
+
+router.get('/puntos-limpios', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT pl.*, ca.codigo AS campana_codigo, ca.empresa AS campana_empresa,
+              (SELECT COUNT(*)::int FROM reciclajes r WHERE r.punto_limpio_id = pl.id) AS n_entregas
+       FROM puntos_limpios pl LEFT JOIN codigos_acceso ca ON ca.id = pl.codigo_id
+       ORDER BY pl.created_at DESC`
+    );
+    res.json({ puntos: rows });
+  } catch (err) { next(err); }
+});
+
+router.post('/puntos-limpios', adminOnly, async (req, res, next) => {
+  try {
+    const { nombre, direccion, lat, lng, codigo_id } = req.body || {};
+    if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'Nombre es obligatorio.' });
+    const coords = parLatLng(lat, lng);
+    if (!coords) return res.status(400).json({ error: 'Latitud/longitud inválidas (van en pareja, en grados decimales).' });
+    const token = `pl_${crypto.randomBytes(9).toString('base64url')}`;
+    const { rows } = await query(
+      `INSERT INTO puntos_limpios (nombre, direccion, lat, lng, token, codigo_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [String(nombre).trim(), direccion || null, coords.lat, coords.lng, token, codigo_id || null]
+    );
+    await logActividad({ usuarioId: req.user.sub, accion: 'crear_punto_limpio', entidad: 'punto_limpio', entidadId: rows[0].id, ip: req.ip });
+    res.status(201).json({ punto: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.put('/puntos-limpios/:id', adminOnly, async (req, res, next) => {
+  try {
+    const { nombre, direccion, lat, lng, activo } = req.body || {};
+    const coords = lat !== undefined || lng !== undefined ? parLatLng(lat, lng) : undefined;
+    if (coords === null) return res.status(400).json({ error: 'Latitud/longitud inválidas (van en pareja, en grados decimales).' });
+    const { rows } = await query(
+      `UPDATE puntos_limpios SET
+         nombre = COALESCE($2, nombre),
+         direccion = COALESCE($3, direccion),
+         lat = CASE WHEN $4::boolean THEN $5 ELSE lat END,
+         lng = CASE WHEN $4::boolean THEN $6 ELSE lng END,
+         activo = COALESCE($7, activo)
+       WHERE id = $1 RETURNING *`,
+      [req.params.id, nombre || null, direccion || null,
+       coords !== undefined, coords?.lat ?? null, coords?.lng ?? null,
+       typeof activo === 'boolean' ? activo : null]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Punto limpio no encontrado' });
+    res.json({ punto: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// Cartel QR imprimible (PNG grande). El QR codifica la URL de la pantalla
+// Reciclar con el punto pre-seleccionado.
+router.get('/puntos-limpios/:id/qr.png', async (req, res, next) => {
+  try {
+    const { rows } = await query(`SELECT token FROM puntos_limpios WHERE id = $1`, [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Punto limpio no encontrado' });
+    res.type('png').send(await qrBufferDe(reciclarUrl(rows[0].token), 1024));
   } catch (err) { next(err); }
 });
 

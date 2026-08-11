@@ -114,16 +114,19 @@ CLUSTER BY rut_consultado, actor_id;
 -- igual que line_items.
 
 -- Bitácora de puntaje: cada vez que un jugador escanea un documento,
--- completa una misión o cierra un trayecto de bajo carbono.
+-- completa una misión, cierra un trayecto o entrega envases reciclables.
+-- Si la tabla ya existía sin reciclaje_id, agregarla con:
+--   ALTER TABLE `PROYECTO.sicr3p.puntos_eventos` ADD COLUMN IF NOT EXISTS reciclaje_id STRING;
 CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.puntos_eventos` (
-  id           STRING NOT NULL,
-  jugador_id   STRING NOT NULL,
-  tipo         STRING NOT NULL,    -- documento_escaneado | mision_completada | trayecto_registrado
-  puntos       INT64 NOT NULL,
-  factura_id   STRING,
-  mision_id    STRING,
-  trayecto_id  STRING,
-  created_at   TIMESTAMP NOT NULL
+  id            STRING NOT NULL,
+  jugador_id    STRING NOT NULL,
+  tipo          STRING NOT NULL,    -- documento_escaneado | mision_completada | trayecto_registrado | envase_reciclado
+  puntos        INT64 NOT NULL,
+  factura_id    STRING,
+  mision_id     STRING,
+  trayecto_id   STRING,
+  reciclaje_id  STRING,
+  created_at    TIMESTAMP NOT NULL
 );
 
 -- Canje de una recompensa simbólica (insignia o constancia) por puntos.
@@ -138,13 +141,34 @@ CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.canjes` (
 );
 
 -- Trayecto de ida/vuelta a la empresa — solo se exporta ya cerrado (con
--- llegada_at/puntos), nunca al abrirse.
+-- llegada_at/puntos), nunca al abrirse. Si la tabla ya existía sin las
+-- columnas de GPS/distancia, agregarlas con ALTER TABLE ... ADD COLUMN IF NOT EXISTS.
 CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.trayectos` (
   id               STRING NOT NULL,
   jugador_id       STRING NOT NULL,
   salida_at        TIMESTAMP NOT NULL,
   llegada_at       TIMESTAMP,
   modo_transporte  STRING,          -- caminando | bicicleta | transporte_publico | auto | moto | otro
+  puntos           INT64 NOT NULL,
+  salida_lat       NUMERIC,
+  salida_lng       NUMERIC,
+  llegada_lat      NUMERIC,
+  llegada_lng      NUMERIC,
+  distancia_m      NUMERIC,
+  created_at       TIMESTAMP NOT NULL
+);
+
+-- Entrega de envases reciclables validada en un punto limpio. `envases`
+-- es JSON [{material, cantidad}] tal como lo validó el backend.
+CREATE TABLE IF NOT EXISTS `PROYECTO.sicr3p.reciclajes` (
+  id               STRING NOT NULL,
+  jugador_id       STRING NOT NULL,
+  punto_limpio_id  STRING NOT NULL,
+  lat              NUMERIC,
+  lng              NUMERIC,
+  distancia_m      NUMERIC,
+  envases          STRING,          -- JSON [{material, cantidad}]
+  total_envases    INT64 NOT NULL,
   puntos           INT64 NOT NULL,
   created_at       TIMESTAMP NOT NULL
 );

@@ -75,6 +75,57 @@ export function esModoBajoCarbono(modoTransporte) {
   return (BONUS_POR_MODO[modoTransporte] ?? 0) > 0;
 }
 
+// ---------- Reciclaje en punto limpio ----------
+// Puntaje simbólico por envase entregado (coherente con
+// PUNTOS_POR_DOCUMENTO=10 y el bonus de trayecto) + topes anti-abuso:
+// el premio es simbólico, así que el abuso debe ser caro y de bajo retorno.
+export const PUNTOS_POR_ENVASE = 2;
+export const TOPE_ENVASES_POR_REGISTRO = 30; // máx. puntuable por foto
+export const TOPE_RECICLAJES_POR_DIA = 3;    // registros por jugador/día
+export const RADIO_PUNTO_LIMPIO_M = 300;     // cercanía exigida si el punto tiene coordenadas
+// 'otro' existe en el enum de la IA para que tenga dónde poner lo dudoso,
+// pero no puntúa: solo suman los materiales reciclables reconocidos.
+export const MATERIALES_ENVASE = ['pet', 'vidrio', 'lata', 'tetra'];
+
+// Normaliza el conteo que validó la IA → { envases, totalEnvases, puntos }.
+// Filtra materiales no puntuables, descarta cantidades no finitas o
+// negativas y aplica el tope por registro. Pura y determinista: la IA solo
+// cuenta, el puntaje lo decide siempre esta función.
+export function calcularPuntosReciclaje(envases) {
+  const limpios = [];
+  let total = 0;
+  for (const e of Array.isArray(envases) ? envases : []) {
+    if (!e || !MATERIALES_ENVASE.includes(e.material)) continue;
+    const cantidad = Math.floor(Number(e.cantidad));
+    if (!Number.isFinite(cantidad) || cantidad <= 0) continue;
+    limpios.push({ material: e.material, cantidad });
+    total += cantidad;
+  }
+  const totalPuntuable = Math.min(total, TOPE_ENVASES_POR_REGISTRO);
+  return { envases: limpios, totalEnvases: total, puntos: totalPuntuable * PUNTOS_POR_ENVASE };
+}
+
+// Distancia haversine en metros entre dos coordenadas WGS84.
+export function distanciaHaversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const rad = (g) => (g * Math.PI) / 180;
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Valida un par lat/lng venido del request: números finitos y en rango.
+// OJO: Number(null) y Number('') son 0 (finito) — un request sin GPS
+// pasaría como coordenada (0,0) si no se descartan antes.
+export function coordenadasValidas(lat, lng) {
+  if (lat == null || lat === '' || lng == null || lng === '') return false;
+  const la = Number(lat);
+  const ln = Number(lng);
+  return Number.isFinite(la) && Number.isFinite(ln) && Math.abs(la) <= 90 && Math.abs(ln) <= 180;
+}
+
 // Serial legible de canje: SUMA- + 6 hex mayúsculas (ej: SUMA-3F0A9B).
 // La unicidad la garantiza el UNIQUE de la tabla canjes; la ruta que la
 // crea reintenta si colisiona (mismo patrón que capacitacion.js).
@@ -98,12 +149,12 @@ export function hashCanje({ serial, jugador_id, recompensa_codigo, puntos_gastad
 // Suma puntos a un jugador y deja constancia en puntos_eventos, dentro de
 // la MISMA transacción del llamador (client ya abierto con BEGIN). No hace
 // su propio commit/rollback — eso es responsabilidad de withTx.
-export async function otorgarPuntos(client, { jugadorId, tipo, puntos, facturaId = null, misionId = null, trayectoId = null }) {
+export async function otorgarPuntos(client, { jugadorId, tipo, puntos, facturaId = null, misionId = null, trayectoId = null, reciclajeId = null }) {
   if (puntos <= 0) return null;
   const { rows } = await client.query(
-    `INSERT INTO puntos_eventos (jugador_id, tipo, puntos, factura_id, mision_id, trayecto_id)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-    [jugadorId, tipo, puntos, facturaId, misionId, trayectoId]
+    `INSERT INTO puntos_eventos (jugador_id, tipo, puntos, factura_id, mision_id, trayecto_id, reciclaje_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+    [jugadorId, tipo, puntos, facturaId, misionId, trayectoId, reciclajeId]
   );
   await client.query(
     `UPDATE jugadores SET puntos_totales = puntos_totales + $2 WHERE id = $1`,
@@ -161,5 +212,15 @@ export async function impactoDeJugador(jugadorId) {
      WHERE pe.jugador_id = $1 AND pe.tipo = 'documento_escaneado'`,
     [jugadorId]
   );
-  return { documentos: rows[0].documentos, co2e_total: rows[0].co2e_total };
+  const { rows: rec } = await query(
+    `SELECT COUNT(*)::int AS entregas, COALESCE(SUM(total_envases), 0)::int AS envases
+     FROM reciclajes WHERE jugador_id = $1`,
+    [jugadorId]
+  );
+  return {
+    documentos: rows[0].documentos,
+    co2e_total: rows[0].co2e_total,
+    entregas_reciclaje: rec[0].entregas,
+    envases_reciclados: rec[0].envases,
+  };
 }

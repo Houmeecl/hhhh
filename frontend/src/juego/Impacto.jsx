@@ -28,6 +28,12 @@ export default function Impacto() {
         <div className="muted" style={{ fontSize: 13 }}>
           {data.documentos} {data.documentos === 1 ? 'documento escaneado' : 'documentos escaneados'}
         </div>
+        {data.envases_reciclados > 0 && (
+          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            {data.envases_reciclados} {data.envases_reciclados === 1 ? 'envase reciclado' : 'envases reciclados'} en
+            {' '}{data.entregas_reciclaje} {data.entregas_reciclaje === 1 ? 'entrega' : 'entregas'}
+          </div>
+        )}
       </div>
 
       <p className="muted" style={{ fontSize: 12, marginTop: 16, display: 'flex', alignItems: 'center', gap: 6 }}>

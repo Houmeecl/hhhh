@@ -33,6 +33,7 @@ export default function Accesos() {
         <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
         <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
         <button className={`btn btn-sm ${tab === 'proveedores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('proveedores')}>Proveedores</button>
+        <button className={`btn btn-sm ${tab === 'puntos_limpios' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puntos_limpios')}>Puntos limpios</button>
       </div>
 
       {tab === 'codigos' && <Codigos flash={flash} />}
@@ -41,6 +42,7 @@ export default function Accesos() {
       {tab === 'agencias' && <Agencias flash={flash} />}
       {tab === 'trazadores' && <Trazadores flash={flash} />}
       {tab === 'proveedores' && <Proveedores flash={flash} />}
+      {tab === 'puntos_limpios' && <PuntosLimpios flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );
@@ -807,6 +809,99 @@ function Proveedores({ flash }) {
           onClose={() => setCuentaWeb(null)}
         />
       )}
+    </div>
+  );
+}
+
+// Puntos limpios ("Sube y Suma"): lugares de entrega de envases con
+// cartel QR imprimible. Con coordenadas, el registro del jugador exige
+// cercanía; sin ellas, solo el QR. "Campaña" restringe el punto a los
+// jugadores de un código de campaña (vacío = todas).
+function PuntosLimpios({ flash }) {
+  const [items, setItems] = useState([]);
+  const [codigos, setCodigos] = useState([]);
+  const [form, setForm] = useState({ nombre: '', direccion: '', lat: '', lng: '', codigo_id: '' });
+  const [creando, setCreando] = useState(false);
+
+  const cargar = () => api.accesosPuntosLimpios().then((r) => setItems(r.puntos)).catch((e) => flash(e.message, true));
+  useEffect(() => {
+    cargar();
+    api.codigos().then((r) => setCodigos((r.codigos || []).filter((c) => c.modo_juego))).catch(() => {});
+  }, []);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      await api.accesosCrearPuntoLimpio({
+        nombre: form.nombre, direccion: form.direccion || null,
+        lat: form.lat || null, lng: form.lng || null,
+        codigo_id: form.codigo_id || null,
+      });
+      setForm({ nombre: '', direccion: '', lat: '', lng: '', codigo_id: '' });
+      cargar(); flash('Punto limpio creado.');
+    } catch (e) { flash(e.message, true); }
+    finally { setCreando(false); }
+  }
+
+  async function toggle(p) {
+    try { await api.accesosEditarPuntoLimpio(p.id, { activo: !p.activo }); cargar(); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  async function cartel(p) {
+    try { await api.accesosCartelPuntoLimpio(p.id, p.nombre); }
+    catch (e) { flash(e.message, true); }
+  }
+
+  return (
+    <div className="form-content-grid">
+      <div className="card card-pad">
+        <h3 style={{ marginTop: 0 }}>Nuevo punto limpio</h3>
+        <div className="field" style={{ marginBottom: 12 }}><label>Nombre</label><input value={form.nombre} placeholder="Punto limpio casino central" onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
+        <div className="field" style={{ marginBottom: 12 }}><label>Dirección (opcional)</label><input value={form.direccion} placeholder="Av. Ejemplo 1234, Antofagasta" onChange={(e) => setForm({ ...form, direccion: e.target.value })} /></div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div className="field" style={{ minWidth: 0 }}><label>Latitud (opcional)</label><input value={form.lat} placeholder="-23.650000" onChange={(e) => setForm({ ...form, lat: e.target.value })} /></div>
+          <div className="field" style={{ minWidth: 0 }}><label>Longitud (opcional)</label><input value={form.lng} placeholder="-70.400000" onChange={(e) => setForm({ ...form, lng: e.target.value })} /></div>
+        </div>
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label>Campaña</label>
+          <select value={form.codigo_id} onChange={(e) => setForm({ ...form, codigo_id: e.target.value })}>
+            <option value="">Todas las campañas</option>
+            {codigos.map((c) => <option key={c.id} value={c.id}>{c.codigo} — {c.empresa || 'sin empresa'}</option>)}
+          </select>
+        </div>
+        <button className="btn btn-primary" style={{ width: '100%' }} onClick={crear} disabled={creando || !form.nombre}>
+          {creando ? <span className="spinner" /> : 'Crear'}
+        </button>
+        <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+          Con coordenadas, el registro exige que el jugador esté cerca del punto. Imprime el
+          cartel QR y pégalo en el punto limpio: al escanearlo se abre la pantalla de reciclaje.
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+        <table className="data">
+          <thead><tr><th>Nombre</th><th>Campaña</th><th>Coordenadas</th><th>Entregas</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            {items.map((p) => (
+              <tr key={p.id}>
+                <td><b>{p.nombre}</b>{p.direccion && <div className="muted" style={{ fontSize: 12 }}>{p.direccion}</div>}</td>
+                <td className="muted" style={{ fontSize: 13 }}>{p.campana_codigo ? `${p.campana_codigo}${p.campana_empresa ? ` — ${p.campana_empresa}` : ''}` : 'Todas'}</td>
+                <td>{p.lat != null ? <span className="badge badge-green">Con cercanía</span> : <span className="badge badge-gray">Solo QR</span>}</td>
+                <td>{p.n_entregas}</td>
+                <td><span className={`badge ${p.activo ? 'badge-green' : 'badge-gray'}`}>{p.activo ? 'Activo' : 'Inactivo'}</span></td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => cartel(p)}>Cartel QR</button>{' '}
+                  <button className="btn btn-outline btn-sm" onClick={() => toggle(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin puntos limpios registrados.</td></tr>}
+          </tbody>
+        </table>
+        </div>
+      </div>
     </div>
   );
 }
