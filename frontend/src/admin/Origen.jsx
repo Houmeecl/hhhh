@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { validarRut, formatearRut } from '../lib/rut.js';
@@ -102,9 +103,12 @@ export default function Origen() {
           Trazabilidad de lotes minerales — cadena de custodia con hash, alineada a OECD / CBAM / DPP.
         </span>
         {!sel && (
-          <button className="btn btn-sm btn-outline" style={{ marginLeft: 'auto' }} onClick={() => setRevision((v) => !v)}>
-            {revision ? '← Volver a lotes' : 'Revisión de documentos'}
-          </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <Link className="btn btn-sm btn-outline" to="/admin/origen-carteles-qr">Carteles QR del corredor</Link>
+            <button className="btn btn-sm btn-outline" onClick={() => setRevision((v) => !v)}>
+              {revision ? '← Volver a lotes' : 'Revisión de documentos'}
+            </button>
+          </div>
         )}
       </div>
       {msg && (

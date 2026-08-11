@@ -15,6 +15,7 @@ import Usuarios from './Usuarios.jsx';
 import Actividad from './Actividad.jsx';
 import Corredor from './Corredor.jsx';
 import Origen from './Origen.jsx';
+import CorredorQR from './CorredorQR.jsx';
 import CapitalNatural from './CapitalNatural.jsx';
 import Trazabilidad from './Trazabilidad.jsx';
 import Buscar from './Buscar.jsx';
@@ -232,6 +233,7 @@ export default function AdminApp() {
           <Route path="sesiones" element={<Sesiones />} />
           <Route path="corredor" element={<Corredor />} />
           <Route path="origen" element={<Origen />} />
+          <Route path="origen-carteles-qr" element={<CorredorQR />} />
           <Route path="capital" element={<CapitalNatural />} />
           <Route path="trazabilidad" element={<Trazabilidad />} />
           <Route path="buscar" element={<Buscar />} />

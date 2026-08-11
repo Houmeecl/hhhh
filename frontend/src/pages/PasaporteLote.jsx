@@ -135,7 +135,9 @@ export default function PasaporteLote() {
                         )}
                         {e.cantidad != null && <span>{fmt(e.cantidad, 3)} {data.lote.unidad} · </span>}
                         {Number(e.co2e_aportado) > 0 && <span>{fmt(e.co2e_aportado, 4)} t CO2e {t('lote.aportadas')} · </span>}
-                        {e.datos?.punto_control && <span>{e.datos.punto_control} · </span>}
+                        {e.datos?.punto_control && (
+                          <span>{e.datos?.via_qr ? '📷 ' : ''}{e.datos.punto_control} · </span>
+                        )}
                         <span className="mono">{String(e.hash_cadena).slice(0, 16)}…</span>
                       </div>
                     ) : (

@@ -251,6 +251,17 @@ export const api = {
     request(`/admin/origen/lotes/${loteId}/documentos`, { method: 'POST', body: formData, formData: true, authed: true }),
   origenRevisionDocumentos: () => request('/admin/origen/revision-documentos', { authed: true }),
   origenResolverRevision: (id, b) => request(`/admin/origen/revision-documentos/${id}`, { method: 'PUT', body: b, authed: true }),
+  // Cartel QR de un punto de control del corredor — la ruta exige admin,
+  // así que un <img src> plano no puede mandar el Authorization; se trae
+  // como blob autenticado (mismo patrón que abrirPdfAuth) y se muestra
+  // con URL.createObjectURL.
+  origenCorredorQrBlob: async (puntoId) => {
+    const res = await fetch(`/api/admin/origen/corredor/${encodeURIComponent(puntoId)}/qr.png`, {
+      headers: { Authorization: `Bearer ${auth.access}` },
+    });
+    if (!res.ok) throw new Error('No se pudo generar el QR');
+    return URL.createObjectURL(await res.blob());
+  },
   guardarEmbalaje: (sesionId, componentes) => request(`/sesiones/${sesionId}/embalaje`, { method: 'POST', body: { componentes } }),
   // Tarifa oficial de compensación (pública) y registro de la compensación
   // del trámite (pago simulado — sin pasarela). El servidor recalcula el

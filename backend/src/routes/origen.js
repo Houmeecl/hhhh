@@ -13,6 +13,7 @@ import { analizarPeriodo, periodosDescargados, descargarYCalcular } from '../ser
 import { inventarioCsv, inventarioJson } from '../services/exportInventarioSii.js';
 import { cifrar, descifrar, cifradoDisponible } from '../services/cripto.js';
 import { normalizarRut as normalizarRutLocal } from '../services/mandante.js';
+import { qrBufferDe, puntoControlUrl } from '../services/qr.js';
 import {
   ROLES,
   TIPOS,
@@ -990,6 +991,22 @@ router.get('/catalogo', (req, res) => {
   });
 });
 
+// Cartel QR imprimible de un punto de control del corredor (PNG grande).
+// El QR codifica /pc/{puntoId} — página pública informativa; el portador
+// que lo escanea desde /v/{serial} lo usa para autocompletar el paso en
+// vez de tipearlo (ver frontend/src/lib/corredor.js y
+// frontend/src/pages/TarjetaViaje.jsx). No es un secreto: el punto de
+// control no autoriza nada por sí solo, solo evita el error de tipeo.
+router.get('/corredor/:puntoId/qr.png', adminOnly, async (req, res, next) => {
+  try {
+    const puntoId = String(req.params.puntoId || '');
+    if (!PUNTOS_CORREDOR_IDS.includes(puntoId)) {
+      return res.status(404).json({ error: 'Punto de control no encontrado' });
+    }
+    res.type('png').send(await qrBufferDe(puntoControlUrl(puntoId), 1024));
+  } catch (err) { next(err); }
+});
+
 // ---------- POST /demo-torre — arma la demo de la torre de control ----------
 // Crea en una transacción TODO lo que la demo necesita: TRES lotes
 // documentales del Corredor, cada uno con su tarjeta de viaje (camión) —
@@ -1214,6 +1231,16 @@ tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res
           punto_control: String(b.punto_control || '').slice(0, 120) || null,
           ...(puntoId ? { punto_id: puntoId } : {}),
           tarjeta_serial: tarjeta.serial,
+          // via_qr: el portador autocompletó el punto escaneando el cartel
+          // del punto de control (frontend/src/lib/qrScan.js) en vez de
+          // tipearlo — señal de UX/auditoría, no prueba de presencia física
+          // (nada nuevo: tampoco lo era punto_control tipeado a mano).
+          ...(b.via_qr === true ? { via_qr: true } : {}),
+          // capturado_en: hora local del teléfono en que se detectó el QR,
+          // distinta de created_at (cuándo el servidor lo selló) cuando el
+          // paso se encoló sin señal y se reenvió más tarde
+          // (frontend/src/lib/pasoOffline.js).
+          ...(typeof b.capturado_en === 'string' && b.capturado_en ? { capturado_en: b.capturado_en.slice(0, 40) } : {}),
         },
       });
       if (r.status === 201) {
@@ -1228,7 +1255,7 @@ tarjetaRouter.post('/paso', requireAuth, requireRole('tarjeta'), async (req, res
     if (resultado.status === 201) {
       await logActividad({
         accion: 'tarjeta_paso', entidad: 'lote_eslabon', entidadId: resultado.body.eslabon.id,
-        detalle: { eslabon: resultado.body.eslabon.eslabon, punto: b.punto_control || null }, ip: req.ip,
+        detalle: { eslabon: resultado.body.eslabon.eslabon, punto: b.punto_control || null, via_qr: b.via_qr === true }, ip: req.ip,
       });
     }
     res.status(resultado.status).json(resultado.body);

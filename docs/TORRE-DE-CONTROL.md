@@ -64,6 +64,37 @@ Se puede crear una demo nueva las veces que sea (cada una crea lotes nuevos).
    cualquiera —sin cuenta, sin permiso— puede comprobar la cadena íntegra
    del viaje. Ese es el producto.
 
+## Escaneo del punto de control (QR físico)
+
+Desde la Tarjeta de Viaje (`/v/{serial}`), el portador ya no tiene que
+tipear el punto de control: cada punto físico del corredor (puerto,
+frontera, estacionamiento) lleva un **cartel QR impreso** — el botón
+"📷 Escanear punto de control" abre la cámara del teléfono, lo lee y
+autocompleta el punto. El `<select>`/texto libre de siempre **sigue ahí**:
+si la cámara falla, se deniega el permiso, o el QR no calza con ningún
+punto del catálogo, el ingreso manual no se bloquea nunca.
+
+- **Carteles**: se generan e imprimen desde el panel admin → Pasaporte de
+  Origen → "Carteles QR del corredor" (`/admin/origen-carteles-qr`). Cada
+  QR codifica `{URL pública}/pc/{punto_id}` — una página informativa (por
+  si alguien lo escanea con la cámara nativa fuera de la app), no un
+  secreto: el punto de control no autoriza nada por sí solo, solo
+  autocompleta un dato declarativo (igual que el texto libre de siempre).
+  **Imprimir en alto contraste y proteger de la intemperie** — el sol
+  directo en los pasos fronterizos puede lavar el QR.
+- **Sin señal en el punto de control**: el escaneo del QR es 100% local
+  (no necesita red); lo que sí la necesita es registrar el paso. Si el
+  teléfono no tiene señal en ese momento (frecuente en los pasos
+  fronterizos), el paso queda guardado en el teléfono y se reenvía solo
+  apenas hay una autenticación con conexión — o con el botón "Reintentar
+  ahora". No se pierde ni se bloquea el registro por falta de señal.
+- **`via_qr` en el eslabón**: un paso registrado por escaneo queda con
+  `datos.via_qr = true` (visible como 📷 en la línea de tiempo de la
+  torre y el pasaporte del lote; ⌨️ para lo tipeado a mano). Es una señal
+  de UX/auditoría, no una prueba criptográfica de presencia — el modelo
+  de confianza sigue siendo el mismo eslabón declarativo sellado con hash
+  de siempre.
+
 ## Detalles que conviene saber
 
 - **Quién puede qué**: cualquiera que tenga el link VE la torre de un lote
@@ -79,7 +110,8 @@ Se puede crear una demo nueva las veces que sea (cada una crea lotes nuevos).
   vale igual y queda en la línea de tiempo; solo que no mueve el camión.
 - **Internet**: el dispositivo que MIRA la torre necesita conexión (los
   mosaicos del mapa vienen de OpenStreetMap). El registro de pasos es la
-  misma llamada liviana de siempre.
+  misma llamada liviana de siempre — y ahora tolera cortes de señal
+  gracias a la cola local descrita arriba.
 - **Pasos en Chile sin RUT**: el portador registra pasos sin RUT también en
   territorio chileno — su identidad la da la clave de la tarjeta (queda
   `tarjeta_serial` en el eslabón). Cualquier otro rol chileno de la cadena

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import { useIdioma } from '../lib/i18n.js';
 import { PUNTOS_CORREDOR, etiquetaInstruccion } from '../lib/corredor.js';
+import { useEscanerQR, idPuntoDesdeQr } from '../lib/qrScan.js';
+import { encolarPaso, listarPendientes, quitarPendiente, esErrorDeConexion } from '../lib/pasoOffline.js';
 
 // Tarjeta de Viaje: la URL grabada en el NDEF de la tarjeta NFC/RFID
 // que acompaña a la carga es /v/{serial}. Cualquiera que la lea llega
@@ -26,6 +28,15 @@ export default function TarjetaViaje() {
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [errPaso, setErrPaso] = useState('');
+  // Escaneo de QR del punto de control (frontend/src/lib/qrScan.js).
+  const [escaneando, setEscaneando] = useState(false);
+  const [avisoQr, setAvisoQr] = useState('');
+  const [viaQr, setViaQr] = useState(false);
+  // Cola local de pasos sin señal (frontend/src/lib/pasoOffline.js).
+  const [pendientes, setPendientes] = useState(() => listarPendientes(serial));
+  const [enviandoPendientes, setEnviandoPendientes] = useState(false);
+  const claveRef = useRef(clave);
+  useEffect(() => { claveRef.current = clave; }, [clave]);
 
   // La credencial se refresca sola: así el portador ve la instrucción de
   // la torre ("puerto seco" / "puerto") apenas la envían, sin recargar.
@@ -45,25 +56,96 @@ export default function TarjetaViaje() {
     if (p) { setPais(p.pais); setPunto(''); }
   };
 
+  const { videoRef } = useEscanerQR({
+    activo: escaneando,
+    onDetect: (texto) => {
+      const id = idPuntoDesdeQr(texto);
+      const p = id && PUNTOS_CORREDOR.find((x) => x.id === id);
+      setEscaneando(false);
+      if (p) {
+        elegirPunto(p.id);
+        setViaQr(true);
+        setAvisoQr('');
+      } else {
+        setAvisoQr(t('tv.qr_no_reconocido'));
+      }
+    },
+    onError: () => {
+      setEscaneando(false);
+      setAvisoQr(t('tv.camara_denegada'));
+    },
+  });
+
+  // Vacía la cola de pasos pendientes con un token recién obtenido — se
+  // llama apenas hay una autenticación exitosa (prueba de que hay señal),
+  // nunca con un token guardado: no se persiste ninguna credencial.
+  async function flushPendientes(token) {
+    const lista = listarPendientes(serial);
+    if (!lista.length) return;
+    setEnviandoPendientes(true);
+    for (const p of lista) {
+      const { id, capturado_en, ...body } = p;
+      try {
+        await api.tarjetaPaso(token, { ...body, capturado_en });
+        quitarPendiente(serial, id);
+      } catch {
+        break; // probablemente sigue sin señal: se deja el resto para el próximo intento
+      }
+    }
+    setPendientes(listarPendientes(serial));
+    setEnviandoPendientes(false);
+  }
+
+  async function reintentarPendientesAhora() {
+    if (!clave.trim()) { setErrPaso(t('tv.falta_clave')); return; }
+    try {
+      const { token } = await api.tarjetaAuth({ serial, clave: clave.trim() });
+      await flushPendientes(token);
+    } catch (e) { setErrPaso(e.message); }
+  }
+
+  // Si vuelve la señal mientras el portador sigue con la clave escrita en
+  // pantalla, se reintenta solo — sin esto tendría que acordarse de volver
+  // y tocar "Reintentar ahora".
+  useEffect(() => {
+    function alVolverOnline() {
+      if (claveRef.current.trim() && listarPendientes(serial).length) reintentarPendientesAhora();
+    }
+    window.addEventListener('online', alVolverOnline);
+    return () => window.removeEventListener('online', alVolverOnline);
+  }, [serial, clave]);
+
   async function registrarPaso() {
     setErrPaso('');
     setResultado(null);
     if (!clave.trim()) { setErrPaso(t('tv.falta_clave')); return; }
     setEnviando(true);
+    const sel = PUNTOS_CORREDOR.find((x) => x.id === puntoId) || null;
+    const entrada = {
+      punto_control: sel ? sel.nombre : (punto.trim() || null),
+      punto_id: sel ? sel.id : undefined,
+      pais: pais.trim().toUpperCase() || 'CL',
+      ...(viaQr ? { via_qr: true } : {}),
+    };
     try {
-      const sel = PUNTOS_CORREDOR.find((x) => x.id === puntoId) || null;
       const { token } = await api.tarjetaAuth({ serial, clave: clave.trim() });
-      const r = await api.tarjetaPaso(token, {
-        punto_control: sel ? sel.nombre : (punto.trim() || null),
-        punto_id: sel ? sel.id : undefined,
-        pais: pais.trim().toUpperCase() || 'CL',
-      });
+      await flushPendientes(token); // conexión + clave OK: aprovecha para vaciar la cola
+      const r = await api.tarjetaPaso(token, entrada);
       setResultado(r.eslabon);
       setClave('');
       setPunto('');
       setPuntoId('');
-    } catch (e) { setErrPaso(e.message); }
-    finally { setEnviando(false); }
+      setViaQr(false);
+    } catch (e) {
+      if (esErrorDeConexion(e)) {
+        encolarPaso(serial, entrada);
+        setPendientes(listarPendientes(serial));
+        setClave('');
+        setViaQr(false);
+      } else {
+        setErrPaso(e.message);
+      }
+    } finally { setEnviando(false); }
   }
 
   return (
@@ -103,6 +185,17 @@ export default function TarjetaViaje() {
               </div>
             )}
 
+            {/* Pasos sin señal, guardados en este teléfono — se vacía sola
+                en la próxima autenticación exitosa, o con el botón. */}
+            {pendientes.length > 0 && (
+              <div className="badge badge-amber" style={{ display: 'block', textAlign: 'left', padding: '10px 14px', marginBottom: 14 }}>
+                <div>{t('tv.pendientes_offline')} ({pendientes.length})</div>
+                <button className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={reintentarPendientesAhora} disabled={enviandoPendientes}>
+                  {enviandoPendientes ? <><span className="spinner" /> {t('tv.enviando_pendientes')}</> : t('tv.reintentar_ahora')}
+                </button>
+              </div>
+            )}
+
             {/* QR de la propia credencial: el portador muestra la pantalla
                 y otro la escanea — la tarjeta ES el teléfono. */}
             <div className="pas-qr" style={{ marginBottom: 16 }}>
@@ -134,9 +227,31 @@ export default function TarjetaViaje() {
                     </a>
                   </p>
                 </div>
+                {/* Escaneo del cartel QR del punto de control — autocompleta el
+                    select de abajo en vez de tipear a mano. */}
+                <div className="field">
+                  {!escaneando ? (
+                    <button type="button" className="btn btn-outline" style={{ width: '100%' }} onClick={() => { setAvisoQr(''); setEscaneando(true); }}>
+                      {t('tv.escanear')}
+                    </button>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      <video ref={videoRef} playsInline muted autoPlay style={{ width: '100%', maxWidth: 320, borderRadius: 10, background: '#000' }} />
+                      <p className="muted" style={{ fontSize: 12, margin: '8px 0' }}>{t('tv.escaneando')}</p>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEscaneando(false)}>{t('tv.cancelar_escaneo')}</button>
+                    </div>
+                  )}
+                  {avisoQr && <p className="muted" style={{ fontSize: 12, color: '#b45309', marginTop: 6 }}>{avisoQr}</p>}
+                  {viaQr && puntoId && (
+                    <div className="badge badge-green" style={{ display: 'inline-block', marginTop: 8 }}>
+                      ✓ {t('tv.punto_detectado')}: {PUNTOS_CORREDOR.find((p) => p.id === puntoId)?.nombre}{' '}
+                      <a href="#" onClick={(e) => { e.preventDefault(); setViaQr(false); }}>({t('tv.cambiar')})</a>
+                    </div>
+                  )}
+                </div>
                 <div className="field">
                   <label>{t('tv.punto_sel')}</label>
-                  <select value={puntoId} onChange={(e) => elegirPunto(e.target.value)}>
+                  <select value={puntoId} onChange={(e) => { elegirPunto(e.target.value); setViaQr(false); }}>
                     <option value="">{t('tv.punto_otro')}</option>
                     {PUNTOS_CORREDOR.map((p) => (
                       <option key={p.id} value={p.id}>{p.nombre} ({p.pais})</option>
@@ -146,7 +261,7 @@ export default function TarjetaViaje() {
                 {!puntoId && (
                   <div className="field">
                     <label>{t('tv.punto')}</label>
-                    <input value={punto} placeholder={t('tv.punto_ej')} onChange={(e) => setPunto(e.target.value)} />
+                    <input value={punto} placeholder={t('tv.punto_ej')} onChange={(e) => { setPunto(e.target.value); setViaQr(false); }} />
                   </div>
                 )}
                 <div className="field">

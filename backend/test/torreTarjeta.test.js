@@ -97,6 +97,30 @@ test('GET /api/torre/flota refleja los camiones creados por demo-torre', { skip:
   assert.equal(filaEnRuta.ultimo_paso.punto_id, 'mariscal-estigarribia');
 });
 
+// ---------- GET /api/admin/origen/corredor/:puntoId/qr.png ----------
+
+test('GET /admin/origen/corredor/:puntoId/qr.png con id del catálogo → 200 PNG', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/origen/corredor/susques/qr.png`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'image/png');
+  const buf = Buffer.from(await res.arrayBuffer());
+  assert.ok(buf.length > 100); // un PNG real, no una respuesta vacía
+});
+
+test('GET /admin/origen/corredor/:puntoId/qr.png con id fuera del catálogo → 404', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/origen/corredor/punto-inventado/qr.png`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  assert.equal(res.status, 404);
+});
+
+test('GET /admin/origen/corredor/:puntoId/qr.png sin token → 401', { skip: SALTO_PROD }, async () => {
+  const res = await fetch(`${baseUrl}/api/admin/origen/corredor/susques/qr.png`);
+  assert.equal(res.status, 401);
+});
+
 // ---------- POST /api/tarjeta/paso ----------
 
 test('POST /api/tarjeta/paso con punto_id fuera del catálogo: se guarda igual, con advertencia', { skip: SALTO_PROD }, async () => {
@@ -130,6 +154,39 @@ test('POST /api/tarjeta/paso con punto_id del catálogo real: sin advertencia de
   assert.equal(res.status, 201);
   const body = await res.json();
   assert.ok(!body.advertencias.some((a) => a.includes('catálogo del corredor')));
+});
+
+test('POST /api/tarjeta/paso sin via_qr: la clave no aparece en datos (retrocompatibilidad)', { skip: SALTO_PROD }, async () => {
+  const resAuth = await fetch(`${baseUrl}/api/tarjeta/auth`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serial: camionEnRuta.tarjeta.serial, clave: camionEnRuta.tarjeta.clave }),
+  });
+  const { token } = await resAuth.json();
+  const res = await fetch(`${baseUrl}/api/tarjeta/paso`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ punto_control: 'Susques', punto_id: 'susques', pais: 'AR' }),
+  });
+  assert.equal(res.status, 201);
+  const { eslabon } = await res.json();
+  assert.equal('via_qr' in eslabon.datos, false);
+  assert.equal('capturado_en' in eslabon.datos, false);
+});
+
+test('POST /api/tarjeta/paso con via_qr:true y capturado_en: quedan guardados en datos', { skip: SALTO_PROD }, async () => {
+  const resAuth = await fetch(`${baseUrl}/api/tarjeta/auth`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ serial: camionEnRuta.tarjeta.serial, clave: camionEnRuta.tarjeta.clave }),
+  });
+  const { token } = await resAuth.json();
+  const capturadoEn = new Date(Date.now() - 3_600_000).toISOString(); // encolado hace 1h, reenviado ahora
+  const res = await fetch(`${baseUrl}/api/tarjeta/paso`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ punto_control: 'Susques', punto_id: 'susques', pais: 'AR', via_qr: true, capturado_en: capturadoEn }),
+  });
+  assert.equal(res.status, 201);
+  const { eslabon } = await res.json();
+  assert.equal(eslabon.datos.via_qr, true);
+  assert.equal(eslabon.datos.capturado_en, capturadoEn);
 });
 
 // ---------- POST /api/torre/mensaje ----------

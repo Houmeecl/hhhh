@@ -62,6 +62,13 @@ export function firmaProveedorUrl(serial) {
   return `${config.publicAppUrl}/f/${serial}`;
 }
 
+// URL del cartel QR de un punto de control del Corredor Bioceánico — lo
+// que el portador de la Tarjeta de Viaje escanea en el punto físico para
+// autocompletar el paso en vez de tipearlo (frontend/src/lib/corredor.js).
+export function puntoControlUrl(puntoId) {
+  return `${config.publicAppUrl}/pc/${puntoId}`;
+}
+
 // Buffer PNG de un QR para cualquier URL propia (pasaporte, verificar).
 // `width` opcional: 320 para embeber en PDF/pantalla, más grande (ej.
 // 1024) para carteles imprimibles como el del punto limpio.

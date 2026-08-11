@@ -6,7 +6,7 @@ import Resultado from './pages/Resultado.jsx';
 import Verificar from './pages/Verificar.jsx';
 import Pasaporte from './pages/Pasaporte.jsx';
 import PasaporteLote from './pages/PasaporteLote.jsx';
-import TarjetaViaje from './pages/TarjetaViaje.jsx';
+import PuntoControl from './pages/PuntoControl.jsx';
 import FirmaProveedor from './pages/FirmaProveedor.jsx';
 import AccesoUnico from './pages/AccesoUnico.jsx';
 import Prueba from './pages/Prueba.jsx';
@@ -45,6 +45,10 @@ const ProveedorApp = lazy(() => import('./panel-proveedor/ProveedorApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
+// La Tarjeta de Viaje carga jsQR (escaneo de punto de control): chunk
+// aparte para no pesarle el bundle a las páginas públicas de mayor
+// tráfico (portador de tarjeta es un flujo operativo, no de visitantes).
+const TarjetaViaje = lazy(() => import('./pages/TarjetaViaje.jsx'));
 const JuegoApp = lazy(() => import('./juego/JuegoApp.jsx'));
 
 const CargandoModulo = () => (
@@ -71,6 +75,7 @@ export default function App() {
       <Route path="/pasaporte/:id" element={<Pasaporte />} />
       <Route path="/lote/:codigo" element={<PasaporteLote />} />
       <Route path="/v/:serial" element={<TarjetaViaje />} />
+      <Route path="/pc/:puntoId" element={<PuntoControl />} />
       <Route path="/f/:serial" element={<FirmaProveedor />} />
       <Route path="/torre" element={<TorreFlota />} />
       <Route path="/torre/:codigo" element={<Torre />} />

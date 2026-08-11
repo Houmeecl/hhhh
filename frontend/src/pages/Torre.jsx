@@ -241,6 +241,9 @@ export default function Torre() {
                       <div className="tl-item" key={e.eslabon}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 600 }}>
+                            <span title={e.datos?.via_qr ? 'Registrado escaneando el punto de control' : 'Registrado a mano'}>
+                              {e.datos?.via_qr ? '📷' : '⌨️'}
+                            </span>{' '}
                             #{e.eslabon} · {e.datos?.punto_control || e.datos?.punto_id}
                             {!puntoDe(e) && <span className="muted" style={{ fontWeight: 400 }}> · {t('torre.fuera_mapa')}</span>}
                             {retrocedidos.has(e.eslabon) && (
