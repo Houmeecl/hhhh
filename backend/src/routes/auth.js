@@ -7,7 +7,7 @@ import { query } from '../lib/db.js';
 import { signAccess, signRefresh, requireAuth, logActividad } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { sendMail, resetEmail, magicEmail } from '../services/mailer.js';
-import { RUTA_ACTIVAR } from '../services/cuentas.js';
+import { RUTA_ACTIVAR, PANEL_LABEL } from '../services/cuentas.js';
 
 const router = express.Router();
 
@@ -15,12 +15,11 @@ const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 const PANELES_VALIDOS = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador', 'proveedor'];
 
-// Etiqueta legible de cada panel para el copy visible: 'aduana_verde' es
-// el nombre interno histórico del canal que hoy se llama "terreno".
-const NOMBRE_PANEL = {
-  sicrep: 'sicrep', aduana_verde: 'terreno', puerto: 'Puerto',
-  mandante: 'Mandante', agencia: 'Agencia', trazador: 'Trazador', proveedor: 'Proveedor',
-};
+// Etiqueta legible de cada panel para el copy visible ('aduana_verde' es el
+// nombre interno histórico del canal que hoy se llama "terreno"): misma
+// fuente que usan los correos de activación/reset (mailer.js `area`),
+// importada de cuentas.js para no mantener dos mapas iguales.
+const NOMBRE_PANEL = PANEL_LABEL;
 
 // ---------- POST /api/auth/login ----------
 router.post('/login', loginLimiter, async (req, res, next) => {
@@ -209,8 +208,9 @@ router.post('/solicitar-reset', loginLimiter, async (req, res, next) => {
       );
       const ruta = RUTA_ACTIVAR[user.panel] || RUTA_ACTIVAR.sicrep;
       const link = `${config.publicAppUrl}${ruta}?token=${raw}`;
-      const mail = resetEmail({ nombre: user.nombre, link });
-      await sendMail({ to: user.email, ...mail });
+      const area = PANEL_LABEL[user.panel] || PANEL_LABEL.sicrep;
+      const mail = resetEmail({ nombre: user.nombre, link, area });
+      await sendMail({ to: user.email, area, ...mail });
     }
     res.json({ ok: true, mensaje: 'Si el correo existe, enviamos instrucciones.' });
   } catch (err) {
@@ -253,7 +253,11 @@ router.post('/magic', loginLimiter, async (req, res, next) => {
       [email, hashToken(raw), expira, codigoId]
     );
     const link = `${config.publicAppUrl}/acceso?token=${raw}`;
-    await sendMail({ to: email, ...magicEmail({ link }) });
+    // codigoId solo se resuelve con modo_juego=true: distingue el acceso de
+    // "Sube y Suma" del acceso de cliente genérico — mismo mecanismo de
+    // token, pero abren a un perfil de jugador o a un historial distintos.
+    const area = codigoId ? 'Sube y Suma' : null;
+    await sendMail({ to: email, area, ...magicEmail({ link, area }) });
     // Respuesta genérica: no revela si el correo tiene historial.
     res.json({ ok: true, mensaje: 'Te enviamos un enlace de acceso. Revisa tu correo.' });
   } catch (err) { next(err); }

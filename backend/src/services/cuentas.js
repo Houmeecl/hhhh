@@ -34,6 +34,22 @@ export const RUTA_ACTIVAR = {
   proveedor: '/panel-proveedor/activar',
 };
 
+// Etiqueta legible de cada panel — se imprime en el asunto/remitente de los
+// correos de activación y de restablecimiento de contraseña (mailer.js
+// `area`), para que quien recibe varias invitaciones seguidas (o gestiona
+// cuentas de más de un panel) sepa de inmediato cuál es cuál sin abrir el
+// correo. Fuente única: antes routes/auth.js tenía su propio mapa
+// (NOMBRE_PANEL) con la misma info duplicada — ahora lo importa de acá.
+export const PANEL_LABEL = {
+  sicrep: 'Admin',
+  aduana_verde: 'Terreno',
+  puerto: 'Puerto',
+  mandante: 'Mandante',
+  agencia: 'Agencia',
+  trazador: 'Trazador',
+  proveedor: 'Proveedor',
+};
+
 const hashToken = (t) => crypto.createHash('sha256').update(t).digest('hex');
 
 // Envía (o reenvía) el correo de activación para un usuario ya insertado.
@@ -58,9 +74,10 @@ export async function enviarActivacion({ usuarioId, email, nombre, panel }) {
   );
   const ruta = RUTA_ACTIVAR[panel] || RUTA_ACTIVAR.sicrep;
   const link = `${config.publicAppUrl}${ruta}?token=${raw}`;
+  const area = PANEL_LABEL[panel] || PANEL_LABEL.sicrep;
   let correoEnviado = true;
   try {
-    await sendMail({ to: email, ...activationEmail({ nombre, link }) });
+    await sendMail({ to: email, area, ...activationEmail({ nombre, link, area }) });
   } catch (err) {
     correoEnviado = false;
     console.error('[activacion] no se pudo enviar el correo:', err.message);

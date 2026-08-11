@@ -23,6 +23,19 @@ const smtpTransport = (config.smtp.host && config.smtp.user && config.smtp.pass)
 // del sitio (ej. no-responder@sicrep.cl) — para que el DKIM firme y el SPF pase.
 const FROM = config.resend.from;
 
+// Nombre visible del remitente por ÁREA (admin, terreno, proveedor, puerto,
+// mandante, agencia, trazador, cliente, Sube y Suma…), sin cambiar la
+// casilla real: mismo dominio autenticado por SPF/DKIM, solo cambia el
+// nombre que el destinatario ve en su bandeja. Existen 7 paneles con
+// activación de cuenta idéntica — sin esto, un correo de "Proveedor" y uno
+// de "Puerto" llegaban indistinguibles como "sicr3p" a secas, y quien
+// gestiona varias áreas no podía saber cuál era cuál de un vistazo.
+export function construirFrom(area) {
+  if (!area) return FROM;
+  const email = FROM.match(/<([^>]+)>/)?.[1] || FROM;
+  return `sicr3p ${area} <${email}>`;
+}
+
 // Qué transporte se usaría según la config: SMTP propio tiene prioridad, luego
 // Resend, y si no hay ninguno, modo dev (log). Función pura para poder testear
 // la prioridad sin tocar red ni entorno.
@@ -33,12 +46,15 @@ export function elegirTransporte(cfg = config) {
 }
 
 // Envía un correo. Prioridad: SMTP propio → Resend → modo dev (log en consola).
-// `attachments`: [{ filename, content: Buffer }] (opcional).
-export async function sendMail({ to, subject, html, attachments }) {
+// `attachments`: [{ filename, content: Buffer }] (opcional). `area`: nombre
+// del panel/área que origina el correo (ver construirFrom arriba) — opcional,
+// sin ella se usa el FROM genérico de siempre.
+export async function sendMail({ to, subject, html, attachments, area }) {
+  const from = construirFrom(area);
   // 1) SMTP propio (servidor de correo del VPS).
   if (smtpTransport) {
     const info = await smtpTransport.sendMail({
-      from: FROM,
+      from,
       to,
       subject,
       html,
@@ -50,7 +66,7 @@ export async function sendMail({ to, subject, html, attachments }) {
   // 2) Resend (transaccional externo).
   if (resend) {
     const { data, error } = await resend.emails.send({
-      from: FROM,
+      from,
       to,
       subject,
       html,
@@ -62,6 +78,7 @@ export async function sendMail({ to, subject, html, attachments }) {
 
   // 3) Modo dev: sin SMTP ni Resend, se registra en consola.
   console.log('\n===== CORREO (modo dev, sin SMTP ni Resend) =====');
+  console.log('De:', from);
   console.log('Para:', to);
   console.log('Asunto:', subject);
   console.log(html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
@@ -73,13 +90,18 @@ export async function sendMail({ to, subject, html, attachments }) {
   return { dev: true };
 }
 
-export function activationEmail({ nombre, link }) {
+// `area`: etiqueta del panel (ej. "Proveedor", "Puerto") — se imprime en el
+// asunto y el cuerpo para que quien gestiona varias cuentas (o recibe varias
+// invitaciones seguidas) sepa de inmediato para cuál panel es cada una, sin
+// tener que abrir el correo o revisar el enlace.
+export function activationEmail({ nombre, link, area }) {
+  const sufijo = area ? ` — Panel ${area}` : '';
   return {
-    subject: 'Activa tu cuenta en sicr3p',
+    subject: `Activa tu cuenta en sicr3p${sufijo}`,
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
-        <h2 style="color:#0f1f2e">Bienvenido/a a <b>sicr3p</b></h2>
-        <p>Hola ${nombre}, se creó una cuenta para ti en la plataforma de contabilidad de carbono trazable.</p>
+        <h2 style="color:#0f1f2e">Bienvenido/a a <b>sicr3p</b>${area ? ` — ${area}` : ''}</h2>
+        <p>Hola ${nombre}, se creó una cuenta para ti en la plataforma de contabilidad de carbono trazable${area ? `, panel <b>${area}</b>` : ''}.</p>
         <p>Activa tu cuenta y define tu contraseña con este enlace:</p>
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Activar mi cuenta</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 48 horas. Si no reconoces esta invitación, ignora este correo.</p>
@@ -105,13 +127,18 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas }) {
   };
 }
 
-export function magicEmail({ link }) {
+// `area`: "Sube y Suma" cuando el magic link viene de un código de campaña
+// del juego (modo_juego=true), sin ella es el acceso genérico de cliente —
+// mismo mecanismo de token, pero el contenido que desbloquea es distinto
+// (historial de contabilidad vs. perfil de jugador) y sin distinguirlos el
+// correo no decía a qué se estaba entrando.
+export function magicEmail({ link, area }) {
   return {
-    subject: 'Tu enlace de acceso · sicr3p',
+    subject: `Tu enlace de acceso${area ? ` a ${area}` : ''} · sicr3p`,
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
-        <h2 style="color:#0f1f2e">Ingresa a <b>sicr3p</b></h2>
-        <p>Usa este enlace para entrar a tu historial de contabilidad de carbono. No necesitas contraseña.</p>
+        <h2 style="color:#0f1f2e">Ingresa a <b>sicr3p</b>${area ? ` — ${area}` : ''}</h2>
+        <p>Usa este enlace para entrar${area ? ` a ${area}` : ' a tu historial de contabilidad de carbono'}. No necesitas contraseña.</p>
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Ingresar a mi cuenta</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 15 minutos y sirve una sola vez. Si no lo solicitaste, ignora este correo.</p>
       </div>`,
@@ -134,6 +161,7 @@ export async function enviarComprobantePos({ para, empresa, t_co2e, monto_clp, e
         <p style="margin:4px 0"><b>Sin cobro en esta visita.</b></p>`;
   return sendMail({
     to: para,
+    area: 'Terreno',
     subject: `Comprobante sicr3p — ${empresa}`,
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
@@ -152,13 +180,15 @@ export async function enviarComprobantePos({ para, empresa, t_co2e, monto_clp, e
   });
 }
 
-export function resetEmail({ nombre, link }) {
+// `area`: mismo criterio que activationEmail — de qué panel es la cuenta
+// cuya contraseña se está restableciendo.
+export function resetEmail({ nombre, link, area }) {
   return {
-    subject: 'Restablece tu contraseña · sicr3p',
+    subject: `Restablece tu contraseña${area ? ` — Panel ${area}` : ''} · sicr3p`,
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
-        <h2 style="color:#0f1f2e">Restablecer contraseña</h2>
-        <p>Hola ${nombre}, recibimos una solicitud para restablecer tu contraseña.</p>
+        <h2 style="color:#0f1f2e">Restablecer contraseña${area ? ` — ${area}` : ''}</h2>
+        <p>Hola ${nombre}, recibimos una solicitud para restablecer tu contraseña${area ? ` del panel <b>${area}</b>` : ''}.</p>
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Definir nueva contraseña</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 2 horas.</p>
       </div>`,
