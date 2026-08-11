@@ -5,7 +5,11 @@ import { Icon } from './icons.jsx';
 // tomar la foto directo con la cámara del celular (input con `capture`).
 // En desktop se ve como un solo dropzone; en móvil (o pantalla táctil)
 // aparecen además los dos botones de acción.
-export default function Dropzone({ onFiles, accept = '.pdf,.xml,.jpg,.jpeg,.png,.heic' }) {
+export default function Dropzone({
+  onFiles,
+  accept = '.pdf,.xml,.jpg,.jpeg,.png,.heic',
+  hint = 'Formatos permitidos: PDF, XML, JPG, PNG (o HEIC de iPhone)',
+}) {
   const fileRef = useRef();
   const cameraRef = useRef();
   const [drag, setDrag] = useState(false);
@@ -40,7 +44,7 @@ export default function Dropzone({ onFiles, accept = '.pdf,.xml,.jpg,.jpeg,.png,
       </div>
 
       <div className="muted" style={{ fontSize: 13, marginTop: 12 }}>
-        Formatos permitidos: PDF, XML, JPG, PNG (o HEIC de iPhone)
+        {hint}
       </div>
 
       <input

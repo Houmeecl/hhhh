@@ -131,7 +131,11 @@ export default function Reciclar() {
       )}
 
       <div className="card card-pad">
-        <Dropzone accept="image/*" onFiles={(list) => { setError(''); setFoto(Array.from(list)[0] || null); }} />
+        <Dropzone
+          accept="image/*"
+          hint="Sube una foto de tus envases (JPG, PNG o HEIC)"
+          onFiles={(list) => { setError(''); setFoto(Array.from(list)[0] || null); }}
+        />
 
         {foto && (
           <div className="file-list">

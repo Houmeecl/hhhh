@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { api, fmt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
+import Dropzone from '../components/Dropzone.jsx';
 
 const PAISES = { CL: 'Chile', AR: 'Argentina', PY: 'Paraguay', BR: 'Brasil' };
 const TIPOS = [
@@ -142,7 +143,6 @@ function Documentos({ flash }) {
   const [form, setForm] = useState({ pais_origen: 'BR', pais_destino: 'CL', tramo: '', tipo_documento: 'factura', rut_emisor: '', rut_receptor: '', numero_documento: '' });
   const [file, setFile] = useState(null);
   const [subiendo, setSubiendo] = useState(false);
-  const fileRef = useRef();
 
   const cargar = () => api.corredorDocumentos().then((r) => setDocs(r.documentos)).catch((e) => flash(e.message, true));
   useEffect(() => { cargar(); }, []);
@@ -155,7 +155,7 @@ function Documentos({ flash }) {
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
       fd.append('archivo', file);
       const { documento } = await api.subirDocumentoCorredor(fd);
-      setFile(null); if (fileRef.current) fileRef.current.value = '';
+      setFile(null);
       cargar();
       flash(documento.estado === 'procesado' ? `Procesado: ${fmt(documento.total_co2e, 3)} t CO2e` : documento.estado === 'pendiente_motor' ? 'Guardado (país inactivo: pendiente de motor).' : 'Guardado como traza documental.');
     } catch (e) { flash(e.message, true); } finally { setSubiendo(false); }
@@ -192,9 +192,22 @@ function Documentos({ flash }) {
             Manifiesto Internacional de Carga / Declaración de Tránsito Aduanero (Acuerdo ATIT). Traza el tránsito terrestre entre los cuatro países.
           </div>
         )}
-        {/* Carga por archivo o cámara del teléfono */}
-        <input ref={fileRef} type="file" accept=".pdf,.xml,.jpg,.jpeg,.png" capture="environment" onChange={(e) => setFile(e.target.files[0])} style={{ fontSize: 13, marginBottom: 10, width: '100%' }} />
-        {file && <div className="muted" style={{ fontSize: 13, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Icon.Doc size={14} /> {file.name}</div>}
+        {/* Carga por archivo o cámara del teléfono. Mismo Dropzone que el
+            resto de la plataforma: en móvil separa "Tomar foto" (cámara
+            directa) de "Elegir archivos" — un solo input con capture= y
+            accept mixto (.pdf) forzaba la cámara en Android y no dejaba
+            elegir el PDF. Un documento por envío: se toma el primero. */}
+        <Dropzone
+          accept=".pdf,.xml,.jpg,.jpeg,.png"
+          hint="Formatos permitidos: PDF, XML, JPG, PNG"
+          onFiles={(list) => setFile(Array.from(list)[0] || null)}
+        />
+        {file && (
+          <div className="file-item" style={{ marginTop: 8, marginBottom: 8 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}><Icon.Doc size={14} /> {file.name}</span>
+            <span className="rm" onClick={() => setFile(null)}>Quitar</span>
+          </div>
+        )}
         <button className="btn btn-primary" style={{ width: '100%' }} onClick={subir} disabled={subiendo}>
           {subiendo ? <span className="spinner" /> : 'Cargar y trazar'}
         </button>
