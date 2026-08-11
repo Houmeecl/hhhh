@@ -18,10 +18,21 @@ import { clasificaParaCuentasFisicas } from './categoriaPresentacion.js';
 const round4 = (n) => Math.round(n * 10000) / 10000;
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 
+// Nombre → código, solo para documentos SIN categoria_codigo (anteriores a
+// la migración 077). Incluye el nombre previo Y el vigente de 'agua' porque
+// la ventana entre la 031 (renombre) y la 077 (columna categoria_codigo)
+// tuvo documentos con el nombre nuevo pero todavía sin código.
+const NOMBRE_LEGADO_A_CODIGO = {
+  'Energía eléctrica': 'electricidad',
+  'Agua': 'agua_potable',
+  'Agua potable (red)': 'agua_potable',
+  'Insumos y materiales': 'materiales',
+};
+
 // Factores por defecto si la cuenta no define el suyo.
 const DEFAULTS = {
   electricidad_kgco2e_kwh: 0.2421, // HuellaChile — SEN 2023
-  agua_kgco2e_m3: 0.344,           // agua potable (referencia, editable)
+  agua_kgco2e_m3: 0.41,            // agua potable (red) — DEFRA 2024, mismo factor citado que motor_categorias.agua_potable (migración 031)
   materiales_kgco2e_kg: 1.5,       // insumos genéricos (referencia, editable)
 };
 
@@ -107,22 +118,40 @@ export function derivarMovimientos(factura, cuentas) {
 
   // Cuentas físicas según la categoría del documento (cantidad estimada
   // a partir del CO2e de esa categoría y el factor de conversión de la cuenta).
-  switch (factura.categoria) {
-    case 'Energía eléctrica': {
+  //
+  // Se compara por CÓDIGO (categoria_codigo), no por nombre (categoria):
+  // el nombre es el que se imprime y edita desde el panel del motor —
+  // "Agua" pasó a llamarse "Agua potable (red)" con código 'agua_potable'
+  // en la migración 031, y este switch quedó comparando contra el nombre
+  // viejo. Desde entonces ningún documento de agua real cargaba la cuenta
+  // AGUA: el `case 'Agua':` nunca calzaba y todo caía al `default` (solo
+  // CO2e, sin m3) — bug muerto detectado en auditoría, mismo patrón ya
+  // corregido antes en routes/public.js (ver comentario ahí). El código es
+  // estable ante un renombre; el nombre no.
+  //
+  // `categoria_codigo` no existe en documentos anteriores a la migración
+  // 077 (la columna no existía): para esos se cae al nombre tal como quedó
+  // CONGELADO en la fila al momento de calcularse — nunca se reescribe
+  // histórico. Cubre tanto el nombre previo a la 031 ('Agua') como el
+  // nombre vigente sin código aún (documentos calculados entre la 031 y la
+  // 077, ventana angosta pero real).
+  const clave = factura.categoria_codigo || NOMBRE_LEGADO_A_CODIGO[factura.categoria] || null;
+  switch (clave) {
+    case 'electricidad': {
       if (activa('ENER') && fisico > 0) {
         const kwh = (fisico * 1000) / factor('ENER', 'electricidad_kgco2e_kwh');
         movs.push({ cuenta_codigo: 'ENER', cantidad: round4(kwh), unidad: 'kWh', glosa: glosa('Consumo eléctrico') });
       }
       break;
     }
-    case 'Agua': {
+    case 'agua_potable': {
       if (activa('AGUA') && fisico > 0) {
         const m3 = (fisico * 1000) / factor('AGUA', 'agua_kgco2e_m3');
         movs.push({ cuenta_codigo: 'AGUA', cantidad: round4(m3), unidad: 'm3', glosa: glosa('Consumo de agua') });
       }
       break;
     }
-    case 'Insumos y materiales': {
+    case 'materiales': {
       if (activa('MATR') && fisico > 0) {
         // kgCO2e/kg equivale a tCO2e/t → toneladas de material.
         const t = fisico / factor('MATR', 'materiales_kgco2e_kg');
@@ -131,7 +160,8 @@ export function derivarMovimientos(factura, cuentas) {
       break;
     }
     default:
-      // Combustibles, Transporte, Servicios y categorías desconocidas:
+      // Combustibles, Transporte, Servicios, documentos sin categoria_codigo
+      // (histórico anterior a la migración 077) y categorías desconocidas:
       // solo cargan CO2E (ya agregado arriba).
       break;
   }

@@ -253,3 +253,30 @@ test('sin ítems con categoría (motor externo, histórico): se usa el total, qu
   );
   assert.equal(movs.find((m) => m.cuenta_codigo === 'ENER').cantidad, 10000);
 });
+
+// ============================================================
+// Bug de auditoría: el switch comparaba por NOMBRE (factura.categoria).
+// "Agua" pasó a llamarse "Agua potable (red)" (código 'agua_potable',
+// migración 031) y desde entonces ningún documento de agua REAL — el que
+// trae categoria_codigo, porque se calculó después de la migración 077 —
+// cargaba la cuenta AGUA: el case nunca calzaba contra el nombre nuevo.
+// ============================================================
+test('agua REAL (con categoria_codigo, nombre vigente) carga AGUA — antes del fix caía siempre al default', () => {
+  const movs = derivarMovimientos(
+    // 0,344 tCO2e / 0,344 kgCO2e/m3 (factor propio de la cuenta en el fixture) = 1.000 m3
+    { categoria: 'Agua potable (red)', categoria_codigo: 'agua_potable', total_co2e: 0.344, numero_venta: 'V-REAL' },
+    cuentas()
+  );
+  const agua = movs.find((m) => m.cuenta_codigo === 'AGUA');
+  assert.ok(agua, 'un documento de agua con categoria_codigo debe cargar la cuenta física AGUA');
+  assert.equal(agua.cantidad, 1000);
+});
+
+test('agua sin factor propio en la cuenta usa el default VIGENTE (0,41 DEFRA 2024), no el 0,344 legado y desactivado', () => {
+  const movs = derivarMovimientos(
+    { categoria: 'Agua potable (red)', categoria_codigo: 'agua_potable', total_co2e: 0.41, numero_venta: 'V-DEFAULT' },
+    cuentas({ AGUA: { activo: true, factores: {} } }) // sin factor propio → cae al DEFAULT del módulo
+  );
+  const agua = movs.find((m) => m.cuenta_codigo === 'AGUA');
+  assert.equal(agua.cantidad, 1000); // 0,41 t / 0,41 kg/m3 (default) = 1.000 m3
+});
