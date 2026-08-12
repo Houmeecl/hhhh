@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
+import BotonInstalar from '../components/BotonInstalar.jsx';
 
 // ============================================================
 // "Sube y Suma" — acceso sin contraseña: correo + código de invitación de
@@ -75,6 +76,12 @@ export default function LoginSuma() {
               <button className="btn btn-outline btn-sm" onClick={() => setEnviado(false)}>Usar otro correo o código</button>
             </div>
           )}
+
+          {/* Acá llega quien entra por primera vez, normalmente desde el
+              QR de un punto limpio: es el mejor momento para ofrecerle
+              dejarla instalada. No estorba a quien ya la instaló — el
+              componente no se dibuja en ese caso. */}
+          <BotonInstalar nombre="Sube y Suma" style={{ marginTop: 18, textAlign: 'center' }} />
         </div>
       </div>
     </div>

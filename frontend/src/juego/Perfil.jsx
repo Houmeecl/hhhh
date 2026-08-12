@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/icons.jsx';
 import { api, fmtInt } from '../api.js';
+import BotonInstalar from '../components/BotonInstalar.jsx';
 
 // Inicio: puntos, nivel y progreso — igual de espíritu al dashboard del
 // mockup ("Scan2Green"), sin el nombre ni la marca ajena. Nunca dice
@@ -79,6 +80,14 @@ export default function Perfil() {
           ))}
         </div>
       )}
+
+      {/* Solo aparece si el navegador puede instalar y la app no lo está
+          ya — ver components/BotonInstalar.jsx. */}
+      <BotonInstalar
+        nombre="Sube y Suma"
+        className="btn btn-primary"
+        style={{ marginTop: 16, textAlign: 'center' }}
+      />
 
       <p className="muted" style={{ fontSize: 12, marginTop: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         <Icon.Info size={14} /> Los puntos son un reconocimiento interno de participación — no equivalen a bonos de
