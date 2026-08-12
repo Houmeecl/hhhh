@@ -71,6 +71,38 @@ test('toda norma legal trae URL citable y las que faltan validar lo dicen', { sk
   );
 });
 
+// ---------- Migración 099: corrección con fuente primaria ----------
+// La 098 registró la NCG 519 con vigencia 2026 tomada de fuentes
+// secundarias. La presentación de la Comisionada de la CMF del 12-08-2026
+// dice que se POSTERGÓ a 2028 (información de 2027). Estos casos fijan la
+// corrección: si alguien "arregla" la fecha de vuelta sin fuente, falla.
+
+test('NCG 519: la vigencia es 2028, no 2026 — la CMF postergó NIIF S1/S2', { skip: SALTO_PROD }, async () => {
+  const { rows } = await query(
+    `SELECT estado, to_char(fecha_vigencia,'YYYY') AS anio, notas
+       FROM fuentes_metodologicas WHERE codigo = 'ncg_519_cmf'`
+  );
+  assert.equal(rows[0].anio, '2028');
+  // La norma SÍ está vigente; lo postergado es cuándo muerde la obligación.
+  // Confundir ambas cosas es justo lo que la tabla existe para evitar.
+  assert.equal(rows[0].estado, 'vigente');
+  // La ventana de adopción voluntaria es la oportunidad comercial concreta:
+  // que no se pierda si alguien reescribe la nota.
+  assert.match(rows[0].notas, /VOLUNTARIA/i);
+  assert.match(rows[0].notas, /FUENTE PRIMARIA/);
+});
+
+test('NCG 461 está registrada y vigente: es la que rige hoy, y convive con la 519', { skip: SALTO_PROD }, async () => {
+  const { rows } = await query(
+    `SELECT estado, to_char(fecha_vigencia,'YYYY') AS anio
+       FROM fuentes_metodologicas WHERE codigo = 'ncg_461_cmf'`
+  );
+  assert.equal(rows.length, 1, 'sin la 461 el registro sugiere que no hay obligación vigente');
+  assert.equal(rows[0].estado, 'vigente');
+  // Rige mucho antes que la 519.
+  assert.ok(Number(rows[0].anio) < 2028);
+});
+
 test('el CHECK de estado acepta el ciclo legal y rechaza un estado inventado', { skip: SALTO_PROD }, async () => {
   for (const estado of ['vigente', 'promulgada', 'en_tramitacion', 'retirada', 'derogada']) {
     const codigo = `prueba_estado_${estado}`;
