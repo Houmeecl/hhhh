@@ -22,8 +22,34 @@ fetch → ¿commits nuevos en origin/<rama>? → no: sale en silencio
 
 Si el deploy falla y hay rollback, el wrapper invoca `claude` (si está instalado
 en el VPS) en modo **solo lectura** para dejar un **diagnóstico escrito** —
-causa probable, evidencia y corrección sugerida — que un humano revisa y aplica.
-El agente de diagnóstico **no repara nada**: no reinicia servicios, no toca git.
+causa probable, evidencia y corrección sugerida — en
+`/root/sicr3p-diagnostico-AAAA-MM-DD-HHMM.txt`.
+
+### Modo reparación (opt-in)
+
+Con `SICR3P_AGENTE_REPARA=1`, después del diagnóstico el agente hace **un**
+intento de destrabar el próximo deploy y deja su informe en
+`/root/sicr3p-reparacion-<fecha>.txt`.
+
+Corre siempre **después del rollback**, o sea con producción ya de vuelta en el
+último commit que funcionaba y sirviendo tráfico: no rescata una caída, destraba
+el siguiente deploy. Si su intento falla, `actualizar.sh` revierte otra vez.
+
+Su allowlist incluye solo lo que destraba un deploy — `pm2 restart/flush`,
+`actualizar.sh` (reintentar / saltar smoke), `npm ci`, `rm -f` de cachés. **No
+incluye git** (la rama de producción no se reescribe desde el servidor), ni
+`rm -rf`, ni `psql` con escritura, ni edición de código: si el arreglo es un
+cambio de código, eso pasa por el repo con revisión y tests. El prompt además
+le exige un solo intento, sin bucles, y no tocar nada si no identificó la causa.
+
+Para activarlo, en el crontab de root:
+
+```
+*/30 * * * * SICR3P_AGENTE_REPARA=1 /opt/sicr3p/deploy/agente-deploy.sh
+```
+
+Sin esa variable el comportamiento es el de siempre: diagnostica y espera a un
+humano.
 
 ## Instalación (en el VPS, como root)
 
