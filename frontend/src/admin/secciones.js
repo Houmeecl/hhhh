@@ -26,7 +26,10 @@ export const SECCIONES_ADMIN_NAV = [
   {
     titulo: 'Módulos',
     items: [
-      { slug: 'sii', to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
+      // 'tambien': hoy la pantalla de SII es 100% sobre empresas
+      // proveedoras (conexión SII, generar, contrato) — una cuenta con
+      // solo la sección 'proveedores' también debe poder llegar acá.
+      { slug: 'sii', tambien: ['proveedores'], to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
       { slug: 'capital_natural', to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
       { slug: 'trazabilidad', to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
       { slug: 'transporte', to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
@@ -43,6 +46,11 @@ export const SECCIONES_ADMIN_NAV = [
       { slug: 'auspiciadores', to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
       { slug: 'juego', to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
       { slug: 'accesos_externos', to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
+      // Alias más angosto de 'accesos_externos': solo la pestaña
+      // Proveedores de esa pantalla (ver Accesos.jsx), sin mandantes/
+      // puertos/agencias/trazadores. No otorga nada que
+      // 'accesos_externos' no otorgara ya — ver migración 097.
+      { slug: 'proveedores', to: '/admin/accesos', ico: Icon.Building, label: 'Proveedores' },
     ],
   },
   {
@@ -58,10 +66,14 @@ export const SECCIONES_ADMIN_NAV = [
 ];
 
 // ¿Esta cuenta puede ver la sección? Superadmin ve todo; 'dashboard'
-// (siempre:true) lo ve cualquiera.
+// (siempre:true) lo ve cualquiera; `item.tambien` deja que una sección
+// más angosta (ej. 'proveedores') también desbloquee una más amplia que
+// hoy cubre exactamente lo mismo (ej. 'sii') sin que a esta última haya
+// que quitarle su propio slug de nadie que ya lo tenga.
 export function puedeVerSeccion(user, slug) {
   const item = SECCIONES_ADMIN_NAV.flatMap((s) => s.items).find((i) => i.slug === slug);
   if (item?.siempre) return true;
   if (user?.es_superadmin) return true;
-  return (user?.secciones_admin || []).includes(slug);
+  const propias = user?.secciones_admin || [];
+  return propias.includes(slug) || (item?.tambien || []).some((s) => propias.includes(s));
 }

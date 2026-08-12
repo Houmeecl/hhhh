@@ -337,7 +337,7 @@ router.delete('/trazadores/:id/ruts/:rutId', requireSeccion('accesos_externos'),
 // un proveedor acá tiene una identidad estable contra la cual registrar su
 // llave FIDO2 y firmar N lotes en el tiempo. La autorización de qué lote
 // puede firmar vive en proveedor_lotes (routes/origen.js), no acá.
-router.get('/proveedores', requireSeccion('accesos_externos'), async (req, res, next) => {
+router.get('/proveedores', requireSeccion('accesos_externos', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo, p.ultimo_uso, p.created_at,
@@ -359,7 +359,7 @@ router.get('/proveedores', requireSeccion('accesos_externos'), async (req, res, 
 // razón social, que sí está desde que se creó la empresa; sin esto el
 // enrolamiento moría con "Email y nombre son obligatorios" y la invitación
 // nunca salía.
-router.post('/proveedores/:id/crear-cuenta', requireSeccion('accesos_externos', 'enrolar'), adminOnly, async (req, res, next) => {
+router.post('/proveedores/:id/crear-cuenta', requireSeccion('accesos_externos', 'enrolar', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query('SELECT nombre_empresa FROM proveedores WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Proveedor no encontrado.' });
@@ -378,7 +378,7 @@ router.post('/proveedores/:id/crear-cuenta', requireSeccion('accesos_externos', 
 // El enlace se manda SIEMPRE al correo registrado de la cuenta, nunca al que
 // venga en el request: reenviar no puede ser una forma de redirigir el acceso
 // de una empresa a otra casilla.
-router.post('/proveedores/:id/reenviar-invitacion', requireSeccion('accesos_externos', 'enrolar'), adminOnly, async (req, res, next) => {
+router.post('/proveedores/:id/reenviar-invitacion', requireSeccion('accesos_externos', 'enrolar', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, email, nombre, estado FROM usuarios WHERE proveedor_id = $1 AND panel = 'proveedor'`,
@@ -412,7 +412,7 @@ router.post('/proveedores/:id/reenviar-invitacion', requireSeccion('accesos_exte
   } catch (err) { next(err); }
 });
 
-router.post('/proveedores', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
+router.post('/proveedores', requireSeccion('accesos_externos', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     // El formulario de esta pestaña usa el mismo nombre de campo que
     // Mandantes/Agencias/Trazadores más arriba en este archivo (`rut`,
@@ -438,7 +438,7 @@ router.post('/proveedores', requireSeccion('accesos_externos'), adminOnly, async
   } catch (err) { next(err); }
 });
 
-router.put('/proveedores/:id', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
+router.put('/proveedores/:id', requireSeccion('accesos_externos', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     const { activo } = req.body || {};
     const { rows } = await query(

@@ -1769,7 +1769,7 @@ router.get('/retencion/registro', requireSeccion('datos_personales'), async (req
 // deploy/SII-CREDENCIALES.md) contra /sii/auth/validar ANTES de operar.
 // Por-request: acá no se guarda nada — el frontend retiene las credenciales
 // solo en memoria mientras la pantalla está abierta.
-router.post('/sii/sesion', requireSeccion('sii'), requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
+router.post('/sii/sesion', requireSeccion('sii', 'proveedores'), requireNivelOperador, siiLimiterAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
     if (!b.rut || !b.password) return res.status(400).json({ error: 'Ingresa el RUT y la clave tributaria.' });
@@ -1796,7 +1796,7 @@ router.post('/sii/sesion', requireSeccion('sii'), requireNivelOperador, siiLimit
 // GET /api/admin/sii/empresas — proveedores con su estado SII: si tienen
 // credenciales guardadas (solo el hecho, jamás la clave) y qué períodos ya
 // descargaron.
-router.get('/sii/empresas', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/empresas', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo,
@@ -1817,7 +1817,7 @@ router.get('/sii/empresas', requireSeccion('sii'), async (req, res, next) => {
 
 // POST /api/admin/sii/empresas — alta rápida de una empresa (proveedor)
 // desde la misma pantalla, para agregar y generar sin pasar por Accesos.
-router.post('/sii/empresas', requireSeccion('sii', 'enrolar'), adminOnly, async (req, res, next) => {
+router.post('/sii/empresas', requireSeccion('sii', 'enrolar', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     const nombre = String(req.body?.nombre_empresa || '').trim();
     const rut = String(req.body?.rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
@@ -1854,7 +1854,7 @@ router.post('/sii/empresas', requireSeccion('sii', 'enrolar'), adminOnly, async 
 // rut/password = credenciales SII que el admin ingresa (por-request, NO se
 // guardan). El RUT de la empresa consultada SALE de la fila `proveedores`,
 // nunca del body.
-router.post('/sii/:proveedorId/descargar', requireSeccion('sii'), requireNivelOperador, async (req, res, next) => {
+router.post('/sii/:proveedorId/descargar', requireSeccion('sii', 'proveedores'), requireNivelOperador, async (req, res, next) => {
   const b = req.body || {};
   try {
     const { rows } = await query(`SELECT id, rut, activo FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
@@ -1892,7 +1892,7 @@ router.post('/sii/:proveedorId/descargar', requireSeccion('sii'), requireNivelOp
 
 // GET /api/admin/sii/:proveedorId/analisis/:periodo — análisis de lo ya
 // descargado (sin costo, sin clave) + períodos disponibles.
-router.get('/sii/:proveedorId/analisis/:periodo', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/analisis/:periodo', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     res.json({
       analisis: await analizarPeriodo(query, req.params.proveedorId, req.params.periodo),
@@ -1903,7 +1903,7 @@ router.get('/sii/:proveedorId/analisis/:periodo', requireSeccion('sii'), async (
 
 // GET /api/admin/sii/:proveedorId/informe/:periodo.pdf — informe de
 // contabilidad de carbono del período, ya descargado (sin costo, sin clave).
-router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
     const empresa = rows[0];
@@ -1920,7 +1920,7 @@ router.get('/sii/:proveedorId/informe/:periodo(\\d{4}-\\d{2}).pdf', requireSecci
 // export entregable del inventario por Alcance GHG y categoría (hermano
 // del informe.pdf, patrón export/alcance3): el archivo que la empresa
 // presenta a procesos externos. Sin costo, sin clave: lee lo descargado.
-router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(`SELECT id, nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.params.proveedorId]);
     const empresa = rows[0];
@@ -1944,7 +1944,7 @@ router.get('/sii/:proveedorId/inventario/:periodo(\\d{4}-\\d{2})', requireSeccio
 });
 
 // GET /api/admin/sii/:proveedorId/periodos — solo el selector de períodos.
-router.get('/sii/:proveedorId/periodos', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/periodos', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     res.json({ periodos: await periodosDescargados(query, req.params.proveedorId) });
   } catch (err) { next(err); }
@@ -1955,7 +1955,7 @@ router.get('/sii/:proveedorId/periodos', requireSeccion('sii'), async (req, res,
 // (services/contrato.js), ahora también sobre la empresa enrolada en esta
 // sección. GET nunca 404: null cuando aún no tiene contrato, para que el
 // frontend muestre "Emitir" sin depender de un catch.
-router.get('/sii/:proveedorId/contrato', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/contrato', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,
@@ -1965,7 +1965,7 @@ router.get('/sii/:proveedorId/contrato', requireSeccion('sii'), async (req, res,
   } catch (err) { next(err); }
 });
 
-router.post('/sii/:proveedorId/contrato', requireSeccion('sii'), adminOnly, async (req, res, next) => {
+router.post('/sii/:proveedorId/contrato', requireSeccion('sii', 'proveedores'), adminOnly, async (req, res, next) => {
   try {
     const contrato = await withTx(async (client) => {
       const { rows } = await client.query(`SELECT * FROM proveedores WHERE id = $1 FOR UPDATE`, [req.params.proveedorId]);
@@ -1987,7 +1987,7 @@ router.post('/sii/:proveedorId/contrato', requireSeccion('sii'), adminOnly, asyn
   } catch (err) { next(err); }
 });
 
-router.get('/sii/:proveedorId/contrato.pdf', requireSeccion('sii'), async (req, res, next) => {
+router.get('/sii/:proveedorId/contrato.pdf', requireSeccion('sii', 'proveedores'), async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT * FROM contratos WHERE proveedor_id = $1 AND estado <> 'anulado' ORDER BY created_at DESC LIMIT 1`,

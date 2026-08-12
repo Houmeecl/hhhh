@@ -39,9 +39,13 @@ import { SECCIONES_ADMIN_NAV, puedeVerSeccion } from './secciones.js';
 
 // Envuelve una pantalla que exige sección: sin permiso, rebota al
 // Dashboard en vez de renderizar — así una URL tecleada a mano tampoco
-// muestra nada, aunque el NAV ya la esconda.
+// muestra nada, aunque el NAV ya la esconda. `slug` acepta un array
+// cuando la pantalla la comparten dos secciones con distinto alcance
+// (ej. accesos_externos completo Y proveedores, más angosta — ver
+// Accesos.jsx, que filtra sus propias tabs según cuál de las dos tiene).
 function RequiereSeccion({ user, slug, children }) {
-  if (!puedeVerSeccion(user, slug)) return <Navigate to="/admin" replace />;
+  const slugs = Array.isArray(slug) ? slug : [slug];
+  if (!slugs.some((s) => puedeVerSeccion(user, s))) return <Navigate to="/admin" replace />;
   return children;
 }
 
@@ -207,7 +211,7 @@ export default function AdminApp() {
           <Route path="trazabilidad" element={<RequiereSeccion user={user} slug="trazabilidad"><Trazabilidad /></RequiereSeccion>} />
           <Route path="buscar" element={<RequiereSeccion user={user} slug="buscar"><Buscar /></RequiereSeccion>} />
           <Route path="transporte" element={<RequiereSeccion user={user} slug="transporte"><Transporte /></RequiereSeccion>} />
-          <Route path="accesos" element={<RequiereSeccion user={user} slug="accesos_externos"><Accesos /></RequiereSeccion>} />
+          <Route path="accesos" element={<RequiereSeccion user={user} slug={['accesos_externos', 'proveedores']}><Accesos user={user} /></RequiereSeccion>} />
           <Route path="metricas" element={<RequiereSeccion user={user} slug="metricas"><Metricas /></RequiereSeccion>} />
           <Route path="juego" element={<RequiereSeccion user={user} slug="juego"><Juego /></RequiereSeccion>} />
           <Route path="prospectos" element={<RequiereSeccion user={user} slug="prospectos"><Prospectos /></RequiereSeccion>} />

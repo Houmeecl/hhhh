@@ -3,10 +3,17 @@ import { api, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import PasswordUnaVez from '../components/PasswordUnaVez.jsx';
 import { PUNTOS_CORREDOR } from '../lib/corredor.js';
+import { puedeVerSeccion } from './secciones.js';
 
 // Accesos externos: API para mandantes + códigos de prueba con créditos.
-export default function Accesos() {
-  const [tab, setTab] = useState('codigos');
+// Una cuenta con la sección 'proveedores' (más angosta que
+// 'accesos_externos') llega a esta MISMA pantalla (AdminApp.jsx la deja
+// pasar) pero solo ve la tab Proveedores — el resto de las entidades
+// (mandantes/puertos/agencias/trazadores/códigos/puntos limpios) siguen
+// exigiendo 'accesos_externos' completo, tanto acá como en el backend.
+export default function Accesos({ user }) {
+  const soloProveedores = !puedeVerSeccion(user, 'accesos_externos') && puedeVerSeccion(user, 'proveedores');
+  const [tab, setTab] = useState(soloProveedores ? 'proveedores' : 'codigos');
   const [toast, setToast] = useState(null);
   const flash = (msg, err = false) => { setToast({ msg, err }); setTimeout(() => setToast(null), 3500); };
 
@@ -15,34 +22,38 @@ export default function Accesos() {
       <div className="admin-head">
         <div>
           <h1 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ color: 'var(--green-600)' }}><Icon.Qr size={24} /></span> Accesos externos
+            <span style={{ color: 'var(--green-600)' }}><Icon.Qr size={24} /></span> {soloProveedores ? 'Proveedores' : 'Accesos externos'}
           </h1>
           <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>
-            Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes,
-            API keys para puertos (tránsito del Corredor por su punto), accesos para agencias de aduana
-            (Pasaporte Bioceánico — sicr3p es su infraestructura documental, nunca se presenta como agencia)
-            y cuentas de proveedor con login por llave USB para firmar lotes de producto en Pasaporte de Origen.
+            {soloProveedores
+              ? 'Empresas proveedoras y sus cuentas de panel propio (login por llave USB para firmar lotes de producto en Pasaporte de Origen).'
+              : 'Códigos de prueba con créditos (1 crédito = 1 factura), API keys para empresas mandantes, ' +
+                'API keys para puertos (tránsito del Corredor por su punto), accesos para agencias de aduana ' +
+                '(Pasaporte Bioceánico — sicr3p es su infraestructura documental, nunca se presenta como agencia) ' +
+                'y cuentas de proveedor con login por llave USB para firmar lotes de producto en Pasaporte de Origen.'}
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
-        <button className={`btn btn-sm ${tab === 'codigos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('codigos')}>Códigos de prueba</button>
-        <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
-        <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
-        <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
-        <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
-        <button className={`btn btn-sm ${tab === 'proveedores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('proveedores')}>Proveedores</button>
-        <button className={`btn btn-sm ${tab === 'puntos_limpios' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puntos_limpios')}>Puntos limpios</button>
-      </div>
+      {!soloProveedores && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+          <button className={`btn btn-sm ${tab === 'codigos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('codigos')}>Códigos de prueba</button>
+          <button className={`btn btn-sm ${tab === 'mandantes' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('mandantes')}>API mandantes</button>
+          <button className={`btn btn-sm ${tab === 'puertos' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puertos')}>API puertos</button>
+          <button className={`btn btn-sm ${tab === 'agencias' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('agencias')}>Agencias de aduana</button>
+          <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
+          <button className={`btn btn-sm ${tab === 'proveedores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('proveedores')}>Proveedores</button>
+          <button className={`btn btn-sm ${tab === 'puntos_limpios' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puntos_limpios')}>Puntos limpios</button>
+        </div>
+      )}
 
-      {tab === 'codigos' && <Codigos flash={flash} />}
-      {tab === 'mandantes' && <Mandantes flash={flash} />}
-      {tab === 'puertos' && <Puertos flash={flash} />}
-      {tab === 'agencias' && <Agencias flash={flash} />}
-      {tab === 'trazadores' && <Trazadores flash={flash} />}
+      {tab === 'codigos' && !soloProveedores && <Codigos flash={flash} />}
+      {tab === 'mandantes' && !soloProveedores && <Mandantes flash={flash} />}
+      {tab === 'puertos' && !soloProveedores && <Puertos flash={flash} />}
+      {tab === 'agencias' && !soloProveedores && <Agencias flash={flash} />}
+      {tab === 'trazadores' && !soloProveedores && <Trazadores flash={flash} />}
       {tab === 'proveedores' && <Proveedores flash={flash} />}
-      {tab === 'puntos_limpios' && <PuntosLimpios flash={flash} />}
+      {tab === 'puntos_limpios' && !soloProveedores && <PuntosLimpios flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
     </div>
   );

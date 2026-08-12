@@ -13,7 +13,7 @@ export const SECCIONES_ADMIN = [
   'capital_natural', 'trazabilidad', 'transporte', 'corredor', 'origen',
   'capacitacion', 'apl', 'prospectos', 'auspiciadores', 'juego',
   'accesos_externos', 'motor_propio', 'motor_externo', 'usuarios', 'actividad',
-  'datos_personales',
+  'datos_personales', 'proveedores',
 ];
 
 export function seccionesValidas(arr) {

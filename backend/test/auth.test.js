@@ -167,7 +167,7 @@ test('requireSeccion sin req.user responde 401, no 403', () => {
 });
 
 test('seccionesValidas: acepta subconjuntos del vocabulario y rechaza slugs inventados', () => {
-  assert.equal(SECCIONES_ADMIN.length, 23);
+  assert.equal(SECCIONES_ADMIN.length, 24);
   assert.equal(seccionesValidas(['clientes', 'sii']), true);
   assert.equal(seccionesValidas([]), true);
   assert.equal(seccionesValidas(['inventada']), false);

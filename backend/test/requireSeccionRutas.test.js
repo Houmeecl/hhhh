@@ -79,12 +79,15 @@ test('backfill 092: una cuenta sicrep preexistente conserva las 23 secciones tra
   // Se verifica su efecto observable: cualquier fila sicrep anterior a la
   // migración tiene las 23 secciones (acá basta con que el UPDATE haya
   // dejado el default lleno en las cuentas viejas — la de seed existe
-  // desde 001).
+  // desde 001). 23 a propósito, NO SECCIONES_ADMIN.length: ese backfill
+  // quedó fijo en el vocabulario de 092; secciones agregadas después
+  // (ej. 'proveedores' en 097) son deliberadamente SIN backfill — una
+  // cuenta vieja no gana de la nada una sección que nadie le asignó.
   const { rows: viejas } = await query(
     `SELECT secciones_admin FROM usuarios WHERE panel = 'sicrep' ORDER BY created_at ASC LIMIT 1`
   );
   if (viejas[0]) {
-    assert.equal(viejas[0].secciones_admin.length, SECCIONES_ADMIN.length);
+    assert.equal(viejas[0].secciones_admin.length, 23);
   }
 
   // Alta nueva sin especificar secciones → '{}' (el default fail-closed).
