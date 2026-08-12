@@ -4,6 +4,7 @@ import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { Donut, Serie } from '../components/Charts.jsx';
 import { SkeletonCards } from '../components/Skeleton.jsx';
+import { puedeVerSeccion } from './secciones.js';
 
 // Flecha de variación % vs. el mes anterior. null (mes anterior en 0)
 // no muestra nada — evita un falso "+infinito%".
@@ -24,7 +25,7 @@ const ACCION_LABEL = {
   eliminar_cliente: 'Cliente eliminado',
 };
 
-export default function Dashboard() {
+export default function Dashboard({ user }) {
   const [d, setD] = useState(null);
   const [alertas, setAlertas] = useState([]);
   const [cadena, setCadena] = useState(null);
@@ -38,11 +39,20 @@ export default function Dashboard() {
 
   useEffect(() => {
     api.dashboard().then(setD).catch((e) => setErr(e.message));
-    api.alertasContratos().then((r) => setAlertas(r.alertas)).catch(() => {});
     api.cadenaEstado().then((r) => setCadena(r.estado)).catch(() => {});
     api.posConfig().then((c) => setCompensacionHabilitada(c?.compensacion_habilitada === true)).catch(() => {});
-    api.motorEstadisticas().then(setMotor).catch(() => {});
-  }, []);
+    // Estos dos SÍ están gateados por sección en el backend
+    // (contratos/alertas → 'clientes', motor-propio → 'motor_propio'):
+    // pedirlos sin tenerla devuelve 403 y ensucia la consola de toda
+    // cuenta acotada. El `.catch` los silenciaba, pero la petición se
+    // hacía igual — mejor no preguntar por lo que no nos corresponde.
+    if (puedeVerSeccion(user, 'clientes')) {
+      api.alertasContratos().then((r) => setAlertas(r.alertas)).catch(() => {});
+    }
+    if (puedeVerSeccion(user, 'motor_propio')) {
+      api.motorEstadisticas().then(setMotor).catch(() => {});
+    }
+  }, [user]);
 
   useEffect(() => {
     if (!compensacionHabilitada) return;

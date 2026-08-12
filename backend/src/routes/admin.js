@@ -32,7 +32,7 @@ import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiterAdmin } from '../middleware/rateLimit.js';
 import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
-import { seccionesValidas } from '../constants/seccionesAdmin.js';
+import { seccionesValidas, seccionesNoOtorgables } from '../constants/seccionesAdmin.js';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
@@ -1127,6 +1127,20 @@ router.get('/usuarios', requireSeccion('usuarios'), adminOnly, async (req, res, 
   } catch (err) { next(err); }
 });
 
+// Techo de delegación: nadie otorga secciones que su propia cuenta no
+// tiene. Devuelve el mensaje de rechazo, o null si puede otorgarlas todas
+// (incluido siempre el superadmin, que por diseño pasa cualquier
+// requireSeccion). Aplica igual al alta y a la edición — y también cuando
+// el destinatario es uno mismo, que era justamente el camino de escalada:
+// un admin con la sección 'usuarios' se editaba a sí mismo y se quedaba
+// con el vocabulario completo.
+function rechazoPorSeccionesAjenas(req, secciones) {
+  if (secciones === undefined || req.user.es_superadmin === true) return null;
+  const ajenas = seccionesNoOtorgables(secciones, req.user.secciones_admin);
+  if (!ajenas.length) return null;
+  return `No puedes otorgar secciones que tu propia cuenta no tiene: ${ajenas.join(', ')}.`;
+}
+
 // Alta general de usuario para cualquier panel — pantalla única en
 // Usuarios.jsx. Para los 5 paneles externos (puerto/mandante/agencia/
 // trazador/proveedor) delega en crearCuentaEntidad (services/cuentas.js,
@@ -1145,16 +1159,14 @@ router.post('/usuarios', requireSeccion('usuarios'), adminOnly, async (req, res,
       if (!entidad_id) return res.status(400).json({ error: 'Falta elegir la entidad' });
       const { rows: entidadRows } = await query(`SELECT id FROM ${entidadCfg.tabla} WHERE id = $1 AND activo`, [entidad_id]);
       if (!entidadRows[0]) return res.status(404).json({ error: 'Entidad no encontrada o inactiva' });
-      // Por defecto los paneles de consulta (puerto/mandante/trazador)
-      // nacen en SOLO LECTURA — escribir se otorga a propósito. Agencia y
-      // proveedor nacen operador porque su función central ESCRIBE: la
-      // agencia captura el expediente en terreno (sube documentos) y el
-      // proveedor opera sus propios datos (onboarding, SII, REP, firma).
-      // La elección explícita del admin siempre manda.
-      const nivelPorDefecto = panel === 'proveedor' || panel === 'agencia' ? 'operador' : 'lectura';
+      // Toda cuenta externa nace pudiendo OPERAR (decisión del usuario):
+      // antes puerto/mandante/trazador nacían en 'lectura' y había que
+      // habilitarlos a mano, lo que en la práctica solo agregaba un paso
+      // olvidable al alta. 'lectura' sigue existiendo y se puede elegir
+      // explícitamente en el alta o después desde Usuarios.
       return crearCuentaEntidad({
         req, res, panel, columnaFk: entidadCfg.columnaFk, entidadId: entidad_id,
-        nivelAcceso: nivel_acceso === 'lectura' || nivel_acceso === 'operador' ? nivel_acceso : nivelPorDefecto,
+        nivelAcceso: nivel_acceso === 'lectura' ? 'lectura' : 'operador',
       });
     }
 
@@ -1165,6 +1177,8 @@ router.post('/usuarios', requireSeccion('usuarios'), adminOnly, async (req, res,
     if (secciones !== undefined && !seccionesValidas(secciones)) {
       return res.status(400).json({ error: 'secciones_admin trae una sección que no existe.' });
     }
+    const negadas = rechazoPorSeccionesAjenas(req, secciones);
+    if (negadas) return res.status(403).json({ error: negadas });
 
     const emailNorm = String(email).toLowerCase();
     const password = generarPasswordTemporal();
@@ -1218,6 +1232,8 @@ router.put('/usuarios/:id', requireSeccion('usuarios'), adminOnly, async (req, r
     if (secciones !== undefined && !seccionesValidas(secciones)) {
       return res.status(400).json({ error: 'secciones_admin trae una sección que no existe.' });
     }
+    const negadas = rechazoPorSeccionesAjenas(req, secciones);
+    if (negadas) return res.status(403).json({ error: negadas });
     let rows;
     try {
       ({ rows } = await query(

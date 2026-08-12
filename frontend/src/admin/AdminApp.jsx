@@ -201,7 +201,7 @@ export default function AdminApp() {
 
       <main className="admin-main">
         <Routes>
-          <Route index element={<Dashboard />} />
+          <Route index element={<Dashboard user={user} />} />
           <Route path="clientes" element={<RequiereSeccion user={user} slug="clientes"><Clientes rol={user?.rol} /></RequiereSeccion>} />
           <Route path="sesiones" element={<RequiereSeccion user={user} slug="sesiones"><Sesiones /></RequiereSeccion>} />
           <Route path="corredor" element={<RequiereSeccion user={user} slug="corredor"><Corredor /></RequiereSeccion>} />

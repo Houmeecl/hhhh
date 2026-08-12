@@ -37,13 +37,11 @@ router.get('/mandantes', requireSeccion('accesos_externos'), async (req, res, ne
 
 // Acceso web propio del mandante (panel /panel-mandante) — distinto de la
 // API key (X-Api-Key, integración de sistemas): esto es un login humano.
-// Nace en SOLO LECTURA (igual que puerto y trazador): son paneles de
-// consulta — escribir se otorga a propósito desde «Usuarios y roles».
-// Agencia y proveedor son distintos: la agencia CAPTURA el expediente en
-// terreno (sube documentos, ver agencia.js) y el proveedor opera sus
-// propios datos (onboarding, SII, REP, firma) — ambos nacen operador.
+// Nace como OPERADOR, igual que puerto/trazador/agencia/proveedor: el alta
+// ya no deja cuentas a medias que después hay que habilitar a mano desde
+// «Usuarios y roles». Bajar una cuenta a solo lectura sigue disponible ahí.
 router.post('/mandantes/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'mandante', columnaFk: 'mandante_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'mandante', columnaFk: 'mandante_id', entidadId: req.params.id, nivelAcceso: 'operador' }).catch(next)
 );
 
 router.post('/mandantes', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
@@ -140,7 +138,7 @@ router.get('/puertos', requireSeccion('accesos_externos'), async (req, res, next
 // Acceso web propio del puerto (panel /panel-puerto) — distinto de la API
 // key (X-Api-Key, integración de sistemas): esto es un login humano.
 router.post('/puertos/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'puerto', columnaFk: 'puerto_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'puerto', columnaFk: 'puerto_id', entidadId: req.params.id, nivelAcceso: 'operador' }).catch(next)
 );
 
 router.post('/puertos', requireSeccion('accesos_externos'), adminOnly, async (req, res, next) => {
@@ -247,7 +245,7 @@ router.get('/trazadores', requireSeccion('accesos_externos'), async (req, res, n
 
 // Acceso web propio del trazador (panel /panel-trazador).
 router.post('/trazadores/:id/crear-cuenta', requireSeccion('accesos_externos'), adminOnly, (req, res, next) =>
-  crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id, nivelAcceso: 'lectura' }).catch(next)
+  crearCuentaEntidad({ req, res, panel: 'trazador', columnaFk: 'trazador_id', entidadId: req.params.id, nivelAcceso: 'operador' }).catch(next)
 );
 
 // Genera (o rota) la API key del trazador — se muestra UNA sola vez. Solo
