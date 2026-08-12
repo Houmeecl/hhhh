@@ -695,6 +695,8 @@ export const api = {
     descargarAuth(`/api/panel-proveedor/rep/ventas/${id}/archivo`, authProveedor, nombre || 'factura'),
   repVerFotoProducto: (id) =>
     abrirPdfAuth(`/api/panel-proveedor/rep/productos/${id}/foto`, authProveedor),
+  proveedorRepDescargarInformePdf: (periodo) =>
+    descargarAuth(`/api/panel-proveedor/rep/informe/${periodo}.pdf`, authProveedor, `rep-trazabilidad-${periodo}.pdf`),
   // --- Transporte de personal (Cat. 7): viajes propios + informe mensual ---
   proveedorTransporteModos: () => request('/panel-proveedor/transporte/modos', { authedProveedor: true }),
   proveedorTransporteViajes: () => request('/panel-proveedor/transporte/viajes', { authedProveedor: true }),

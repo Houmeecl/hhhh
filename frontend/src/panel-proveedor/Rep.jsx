@@ -20,6 +20,11 @@ import { MATERIALES_REP, calcularReciclabilidad, UMBRAL_EXENCION_REP_KG, EXENCIO
 
 const COMPONENTE_VACIO = { material: 'plasticos', peso_gr: '', cantidad: '1', reciclable: true };
 
+function periodoActual() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export default function Rep() {
   const [productos, setProductos] = useState(null);
   const [ventas, setVentas] = useState(null);
@@ -51,7 +56,7 @@ export default function Rep() {
         tu empresa declara en RETC/SGR.
       </p>
 
-      <ResumenRep resumen={resumen} aviso={aviso} cruceRcv={cruceRcv} />
+      <ResumenRep resumen={resumen} aviso={aviso} cruceRcv={cruceRcv} flash={flash} />
       <Productos productos={productos} recargar={() => cargarProductos().catch((e) => flash(e.message, true))} flash={flash} />
       <RegistrarVenta
         productos={productos.filter((p) => p.activo)}
@@ -66,7 +71,17 @@ export default function Rep() {
 }
 
 // ---------- Resumen: kilos por material (la base de la declaración) ----------
-function ResumenRep({ resumen, aviso, cruceRcv }) {
+function ResumenRep({ resumen, aviso, cruceRcv, flash }) {
+  const [periodo, setPeriodo] = useState(periodoActual());
+  const [generando, setGenerando] = useState(false);
+
+  async function generarInforme() {
+    setGenerando(true);
+    try { await api.proveedorRepDescargarInformePdf(periodo); }
+    catch (e) { flash(e.message, true); }
+    finally { setGenerando(false); }
+  }
+
   if (!resumen || resumen.total.n_ventas === 0) return null;
   // El empujón honesto: períodos donde el RCV del SII (pestaña "Compras y
   // ventas") tiene ventas que aún no están pegadas a productos REP.
@@ -111,6 +126,19 @@ function ResumenRep({ resumen, aviso, cruceRcv }) {
         </p>
       )}
       <p className="muted" style={{ fontSize: 12, marginBottom: 0, marginTop: 8 }}>{aviso}</p>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 18, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+        <div className="field" style={{ margin: 0 }}>
+          <label>Período de la trazabilidad</label>
+          <input type="month" value={periodo} onChange={(e) => setPeriodo(e.target.value)} />
+        </div>
+        <button className="btn btn-outline" onClick={generarInforme} disabled={generando}>
+          {generando ? <span className="spinner" /> : <><Icon.Download size={16} /> Descargar trazabilidad completa</>}
+        </button>
+      </div>
+      <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+        Composición declarada + ventas del período + validación RCV + evidencia fotográfica y hashes de integridad, en un solo PDF.
+      </p>
     </div>
   );
 }

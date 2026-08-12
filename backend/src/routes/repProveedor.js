@@ -9,6 +9,7 @@ import {
   normalizarNumeroDoc, cruzarConRcv,
 } from '../services/repProveedor.js';
 import { analisisIA } from '../services/analisisIA.js';
+import { generateReporteRepTrazabilidad } from '../services/pdf.js';
 
 // ============================================================
 // Ley REP desde el panel del proveedor (/api/panel-proveedor/rep).
@@ -75,13 +76,20 @@ const CAMPOS_PRODUCTO = `id, nombre, codigo, componentes, peso_total_gr, peso_re
 // Foto de embalaje como EVIDENCIA del producto (opcional, migración 095) —
 // distinta de la foto que /estimar-embalaje analiza y descarta: esta se
 // adjunta al crear/editar el producto, solo si la persona la guarda.
-// Mismos formatos y tope que uploadFotoEmbalaje más abajo.
+// Lista blanca CERRADA de mimetypes (a diferencia de /estimar-embalaje,
+// que solo pasa por la IA y nunca se persiste): esta SÍ queda guardada y
+// se vuelve a servir después, así que solo se aceptan los formatos que
+// `datosFotoDesde`/MIME saben mapear ida y vuelta sin ambigüedad — un
+// `/^image\//` amplio (heic, gif, tiff…) terminaba mal etiquetado como
+// "jpg" al guardar y servido como octet-stream o con el Content-Type
+// equivocado al descargar.
+const MIME_FOTO_PRODUCTO = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const uploadFotoProducto = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: 1 },
   fileFilter: (req, file, cb) => {
-    const ok = /^image\//.test(file.mimetype);
-    cb(ok ? null : new Error('La foto de evidencia debe ser una imagen (JPG, PNG o WEBP).'), ok);
+    const ok = file.mimetype in MIME_FOTO_PRODUCTO;
+    cb(ok ? null : new Error('La foto de evidencia debe ser JPG, PNG o WEBP.'), ok);
   },
 });
 function uploadFotoOpcional(req, res, next) {
@@ -180,12 +188,11 @@ function leerProducto(body) {
 }
 
 // Extensión real desde el mimetype (no del nombre del archivo, que en
-// fotos de cámara suele venir genérico o ausente) — mismo criterio que
-// estimar-embalaje más arriba.
+// fotos de cámara suele venir genérico o ausente) — MIME_FOTO_PRODUCTO ya
+// garantiza que solo llegan estos tres formatos (fileFilter arriba).
 function datosFotoDesde(req) {
   if (!req.file) return null;
-  const extension = req.file.mimetype === 'image/png' ? 'png'
-    : req.file.mimetype === 'image/webp' ? 'webp' : 'jpg';
+  const extension = MIME_FOTO_PRODUCTO[req.file.mimetype];
   return {
     foto_embalaje: req.file.buffer,
     foto_extension: extension,
@@ -403,9 +410,13 @@ router.get('/productos/:id/foto', async (req, res, next) => {
 });
 
 // ---------- GET /ventas/:id/archivo — descargar la evidencia propia ----------
+// Compartido con GET /productos/:id/foto más arriba — `webp` solo lo usa
+// esa ruta (MIME_FOTO_PRODUCTO es la única que lo produce), pero vive acá
+// para no tener dos diccionarios de extensión→Content-Type en el mismo
+// archivo.
 const MIME = {
   pdf: 'application/pdf', xml: 'application/xml', jpg: 'image/jpeg',
-  jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic',
+  jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', webp: 'image/webp',
 };
 router.get('/ventas/:id/archivo', async (req, res, next) => {
   try {
@@ -422,6 +433,53 @@ router.get('/ventas/:id/archivo', async (req, res, next) => {
     const nombreSeguro = rows[0].archivo_nombre.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '');
     res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro || 'factura'}"`);
     res.send(rows[0].archivo);
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /informe/:periodo.pdf — trazabilidad 360 del período ----------
+// Cuatro perspectivas en un solo PDF: composición declarada (catálogo
+// vigente), ventas del período pegadas a productos, validación contra el
+// RCV del SII, y evidencia (fotos + hashes SHA-256) — ver
+// generateReporteRepTrazabilidad (services/pdf.js) para el detalle de
+// cada sección y sus límites declarados.
+const PERIODO_RE = /^\d{4}-\d{2}$/;
+router.get('/informe/:periodo.pdf', async (req, res, next) => {
+  try {
+    const periodo = req.params.periodo;
+    if (!PERIODO_RE.test(periodo)) return res.status(400).json({ error: 'Período inválido — usa AAAA-MM.' });
+
+    const { rows: prov } = await query(`SELECT nombre_empresa, rut FROM proveedores WHERE id = $1`, [req.user.proveedor_id]);
+
+    // Composición: TODO el catálogo vigente (no se filtra por período — un
+    // producto declarado hoy describe el envase actual, no uno de un mes
+    // pasado). Trae foto_embalaje completa: es la única vista que la
+    // necesita para embeberla en el PDF.
+    const { rows: productos } = await query(
+      `SELECT nombre, codigo, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel, activo,
+              foto_embalaje, foto_sha256
+         FROM productos_proveedor WHERE proveedor_id = $1 ORDER BY activo DESC, nombre`,
+      [req.user.proveedor_id]
+    );
+
+    const { rows: ventasCrudo } = await query(
+      `SELECT id, numero_documento, fecha_documento, periodo, kg_envases, kg_reciclables, sha256, items
+         FROM ventas_rep WHERE proveedor_id = $1 AND periodo = $2
+        ORDER BY fecha_documento`,
+      [req.user.proveedor_id, periodo]
+    );
+    const { rows: rcv } = await query(
+      `SELECT periodo, folio, tipo_dte FROM dte_proveedor WHERE proveedor_id = $1 AND tipo = 'venta'`,
+      [req.user.proveedor_id]
+    );
+    const cruce = cruzarConRcv(ventasCrudo, rcv);
+    const ventas = ventasCrudo.map((v) => ({ ...v, consta_en_rcv: cruce.por_venta.get(v.id) ?? null }));
+
+    const pdf = await generateReporteRepTrazabilidad({
+      empresa: prov[0] || {}, periodo, productos, ventas, resumen: resumenRep(ventas),
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-rep-trazabilidad-${periodo}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

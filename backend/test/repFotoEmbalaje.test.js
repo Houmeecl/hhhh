@@ -185,3 +185,34 @@ test('POST /productos rechaza un archivo que no es imagen', { skip: SALTO_PROD }
   });
   assert.equal(res.status, 400);
 });
+
+test('POST /productos rechaza formatos de imagen fuera de la lista blanca (heic, gif)', { skip: SALTO_PROD }, async () => {
+  for (const mime of ['image/heic', 'image/gif', 'image/bmp']) {
+    const fd = new FormData();
+    fd.append('nombre', `Producto con ${mime}`);
+    fd.append('componentes', JSON.stringify(COMPONENTES));
+    fd.append('foto', new Blob([FOTO_JPG], { type: mime }), `archivo.${mime.split('/')[1]}`);
+    const res = await fetch(`${baseUrl}/api/panel-proveedor/rep/productos`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenA}` },
+      body: fd,
+    });
+    assert.equal(res.status, 400, `${mime} debería rechazarse — solo jpg/png/webp se sirven después con el Content-Type correcto`);
+  }
+});
+
+test('foto WEBP se guarda y se sirve con Content-Type image/webp (no octet-stream)', { skip: SALTO_PROD }, async () => {
+  const crear = await fetch(`${baseUrl}/api/panel-proveedor/rep/productos`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${tokenA}` },
+    body: formDataProducto({ nombre: 'Producto WEBP', componentes: COMPONENTES, foto: FOTO_JPG, filename: 'e.webp', mime: 'image/webp' }),
+  });
+  assert.equal(crear.status, 201);
+  const { producto } = await crear.json();
+
+  const foto = await fetch(`${baseUrl}/api/panel-proveedor/rep/productos/${producto.id}/foto`, {
+    headers: { Authorization: `Bearer ${tokenA}` },
+  });
+  assert.equal(foto.status, 200);
+  assert.equal(foto.headers.get('content-type'), 'image/webp');
+});

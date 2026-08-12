@@ -8,6 +8,7 @@ import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
 import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
 import { formatearRut } from './mandante.js';
+import { MATERIALES_REP } from './rep.js';
 // Import circular benigno con alcanceGhg.js (que toma citaFuente de acá):
 // citaFuente es una function declaration —hoisted—, así que está disponible
 // aunque alcanceGhg se evalúe primero; y estas dos solo se llaman en runtime.
@@ -1480,6 +1481,199 @@ export async function generateInformeTransporte({ empresa, periodo, viajes, resu
   doc.font('Helvetica').fontSize(8).fillColor(GRAY);
   for (const l of LIMITES) {
     if (y > doc.page.height - 100) { doc.addPage(); y = 60; }
+    doc.text(`• ${l}`, M, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  avisoNoVerificacion(doc, M, doc.page.height - 54, W);
+  return bufferDoc(doc);
+}
+
+// ---------- REP — Trazabilidad integrada (escaneo 360) ----------
+// Cuatro perspectivas del mismo envase declarado, en un solo documento:
+// composición (qué declaró la empresa) → ventas (qué facturó, pegado a
+// esos productos) → validación RCV (¿el SII conoce esas ventas?) →
+// evidencia fotográfica + hashes de integridad (¿hay respaldo verificable
+// de cada pieza?). A diferencia de otros informes de sicr3p (lotes,
+// corredor), la declaración REP del proveedor NO está en la cadena de
+// hash pública (CADENA.NINGUNA — ver inventarioDatos.js): es un insumo
+// para la declaración de la EMPRESA ante RETC/SGR, no una atestación
+// propia de sicr3p, así que este documento no lleva QR de verificación
+// pública — sería prometer una cadena que no existe.
+const NOMBRE_MATERIAL_REP = new Map(MATERIALES_REP.map((m) => [m.codigo, m.nombre]));
+
+function tablaComposicionRep(doc, x, y, ancho, productos) {
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('1. Composición declarada', x, y, { width: ancho });
+  y = doc.y + 4;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text('Catálogo vigente de productos con la composición de su envase, tal como está declarado hoy.', x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!productos?.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin productos en el catálogo.', x, y);
+    return doc.y + 12;
+  }
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Producto', x + 6, y + 4, { width: ancho - 260 })
+    .text('Envase (g/u)', x + ancho - 250, y + 4, { width: 80, align: 'right' })
+    .text('% reciclable', x + ancho - 160, y + 4, { width: 80, align: 'right' })
+    .text('Nivel', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+  let zebra = false;
+  for (const p of productos) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 15).fill(LIGHT);
+    zebra = !zebra;
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(`${p.nombre}${p.activo ? '' : ' (inactivo)'}`, x + 6, y + 3, { width: ancho - 260 })
+      .text(nf(p.peso_total_gr, 1), x + ancho - 250, y + 3, { width: 80, align: 'right' })
+      .text(nf(p.porcentaje, 1), x + ancho - 160, y + 3, { width: 80, align: 'right' })
+      .text(p.nivel, x + ancho - 70, y + 3, { width: 64, align: 'right' });
+    y += 15;
+  }
+  return y + 14;
+}
+
+function tablaVentasRep(doc, x, y, ancho, ventas) {
+  if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('2. Ventas del período y validación RCV', x, y, { width: ancho });
+  y = doc.y + 4;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text('Cada factura pegada a productos del catálogo, contrastada contra el RCV que la empresa descargó del SII.', x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!ventas?.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin ventas registradas en este período.', x, y);
+    return doc.y + 12;
+  }
+  doc.rect(x, y, ancho, 16).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff')
+    .text('Documento', x + 6, y + 4, { width: 120 })
+    .text('Fecha', x + 130, y + 4, { width: 60 })
+    .text('Kg envase', x + ancho - 160, y + 4, { width: 80, align: 'right' })
+    .text('¿En RCV?', x + ancho - 70, y + 4, { width: 64, align: 'right' });
+  y += 16;
+  let zebra = false;
+  const ENRCV = { true: 'Sí', false: 'No', null: 'Sin datos' };
+  for (const v of ventas) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    if (zebra) doc.rect(x, y, ancho, 15).fill(LIGHT);
+    zebra = !zebra;
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+      .text(v.numero_documento || '—', x + 6, y + 3, { width: 120 })
+      .text(fechaCorta(new Date(v.fecha_documento)), x + 130, y + 3, { width: 60 })
+      .text(nf(v.kg_envases, 2), x + ancho - 160, y + 3, { width: 80, align: 'right' })
+      .fillColor(v.consta_en_rcv === false ? '#b45309' : NAVY)
+      .text(ENRCV[String(v.consta_en_rcv)], x + ancho - 70, y + 3, { width: 64, align: 'right' })
+      .fillColor(NAVY);
+    y += 15;
+  }
+  return y + 14;
+}
+
+// Miniaturas de la evidencia fotográfica guardada por producto — solo
+// jpg/png (formatos que PDFKit sabe decodificar; webp no).
+function seccionFotosRep(doc, x, y, ancho, productosConFoto) {
+  if (!productosConFoto.length) return y;
+  if (y > doc.page.height - 160) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('3. Evidencia fotográfica del envase', x, y, { width: ancho });
+  y = doc.y + 10;
+  const LADO = 110;
+  const GAP = 14;
+  let colX = x;
+  let filaAltoMax = 0;
+  for (const p of productosConFoto) {
+    if (colX + LADO > x + ancho) { colX = x; y += filaAltoMax + GAP; filaAltoMax = 0; }
+    if (y + LADO + 20 > doc.page.height - 60) { doc.addPage(); y = 60; colX = x; }
+    try {
+      doc.image(p.foto_embalaje, colX, y, { width: LADO, height: LADO, fit: [LADO, LADO] });
+    } catch {
+      doc.roundedRect(colX, y, LADO, LADO, 6).fillAndStroke(LIGHT, BORDER);
+      doc.font('Helvetica').fontSize(7).fillColor(GRAY)
+        .text('Formato no visualizable en PDF', colX + 8, y + LADO / 2 - 10, { width: LADO - 16, align: 'center' });
+    }
+    doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
+      .text(p.nombre, colX, y + LADO + 4, { width: LADO });
+    colX += LADO + GAP;
+    filaAltoMax = LADO + 20;
+  }
+  return y + filaAltoMax + 14;
+}
+
+function seccionIntegridadRep(doc, x, y, ancho, hashes) {
+  if (y > doc.page.height - 140) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('4. Integridad de la evidencia', x, y, { width: ancho });
+  y = doc.y + 4;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text('SHA-256 de cada archivo original tal como se subió — permite comprobar que el archivo no fue alterado.', x, y, { width: ancho });
+  y = doc.y + 8;
+  if (!hashes.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin archivos con hash registrado en este período.', x, y);
+    return doc.y + 12;
+  }
+  doc.font('Courier').fontSize(7.5).fillColor(GRAY);
+  for (const h of hashes) {
+    if (y > doc.page.height - 80) { doc.addPage(); y = 60; }
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(NAVY).text(h.etiqueta, x, y, { width: ancho, continued: true })
+      .font('Courier').fillColor(GRAY).text(`  ${h.sha256}`);
+    y = doc.y + 3;
+  }
+  return y + 10;
+}
+
+export async function generateReporteRepTrazabilidad({ empresa, periodo, productos, ventas, resumen }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const M = 48;
+  const W = doc.page.width - M * 2;
+
+  drawLogo(doc, M, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`Emitido el ${fechaCorta(new Date())}`, M, 50, { width: W, align: 'right' });
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
+    .text('Trazabilidad Ley REP — Escaneo 360', M, 96, { width: W });
+  doc.font('Helvetica').fontSize(10.5).fillColor(GRAY)
+    .text(`Ley 20.920 — período ${periodo || 'todo el catálogo'}`, M, doc.y + 4, { width: W });
+
+  doc.roundedRect(M, 148, W, 46, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('EMPRESA', M + 16, 160);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+    .text(`${empresa?.nombre_empresa || ''}  ·  ${formatearRut(empresa?.rut)}`, M + 16, 173);
+
+  let y = 216;
+  doc.roundedRect(M, y, W, 60, 8).fillAndStroke('#f0fdfa', '#14b8a6');
+  doc.font('Helvetica-Bold').fontSize(18).fillColor(NAVY).text(`${nf(resumen.total.kg_envases, 2)} kg`, M + 16, y + 10);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY).text(
+    `${nf(resumen.total.kg_reciclables, 2)} kg reciclables · ${nfp(resumen.total.n_ventas)} venta${resumen.total.n_ventas === 1 ? '' : 's'} pegada${resumen.total.n_ventas === 1 ? '' : 's'} a productos.`,
+    M + 16, y + 36, { width: W - 32 }
+  );
+  y += 76;
+
+  y = tablaComposicionRep(doc, M, y, W, productos);
+  y = tablaVentasRep(doc, M, y, W, ventas);
+
+  const productosConFoto = productos.filter((p) => p.foto_embalaje);
+  y = seccionFotosRep(doc, M, y, W, productosConFoto);
+
+  const hashes = [
+    ...productosConFoto.map((p) => ({ etiqueta: `Foto — ${p.nombre}`, sha256: p.foto_sha256 })),
+    ...ventas.filter((v) => v.sha256).map((v) => ({ etiqueta: `Factura ${v.numero_documento || v.id.slice(0, 8)}`, sha256: v.sha256 })),
+  ];
+  y = seccionIntegridadRep(doc, M, y, W, hashes);
+
+  if (y > doc.page.height - 100) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('Alcance de este documento', M, y, { width: W });
+  y = doc.y + 6;
+  const LIMITES_REP = [
+    'La declaración formal de envases y embalajes ante el MMA (RETC/SGR) la hace la empresa — '
+      + 'sicr3p prepara el insumo, no declara ni certifica en su nombre.',
+    'La validación RCV solo puede afirmar algo de los períodos con RCV descargado: "Sin datos" no '
+      + 'es un error, es la ausencia de esa descarga.',
+    'La foto de evidencia es la que la empresa decidió guardar al declarar el producto — no es una '
+      + 'auditoría independiente del envase.',
+  ];
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES_REP) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
     doc.text(`• ${l}`, M, y, { width: W });
     y = doc.y + 4;
   }
