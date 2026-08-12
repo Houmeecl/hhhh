@@ -166,7 +166,10 @@ torreRouter.get('/flota', requireAuth, requireRole('pos'), async (req, res, next
                  'destino', m.destino, 'zona', m.zona, 'nota', m.nota, 'creado', m.creado)
                FROM torre_mensajes m
                WHERE m.lote_id = l.id ORDER BY m.creado DESC LIMIT 1) AS instruccion,
-              (SELECT json_agg(json_build_object('serial', t.serial, 'portador', t.portador))
+              -- ORDER BY: con 2+ tarjetas activas por lote, un json_agg sin
+              -- orden puede serializar distinto entre requests con el mismo
+              -- dato → ETag espurio → el polling nunca ve un 304 real.
+              (SELECT json_agg(json_build_object('serial', t.serial, 'portador', t.portador) ORDER BY t.serial)
                FROM tarjetas_viaje t
                WHERE t.lote_id = l.id AND t.activo) AS tarjetas
        FROM lotes_minerales l
