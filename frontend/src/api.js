@@ -682,12 +682,19 @@ export const api = {
     descargarAuth(`/api/panel-proveedor/sii/inventario/${periodo}?formato=csv`, authProveedor, `inventario-${periodo}.csv`),
   // --- Ley REP (20.920): catálogo de productos + ventas con evidencia ---
   proveedorRepProductos: () => request('/panel-proveedor/rep/productos', { authedProveedor: true }),
-  proveedorRepCrearProducto: (body) => request('/panel-proveedor/rep/productos', { method: 'POST', body, authedProveedor: true }),
-  proveedorRepEditarProducto: (id, body) => request(`/panel-proveedor/rep/productos/${id}`, { method: 'PUT', body, authedProveedor: true }),
+  // `body` es un objeto plano (JSON, sin foto) o un FormData (con foto de
+  // evidencia adjunta, migración 095) — Productos.guardar() en Rep.jsx
+  // decide cuál según si la persona marcó "guardar foto".
+  proveedorRepCrearProducto: (body) =>
+    request('/panel-proveedor/rep/productos', { method: 'POST', body, formData: body instanceof FormData, authedProveedor: true }),
+  proveedorRepEditarProducto: (id, body) =>
+    request(`/panel-proveedor/rep/productos/${id}`, { method: 'PUT', body, formData: body instanceof FormData, authedProveedor: true }),
   proveedorRepVentas: () => request('/panel-proveedor/rep/ventas', { authedProveedor: true }),
   proveedorRepRegistrarVenta: (formData) => request('/panel-proveedor/rep/ventas', { method: 'POST', body: formData, formData: true, authedProveedor: true }),
   proveedorRepDescargarEvidencia: (id, nombre) =>
     descargarAuth(`/api/panel-proveedor/rep/ventas/${id}/archivo`, authProveedor, nombre || 'factura'),
+  repVerFotoProducto: (id) =>
+    abrirPdfAuth(`/api/panel-proveedor/rep/productos/${id}/foto`, authProveedor),
   // --- Transporte de personal (Cat. 7): viajes propios + informe mensual ---
   proveedorTransporteModos: () => request('/panel-proveedor/transporte/modos', { authedProveedor: true }),
   proveedorTransporteViajes: () => request('/panel-proveedor/transporte/viajes', { authedProveedor: true }),

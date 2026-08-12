@@ -119,10 +119,13 @@ function ResumenRep({ resumen, aviso, cruceRcv }) {
 function Productos({ productos, recargar, flash }) {
   const [edit, setEdit] = useState(null); // {id?, nombre, codigo, componentes:[...]} | null
 
-  const abrirNuevo = () => setEdit({ nombre: '', codigo: '', componentes: [{ ...COMPONENTE_VACIO }] });
+  const abrirNuevo = () => setEdit({
+    nombre: '', codigo: '', componentes: [{ ...COMPONENTE_VACIO }], fotoEvidencia: null, guardarFoto: true,
+  });
   const abrirEditar = (p) => setEdit({
     id: p.id, nombre: p.nombre, codigo: p.codigo || '',
     componentes: p.componentes.map((c) => ({ ...c, peso_gr: String(c.peso_gr), cantidad: String(c.cantidad ?? 1) })),
+    fotoEvidencia: null, guardarFoto: true, tieneFotoExistente: !!p.tiene_foto_embalaje,
   });
 
   async function guardar() {
@@ -132,8 +135,19 @@ function Productos({ productos, recargar, flash }) {
       cantidad: Number(c.cantidad) || 1,
       reciclable: Boolean(c.reciclable),
     }));
-    const body = { nombre: edit.nombre, codigo: edit.codigo, componentes };
     try {
+      // Con foto (y la persona la quiere guardar como evidencia): multipart.
+      // Sin foto: JSON plano, exactamente como antes.
+      let body;
+      if (edit.fotoEvidencia && edit.guardarFoto) {
+        body = new FormData();
+        body.append('nombre', edit.nombre);
+        body.append('codigo', edit.codigo || '');
+        body.append('componentes', JSON.stringify(componentes));
+        body.append('foto', edit.fotoEvidencia);
+      } else {
+        body = { nombre: edit.nombre, codigo: edit.codigo, componentes };
+      }
       if (edit.id) await api.proveedorRepEditarProducto(edit.id, body);
       else await api.proveedorRepCrearProducto(body);
       setEdit(null); recargar();
@@ -171,6 +185,7 @@ function Productos({ productos, recargar, flash }) {
                     {p.nombre}
                     {p.codigo && <span className="muted" style={{ fontSize: 12 }}> · {p.codigo}</span>}
                     {!p.activo && <span className="badge badge-gray" style={{ marginLeft: 8 }}>Inactivo</span>}
+                    {p.tiene_foto_embalaje && <span className="badge badge-gray" style={{ marginLeft: 8 }} title="Tiene foto de evidencia">📷</span>}
                   </td>
                   <td className="num">{fmt(p.peso_total_gr, 1)}</td>
                   <td className="num">{fmt(p.porcentaje, 1)}%</td>
@@ -201,8 +216,25 @@ function Productos({ productos, recargar, flash }) {
             </div>
             <EstimarEmbalajeFoto
               estimar={api.repEstimarEmbalaje}
-              onResultado={(cs) => setEdit({ ...edit, componentes: cs })}
+              onResultado={(cs, archivo) => setEdit({ ...edit, componentes: cs, fotoEvidencia: archivo })}
             />
+            {edit.fotoEvidencia && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 10, cursor: 'pointer' }}>
+                <input type="checkbox" checked={edit.guardarFoto} style={{ width: 'auto' }}
+                  onChange={(e) => setEdit({ ...edit, guardarFoto: e.target.checked })} />
+                Guardar esta foto como evidencia del envase declarado
+              </label>
+            )}
+            {!edit.fotoEvidencia && edit.tieneFotoExistente && (
+              <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                Este producto ya tiene una foto de evidencia guardada.{' '}
+                <button type="button"
+                  style={{ padding: 0, border: 0, background: 'none', color: 'var(--green-600)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                  onClick={() => api.repVerFotoProducto(edit.id).catch((e) => flash(e.message, true))}>
+                  Ver foto
+                </button>
+              </p>
+            )}
             {edit.componentes.map((c, i) => (
               <div key={i} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 8 }}>
                 <div className="field" style={{ margin: 0, flex: '1 1 140px' }}>

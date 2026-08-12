@@ -197,7 +197,10 @@ export const INVENTARIO = {
     clasificacion: NO_PERSONAL,
     columnas: [],
     nota: 'El escáner marca `nombre`, pero es el nombre del PRODUCTO ("Botella 1L"), no de una '
-      + 'persona. La empresa dueña del catálogo está en `proveedores`, no acá.',
+      + 'persona. La empresa dueña del catálogo está en `proveedores`, no acá. `foto_embalaje` '
+      + '(migración 095, evidencia opcional del envase) es una foto de un producto/embalaje, no '
+      + 'un retrato — mismo criterio que `ventas_rep.archivo`: puede contener a alguien de fondo '
+      + 'sin ser su finalidad ni la de la captura.',
     finalidad: 'Catálogo de productos con la composición de su envase para la declaración REP.',
     base: BASE.LEY,
     cadena: CADENA.NINGUNA,

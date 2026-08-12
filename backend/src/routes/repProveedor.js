@@ -69,7 +69,30 @@ function uploadArchivo(req, res, next) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CAMPOS_PRODUCTO = `id, nombre, codigo, componentes, peso_total_gr, peso_reciclable_gr,
-                         porcentaje, nivel, activo, created_at, updated_at`;
+                         porcentaje, nivel, activo, created_at, updated_at,
+                         (foto_embalaje IS NOT NULL) AS tiene_foto_embalaje`;
+
+// Foto de embalaje como EVIDENCIA del producto (opcional, migración 095) —
+// distinta de la foto que /estimar-embalaje analiza y descarta: esta se
+// adjunta al crear/editar el producto, solo si la persona la guarda.
+// Mismos formatos y tope que uploadFotoEmbalaje más abajo.
+const uploadFotoProducto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /^image\//.test(file.mimetype);
+    cb(ok ? null : new Error('La foto de evidencia debe ser una imagen (JPG, PNG o WEBP).'), ok);
+  },
+});
+function uploadFotoOpcional(req, res, next) {
+  uploadFotoProducto.single('foto')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'La foto debe pesar menos de 15 MB.' : 'No se pudo procesar la foto.' });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}
 
 // ---------- POST /estimar-embalaje — foto → componentes propuestos ----------
 // El mismo mecanismo de visión del juego "Sube y Suma", pero para dejar
@@ -129,44 +152,82 @@ router.get('/productos', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Solo invoca multer si la petición realmente es multipart — crear/editar
+// sin foto sigue mandando JSON puro (ej. el toggle activar/desactivar), y
+// multer no sabe parsear eso.
+function conFotoOpcional(req, res, next) {
+  if (req.is('multipart/form-data')) return uploadFotoOpcional(req, res, next);
+  next();
+}
+
 // Valida el cuerpo de crear/editar producto. Devuelve {error} o {datos}.
+// `componentes` llega como array con JSON body, o como STRING con
+// multipart (FormData no serializa arrays anidados) — se parsea acá.
 function leerProducto(body) {
   const nombre = String(body?.nombre || '').trim();
   if (!nombre) return { error: 'El nombre del producto es obligatorio.' };
   if (nombre.length > 200) return { error: 'El nombre del producto es demasiado largo.' };
   const codigo = body?.codigo == null || String(body.codigo).trim() === '' ? null : String(body.codigo).trim().slice(0, 80);
-  const v = validarComponentes(body?.componentes);
+  let componentes = body?.componentes;
+  if (typeof componentes === 'string') {
+    try { componentes = JSON.parse(componentes); } catch { return { error: 'Los componentes del envase no son válidos.' }; }
+  }
+  const v = validarComponentes(componentes);
   if (!v.ok) return { error: v.error };
-  const calc = calcularReciclabilidad(body.componentes);
+  const calc = calcularReciclabilidad(componentes);
   if (!calc.nivel) return { error: 'El envase declarado no tiene peso: revisa los componentes.' };
-  return { datos: { nombre, codigo, componentes: body.componentes, ...calc } };
+  return { datos: { nombre, codigo, componentes, ...calc } };
+}
+
+// Extensión real desde el mimetype (no del nombre del archivo, que en
+// fotos de cámara suele venir genérico o ausente) — mismo criterio que
+// estimar-embalaje más arriba.
+function datosFotoDesde(req) {
+  if (!req.file) return null;
+  const extension = req.file.mimetype === 'image/png' ? 'png'
+    : req.file.mimetype === 'image/webp' ? 'webp' : 'jpg';
+  return {
+    foto_embalaje: req.file.buffer,
+    foto_extension: extension,
+    foto_tamano_bytes: req.file.size,
+    foto_sha256: sha256(req.file.buffer),
+  };
 }
 
 // ---------- POST /productos — crear producto con su envase ----------
-router.post('/productos', requireNivelOperador, async (req, res, next) => {
+// Multipart opcional: campo `foto` con la evidencia de embalaje que la
+// persona decidió guardar (checkbox del frontend, migración 095) — sin
+// ella, crear un producto funciona exactamente igual que antes.
+router.post('/productos', requireNivelOperador, conFotoOpcional, async (req, res, next) => {
   try {
     const r = leerProducto(req.body);
     if (r.error) return res.status(400).json({ error: r.error });
     const d = r.datos;
+    const foto = datosFotoDesde(req);
     const { rows } = await query(
       `INSERT INTO productos_proveedor
-         (proveedor_id, nombre, codigo, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (proveedor_id, nombre, codigo, componentes, peso_total_gr, peso_reciclable_gr, porcentaje, nivel,
+          foto_embalaje, foto_extension, foto_tamano_bytes, foto_sha256)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING ${CAMPOS_PRODUCTO}`,
       [req.user.proveedor_id, d.nombre, d.codigo, JSON.stringify(d.componentes),
-       d.peso_total_gr, d.peso_reciclable_gr, d.porcentaje, d.nivel]
+       d.peso_total_gr, d.peso_reciclable_gr, d.porcentaje, d.nivel,
+       foto?.foto_embalaje ?? null, foto?.foto_extension ?? null,
+       foto?.foto_tamano_bytes ?? null, foto?.foto_sha256 ?? null]
     );
     await logActividad({
       usuarioId: req.user.sub, accion: 'rep_producto_crear', entidad: 'producto_proveedor',
-      entidadId: rows[0].id, detalle: { nombre: d.nombre, nivel: d.nivel }, ip: req.ip,
+      entidadId: rows[0].id, detalle: { nombre: d.nombre, nivel: d.nivel, con_foto: !!foto }, ip: req.ip,
     });
     res.status(201).json({ producto: rows[0] });
   } catch (err) { next(err); }
 });
 
 // ---------- PUT /productos/:id — editar o activar/desactivar ----------
-// Editar NO reescribe ventas pasadas: sus items son snapshots.
-router.put('/productos/:id', requireNivelOperador, async (req, res, next) => {
+// Editar NO reescribe ventas pasadas: sus items son snapshots. La foto
+// solo se reemplaza si llega una nueva (COALESCE) — editar el texto del
+// envase no borra la evidencia ya guardada.
+router.put('/productos/:id', requireNivelOperador, conFotoOpcional, async (req, res, next) => {
   try {
     if (!UUID_RE.test(String(req.params.id))) return res.status(404).json({ error: 'Producto no encontrado.' });
     const { rows: propios } = await query(
@@ -188,20 +249,28 @@ router.put('/productos/:id', requireNivelOperador, async (req, res, next) => {
     const r = leerProducto(req.body);
     if (r.error) return res.status(400).json({ error: r.error });
     const d = r.datos;
+    const foto = datosFotoDesde(req);
     const { rows } = await query(
       `UPDATE productos_proveedor
           SET nombre = $3, codigo = $4, componentes = $5, peso_total_gr = $6,
               peso_reciclable_gr = $7, porcentaje = $8, nivel = $9,
-              activo = COALESCE($10, activo), updated_at = now()
+              activo = COALESCE($10, activo),
+              foto_embalaje = COALESCE($11, foto_embalaje),
+              foto_extension = COALESCE($12, foto_extension),
+              foto_tamano_bytes = COALESCE($13, foto_tamano_bytes),
+              foto_sha256 = COALESCE($14, foto_sha256),
+              updated_at = now()
         WHERE id = $1 AND proveedor_id = $2
         RETURNING ${CAMPOS_PRODUCTO}`,
       [req.params.id, req.user.proveedor_id, d.nombre, d.codigo, JSON.stringify(d.componentes),
        d.peso_total_gr, d.peso_reciclable_gr, d.porcentaje, d.nivel,
-       typeof req.body?.activo === 'boolean' ? req.body.activo : null]
+       typeof req.body?.activo === 'boolean' ? req.body.activo : null,
+       foto?.foto_embalaje ?? null, foto?.foto_extension ?? null,
+       foto?.foto_tamano_bytes ?? null, foto?.foto_sha256 ?? null]
     );
     await logActividad({
       usuarioId: req.user.sub, accion: 'rep_producto_editar', entidad: 'producto_proveedor',
-      entidadId: req.params.id, detalle: { nombre: d.nombre }, ip: req.ip,
+      entidadId: req.params.id, detalle: { nombre: d.nombre, con_foto_nueva: !!foto }, ip: req.ip,
     });
     res.json({ producto: rows[0] });
   } catch (err) { next(err); }
@@ -315,6 +384,22 @@ router.post('/ventas', requireNivelOperador, uploadArchivo, async (req, res, nex
     }
     next(err);
   }
+});
+
+// ---------- GET /productos/:id/foto — descargar la foto de evidencia ----------
+router.get('/productos/:id/foto', async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(String(req.params.id))) return res.status(404).json({ error: 'Producto no encontrado.' });
+    const { rows } = await query(
+      `SELECT foto_embalaje, foto_extension FROM productos_proveedor
+        WHERE id = $1 AND proveedor_id = $2`,
+      [req.params.id, req.user.proveedor_id]
+    );
+    if (!rows[0] || !rows[0].foto_embalaje) return res.status(404).json({ error: 'Este producto no tiene foto de evidencia.' });
+    res.setHeader('Content-Type', MIME[rows[0].foto_extension] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    res.send(rows[0].foto_embalaje);
+  } catch (err) { next(err); }
 });
 
 // ---------- GET /ventas/:id/archivo — descargar la evidencia propia ----------

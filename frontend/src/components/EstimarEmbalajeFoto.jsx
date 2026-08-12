@@ -12,7 +12,9 @@ import { comprimirImagen } from '../lib/imagen.js';
 //
 // `estimar`: async (file) => { componentes } — la API del panel que
 // corresponda (posEstimarEmbalaje | repEstimarEmbalaje). `onResultado`:
-// recibe los componentes propuestos ya como strings editables.
+// recibe los componentes propuestos ya como strings editables, y además
+// la foto comprimida que se usó para la estimación — así quien la llama
+// (Rep.jsx) puede ofrecer guardarla como evidencia sin pedirla de nuevo.
 // ============================================================
 export default function EstimarEmbalajeFoto({ estimar, onResultado }) {
   const inputRef = useRef(null);
@@ -33,7 +35,7 @@ export default function EstimarEmbalajeFoto({ estimar, onResultado }) {
         peso_gr: String(c.peso_gr),
         cantidad: String(c.cantidad),
         reciclable: !!c.reciclable,
-      })));
+      })), comprimida);
       setListo(true);
     } catch (e) {
       setError(e.message || 'No se pudo estimar con la foto — ingresa los componentes a mano.');
