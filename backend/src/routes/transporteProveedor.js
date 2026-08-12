@@ -7,6 +7,7 @@ import { calcularCo2eViaje, resumenTransporte, validarViaje } from '../services/
 import { generateInformeTransporte } from '../services/pdf.js';
 import { generateComprobanteTransporte } from '../services/transportePdf.js';
 import { sendMail, comprobanteTransporteEmail } from '../services/mailer.js';
+import { parseDte } from '../services/dte.js';
 
 // ============================================================
 // Transporte de personal (GHG Protocol Categoría 7) desde el panel del
@@ -54,7 +55,52 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const PERIODO_RE = /^\d{4}-\d{2}$/;
 
 const CAMPOS_VIAJE = `v.id, v.fecha, v.modo, v.origen, v.destino, v.km, v.pasajeros, v.ida_vuelta,
-                       v.co2e, v.notas, v.archivo_nombre, v.created_at, m.nombre AS modo_nombre`;
+                       v.co2e, v.notas, v.patente, v.archivo_nombre, v.created_at, m.nombre AS modo_nombre`;
+
+// Solo el XML de una guía de despacho — a diferencia de uploadEvidencia
+// (que además acepta PDF/JPG/PNG/HEIC porque es evidencia de cualquier
+// tipo), acá el archivo ES el dato: si no es XML no hay nada que leer.
+const uploadGuia = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.xml$/i.test(file.originalname);
+    cb(ok ? null : new Error('Sube el archivo XML de la guía de despacho.'), ok);
+  },
+});
+function uploadGuiaUnica(req, res, next) {
+  uploadGuia.single('archivo')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'El XML debe pesar menos de 5 MB.' : 'No se pudo procesar el archivo.' });
+    }
+    if (err) return res.status(400).json({ error: err.message });
+    next();
+  });
+}
+
+// ---------- POST /leer-guia — patente/origen/destino desde una guía XML ----------
+// Solo LEE y devuelve — no persiste nada. La persona revisa lo propuesto
+// y lo confirma (o corrige) al enviar POST /viajes, igual que la foto de
+// embalaje en Ley REP: la IA/el parser proponen, el servidor solo guarda
+// lo que la persona finalmente envía.
+router.post('/leer-guia', requireNivelOperador, uploadGuiaUnica, async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Falta el archivo XML.' });
+    const dte = parseDte(req.file.buffer.toString('utf8'));
+    if (!dte) return res.status(422).json({ error: 'El archivo no parece un documento tributario electrónico válido.' });
+    if (dte.tipo_dte !== 52) {
+      return res.status(422).json({
+        error: `Este documento es "${dte.tipo_nombre}", no una guía de despacho — solo las guías (tipo 52) traen patente y destino del traslado.`,
+      });
+    }
+    res.json({
+      patente: dte.patente,
+      origen: dte.direccion_origen,
+      destino: dte.direccion_destino,
+      folio: dte.folio,
+    });
+  } catch (err) { next(err); }
+});
 
 // ---------- GET /modos — catálogo de modos, mismos que usa el admin ----------
 router.get('/modos', async (req, res, next) => {
@@ -91,7 +137,7 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
     // inventario — un typo acá se sella como cargo en Capital Natural.
     const v = validarViaje(req.body);
     if (v.error) return res.status(400).json({ error: v.error });
-    const { modo, fecha, origen, destino, km, pasajeros: pax, ida_vuelta: idaVuelta, notas } = v.datos;
+    const { modo, fecha, origen, destino, km, pasajeros: pax, ida_vuelta: idaVuelta, notas, patente } = v.datos;
 
     const { rows: mRows } = await query(`SELECT * FROM transporte_modos WHERE codigo = $1`, [modo]);
     if (!mRows[0]) return res.status(400).json({ error: 'Modo de transporte desconocido.' });
@@ -101,12 +147,12 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
     const ext = req.file ? (req.file.originalname.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase() : null;
     const { rows } = await query(
       `INSERT INTO transporte_viajes
-         (proveedor_id, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas,
+         (proveedor_id, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas, patente,
           archivo, archivo_nombre, extension, tamano_bytes, sha256)
-       VALUES ($1,COALESCE($2::date,CURRENT_DATE),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING id, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas, archivo_nombre, created_at`,
+       VALUES ($1,COALESCE($2::date,CURRENT_DATE),$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       RETURNING id, fecha, modo, origen, destino, km, pasajeros, ida_vuelta, co2e, notas, patente, archivo_nombre, created_at`,
       [
-        req.user.proveedor_id, fecha, modo, origen, destino, km, pax, idaVuelta, co2e, notas,
+        req.user.proveedor_id, fecha, modo, origen, destino, km, pax, idaVuelta, co2e, notas, patente,
         req.file ? req.file.buffer : null,
         req.file ? req.file.originalname.slice(0, 200) : null,
         ext,

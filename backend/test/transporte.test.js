@@ -142,6 +142,14 @@ test('validarViaje: origen/destino obligatorios, con tope de largo; notas se rec
   assert.equal(r.datos.notas.length, 500);
 });
 
+test('validarViaje: patente es opcional, se normaliza a mayúsculas y nunca bloquea el registro', () => {
+  assert.equal(validarViaje({ ...CUERPO_OK }).datos.patente, null);
+  assert.equal(validarViaje({ ...CUERPO_OK, patente: '' }).datos.patente, null);
+  assert.equal(validarViaje({ ...CUERPO_OK, patente: '  abcd12  ' }).datos.patente, 'ABCD12');
+  // Formato laxo a propósito: no se valida contra el registro civil.
+  assert.equal(validarViaje({ ...CUERPO_OK, patente: 'no-es-una-patente-de-verdad' }).error, undefined);
+});
+
 // ============================================================
 // generateComprobanteTransporte — PDF de comprobante de viaje
 // para enviar por email.

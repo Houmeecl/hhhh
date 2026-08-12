@@ -19,7 +19,7 @@ export const MAX_PASAJEROS_VIAJE = 1000;
 // con los valores ya normalizados — mismo patrón que leerProducto en
 // repProveedor.js. Función pura (testeable sin BD ni HTTP); la existencia
 // del modo en transporte_modos la verifica el llamador, que tiene la BD.
-export function validarViaje({ modo, fecha, origen, destino, km, pasajeros, ida_vuelta, notas } = {}) {
+export function validarViaje({ modo, fecha, origen, destino, km, pasajeros, ida_vuelta, notas, patente } = {}) {
   const org = String(origen || '').trim();
   const dst = String(destino || '').trim();
   if (!modo || !org || !dst) return { error: 'Modo, origen, destino y km son obligatorios.' };
@@ -59,6 +59,12 @@ export function validarViaje({ modo, fecha, origen, destino, km, pasajeros, ida_
   }
 
   const nts = notas == null || String(notas).trim() === '' ? null : String(notas).trim().slice(0, 500);
+  // Patente del vehículo — informativa (migración 096): puede venir
+  // tipeada a mano o precargada desde una guía de despacho, pero NUNCA
+  // participa del cálculo de CO2e. Formato laxo (no se valida contra el
+  // registro civil): un dígito verificador equivocado acá no debe
+  // bloquear el registro del traslado.
+  const pat = patente == null || String(patente).trim() === '' ? null : String(patente).trim().toUpperCase().slice(0, 12);
   return {
     datos: {
       modo,
@@ -69,6 +75,7 @@ export function validarViaje({ modo, fecha, origen, destino, km, pasajeros, ida_
       pasajeros: pax,
       ida_vuelta: ida_vuelta === true || ida_vuelta === 'true',
       notas: nts,
+      patente: pat,
     },
   };
 }

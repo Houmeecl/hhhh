@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
 import { Donut } from '../components/Charts.jsx';
@@ -98,12 +98,34 @@ function ResumenTransporte({ resumen, flash }) {
 }
 
 // ---------- Registrar un traslado ----------
-const VIAJE_VACIO = { modo: 'bus', fecha: '', origen: '', destino: '', km: '', pasajeros: '1', ida_vuelta: true, notas: '' };
+const VIAJE_VACIO = { modo: 'bus', fecha: '', origen: '', destino: '', km: '', pasajeros: '1', ida_vuelta: true, notas: '', patente: '' };
 
 function RegistrarViaje({ modos, alRegistrar, flash }) {
   const [form, setForm] = useState({ ...VIAJE_VACIO });
   const [archivo, setArchivo] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [leyendoGuia, setLeyendoGuia] = useState(false);
+  const guiaInputRef = useRef(null);
+
+  async function leerGuia(file) {
+    if (!file) return;
+    setLeyendoGuia(true);
+    try {
+      const { patente, origen, destino, folio } = await api.proveedorTransporteLeerGuia(file);
+      setForm((f) => ({
+        ...f,
+        modo: 'camioneta',
+        origen: origen || f.origen,
+        destino: destino || f.destino,
+        patente: patente || f.patente,
+      }));
+      flash(`✓ Guía N° ${folio || ''} leída: origen, destino${patente ? ' y patente' : ''} precargados. Revisa y completa km y pasajeros.`);
+    } catch (e) { flash(e.message, true); }
+    finally {
+      setLeyendoGuia(false);
+      if (guiaInputRef.current) guiaInputRef.current.value = '';
+    }
+  }
 
   async function guardar() {
     if (!form.origen || !form.destino || !form.km) { flash('Origen, destino y km son obligatorios.', true); return; }
@@ -124,6 +146,17 @@ function RegistrarViaje({ modos, alRegistrar, flash }) {
   return (
     <div className="card card-pad" style={{ marginBottom: 20 }}>
       <h3 style={{ marginTop: 0 }}>Registrar traslado</h3>
+
+      <input
+        ref={guiaInputRef} type="file" accept=".xml" style={{ display: 'none' }}
+        onChange={(e) => leerGuia(e.target.files?.[0])}
+      />
+      <button type="button" className="btn btn-outline btn-sm" disabled={leyendoGuia}
+        style={{ marginBottom: 14 }}
+        onClick={() => guiaInputRef.current?.click()}>
+        {leyendoGuia ? <span className="spinner dark" /> : '📄 Cargar guía de despacho (XML) para precargar origen, destino y patente'}
+      </button>
+
       <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', margin: '0 0 12px' }}>
         <div className="field"><label>Modo</label>
           <select value={form.modo} onChange={(e) => setForm({ ...form, modo: e.target.value })}>
@@ -135,6 +168,7 @@ function RegistrarViaje({ modos, alRegistrar, flash }) {
         <div className="field"><label>Destino</label><input value={form.destino} onChange={(e) => setForm({ ...form, destino: e.target.value })} placeholder="Faena / Calama" /></div>
         <div className="field"><label>Km (por tramo)</label><input value={form.km} onChange={(e) => setForm({ ...form, km: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })} placeholder="200" /></div>
         <div className="field"><label>Pasajeros</label><input value={form.pasajeros} onChange={(e) => setForm({ ...form, pasajeros: e.target.value.replace(/\D/g, '') })} /></div>
+        <div className="field"><label>Patente (opcional)</label><input value={form.patente} onChange={(e) => setForm({ ...form, patente: e.target.value.toUpperCase() })} placeholder="ABCD12" /></div>
         <div className="field" style={{ display: 'flex', alignItems: 'flex-end' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500, marginBottom: 8 }}>
             <input type="checkbox" checked={form.ida_vuelta} onChange={(e) => setForm({ ...form, ida_vuelta: e.target.checked })} style={{ width: 'auto' }} /> Ida y vuelta
@@ -181,7 +215,10 @@ function Viajes({ viajes, recargar, flash }) {
             {viajes.map((v) => (
               <tr key={v.id}>
                 <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(v.fecha)}</td>
-                <td><b>{v.origen} → {v.destino}</b>{v.ida_vuelta && <span className="muted" style={{ fontSize: 12 }}> · ida y vuelta</span>}</td>
+                <td>
+                  <b>{v.origen} → {v.destino}</b>{v.ida_vuelta && <span className="muted" style={{ fontSize: 12 }}> · ida y vuelta</span>}
+                  {v.patente && <div className="muted" style={{ fontSize: 12 }}>Patente {v.patente}</div>}
+                </td>
                 <td><span className="badge badge-gray">{v.modo_nombre}</span></td>
                 <td className="num">{fmt(v.km, 0)}</td>
                 <td className="num">{v.pasajeros}</td>

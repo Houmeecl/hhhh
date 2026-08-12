@@ -702,6 +702,13 @@ export const api = {
   proveedorTransporteViajes: () => request('/panel-proveedor/transporte/viajes', { authedProveedor: true }),
   proveedorTransporteCrearViaje: (formData) =>
     request('/panel-proveedor/transporte/viajes', { method: 'POST', body: formData, formData: true, authedProveedor: true }),
+  // Lee (no guarda) una guía de despacho XML: propone patente/origen/
+  // destino para precargar el formulario de traslado.
+  proveedorTransporteLeerGuia: (file) => {
+    const fd = new FormData();
+    fd.append('archivo', file);
+    return request('/panel-proveedor/transporte/leer-guia', { method: 'POST', body: fd, formData: true, authedProveedor: true });
+  },
   proveedorTransporteEliminarViaje: (id) => request(`/panel-proveedor/transporte/viajes/${id}`, { method: 'DELETE', authedProveedor: true }),
   proveedorTransporteDescargarEvidencia: (id, nombre) =>
     descargarAuth(`/api/panel-proveedor/transporte/viajes/${id}/archivo`, authProveedor, nombre || 'evidencia'),
