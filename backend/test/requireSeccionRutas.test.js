@@ -19,6 +19,14 @@ import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 // Mismo patrón de integración que adminCuentas.test.js.
 // ============================================================
 
+// Snapshot CONGELADO del backfill de la migración 092 — NO es
+// SECCIONES_ADMIN.length (que sigue creciendo; hoy 24 con 'proveedores'
+// de la migración 097, que a propósito NO se backfillea). Si algún día
+// agregas una sección que SÍ deba backfillearse a cuentas existentes,
+// ese número necesita su propio assert — no toques esta constante para
+// "arreglarla", significaría romper el backfill congelado que describe.
+const SECCIONES_BACKFILL_092 = 23;
+
 const sufijo = crypto.randomBytes(4).toString('hex');
 
 let server;
@@ -87,7 +95,7 @@ test('backfill 092: una cuenta sicrep preexistente conserva las 23 secciones tra
     `SELECT secciones_admin FROM usuarios WHERE panel = 'sicrep' ORDER BY created_at ASC LIMIT 1`
   );
   if (viejas[0]) {
-    assert.equal(viejas[0].secciones_admin.length, 23);
+    assert.equal(viejas[0].secciones_admin.length, SECCIONES_BACKFILL_092);
   }
 
   // Alta nueva sin especificar secciones → '{}' (el default fail-closed).

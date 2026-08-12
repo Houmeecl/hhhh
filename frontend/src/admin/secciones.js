@@ -1,7 +1,7 @@
 import { Icon } from '../components/icons.jsx';
 
 // ============================================================
-// Metadata de las 23 secciones del panel admin — la única fuente para el
+// Metadata de las 24 secciones del panel admin — la única fuente para el
 // NAV de AdminApp.jsx y para los checkboxes de Usuarios.jsx. El slug es
 // el vocabulario de usuarios.secciones_admin (migración 092; espejo
 // backend en src/constants/seccionesAdmin.js — mantener los tres
@@ -76,4 +76,11 @@ export function puedeVerSeccion(user, slug) {
   if (user?.es_superadmin) return true;
   const propias = user?.secciones_admin || [];
   return propias.includes(slug) || (item?.tambien || []).some((s) => propias.includes(s));
+}
+
+// OR de varias secciones — mismo idiom que requireSeccion(...slugs) del
+// backend (middleware/auth.js), como primitiva única en vez de que cada
+// pantalla reimplemente su propio Array.isArray/.some ad hoc.
+export function puedeVerAlguna(user, ...slugs) {
+  return slugs.some((s) => puedeVerSeccion(user, s));
 }

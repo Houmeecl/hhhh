@@ -29,7 +29,7 @@ import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
 import SelectorPanel from './SelectorPanel.jsx';
-import { SECCIONES_ADMIN_NAV, puedeVerSeccion } from './secciones.js';
+import { SECCIONES_ADMIN_NAV, puedeVerSeccion, puedeVerAlguna } from './secciones.js';
 
 // El menú (23 entradas agrupadas por lo que la persona viene a hacer)
 // vive en secciones.js — misma fuente que los checkboxes de Usuarios.jsx.
@@ -45,7 +45,7 @@ import { SECCIONES_ADMIN_NAV, puedeVerSeccion } from './secciones.js';
 // Accesos.jsx, que filtra sus propias tabs según cuál de las dos tiene).
 function RequiereSeccion({ user, slug, children }) {
   const slugs = Array.isArray(slug) ? slug : [slug];
-  if (!slugs.some((s) => puedeVerSeccion(user, s))) return <Navigate to="/admin" replace />;
+  if (!puedeVerAlguna(user, ...slugs)) return <Navigate to="/admin" replace />;
   return children;
 }
 
