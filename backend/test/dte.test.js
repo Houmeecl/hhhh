@@ -124,6 +124,28 @@ test('parseDte: destino cae a DirRecep si la guía no trae <DirDest> (sin bloque
   assert.equal(d.direccion_destino, 'Bodega Central 10');
 });
 
+// ============================================================
+// tag()/tags() deben ser O(n), no O(n²) — un XML con muchas aperturas
+// del mismo tag sin cerrar (subido por cualquier proveedor autenticado
+// vía routes/informes.js, lecturaDocumento.js o transporteProveedor.js)
+// no debe poder bloquear el event loop de Node.
+// ============================================================
+
+test('parseDte no se cuelga con miles de tags sin cerrar (O(n), no O(n²))', () => {
+  const aperturasSinCerrar = '<Encabezado>'.repeat(50000);
+  const malicioso = `<DTE><Documento>${aperturasSinCerrar}<IdDoc><TipoDTE>33</TipoDTE></IdDoc></Documento></DTE>`;
+  const t0 = Date.now();
+  parseDte(malicioso);
+  const ms = Date.now() - t0;
+  // Umbral generoso a propósito: la suite completa corre este archivo en
+  // paralelo con cientos de otros tests, y el punto no es medir
+  // milisegundos exactos sino descartar el O(n²) que este mismo caso
+  // tardaba MINUTOS en producir (ver commit) — 8s aquí ya sería 100x más
+  // lento que lo medido en desarrollo (~5ms) y seguiría siendo una señal
+  // clara de regresión, sin que la carga del entorno de CI dispare un falso positivo.
+  assert.ok(ms < 8000, `parseDte tardó ${ms}ms con 50.000 tags sin cerrar — sospechoso de haber vuelto a O(n²)`);
+});
+
 test('rutValido aplica módulo 11', () => {
   assert.equal(rutValido('76.123.456-0'), true);
   assert.equal(rutValido('11.111.111-1'), true);

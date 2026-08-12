@@ -364,8 +364,10 @@ Sin dependencias nuevas: autenticación JWT RS256 + streaming `insertAll` vía R
   (kgCO2e/pasajero-km, referenciales — validar fuente antes de reportar) y registro de
   traslados; cada viaje carga la cuenta de carbono del Capital Natural. La empresa
   enrolada también registra sus propios traslados desde su panel (pestaña
-  "Transporte Cat. 7"), con evidencia opcional (PDF/XML/foto) y un informe mensual
-  consolidado en PDF por período — mismos modos y cálculo que el admin.
+  "Transporte Cat. 7"), con evidencia opcional (PDF/XML/foto), un botón para precargar
+  origen/destino/patente subiendo el XML de una guía de despacho (la patente es
+  informativa, nunca entra al cálculo de CO2e), y un informe mensual consolidado en
+  PDF por período — mismos modos y cálculo que el admin.
 
 ### Acceso de prueba con códigos (créditos)
 

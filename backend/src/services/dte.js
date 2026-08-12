@@ -5,17 +5,44 @@
 // ============================================================
 
 // Extrae el contenido del primer tag <name>…</name> dentro de un bloque.
+//
+// A propósito NO usa `<name(?:\s[^>]*)?>([\s\S]*?)</name>` de punta a
+// punta: esa forma es O(n²) ante un XML con muchas aperturas del mismo
+// tag sin su cierre (el motor reintenta el match completo desde cada
+// posición fallida) — un archivo de unos cientos de KB con ese patrón
+// bloquea el event loop por segundos, y esta función la alcanzan
+// proveedores autenticados subiendo su propio XML (routes/informes.js,
+// lecturaDocumento.js, transporteProveedor.js). Acá se ubica la apertura
+// con una regex simple (sin backtracking posible: no hay cuantificador
+// anidado) y el cierre con `indexOf` plano — ambos O(n), sin importar
+// cuántas aperturas huérfanas traiga el resto del documento.
 function tag(xml, name) {
-  const m = xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'i'));
-  return m ? m[1].trim() : null;
+  const openRe = new RegExp(`<${name}(?:\\s[^>]*)?>`, 'i');
+  const open = xml.match(openRe);
+  if (!open) return null;
+  const start = open.index + open[0].length;
+  const closeIdx = xml.toLowerCase().indexOf(`</${name.toLowerCase()}>`, start);
+  if (closeIdx === -1) return null;
+  return xml.slice(start, closeIdx).trim();
 }
 
-// Extrae todos los bloques <name>…</name>.
+// Extrae todos los bloques <name>…</name> — mismo criterio O(n) que tag()
+// de arriba: cada iteración avanza `lastIndex` hasta DESPUÉS del cierre
+// encontrado, así que ningún tramo del string se vuelve a escanear.
 function tags(xml, name) {
   const out = [];
-  const re = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, 'gi');
+  const openRe = new RegExp(`<${name}(?:\\s[^>]*)?>`, 'gi');
+  const closeTag = `</${name}>`;
+  const xmlLower = xml.toLowerCase();
+  const closeTagLower = closeTag.toLowerCase();
   let m;
-  while ((m = re.exec(xml)) !== null) out.push(m[1]);
+  while ((m = openRe.exec(xml)) !== null) {
+    const start = m.index + m[0].length;
+    const closeIdx = xmlLower.indexOf(closeTagLower, start);
+    if (closeIdx === -1) break;
+    out.push(xml.slice(start, closeIdx));
+    openRe.lastIndex = closeIdx + closeTag.length;
+  }
   return out;
 }
 
