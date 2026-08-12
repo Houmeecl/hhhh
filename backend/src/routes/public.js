@@ -1,6 +1,8 @@
 import express from 'express';
 import multer from 'multer';
 import jwt from 'jsonwebtoken';
+import { gzipSync } from 'zlib';
+import crypto from 'crypto';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
@@ -46,7 +48,9 @@ const router = express.Router();
 const motorExternoActivo = () =>
   String(process.env.MOTOR_EXTERNO || 'on').toLowerCase() !== 'off';
 
-// Almacenamiento en memoria; solo guardamos el nombre original (no el binario).
+// Almacenamiento en memoria durante la petición; el binario ORIGINAL se
+// persiste comprimido en `facturas.archivo_binario` (migración 094) para
+// backup/compliance — antes se descartaba al responder.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 15 * 1024 * 1024, files: config.maxFilesPerSession },
@@ -546,13 +550,22 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         eslabon += 1;
         const nEslabon = eslabon;
 
+        // Binario original comprimido (backup/compliance, migración 094).
+        // NUNCA entra al hash de la cadena (hDoc arriba ya se calculó sin
+        // él) — mismo criterio que lote_documentos: el archivo es evidencia
+        // retenida, no parte de lo que la cadena atestigua.
+        const extension = (file.originalname.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase() || null;
+        const archivoBinario = gzipSync(file.buffer);
+        const sha256Archivo = crypto.createHash('sha256').update(file.buffer).digest('hex');
+
         const { rows: fRows } = await client.query(
           `INSERT INTO facturas
              (sesion_id, invoice_id_simple, numero_venta, archivo_original,
               rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo,
               categoria_origen, status, motor,
-              hash_documento, hash_anterior, hash_cadena, eslabon, motor_version_id)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING *`,
+              hash_documento, hash_anterior, hash_cadena, eslabon, motor_version_id,
+              archivo_binario, extension, tamano_bytes, sha256)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -576,6 +589,10 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
             // número, para que el informe cite después la metodología real y
             // no la vigente al momento de imprimirlo (services/pdf.js).
             versionMotorId,
+            archivoBinario,
+            extension,
+            file.buffer.length,
+            sha256Archivo,
           ]
         );
         hashAnterior = hCad;

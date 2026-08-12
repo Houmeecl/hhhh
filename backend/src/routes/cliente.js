@@ -1,4 +1,5 @@
 import express from 'express';
+import { gunzipSync } from 'zlib';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { categoriaParaMostrar } from '../services/categoriaPresentacion.js';
@@ -24,9 +25,17 @@ router.get('/mis-sesiones', soloCliente, async (req, res, next) => {
       [email]
     );
     for (const s of sesiones) {
+      // `tamano_bytes` sale de `facturas` directo (JOIN aparte, no de la
+      // vista): facturas_vigentes no lo expone — ver migración 094 sobre
+      // por qué esa vista no se toca. No nulo = hay binario original
+      // disponible para descargar (facturas antiguas o del motor externo
+      // no lo tienen).
       const { rows: facturas } = await query(
-        `SELECT id, numero_venta, archivo_original, categoria, categoria_origen, total_co2e
-         FROM facturas_vigentes WHERE sesion_id = $1 ORDER BY created_at`,
+        `SELECT fv.id, fv.numero_venta, fv.archivo_original, fv.categoria, fv.categoria_origen, fv.total_co2e,
+                (f.tamano_bytes IS NOT NULL) AS tiene_archivo_original
+         FROM facturas_vigentes fv
+         JOIN facturas f ON f.id = fv.id
+         WHERE fv.sesion_id = $1 ORDER BY fv.created_at`,
         [s.id]
       );
       // La categoría se entrega ya rotulada: el cliente ve el nombre que el
@@ -35,6 +44,38 @@ router.get('/mis-sesiones', soloCliente, async (req, res, next) => {
       s.facturas = facturas.map((f) => ({ ...f, categoria: categoriaParaMostrar(f).detalle }));
     }
     res.json({ email, sesiones });
+  } catch (err) { next(err); }
+});
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MIME = {
+  pdf: 'application/pdf', xml: 'application/xml', jpg: 'image/jpeg',
+  jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic',
+};
+
+// ---------- GET /api/mis-facturas/:id/archivo-original ----------
+// Descarga el binario original (comprimido con gzip en BD, migración 094).
+// Scopeado al email del cliente vía JOIN con sesiones — un cliente no
+// puede pedir el archivo de otra empresa cambiando el id en la URL.
+router.get('/mis-facturas/:id/archivo-original', soloCliente, async (req, res, next) => {
+  try {
+    if (!UUID_RE.test(String(req.params.id))) return res.status(404).json({ error: 'Factura no encontrada.' });
+    const email = String(req.user.email || '').toLowerCase();
+    const { rows } = await query(
+      `SELECT f.archivo_binario, f.archivo_original, f.extension
+         FROM facturas f
+         JOIN sesiones s ON s.id = f.sesion_id
+        WHERE f.id = $1 AND lower(s.email_cliente) = $2`,
+      [req.params.id, email]
+    );
+    if (!rows[0] || !rows[0].archivo_binario) {
+      return res.status(404).json({ error: 'Esta factura no tiene un archivo original disponible.' });
+    }
+    const original = gunzipSync(rows[0].archivo_binario);
+    res.setHeader('Content-Type', MIME[rows[0].extension] || 'application/octet-stream');
+    const nombreSeguro = (rows[0].archivo_original || 'factura').replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreSeguro}"`);
+    res.send(original);
   } catch (err) { next(err); }
 });
 

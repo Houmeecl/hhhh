@@ -376,6 +376,14 @@ export const INVENTARIO = {
     base: null, cadena: CADENA.NINGUNA, retencion: null,
     motivoSinPurga: 'No contiene datos personales.',
   },
+  puntos_corredor: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Corredor Bioceánico: `nombre` y `lat`/`lng` describen un punto de control geográfico fijo '
+      + 'del corredor (báscula, frontera, puerto), no a una persona ni su ubicación.',
+    finalidad: 'Catálogo de puntos de control del corredor, editable desde el panel admin sin deploy.',
+    base: null, cadena: CADENA.NINGUNA, retencion: null,
+    motivoSinPurga: 'Los eslabones históricos referencian el id (slug) del punto; se desactiva, no se borra.',
+  },
   reciclajes: {
     clasificacion: PERSONAL,
     columnas: ['lat', 'lng'],

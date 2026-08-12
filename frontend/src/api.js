@@ -577,6 +577,8 @@ export const api = {
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
   misSesiones: () => request('/mis-sesiones', { cliente: true }),
+  descargarFacturaOriginal: (id, nombre) =>
+    descargarAuthToken(`/api/mis-facturas/${id}/archivo-original`, clienteAuth.token, nombre || 'factura'),
 
   // --- "Sube y Suma" (/suma) — escaneo gamificado con código de campaña.
   // El magic link es el mismo mecanismo de arriba, solo que con `codigo` en
@@ -713,7 +715,14 @@ async function abrirPdfAuth(url, store = auth) {
 // servidor exige Authorization: Bearer, que un <a href> normal no puede
 // mandar. Se trae como blob y se dispara la descarga con un <a> temporal.
 async function descargarAuth(url, store, filename) {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${store.access}` } });
+  return descargarAuthToken(url, store.access, filename);
+}
+
+// Misma mecánica que descargarAuth, pero recibe el token directo en vez de
+// un almacén con `.access` — clienteAuth (magic link) guarda el suyo en
+// `.token`, no `.access`.
+async function descargarAuthToken(url, token, filename) {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error || 'No se pudo generar el archivo');

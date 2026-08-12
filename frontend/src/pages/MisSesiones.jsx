@@ -8,6 +8,14 @@ export default function MisSesiones() {
   const nav = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [descargando, setDescargando] = useState(null);
+
+  async function descargarOriginal(f) {
+    setDescargando(f.id);
+    try { await api.descargarFacturaOriginal(f.id, f.archivo_original); }
+    catch (e) { alert(e.message); }
+    finally { setDescargando(null); }
+  }
 
   useEffect(() => {
     if (!clienteAuth.token) { nav('/ingresar', { replace: true }); return; }
@@ -94,6 +102,16 @@ export default function MisSesiones() {
                         <td className="num">{fmt(f.total_co2e, 3)}</td>
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <a className="btn btn-outline btn-sm" href={api.etiquetaUrl(f.id)} target="_blank" rel="noreferrer">Etiqueta</a>
+                          {f.tiene_archivo_original && (
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ marginLeft: 6 }}
+                              onClick={() => descargarOriginal(f)}
+                              disabled={descargando === f.id}
+                            >
+                              {descargando === f.id ? <span className="spinner" /> : 'Descargar original'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
