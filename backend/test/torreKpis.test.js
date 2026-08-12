@@ -115,3 +115,17 @@ test('la respuesta se cachea 60 s (dos GET seguidos devuelven el mismo `generado
   const b = await (await fetch(`${baseUrl}/api/torre/kpis`, { headers: { Authorization: `Bearer ${posToken}` } })).json();
   assert.equal(a.generado, b.generado);
 });
+
+test('ETag: un segundo GET con If-None-Match devuelve 304 sin cuerpo', { skip: SALTO_PROD }, async () => {
+  const primera = await fetch(`${baseUrl}/api/torre/kpis`, { headers: { Authorization: `Bearer ${posToken}` } });
+  assert.equal(primera.status, 200);
+  const etag = primera.headers.get('etag');
+  assert.ok(etag, 'la respuesta trae header ETag');
+
+  const segunda = await fetch(`${baseUrl}/api/torre/kpis`, {
+    headers: { Authorization: `Bearer ${posToken}`, 'If-None-Match': etag },
+  });
+  assert.equal(segunda.status, 304);
+  const cuerpo = await segunda.text();
+  assert.equal(cuerpo, '', 'un 304 no trae cuerpo');
+});

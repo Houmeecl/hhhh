@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 // ============================================================
 import {
   PUNTOS_CORREDOR, HORAS_ALERTA_AMBAR, HORAS_ALERTA_ROJA,
-  horasSinAvance, estadoAvance, textoDuracion, pasosRetrocedidos,
+  horasSinAvance, estadoAvance, textoDuracion, pasosRetrocedidos, resumenFlota,
 } from '../../frontend/src/lib/corredor.js';
 
 const AHORA = Date.parse('2026-08-11T12:00:00Z');
@@ -90,6 +90,45 @@ test('pasosRetrocedidos: un eslabón sin punto reconocible no rompe la secuencia
 
 test('pasosRetrocedidos: catálogo del corredor cubre el tramo Brasil→Chile completo (14 puntos)', () => {
   assert.equal(PUNTOS_CORREDOR.length, 14);
+});
+
+// ---------- resumenFlota ----------
+// `flota` tiene la forma de la respuesta de GET /api/torre/flota: cada
+// camión trae (o no) `ultimo_paso: { punto_id, creado }` (torre.js:157-160).
+const camion = (codigo, punto_id, horas) => ({
+  codigo, ultimo_paso: punto_id ? { punto_id, creado: horasAtras(horas) } : null,
+});
+
+test('resumenFlota: array vacío da todo en 0', () => {
+  assert.deepEqual(resumenFlota([], AHORA), { total: 0, en_ruta: 0, ambar: 0, rojo: 0, sin_posicion: 0 });
+});
+
+test('resumenFlota: sin ultimo_paso o con punto no reconocible cuenta como sin_posicion, sin romper el resto', () => {
+  const flota = [
+    camion('LM-A', null, 0),
+    { codigo: 'LM-B', ultimo_paso: { punto_control: 'Báscula sin nombre', creado: horasAtras(0) } },
+    camion('LM-C', 'campo-grande', 0),
+  ];
+  const r = resumenFlota(flota, AHORA);
+  assert.equal(r.total, 3);
+  assert.equal(r.sin_posicion, 2);
+  assert.equal(r.en_ruta, 1);
+});
+
+test('resumenFlota: reparte en_ruta/ambar/rojo con los mismos umbrales que estadoAvance', () => {
+  const flota = [
+    camion('LM-OK', 'campo-grande', 0),                        // recién visto → en_ruta
+    camion('LM-AMBAR', 'ponta-pora', HORAS_ALERTA_AMBAR + 1),   // > 12h → ambar
+    camion('LM-ROJO', 'jujuy', HORAS_ALERTA_ROJA + 1),          // > 24h → rojo
+  ];
+  const r = resumenFlota(flota, AHORA);
+  assert.equal(r.total, 3);
+  assert.equal(r.en_ruta, 1);
+  assert.equal(r.ambar, 1);
+  assert.equal(r.rojo, 1);
+  assert.equal(r.sin_posicion, 0);
+  // total siempre es la suma de los 4 baldes.
+  assert.equal(r.total, r.en_ruta + r.ambar + r.rojo + r.sin_posicion);
 });
 
 // ---------- Catálogo dinámico (setCatalogo, migración 093) ----------

@@ -98,6 +98,19 @@ test('GET /api/torre/flota refleja los camiones creados por demo-torre', { skip:
   assert.equal(filaEnRuta.ultimo_paso.punto_id, 'mariscal-estigarribia');
 });
 
+test('GET /api/torre/flota: ETag + If-None-Match devuelve 304 sin cuerpo', { skip: SALTO_PROD }, async () => {
+  const primera = await fetch(`${baseUrl}/api/torre/flota`, { headers: { Authorization: `Bearer ${torreToken}` } });
+  assert.equal(primera.status, 200);
+  const etag = primera.headers.get('etag');
+  assert.ok(etag, 'la respuesta trae header ETag');
+
+  const segunda = await fetch(`${baseUrl}/api/torre/flota`, {
+    headers: { Authorization: `Bearer ${torreToken}`, 'If-None-Match': etag },
+  });
+  assert.equal(segunda.status, 304);
+  assert.equal(await segunda.text(), '', 'un 304 no trae cuerpo');
+});
+
 // ---------- GET /api/admin/origen/corredor/:puntoId/qr.png ----------
 
 test('GET /admin/origen/corredor/:puntoId/qr.png con id del catálogo → 200 PNG', { skip: SALTO_PROD }, async () => {
