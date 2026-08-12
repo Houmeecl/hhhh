@@ -5,6 +5,8 @@ import { query } from '../lib/db.js';
 import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { calcularCo2eViaje, resumenTransporte, validarViaje } from '../services/transporte.js';
 import { generateInformeTransporte } from '../services/pdf.js';
+import { generateComprobanteTransporte } from '../services/transportePdf.js';
+import { sendMail, comprobanteTransporteEmail } from '../services/mailer.js';
 
 // ============================================================
 // Transporte de personal (GHG Protocol Categoría 7) desde el panel del
@@ -130,6 +132,41 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
       usuarioId: req.user.sub, accion: 'proveedor_viaje_registrar', entidad: 'transporte_viaje',
       entidadId: rows[0].id, detalle: { modo, km, co2e }, ip: req.ip,
     });
+
+    // Enviar email con comprobante (best effort — no bloquea si falla).
+    setImmediate(async () => {
+      try {
+        const { rows: provRows } = await query(
+          `SELECT nombre_empresa, rut, contacto_email FROM proveedores WHERE id = $1`,
+          [req.user.proveedor_id]
+        );
+        const prov = provRows[0];
+        if (!prov?.contacto_email) {
+          console.log('[transporte] sin correo de contacto para enviar comprobante');
+          return;
+        }
+        const pdf = await generateComprobanteTransporte({
+          viaje: rows[0],
+          empresa: prov,
+          modoNombre: mRows[0].nombre,
+        });
+        await sendMail({
+          to: prov.contacto_email,
+          subject: `Comprobante de transporte — ${prov.nombre_empresa}`,
+          html: comprobanteTransporteEmail({
+            empresa: prov.nombre_empresa,
+            viaje: rows[0],
+            modoNombre: mRows[0].nombre,
+            co2e: rows[0].co2e,
+          }).html,
+          attachments: [{ filename: `comprobante-transporte-${rows[0].id}.pdf`, content: pdf }],
+          area: 'Proveedor',
+        });
+      } catch (err) {
+        console.error('[transporte] error enviando comprobante por email:', err.message);
+      }
+    });
+
     res.status(201).json({ viaje: { ...rows[0], modo_nombre: mRows[0].nombre } });
   } catch (err) { next(err); }
 });

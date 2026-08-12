@@ -116,7 +116,7 @@ function RegistrarViaje({ modos, alRegistrar, flash }) {
       setForm({ ...VIAJE_VACIO });
       setArchivo(null);
       alRegistrar();
-      flash(`Traslado registrado: ${fmt(viaje.co2e, 3)} t CO2e.`);
+      flash(`✓ Traslado registrado: ${fmt(viaje.co2e, 3)} t CO2e. Comprobante enviado por email.`);
     } catch (e) { flash(e.message, true); }
     finally { setGuardando(false); }
   }

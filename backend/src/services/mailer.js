@@ -194,3 +194,40 @@ export function resetEmail({ nombre, link, area }) {
       </div>`,
   };
 }
+
+// Comprobante de transporte (viaje en bus, camioneta, etc.) para empresa/cliente.
+export function comprobanteTransporteEmail({ empresa, viaje, modoNombre, co2e }) {
+  const total = nfClp(co2e, 2);
+  return {
+    subject: `Comprobante de transporte — ${empresa}`,
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Comprobante de transporte de personal</h2>
+        <p>Hola, te adjuntamos el comprobante del traslado registrado en sicr3p.</p>
+        <div style="background:#f0fdfa;border:1px solid #14b8a6;border-radius:10px;padding:14px 18px;margin:12px 0">
+          <div style="font-size:12px;color:#0d9488;font-weight:700">EMISIONES CALCULADAS</div>
+          <div style="font-size:22px;font-weight:800">${total} tCO2e</div>
+          <div style="font-size:13px;color:#64748b">${modoNombre || 'Transporte'} · ${viaje.origen} → ${viaje.destino}</div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:13px">
+          <tr style="border-bottom:1px solid #e6e9ed">
+            <td style="padding:8px 0;color:#64748b">Modo:</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600">${modoNombre || viaje.modo}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e6e9ed">
+            <td style="padding:8px 0;color:#64748b">Distancia:</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600">${viaje.km} km${viaje.ida_vuelta ? ' (ida y vuelta)' : ''}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #e6e9ed">
+            <td style="padding:8px 0;color:#64748b">Pasajeros:</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600">${viaje.pasajeros}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b">Fecha:</td>
+            <td style="padding:8px 0;text-align:right;font-weight:600">${viaje.fecha}</td>
+          </tr>
+        </table>
+        <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad. Este informe no constituye una verificación de tercera parte acreditada (ISO 14064-3).</p>
+      </div>`,
+  };
+}
