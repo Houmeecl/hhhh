@@ -8,7 +8,6 @@ import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
 import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
 import { formatearRut } from './mandante.js';
-import { MATERIALES_REP } from './rep.js';
 // Import circular benigno con alcanceGhg.js (que toma citaFuente de acá):
 // citaFuente es una function declaration —hoisted—, así que está disponible
 // aunque alcanceGhg se evalúe primero; y estas dos solo se llaman en runtime.
@@ -1500,8 +1499,6 @@ export async function generateInformeTransporte({ empresa, periodo, viajes, resu
 // para la declaración de la EMPRESA ante RETC/SGR, no una atestación
 // propia de sicr3p, así que este documento no lleva QR de verificación
 // pública — sería prometer una cadena que no existe.
-const NOMBRE_MATERIAL_REP = new Map(MATERIALES_REP.map((m) => [m.codigo, m.nombre]));
-
 function tablaComposicionRep(doc, x, y, ancho, productos) {
   doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY).text('1. Composición declarada', x, y, { width: ancho });
   y = doc.y + 4;
@@ -1678,7 +1675,16 @@ export async function generateReporteRepTrazabilidad({ empresa, periodo, product
     y = doc.y + 4;
   }
 
-  avisoNoVerificacion(doc, M, doc.page.height - 54, W);
+  // Pie propio (no avisoNoVerificacion/AVISO_NO_VERIFICACION): ese aviso
+  // es específico de informes que declaran EMISIONES ("factores de
+  // emisión", ISO 14064-3) — este documento no calcula CO2e, así que
+  // reutilizarlo mencionaría algo que no está en el PDF y confundiría a
+  // quien lo lea.
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+    'Este documento reúne evidencia declarada por la empresa en sicr3p — no constituye una '
+      + 'verificación de tercera parte acreditada ni una auditoría independiente del envase.',
+    M, doc.page.height - 54, { width: W }
+  );
   return bufferDoc(doc);
 }
 
