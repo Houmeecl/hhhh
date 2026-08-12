@@ -63,6 +63,12 @@ export function parseDte(xmlText) {
   const emisor = tag(enc, 'Emisor') || '';
   const receptor = tag(enc, 'Receptor') || '';
   const totales = tag(enc, 'Totales') || '';
+  // Solo presente en Guía de Despacho (tipo 52): quién transporta, en qué
+  // patente, y el destino físico del despacho — que puede no ser la
+  // dirección tributaria del receptor (<Receptor><DirRecep>) si la entrega
+  // es en otra bodega/faena. En el resto de los DTE este bloque no existe
+  // y todo lo de acá abajo queda null.
+  const transporte = tag(enc, 'Transporte') || '';
 
   const tipoDte = Number(tag(idDoc, 'TipoDTE')) || null;
   const doc = {
@@ -86,6 +92,12 @@ export function parseDte(xmlText) {
       precio: Number(tag(d, 'PrcItem')) || 0,
       monto: Number(tag(d, 'MontoItem')) || 0,
     })),
+    // Patente del vehículo de transporte (Guía de Despacho) — null en
+    // cualquier otro tipo de DTE, que no trae este bloque.
+    patente: tag(transporte, 'Patente'),
+    direccion_origen: tag(transporte, 'DirOrigen') || tag(emisor, 'DirEmisor') || null,
+    direccion_destino: [tag(transporte, 'DirDest'), tag(transporte, 'CmnaDest')]
+      .filter(Boolean).join(', ') || tag(receptor, 'DirRecep') || null,
   };
 
   // Verificaciones locales (sin red SII).

@@ -1,0 +1,21 @@
+-- ============================================================
+-- 096: patente del vehículo en un traslado de Transporte (Cat. 7).
+--
+-- Las guías de despacho (DTE tipo 52) traen nativamente la patente del
+-- vehículo y el origen/destino físico del despacho en su bloque
+-- <Transporte> (services/dte.js, parseDte). Hasta ahora sicr3p ni
+-- siquiera parseaba esos campos — y una guía subida al flujo normal de
+-- facturas (/api/sesiones) se RECHAZA de entrada (tipo_documento_no_
+-- calculable, ver TIPOS_DTE_NO_CALCULABLES en lecturaDocumento.js): no
+-- representa una compra con emisiones propias, es un comprobante de
+-- traslado de carga.
+--
+-- Este traslado es justamente lo que el módulo de Transporte ya modela
+-- (transporte_viajes) — así que en vez de crear un dominio de "flota"
+-- aparte, la persona puede cargar la guía para PRELLENAR un viaje
+-- (origen/destino/patente), revisar km y pasajeros, y guardarlo con el
+-- mismo flujo de siempre. `patente` es informativa: no participa del
+-- cálculo de CO2e (ese sigue siendo km × pasajeros × factor del modo).
+-- ============================================================
+
+ALTER TABLE transporte_viajes ADD COLUMN IF NOT EXISTS patente TEXT;

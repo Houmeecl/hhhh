@@ -65,6 +65,65 @@ test('parseDte devuelve null si no es un DTE', () => {
   assert.equal(parseDte(null), null);
 });
 
+// ============================================================
+// Guía de despacho (tipo 52): trae un bloque <Transporte> que el resto de
+// los DTE no tiene — patente del vehículo y destino físico del despacho,
+// que puede no ser la dirección tributaria del receptor.
+// ============================================================
+
+const GUIA_EJEMPLO = `<?xml version="1.0" encoding="ISO-8859-1"?>
+<DTE version="1.0">
+  <Documento ID="G1T52">
+    <Encabezado>
+      <IdDoc><TipoDTE>52</TipoDTE><Folio>77</Folio><FchEmis>2026-06-15</FchEmis></IdDoc>
+      <Emisor>
+        <RUTEmisor>76123456-0</RUTEmisor>
+        <RznSoc>Minera del Norte SpA</RznSoc>
+        <DirEmisor>Camino Industrial 500</DirEmisor>
+      </Emisor>
+      <Receptor>
+        <RUTRecep>11111111-1</RUTRecep>
+        <RznSocRecep>Prueba Capital SpA</RznSocRecep>
+        <DirRecep>Bodega Central 10</DirRecep>
+      </Receptor>
+      <Transporte>
+        <Patente>ABCD12</Patente>
+        <RUTTrans>76999888-1</RUTTrans>
+        <DirDest>Faena Norte, camino a Calama km 12</DirDest>
+        <CmnaDest>Calama</CmnaDest>
+      </Transporte>
+      <Totales><MntTotal>0</MntTotal></Totales>
+    </Encabezado>
+    <Detalle><NmbItem>Concentrado de cobre</NmbItem><QtyItem>20</QtyItem><UnmdItem>ton</UnmdItem></Detalle>
+  </Documento>
+</DTE>`;
+
+test('parseDte extrae patente y destino de una guía de despacho (tipo 52)', () => {
+  const d = parseDte(GUIA_EJEMPLO);
+  assert.equal(d.tipo_dte, 52);
+  assert.equal(d.tipo_nombre, 'Guía de despacho');
+  assert.equal(d.patente, 'ABCD12');
+  assert.equal(d.direccion_origen, 'Camino Industrial 500');
+  assert.equal(d.direccion_destino, 'Faena Norte, camino a Calama km 12, Calama');
+});
+
+test('parseDte: sin bloque <Transporte> (factura normal), patente y direcciones quedan null/desde el receptor', () => {
+  const d = parseDte(DTE_EJEMPLO);
+  assert.equal(d.patente, null);
+  assert.equal(d.direccion_origen, null); // DTE_EJEMPLO no trae <DirEmisor>
+  assert.equal(d.direccion_destino, null); // ni <DirRecep>
+});
+
+test('parseDte: destino cae a DirRecep si la guía no trae <DirDest> (sin bloque Transporte separado)', () => {
+  const guiaSinTransporte = GUIA_EJEMPLO.replace(
+    /<Transporte>[\s\S]*?<\/Transporte>/,
+    ''
+  );
+  const d = parseDte(guiaSinTransporte);
+  assert.equal(d.patente, null);
+  assert.equal(d.direccion_destino, 'Bodega Central 10');
+});
+
 test('rutValido aplica módulo 11', () => {
   assert.equal(rutValido('76.123.456-0'), true);
   assert.equal(rutValido('11.111.111-1'), true);
