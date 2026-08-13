@@ -232,8 +232,13 @@ adminRouter.get('/campanas/:id/cobros', async (req, res, next) => {
               c.pasarela, c.pasarela_ref, c.notas,
               c.enviado_at, c.pagado_at, c.entregado_at, c.created_at,
               -- La CLAVE VENDIDA solo para rol admin. Un operador de la
-              -- campaña necesita saber si se entregó (lo dice `estado`),
-              -- no llevarse el listado completo de accesos pagados.
+              -- campaña necesita saber si se entregó (se lo dice la
+              -- columna estado), no llevarse el listado completo de
+              -- accesos pagados.
+              -- OJO: nada de comillas invertidas dentro de esta consulta.
+              -- Va en un template literal de JS, así que una comilla
+              -- invertida en un comentario SQL lo cierra y el archivo
+              -- deja de parsear entero.
               CASE WHEN $3 THEN k.codigo END AS codigo_entregado,
               (k.id IS NOT NULL) AS tiene_codigo,
               -- Solo los correos de CREDENCIALES: un fallo en el correo
