@@ -161,6 +161,20 @@ export const INVENTARIO = {
     motivoSinPurga: 'Borrar una baja la anularía: el correo volvería a entrar en la próxima campaña. '
       + 'Se conserva mientras exista el sistema de envíos.',
   },
+  entregas: {
+    clasificacion: PERSONAL,
+    columnas: ['destinatario_email'],
+    nota: 'Acuse de qué archivo se entregó, a quién y cuándo. Guarda el HASH del archivo tal como '
+      + 'salió —cifrado si iba cifrado—, jamás su contenido: es lo que permite responder "¿qué '
+      + 'informe exacto recibió esta empresa en julio?" sin conservar una copia del informe. '
+      + 'La bandera `cifrado` registra también los envíos que salieron en claro, a propósito: si '
+      + 'algún día falta la llave maestra, tiene que quedar constancia de cuáles fueron. '
+      + 'NO está encadenada: es registro de operación, no un eslabón del cálculo.',
+    finalidad: 'Poder demostrar qué documento se entregó a cada empresa, y detectar entregas sin cifrar.',
+    base: BASE.CONTRATO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Se borra completa pasado el plazo: cumplido su uso como acuse, no hay finalidad que la sostenga.',
+  },
   jugadores: {
     clasificacion: PERSONAL,
     columnas: ['email', 'nombre'],
@@ -621,7 +635,10 @@ export const INVENTARIO = {
     nota: 'Un proveedor suele ser una empresa, pero puede ser una persona natural (un pequeño '
       + 'proveedor sin razón social) — mismo criterio que agencias_aduana/trazadores. Entidad '
       + 'persistente para el login FIDO2 del panel /panel-proveedor (migración 062): NO reemplaza '
-      + 'a `credenciales_proveedor` (de un solo uso, migración 038), que sigue viva sin cambios.',
+      + 'a `credenciales_proveedor` (de un solo uso, migración 038), que sigue viva sin cambios. '
+      + '`clave_informe` (migración 101) NO es un dato de la persona sino un secreto de la '
+      + 'empresa: la contraseña con que se cifran sus informes. Se guarda cifrada en reposo con '
+      + 'la llave maestra en env — si se filtra la base, no sirve de nada.',
     finalidad: 'Acceso web del proveedor para firmar los lotes tipo `producto` que un admin le asignó.',
     base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
     retencion: 'Se puede dar de baja cuando termina la relación con el proveedor.',

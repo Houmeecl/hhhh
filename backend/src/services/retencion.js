@@ -63,6 +63,10 @@ export const PLAZOS = {
   // criterio y mismo plazo que un interesado descartado. Los PAGADOS no
   // se tocan: son el respaldo de una venta.
   cobro_sin_pagar: dias('RETENCION_COBROS_DIAS', 180),
+  // Acuse de entrega: sirve para responder un reclamo sobre un informe
+  // que se mandó. Dos años cubren con holgura el ejercicio contable y
+  // cualquier discusión sobre un entregable mensual.
+  entregas: dias('RETENCION_ENTREGAS_DIAS', 730),
 };
 
 // Cada minuto de más acá es una consulta pesada en producción; cada
@@ -210,6 +214,13 @@ const TAREAS = [
     sql: `DELETE FROM cobros
            WHERE estado IN ('pendiente','enviado','anulado')
              AND created_at < now() - ($1 || ' days')::interval`,
+  },
+  {
+    nombre: 'entregas',
+    accion: 'borrar',
+    plazo: () => PLAZOS.entregas,
+    sql: `DELETE FROM entregas
+           WHERE created_at < now() - ($1 || ' days')::interval`,
   },
 ];
 

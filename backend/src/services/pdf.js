@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { opcionesCifrado } from './entrega.js';
 import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasaporteOrigen.js';
@@ -207,7 +208,11 @@ function folio(sesion) {
 // traer además {organismo, documento, version_anio} para citar la fuente. Si
 // viene undefined, el servicio resuelve la metodología CONGELADA de las
 // versiones del motor con que se calcularon estas facturas; con [] se omiten.
-export async function generateReport({ sesion, facturas, declaracion, alcances }) {
+// `clave` (opcional): contraseña del PDF. Con ella el informe sale cifrado
+// con AES-256 (ver services/entrega.js). El activo de sicr3p es este
+// documento: entregarlo en claro por correo sería sellar el cálculo y
+// mandarlo desnudo.
+export async function generateReport({ sesion, facturas, declaracion, alcances, clave = null }) {
   const decl = declaracion !== undefined ? declaracion : await fetchDeclaracionEmbalaje(sesion?.id);
   // Metodología congelada: sale de la versión del motor estampada en cada
   // factura, no del estado vigente. Así el informe sigue citando lo que
@@ -218,7 +223,7 @@ export async function generateReport({ sesion, facturas, declaracion, alcances }
   const alcancesGhg = Array.isArray(alcances)
     ? alcances
     : (metodologia?.alcances ?? await fetchAlcancesGHG());
-  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true, ...opcionesCifrado(clave) });
   const totalCo2e = facturas.reduce((a, f) => a + Number(f.total_co2e || 0), 0);
   const totalItems = facturas.reduce((a, f) => a + (f.items?.length || 0), 0);
   // Solo las categorías ATRIBUIBLES: las que salieron de la glosa real del

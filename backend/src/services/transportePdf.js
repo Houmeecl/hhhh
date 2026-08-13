@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { opcionesCifrado } from './entrega.js';
 
 // ============================================================
 // Comprobante de transporte para email al cliente/empresa — PDF
@@ -45,8 +46,10 @@ export async function generateComprobanteTransporte({
   viaje,
   empresa,
   modoNombre,
+  // Contraseña del PDF: sin ella el comprobante sale en claro.
+  clave = null,
 }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true, ...opcionesCifrado(clave) });
   const M = 48;
   const W = doc.page.width - M * 2;
 

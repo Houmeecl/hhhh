@@ -6,6 +6,7 @@ import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } fro
 import { calcularCo2eViaje, resumenTransporte, validarViaje } from '../services/transporte.js';
 import { generateInformeTransporte } from '../services/pdf.js';
 import { generateComprobanteTransporte } from '../services/transportePdf.js';
+import { claveDeProveedor, registrarEntrega } from '../services/entrega.js';
 import { sendMail, comprobanteTransporteEmail } from '../services/mailer.js';
 import { parseDte } from '../services/dte.js';
 
@@ -191,10 +192,25 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
           console.log('[transporte] sin correo de contacto para enviar comprobante');
           return;
         }
+        const clave = await claveDeProveedor(req.user.proveedor_id);
         const pdf = await generateComprobanteTransporte({
           viaje: rows[0],
           empresa: prov,
           modoNombre: mRows[0].nombre,
+          // El comprobante sale CIFRADO con la clave de esta empresa. La
+          // clave no viaja acá: se entrega una sola vez desde el panel.
+          // Si falta la llave maestra, `claveDeProveedor` devuelve null y
+          // el PDF sale en claro — pero el acuse lo deja anotado, para
+          // que no pase inadvertido.
+          clave,
+        });
+        await registrarEntrega({
+          tipo: 'comprobante_transporte',
+          proveedorId: req.user.proveedor_id,
+          destinatario: prov.contacto_email,
+          archivo: pdf,
+          cifrado: Boolean(clave),
+          referencia: rows[0].id,
         });
         await sendMail({
           to: prov.contacto_email,
@@ -204,6 +220,7 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
             viaje: rows[0],
             modoNombre: mRows[0].nombre,
             co2e: rows[0].co2e,
+            cifrado: Boolean(clave),
           }).html,
           attachments: [{ filename: `comprobante-transporte-${rows[0].id}.pdf`, content: pdf }],
           area: 'Proveedor',

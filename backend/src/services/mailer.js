@@ -300,8 +300,19 @@ export function credencialesEmail({ empresa, codigo, creditos, link }) {
 }
 
 // Comprobante de transporte (viaje en bus, camioneta, etc.) para empresa/cliente.
-export function comprobanteTransporteEmail({ empresa, viaje, modoNombre, co2e }) {
+export function comprobanteTransporteEmail({ empresa, viaje, modoNombre, co2e, cifrado = false }) {
   const total = nfClp(co2e, 2);
+  // Sin este aviso, quien recibe un PDF que pide contraseña cree que el
+  // archivo llegó dañado. Y la contraseña NO va acá a propósito: mandarla
+  // en el mismo correo que el archivo dejaría el cifrado en decoración.
+  const avisoCifrado = cifrado ? `
+        <div style="background:#f1f5f9;border-left:3px solid #0f1f2e;padding:12px 16px;margin:14px 0">
+          <b style="font-size:13px">El PDF adjunto está cifrado.</b>
+          <div style="font-size:13px;color:#475569;margin-top:4px">
+            Ábralo con la clave de informes de su empresa — la misma que le entregamos al activar su cuenta.
+            Si no la tiene a mano, pídala desde su panel; nunca la enviamos por correo.
+          </div>
+        </div>` : '';
   return {
     subject: `Comprobante de transporte — ${empresa}`,
     html: `
@@ -313,6 +324,7 @@ export function comprobanteTransporteEmail({ empresa, viaje, modoNombre, co2e })
           <div style="font-size:22px;font-weight:800">${total} tCO2e</div>
           <div style="font-size:13px;color:#64748b">${modoNombre || 'Transporte'} · ${viaje.origen} → ${viaje.destino}</div>
         </div>
+        ${avisoCifrado}
         <table style="width:100%;border-collapse:collapse;margin:14px 0;font-size:13px">
           <tr style="border-bottom:1px solid #e6e9ed">
             <td style="padding:8px 0;color:#64748b">Modo:</td>
