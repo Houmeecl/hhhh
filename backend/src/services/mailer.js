@@ -49,7 +49,7 @@ export function elegirTransporte(cfg = config) {
 // `attachments`: [{ filename, content: Buffer }] (opcional). `area`: nombre
 // del panel/área que origina el correo (ver construirFrom arriba) — opcional,
 // sin ella se usa el FROM genérico de siempre.
-export async function sendMail({ to, subject, html, attachments, area }) {
+export async function sendMail({ to, subject, html, attachments, area, headers }) {
   const from = construirFrom(area);
   // 1) SMTP propio (servidor de correo del VPS).
   if (smtpTransport) {
@@ -58,6 +58,7 @@ export async function sendMail({ to, subject, html, attachments, area }) {
       to,
       subject,
       html,
+      headers,
       attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
     });
     return { id: info.messageId, transport: 'smtp' };
@@ -70,6 +71,7 @@ export async function sendMail({ to, subject, html, attachments, area }) {
       to,
       subject,
       html,
+      headers,
       attachments: attachments?.map((a) => ({ filename: a.filename, content: a.content })),
     });
     if (error) throw new Error(`Resend: ${error.message || 'error'}`);
@@ -191,6 +193,108 @@ export function resetEmail({ nombre, link, area }) {
         <p>Hola ${nombre}, recibimos una solicitud para restablecer tu contraseña${area ? ` del panel <b>${area}</b>` : ''}.</p>
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Definir nueva contraseña</a></p>
         <p style="color:#64748b;font-size:13px">El enlace expira en 2 horas.</p>
+      </div>`,
+  };
+}
+
+// ---------- Campaña de cobro ----------
+
+// Escape de HTML para todo lo que viene de la planilla. Los nombres de
+// empresa de una lista real traen `&`, comillas y hasta `<`; sin esto un
+// "Ríos & Cía." rompe el marcado y una celda con `<script>` viajaría
+// intacta al cliente de correo de quien la recibe.
+const esc = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+// El ASUNTO es una cabecera, no HTML: un salto de línea ahí permite
+// inyectar cabeceras nuevas (un Bcc, otro From). Tanto el nombre de la
+// campaña como la razón social vienen de texto que escribe una persona,
+// así que se aplanan a una sola línea y se acotan antes de interpolarse.
+const asunto = (s, max = 120) =>
+  String(s ?? '').replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+
+// Pie legal obligatorio de todo correo comercial: quién escribe y cómo
+// dejar de recibirlos (art. 28 B de la Ley 19.628). No es decorativo —
+// sin la salida visible, el destinatario que no quiere el correo solo
+// tiene un camino: marcarlo como spam, y eso arrastra la reputación del
+// dominio del que dependen los correos de activación de la plataforma.
+function pieComercial(bajaUrl) {
+  return `
+    <hr style="border:none;border-top:1px solid #e6e9ed;margin:22px 0 12px">
+    <p style="color:#94a3b8;font-size:12px;line-height:1.6;margin:0">
+      Le escribe <b>sicr3p</b> · contabilidad de carbono trazable · Chile.<br>
+      Recibe este correo porque su empresa figura en nuestro registro de contactos del rubro.
+      Si no desea recibir más comunicaciones comerciales,
+      <a href="${bajaUrl}" style="color:#64748b">dese de baja aquí</a> — es inmediato y no requiere responder.
+    </p>`;
+}
+
+/**
+ * Correo con el link de pago. `montoClp` ya viene en pesos enteros.
+ *
+ * El link NO lleva credenciales ni entra a ninguna cuenta: solo abre la
+ * página de pago. Lo que se recibe al pagar llega en otro correo, a esta
+ * misma dirección (ver credencialesEmail).
+ */
+export function linkPagoEmail({ empresa, contacto, montoClp, creditos, campana, link, bajaUrl, bajaPostUrl }) {
+  const saludo = contacto ? `Hola ${esc(contacto)}` : 'Hola';
+  return {
+    subject: `${asunto(campana, 70)} — acceso a sicr3p para ${asunto(empresa, 60) || 'su empresa'}`,
+    // Baja en un clic (RFC 8058). Gmail y Yahoo lo EXIGEN a quien envía
+    // en volumen: sin estas dos cabeceras, el botón "cancelar suscripción"
+    // no aparece en la bandeja y al destinatario que no quiere el correo
+    // solo le queda marcarlo como spam — lo que arrastra la reputación
+    // del dominio del que también salen los correos de activación y de
+    // recuperación de clave de toda la plataforma.
+    //
+    // El destino es el BACKEND, no la página: el cliente de correo hace
+    // un POST servidor-a-servidor y nunca ejecuta el JavaScript del sitio.
+    headers: bajaPostUrl ? {
+      'List-Unsubscribe': `<${bajaPostUrl}>, <${bajaUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    } : undefined,
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e;margin-bottom:4px">${esc(campana)}</h2>
+        <p>${saludo}${empresa ? `, de <b>${esc(empresa)}</b>` : ''}:</p>
+        <p>Puede activar el acceso de su empresa a <b>sicr3p</b>, la plataforma de contabilidad
+           de carbono trazable: sube sus facturas y obtiene su inventario de emisiones
+           (Alcances 1, 2 y 3) con respaldo documental.</p>
+        <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:16px 0">
+          <div style="font-size:12px;color:#218838;font-weight:700">SU ACCESO INCLUYE</div>
+          <div style="font-size:22px;font-weight:800">${creditos} documento${creditos === 1 ? '' : 's'}</div>
+          <div style="font-size:13px;color:#64748b">Valor: $ ${nfClp(montoClp)} CLP (IVA incluido)</div>
+        </div>
+        <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600">Pagar y activar el acceso</a></p>
+        <p style="color:#64748b;font-size:13px">Apenas se confirme el pago le llegará su clave de
+           acceso a esta misma dirección, de forma automática.</p>
+        ${pieComercial(bajaUrl)}
+      </div>`,
+  };
+}
+
+/**
+ * Correo con la clave, después de pagar. Este SÍ lleva el acceso, y por
+ * eso va SIEMPRE a la dirección registrada en el cobro y nunca a la que
+ * usó quien pagó: el link de pago es compartible, la clave no.
+ */
+export function credencialesEmail({ empresa, codigo, creditos, link }) {
+  return {
+    subject: 'Su acceso a sicr3p está activo — clave adentro',
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Pago recibido — su acceso está activo</h2>
+        <p>Gracias${empresa ? `, <b>${esc(empresa)}</b>` : ''}. Ya puede empezar a cargar sus documentos.</p>
+        <div style="background:#0f1f2e;border-radius:10px;padding:18px;margin:16px 0;text-align:center">
+          <div style="font-size:12px;color:#8fd3a8;font-weight:700;letter-spacing:.08em">SU CLAVE DE ACCESO</div>
+          <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:.06em;margin:6px 0">${esc(codigo)}</div>
+          <div style="font-size:13px;color:#94a3b8">${creditos} documento${creditos === 1 ? '' : 's'} disponibles</div>
+        </div>
+        <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600">Entrar y subir mi primer documento</a></p>
+        <p style="color:#64748b;font-size:13px">Guarde esta clave: es la que identifica el acceso de su
+           empresa. Si la pierde, respóndanos este correo y se la reenviamos.</p>
+        <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad.</p>
       </div>`,
   };
 }

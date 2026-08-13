@@ -399,6 +399,48 @@ export const api = {
   crearInteresado: (b) => request('/interesados', { method: 'POST', body: b }),
   interesados: (estado) => request(`/admin/interesados${estado ? `?estado=${estado}` : ''}`, { authed: true }),
   estadoInteresado: (id, estado) => request(`/admin/interesados/${id}/estado`, { method: 'PUT', body: { estado }, authed: true }),
+  // ---------- Campañas de cobro ----------
+  // La planilla viaja como multipart. `previsualizar` NO guarda nada:
+  // lee, propone el mapeo de columnas y muestra qué entraría. `importar`
+  // exige el mapeo ya confirmado.
+  campanasCobro: () => request('/admin/cobros/campanas', { authed: true }),
+  crearCampanaCobro: (b) => request('/admin/cobros/campanas', { method: 'POST', body: b, authed: true }),
+  pausarCampanaCobro: (id, activa) =>
+    request(`/admin/cobros/campanas/${id}`, { method: 'PUT', body: { activa }, authed: true }),
+  previsualizarCobros: (id, { archivo, hoja, mapeo, desde }) => {
+    const fd = new FormData();
+    fd.append('archivo', archivo);
+    if (hoja) fd.append('hoja', hoja);
+    if (mapeo) fd.append('mapeo', JSON.stringify(mapeo));
+    if (desde != null) fd.append('desde', String(desde));
+    return request(`/admin/cobros/campanas/${id}/previsualizar`, { method: 'POST', body: fd, formData: true, authed: true });
+  },
+  importarCobros: (id, { archivo, hoja, mapeo, desde }) => {
+    const fd = new FormData();
+    fd.append('archivo', archivo);
+    if (hoja) fd.append('hoja', hoja);
+    fd.append('mapeo', JSON.stringify(mapeo));
+    fd.append('desde', String(desde ?? 0));
+    return request(`/admin/cobros/campanas/${id}/importar`, { method: 'POST', body: fd, formData: true, authed: true });
+  },
+  cobrosDeCampana: (id, estado) =>
+    request(`/admin/cobros/campanas/${id}/cobros${estado ? `?estado=${estado}` : ''}`, { authed: true }),
+  enviarTandaCobros: (id, limite) =>
+    request(`/admin/cobros/campanas/${id}/enviar-tanda`, { method: 'POST', body: { limite }, authed: true }),
+  enviarCobro: (id) => request(`/admin/cobros/cobros/${id}/enviar`, { method: 'POST', authed: true }),
+  marcarCobroPagado: (id, referencia) =>
+    request(`/admin/cobros/cobros/${id}/marcar-pagado`, { method: 'POST', body: { referencia }, authed: true }),
+  reenviarCredenciales: (id) =>
+    request(`/admin/cobros/cobros/${id}/reenviar-credenciales`, { method: 'POST', authed: true }),
+  correosDeCobro: (id) => request(`/admin/cobros/cobros/${id}/correos`, { authed: true }),
+  bajasCorreo: () => request('/admin/cobros/bajas', { authed: true }),
+
+  // Página pública de pago (sin sesión: quien paga todavía no tiene cuenta).
+  pagoInfo: (token) => request(`/pagar/${token}`),
+  iniciarPago: (token) => request(`/pagar/${token}/iniciar`, { method: 'POST' }),
+  estadoPago: (token) => request(`/pagar/${token}/estado`),
+  darseDeBaja: (token) => request(`/pagar/${token}/baja`, { method: 'POST' }),
+
   simpleApi: () => request('/admin/simple-api', { authed: true }),
   usuarios: () => request('/admin/usuarios', { authed: true }),
   cambiarPassword: (actual, nueva) => request('/admin/perfil/password', { method: 'PUT', body: { actual, nueva }, authed: true }),

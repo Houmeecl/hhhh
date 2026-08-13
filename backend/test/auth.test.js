@@ -167,7 +167,11 @@ test('requireSeccion sin req.user responde 401, no 403', () => {
 });
 
 test('seccionesValidas: acepta subconjuntos del vocabulario y rechaza slugs inventados', () => {
-  assert.equal(SECCIONES_ADMIN.length, 24);
+  // El vocabulario VIGENTE. Este número sube cada vez que se agrega una
+  // sección, y subirlo acá es parte del cambio: obliga a tocar también
+  // el CHECK de la migración y frontend/src/admin/secciones.js, que son
+  // los otros dos espejos que no se pueden desincronizar.
+  assert.equal(SECCIONES_ADMIN.length, 25);
   assert.equal(seccionesValidas(['clientes', 'sii']), true);
   assert.equal(seccionesValidas([]), true);
   assert.equal(seccionesValidas(['inventada']), false);

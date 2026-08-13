@@ -41,6 +41,13 @@ export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   publicAppUrl: process.env.PUBLIC_APP_URL || 'http://localhost:5173',
+  // De dónde cuelga la API vista DESDE INTERNET. En producción nginx
+  // sirve el sitio y /api en el mismo dominio, así que por defecto es el
+  // mismo valor. Existe aparte porque una pasarela de pago necesita una
+  // URL de webhook que apunte al BACKEND, y en desarrollo el frontend
+  // vive en :5173 y el backend en :4000 — mandarle a Flow la del
+  // frontend haría que la confirmación del pago nunca llegue.
+  publicApiUrl: process.env.PUBLIC_API_URL || process.env.PUBLIC_APP_URL || 'http://localhost:4000',
 
   databaseUrl: process.env.DATABASE_URL,
 
@@ -159,6 +166,45 @@ export const config = {
       base: process.env.APIGATEWAY_BASE || 'https://app.apigateway.cl/api/v2',
       timeoutMs: parseInt(process.env.APIGATEWAY_TIMEOUT_MS || '20000', 10),
     },
+  },
+
+  // Cobro del acceso por correo (campañas de venta). OJO: esto SÍ mueve
+  // dinero real, a diferencia de `compensacionHabilitada` de arriba, que
+  // es un cobro simulado de compensación de carbono. Son dos cosas
+  // distintas y no comparten nada.
+  //
+  // 'manual' (por defecto) = transferencia bancaria: el correo lleva los
+  // datos de la cuenta y un admin confirma el pago en el panel. Funciona
+  // hoy, sin contratar nada. 'flow' = Flow.cl, que emite el link y avisa
+  // por webhook; se activa solo cuando hay credenciales de verdad, para
+  // que un despliegue sin configurar no deje links de pago rotos.
+  pagos: {
+    pasarela: (process.env.PAGOS_PASARELA || 'manual').toLowerCase(),
+    flow: {
+      apiKey: process.env.FLOW_API_KEY || '',
+      secret: process.env.FLOW_SECRET || '',
+      // Pruebas: https://sandbox.flow.cl/api
+      base: process.env.FLOW_BASE || 'https://www.flow.cl/api',
+      timeoutMs: parseInt(process.env.FLOW_TIMEOUT_MS || '15000', 10),
+    },
+    // Datos que se imprimen en el correo cuando la pasarela es 'manual'.
+    // Sin ellos el correo no puede pedir una transferencia, así que el
+    // envío se bloquea con un mensaje claro en vez de mandar un correo
+    // que dice "transfiere a" y nada más.
+    transferencia: {
+      banco: process.env.PAGO_BANCO || '',
+      tipoCuenta: process.env.PAGO_TIPO_CUENTA || 'Cuenta Corriente',
+      numero: process.env.PAGO_CUENTA || '',
+      titular: process.env.PAGO_TITULAR || '',
+      rut: process.env.PAGO_RUT || '',
+      email: process.env.PAGO_EMAIL || process.env.ADMIN_EMAIL || '',
+    },
+    // Cuántos correos de campaña salen por tanda. La lista real tiene
+    // miles de direcciones: mandarlas de una vez es la forma más rápida
+    // de que el proveedor de correo corte el envío y de que el dominio
+    // quede marcado como spam — y con él, los correos de activación y
+    // recuperación de clave de toda la plataforma.
+    loteMax: parseInt(process.env.COBROS_LOTE_MAX || '100', 10),
   },
 
   resend: {

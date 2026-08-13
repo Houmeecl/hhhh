@@ -10,6 +10,7 @@ import PuntoControl from './pages/PuntoControl.jsx';
 import FirmaProveedor from './pages/FirmaProveedor.jsx';
 import AccesoUnico from './pages/AccesoUnico.jsx';
 import Prueba from './pages/Prueba.jsx';
+import Pagar from './pages/Pagar.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
@@ -85,6 +86,13 @@ export default function App() {
       <Route path="/ingresar" element={<AccesoUnico />} />
       <Route path="/panel/ingresar" element={<Navigate to="/ingresar" replace />} />
       <Route path="/prueba" element={<Prueba />} />
+      {/* Link de pago del correo comercial. Las tres rutas comparten
+          componente: /listo es el retorno desde la pasarela (espera la
+          confirmación del webhook) y /baja ejerce la oposición a recibir
+          más correos — un GET, para que baste un clic desde el correo. */}
+      <Route path="/pagar/:token" element={<Pagar />} />
+      <Route path="/pagar/:token/listo" element={<Pagar modo="listo" />} />
+      <Route path="/pagar/:token/baja" element={<Pagar modo="baja" />} />
       <Route path="/acceso" element={<Acceso />} />
       <Route path="/mis-sesiones" element={<MisSesiones />} />
       {/* /aduana-verde era una segunda landing del canal presencial, con sus

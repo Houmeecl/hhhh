@@ -33,6 +33,7 @@ import trazadorRoutes from './routes/trazador.js';
 import juegoRoutes from './routes/juego.js';
 import repProveedorRoutes from './routes/repProveedor.js';
 import transporteProveedorRoutes from './routes/transporteProveedor.js';
+import { adminRouter as cobrosAdminRoutes, publicRouter as pagarRoutes, webhookRouter as pagosWebhookRoutes } from './routes/cobros.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 import { iniciarPurgaAutomatica } from './services/retencion.js';
 
@@ -102,6 +103,17 @@ app.use('/api/panel-proveedor/rep', apiLimiter, repProveedorRoutes);
 // Transporte de personal (Cat. 7) del propio proveedor: router aparte,
 // mismo criterio que rep — no seguir engordando origen.js.
 app.use('/api/panel-proveedor/transporte', apiLimiter, transporteProveedorRoutes);
+app.use('/api/admin/cobros', cobrosAdminRoutes);
+// Página pública de pago. Va con apiLimiter como todo lo público: el
+// token es largo, pero el endpoint igual es adivinable y no hay motivo
+// para dejarlo sin freno.
+app.use('/api/pagar', apiLimiter, pagarRoutes);
+// El webhook de la pasarela va SIN apiLimiter: lo llama el servidor de
+// Flow desde su propia IP y, si un pico de pagos agotara la cuota, se
+// quedarían sin entregar accesos ya pagados. Que el aviso sea inofensivo
+// no depende del límite sino de que no se le crea: el estado se pregunta
+// de vuelta a Flow firmando la consulta (services/pagos.js).
+app.use('/api/pagos', pagosWebhookRoutes);
 app.use('/api/admin/capacitacion', capacitacionRoutes);
 app.use('/api/admin/apl', aplRoutes);
 app.use('/api/juego', apiLimiter, juegoRoutes);

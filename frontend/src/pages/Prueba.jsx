@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import LeadCta from '../components/LeadForm.jsx';
@@ -6,11 +6,21 @@ import { api } from '../api.js';
 
 // Mini sitio de prueba: se entra con un código que trae créditos
 // (1 crédito = 1 factura procesada). El código lo entrega sicr3p.
+// El código llega en el FRAGMENTO de la URL (#codigo=…), no en la query.
+// El fragmento no se manda al servidor: no queda en el access log de
+// nginx ni viaja en la cabecera Referer. Con `?codigo=` la clave recién
+// vendida quedaba escrita en texto plano en los registros del servidor.
+function codigoDelFragmento() {
+  if (typeof window === 'undefined') return '';
+  return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('codigo')?.trim() || '';
+}
+
 export default function Prueba() {
   const nav = useNavigate();
-  const [codigo, setCodigo] = useState('');
+  const [codigo, setCodigo] = useState(codigoDelFragmento);
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const autoIntentado = useRef(false);
 
   // Si ya hay un código válido en la sesión del navegador, sigue directo.
   useEffect(() => {
@@ -18,11 +28,27 @@ export default function Prueba() {
     if (c) nav('/cargar', { replace: true });
   }, []);
 
-  async function validar(e) {
-    e.preventDefault();
+  // El enlace del correo que se manda al confirmarse un pago
+  // (services/cobros.js) trae el código y entra solo: quien acaba de
+  // pagar no tendría por qué copiar su clave a mano desde el correo.
+  // El campo igual queda cargado y visible por si la validación falla.
+  useEffect(() => {
+    const c = codigoDelFragmento();
+    if (!c || autoIntentado.current) return;
+    autoIntentado.current = true;
+    // Se saca de la barra de direcciones apenas se leyó: el historial
+    // del navegador y lo que se comparte al copiar la URL tampoco tienen
+    // por qué llevar la clave.
+    window.history.replaceState(null, '', window.location.pathname);
+    validar(null, c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function validar(e, codigoDirecto) {
+    e?.preventDefault();
     setError(null); setCargando(true);
     try {
-      const r = await api.codigoEstado(codigo.trim());
+      const r = await api.codigoEstado((codigoDirecto || codigo || '').trim());
       if (r.creditos_restantes <= 0) {
         setError('Este código ya usó todos sus créditos. Contáctanos para más.');
         return;

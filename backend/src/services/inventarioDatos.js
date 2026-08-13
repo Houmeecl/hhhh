@@ -105,6 +105,62 @@ export const INVENTARIO = {
     cadena: CADENA.NINGUNA,
     retencion: 'Mientras el código esté activo.',
   },
+  campanas_cobro: {
+    clasificacion: NO_PERSONAL,
+    columnas: [],
+    nota: 'Define QUÉ se vende y a cuánto (nombre, precio, créditos). `creado_por` es un FK a la '
+      + 'cuenta admin que la creó, no un dato de esa persona: quién la creó ya está en `usuarios`, '
+      + 'acá es solo la referencia. Los destinatarios viven en `cobros`.',
+    finalidad: 'Definir el producto y el precio de una campaña de venta por correo.',
+    cadena: CADENA.NINGUNA,
+    retencion: 'Mientras la campaña sea consultable para conciliar sus cobros.',
+  },
+  cobros: {
+    clasificacion: PERSONAL,
+    columnas: ['rut', 'contacto', 'email'],
+    nota: 'Una fila por empresa a la que se le envió un link de pago. El RUT se incluye por el '
+      + 'mismo motivo que en `clientes`: la lista puede traer empresarios individuales, y excluirlo '
+      + 'dejaría a esa persona sin poder encontrarse al ejercer su derecho de acceso. `token` no es '
+      + 'un dato de la persona sino el identificador del link; `empresa` es razón social. '
+      + 'IMPORTANTE: acá NO hay datos de pago — ni tarjeta, ni cuenta bancaria. Lo único que vuelve '
+      + 'de la pasarela es su identificador de orden (`pasarela_ref`), que sirve para conciliar y no '
+      + 'identifica ningún medio de pago.',
+    finalidad: 'Cobrar el acceso a una empresa de la lista y entregarle su código cuando paga.',
+    // El contacto entra a la lista porque la empresa es un prospecto
+    // comercial, no porque haya consentido: la base honesta es el interés
+    // legítimo, y por eso todo correo lleva salida (ver mailer.js).
+    base: BASE.LEGITIMO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'El cobro pagado se conserva como respaldo de la venta; el que nunca se pagó se borra completo pasado el plazo.',
+  },
+  correos_enviados: {
+    clasificacion: PERSONAL,
+    columnas: ['destinatario_email'],
+    nota: 'Bitácora del HECHO de cada envío — nunca el cuerpo del correo, que incluiría el link de '
+      + 'pago y, en el de credenciales, el código mismo. Existe porque hasta ahora un envío no dejaba '
+      + 'rastro: ante un "nunca me llegó" no había forma de saber si salió, y en una campaña de cobro '
+      + 'eso es la diferencia entre poder reclamar un pago y no poder.',
+    finalidad: 'Poder demostrar qué se envió, a quién y cuándo, y diagnosticar entregas fallidas.',
+    base: BASE.LEGITIMO,
+    cadena: CADENA.NINGUNA,
+    retencion: 'Se borra completa pasado el plazo: cumplido su uso de diagnóstico y prueba de envío, no hay finalidad que la sostenga.',
+  },
+  bajas_correo: {
+    clasificacion: PERSONAL,
+    columnas: ['email'],
+    nota: 'Quién pidió no recibir más correos comerciales. Es el caso raro en que CONSERVAR el '
+      + 'dato es lo que protege al titular: si se borrara el correo, la próxima campaña volvería a '
+      + 'escribirle. Por eso no se purga — borrarla sería deshacer la oposición que la persona '
+      + 'ejerció. Guarda solo la dirección y de dónde salió la baja, nada más.',
+    finalidad: 'Respetar la oposición a recibir comunicaciones comerciales (art. 28 B Ley 19.628).',
+    // La persona ejerció su oposición: la base es esa misma oposición,
+    // y honrarla es una obligación legal, no un interés de la empresa.
+    base: BASE.LEY,
+    cadena: CADENA.NINGUNA,
+    retencion: null,
+    motivoSinPurga: 'Borrar una baja la anularía: el correo volvería a entrar en la próxima campaña. '
+      + 'Se conserva mientras exista el sistema de envíos.',
+  },
   jugadores: {
     clasificacion: PERSONAL,
     columnas: ['email', 'nombre'],

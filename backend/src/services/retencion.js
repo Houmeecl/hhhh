@@ -52,6 +52,17 @@ export const PLAZOS = {
   // fila no informa nada, así que se borra completa — a diferencia de
   // las solicitudes con RUT, donde el hecho sí vale conservarlo.
   interesado_descartado: dias('RETENCION_INTERESADOS_DIAS', 180),
+  // Bitácora de correos: su uso es diagnosticar una entrega y poder
+  // probar que un envío salió. Un año cubre de sobra el reclamo tardío
+  // ("nunca me llegó el link que pagué") y el cierre contable del
+  // ejercicio; pasado eso guarda el correo de alguien sin finalidad.
+  correos_enviados: dias('RETENCION_CORREOS_DIAS', 365),
+  // Cobro que nunca se pagó: el contacto entró a la lista desde un
+  // registro de ferias, no porque lo pidiera, y pasado el plazo ya no
+  // hay gestión comercial viva que sostenga guardar su correo. Mismo
+  // criterio y mismo plazo que un interesado descartado. Los PAGADOS no
+  // se tocan: son el respaldo de una venta.
+  cobro_sin_pagar: dias('RETENCION_COBROS_DIAS', 180),
 };
 
 // Cada minuto de más acá es una consulta pesada en producción; cada
@@ -173,6 +184,31 @@ const TAREAS = [
     plazo: () => PLAZOS.prospecto_perdido,
     sql: `UPDATE prospectos SET contacto = NULL
            WHERE etapa = 'perdido' AND contacto IS NOT NULL
+             AND created_at < now() - ($1 || ' days')::interval`,
+  },
+  {
+    nombre: 'correos_enviados',
+    accion: 'borrar',
+    plazo: () => PLAZOS.correos_enviados,
+    // Se borra la fila entera y no solo el correo: sin destinatario la
+    // bitácora no prueba ni diagnostica nada, sería basura acumulándose.
+    sql: `DELETE FROM correos_enviados
+           WHERE created_at < now() - ($1 || ' days')::interval`,
+  },
+  {
+    // El nombre es la TABLA (con `.columna` si fuera parcial): así lo lee
+    // test/retencion.test.js para cruzar cada tarea contra el inventario.
+    // El matiz de que solo se borran los no pagados va en el SQL y en el
+    // comentario, no en el nombre.
+    nombre: 'cobros',
+    accion: 'borrar',
+    plazo: () => PLAZOS.cobro_sin_pagar,
+    // Solo los que no llegaron a pagar. `pagado`/`entregado` quedan: son
+    // el respaldo de una venta, con su obligación de conservación. La
+    // baja de correo NO se borra con esto — vive en `bajas_correo`, que
+    // no se purga justamente para que la oposición siga valiendo.
+    sql: `DELETE FROM cobros
+           WHERE estado IN ('pendiente','enviado','anulado')
              AND created_at < now() - ($1 || ' days')::interval`,
   },
 ];

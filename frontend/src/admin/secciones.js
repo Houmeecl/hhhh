@@ -1,7 +1,7 @@
 import { Icon } from '../components/icons.jsx';
 
 // ============================================================
-// Metadata de las 24 secciones del panel admin — la única fuente para el
+// Metadata de las 25 secciones del panel admin — la única fuente para el
 // NAV de AdminApp.jsx y para los checkboxes de Usuarios.jsx. El slug es
 // el vocabulario de usuarios.secciones_admin (migración 092; espejo
 // backend en src/constants/seccionesAdmin.js — mantener los tres
@@ -51,6 +51,10 @@ export const SECCIONES_ADMIN_NAV = [
       // puertos/agencias/trazadores. No otorga nada que
       // 'accesos_externos' no otorgara ya — ver migración 097.
       { slug: 'proveedores', to: '/admin/accesos', ico: Icon.Building, label: 'Proveedores' },
+      // Sección propia y no una pestaña de 'accesos_externos': quien
+      // opera la campaña mueve dinero y ve la lista completa de empresas
+      // contactadas — justo lo que un admin de soporte no necesita ver.
+      { slug: 'cobros', to: '/admin/cobros', ico: Icon.Tag, label: 'Cobros y campañas' },
     ],
   },
   {

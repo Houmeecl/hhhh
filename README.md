@@ -121,6 +121,31 @@ Ver `.env.example`. Las principales:
 | `CORS_ORIGIN` | Origen permitido del frontend. |
 | `PUBLIC_APP_URL` | URL pública del frontend (usada en los QR). |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Admin inicial para el seed. |
+| `PUBLIC_API_URL` | URL pública del **backend** (solo si no comparte dominio con el frontend). La usa el webhook de pago. |
+
+### Cobro por correo (sección «Cobros y campañas»)
+
+Se importa una lista de empresas (Excel o CSV), a cada una le llega su link de pago
+y, al confirmarse el pago, el sistema emite un código de acceso con créditos y se lo
+envía por correo sin intervención de nadie.
+
+| Variable | Descripción |
+|----------|-------------|
+| `PAGOS_PASARELA` | `manual` (por defecto, transferencia bancaria) o `flow`. |
+| `FLOW_API_KEY` / `FLOW_SECRET` | Credenciales de Flow.cl. Sin ellas, `flow` degrada a `manual` en vez de emitir links rotos. |
+| `FLOW_BASE` | `https://www.flow.cl/api` (por defecto) o `https://sandbox.flow.cl/api` para probar. |
+| `PAGO_BANCO` / `PAGO_CUENTA` / `PAGO_TITULAR` / `PAGO_TIPO_CUENTA` / `PAGO_RUT` / `PAGO_EMAIL` | Datos de la cuenta que se imprimen en el correo con `PAGOS_PASARELA=manual`. Sin banco, cuenta y titular el envío se bloquea. |
+| `COBROS_LOTE_MAX` | Tope de correos por tanda (100 por defecto). |
+| `RETENCION_CORREOS_DIAS` | Días que se conserva la bitácora de envíos (365 por defecto). |
+
+**Webhook de Flow**: `POST /api/pagos/flow/confirmar`. Debe ser accesible desde internet.
+El aviso *no se cree*: el estado real se pregunta de vuelta a Flow con la consulta firmada,
+y el monto se compara contra el cobrado antes de entregar nada.
+
+**Antes de una campaña masiva**, revisa que el dominio tenga SPF, DKIM y DMARC en regla:
+los correos de activación y de recuperación de clave de toda la plataforma salen de ese
+mismo dominio. Cada correo comercial lleva enlace de baja y cabeceras `List-Unsubscribe`
+(baja en un clic, RFC 8058), y la lista de bajas se respeta en todas las campañas.
 
 ---
 
@@ -468,9 +493,12 @@ cálculo ocurren en la plataforma** (`POST /api/sesiones`, motor propio para DTE
 → declaración de embalajes **REP Ley 20.920** (componentes por material → %
 reciclabilidad Alto/Medio/Bajo) → **compensación del CO2 calculado** (t CO2e × tarifa
 referencial, editable y marcada "referencial") → comprobante con QR verificable
-(`/verificar/:id`, cadena de hash). El **pago es simulado** hasta integrar una
-pasarela real (VirtualPos, pendiente de credenciales); todo lo demás es real contra
-el backend.
+(`/verificar/:id`, cadena de hash). Acá el **pago de compensación sigue siendo
+simulado**: es una compensación voluntaria de carbono, no un cobro por el servicio,
+y no tiene pasarela conectada. No confundirlo con el **cobro real** de la sección
+«Cobros y campañas» (link de pago por correo → acceso automático, con transferencia
+o Flow.cl), que sí mueve dinero y se documenta más arriba. Todo lo demás de este
+canal es real contra el backend.
 
 Este canal no tiene landing propia: `/aduana-verde` era una segunda portada con su
 propio header y los mismos destinos que `/`, y **hoy redirige a `/`** (la ruta se

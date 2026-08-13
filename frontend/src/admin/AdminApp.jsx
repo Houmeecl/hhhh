@@ -28,6 +28,7 @@ import Auspiciadores from './Auspiciadores.jsx';
 import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
+import Cobros from './Cobros.jsx';
 import SelectorPanel from './SelectorPanel.jsx';
 import { SECCIONES_ADMIN_NAV, puedeVerSeccion, puedeVerAlguna } from './secciones.js';
 
@@ -225,6 +226,7 @@ export default function AdminApp() {
           <Route path="datos" element={<RequiereSeccion user={user} slug="datos_personales"><Datos rol={user?.rol} /></RequiereSeccion>} />
           <Route path="sii" element={<RequiereSeccion user={user} slug="sii"><Sii /></RequiereSeccion>} />
           <Route path="enrolar" element={<RequiereSeccion user={user} slug="enrolar"><Enrolar /></RequiereSeccion>} />
+          <Route path="cobros" element={<RequiereSeccion user={user} slug="cobros"><Cobros /></RequiereSeccion>} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </main>
