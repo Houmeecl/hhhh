@@ -1,5 +1,13 @@
 # Auto-deploy del VPS (sicr3p)
 
+> **Un deploy fallido ahora AVISA POR CORREO** (`deploy/avisar-deploy.mjs`), con las
+> últimas 60 líneas del log adjuntas. Antes la causa quedaba solo en
+> `/var/log/sicr3p-actualizar.log` y había que entrar por SSH a leerla — así fue
+> como producción quedó decenas de commits atrás sin que nadie lo notara. El
+> destinatario sale de `DEPLOY_NOTIFY_EMAIL`, o de `ADMIN_EMAIL` si no está.
+> Usa el mismo SMTP que el resto de la plataforma; no hay una segunda
+> configuración que mantener.
+
 Actualización automática de producción: un cron revisa cada 30 minutos si la rama
 de producción tiene commits nuevos y, si los hay, actualiza el VPS solo — con
 respaldo previo, health check y **rollback automático** si algo sale mal.

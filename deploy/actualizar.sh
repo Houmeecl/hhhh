@@ -140,6 +140,8 @@ else
     # mientras producción se queda con código viejo.
     if [ -z "$(find "$AVISADO" -mmin -1440 2>/dev/null)" ]; then
       log "commit ${COMMIT_REMOTO:0:7} EN CUARENTENA: no se reintenta solo y producción sigue en $(git rev-parse --short HEAD). Si la causa fue transitoria, levántala con: bash deploy/actualizar.sh --reintentar"
+      avisar "producción congelada en $(git rev-parse --short HEAD) — hay un commit en cuarentena" \
+        "El commit ${COMMIT_REMOTO:0:7} falló y no se reintenta solo. Todo lo que se haya subido después sigue sin llegar a producción."
       touch "$AVISADO" 2>/dev/null || true
     fi
     exit 0
@@ -232,6 +234,20 @@ anotar_cuarentena() {
     || log "ADVERTENCIA: no se pudo escribir la cuarentena en $CUARENTENA; la operación sigue, pero el cron PUEDE reintentar este commit."
 }
 
+# ---------- Aviso por correo ----------
+# El cron corre cada 30 minutos y, hasta ahora, un deploy fallido escribía
+# su razón SOLO en este log. Nadie se enteraba: producción quedó decenas
+# de commits atrás durante días mientras el cron reportaba su fracaso a un
+# archivo que nadie abría. Un despliegue que falla en silencio es peor que
+# uno que no existe — da la impresión de que lo que subiste está arriba.
+#
+# `|| true` y un plazo corto: esto se invoca DESDE el manejo de un error.
+# No poder mandar un correo no puede dejar el deploy a medias.
+avisar() {
+  local asunto="$1"; local detalle="${2:-}"
+  timeout 45 node "$SCRIPT_DIR/avisar-deploy.mjs" "$asunto" "$detalle" "$LOG" >> "$LOG" 2>&1 || true
+}
+
 # ---------- 8. Rollback al commit previo ----------
 rollback() {
   log "FALLO en el deploy de ${COMMIT_REMOTO:0:7}; iniciando ROLLBACK a ${COMMIT_PREVIO:0:7}."
@@ -255,9 +271,13 @@ rollback() {
   fi
   if health_ok; then
     log "ROLLBACK OK: producción volvió a ${COMMIT_PREVIO:0:7} (el deploy de ${COMMIT_REMOTO:0:7} falló)."
+    avisar "el deploy de ${COMMIT_REMOTO:0:7} falló — producción sigue en ${COMMIT_PREVIO:0:7}" \
+      "El rollback funcionó: el servicio está sano con el commit anterior. Lo que NO subió es ${COMMIT_REMOTO:0:7}."
     exit 1
   fi
   log "CRÍTICO: ni el rollback a ${COMMIT_PREVIO:0:7} pasó el health ($HEALTH_URL). El repo quedó en $RAMA @ ${COMMIT_PREVIO:0:7}. Manual: pm2 logs $PM2_APP --lines 50, revisar backend/.env y la BD."
+  avisar "CRÍTICO: producción caída, ni el rollback levantó" \
+    "El health de $HEALTH_URL no responde ni con el commit anterior (${COMMIT_PREVIO:0:7}). Requiere intervención manual AHORA."
   exit 2
 }
 
