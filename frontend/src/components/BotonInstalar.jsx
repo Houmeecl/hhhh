@@ -28,10 +28,14 @@ function yaInstalada() {
     || window.navigator.standalone === true;
 }
 
-export default function BotonInstalar({ nombre = 'la app', className = 'btn btn-outline btn-sm', style }) {
+// `respaldo`: qué hacer cuando el navegador NO ofrece instalación con un
+// toque. Por defecto se explica cómo hacerlo a mano; con `false` el
+// componente se calla, para los sitios donde el aviso estorbaría en medio
+// de otro flujo.
+export default function BotonInstalar({ nombre = 'la app', className = 'btn btn-outline btn-sm', style, respaldo = true }) {
   const [evento, setEvento] = useState(null);
   const [instalada, setInstalada] = useState(yaInstalada);
-  const [verAyudaIOS, setVerAyudaIOS] = useState(false);
+  const [verAyuda, setVerAyuda] = useState(false);
 
   useEffect(() => {
     // preventDefault: sin esto Chrome muestra su propio banner además
@@ -62,10 +66,10 @@ export default function BotonInstalar({ nombre = 'la app', className = 'btn btn-
   if (esIOS()) {
     return (
       <div style={style}>
-        <button type="button" className={className} onClick={() => setVerAyudaIOS((v) => !v)}>
+        <button type="button" className={className} onClick={() => setVerAyuda((v) => !v)}>
           Instalar {nombre}
         </button>
-        {verAyudaIOS && (
+        {verAyuda && (
           <p className="muted" style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
             En iPhone se agrega desde Safari: toca <b>Compartir</b> (el cuadrado con la flecha
             hacia arriba, abajo en la pantalla) y elige <b>Agregar a inicio</b>.
@@ -75,10 +79,34 @@ export default function BotonInstalar({ nombre = 'la app', className = 'btn btn-
     );
   }
 
-  // Sin el evento no hay nada que ofrecer: o el navegador no soporta
-  // instalación, o aún no considera que la app califique. Mostrar un
-  // botón muerto sería peor que no mostrarlo.
-  if (!evento) return null;
+  // Sin el evento de instalación (Firefox, Chrome de escritorio que aún
+  // no considera que la app califique, cualquier navegador sin soporte)
+  // ANTES no se dibujaba nada. El resultado era el peor de los mundos: la
+  // persona llegaba a la página a buscar cómo bajar el juego y no veía
+  // ningún botón — como si no existiera.
+  //
+  // Un botón muerto sigue siendo mala idea, pero callarse tampoco es la
+  // respuesta: se explica cómo dejarla instalada desde el menú del propio
+  // navegador. `respaldo={false}` lo apaga donde el aviso estorbe (en
+  // medio de un flujo, por ejemplo).
+  if (!evento) {
+    if (!respaldo) return null;
+    return (
+      <div style={style}>
+        <button type="button" className={className} onClick={() => setVerAyuda((v) => !v)}>
+          Cómo instalar {nombre}
+        </button>
+        {verAyuda && (
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
+            Este navegador no ofrece instalación con un toque. Abre su menú
+            (los tres puntos, arriba a la derecha) y busca <b>Instalar</b> o
+            <b> Agregar a la pantalla de inicio</b>. También puedes seguir
+            usándola desde el navegador: funciona igual.
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div style={style}>

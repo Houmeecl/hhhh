@@ -69,6 +69,11 @@ export default function PublicLayout({ children }) {
           <Link to="/mis-datos" style={{ color: 'inherit' }}>{t('layout.mis_datos')}</Link>
           {' · '}
           <Link to="/auspicio" style={{ color: 'inherit' }}>{t('layout.auspicio')}</Link>
+          {' · '}
+          {/* Hasta acá el juego no se enlazaba desde NINGUNA parte del
+              sitio: se llegaba solo con un magic link de campaña, así que
+              para alguien de afuera no existía. */}
+          <Link to="/suma/descargar" style={{ color: 'inherit' }}>Sube y Suma</Link>
           {' · '}{t('layout.tagline')} · www.sicr3p.cl
         </span>
 

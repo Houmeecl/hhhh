@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Icon } from '../components/icons.jsx';
+import { useManifestSuma } from '../components/useManifest.js';
 import { api, authSuma, fmtInt } from '../api.js';
 import Perfil from './Perfil.jsx';
 import Escanear from './Escanear.jsx';
@@ -12,16 +13,9 @@ import Reciclar from './Reciclar.jsx';
 
 // "Sube y Suma" es su propia app instalable (PWA), distinta del panel
 // núcleo — mismo service worker (sw.js), solo cambia el manifest mientras
-// esta ruta está montada (mismo patrón que useManifestAv en admin-av).
-function useManifestSuma() {
-  useEffect(() => {
-    const link = document.querySelector('link[rel="manifest"]');
-    if (!link) return undefined;
-    const original = link.getAttribute('href');
-    link.setAttribute('href', '/manifest-suma.webmanifest');
-    return () => link.setAttribute('href', original);
-  }, []);
-}
+// esta ruta está montada. El hook vive en components/useManifest.js: era
+// una copia por shell, y la copia que FALTABA (en /suma/login) hacía que
+// el botón de instalar bajara el sitio genérico en vez del juego.
 
 const NAV = [
   { to: '/suma', end: true, ico: Icon.Chart, label: 'Inicio' },

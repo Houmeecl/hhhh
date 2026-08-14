@@ -11,6 +11,7 @@ import FirmaProveedor from './pages/FirmaProveedor.jsx';
 import AccesoUnico from './pages/AccesoUnico.jsx';
 import Prueba from './pages/Prueba.jsx';
 import Pagar from './pages/Pagar.jsx';
+import DescargarSuma from './pages/DescargarSuma.jsx';
 import Acceso from './pages/Acceso.jsx';
 import MisSesiones from './pages/MisSesiones.jsx';
 import CorredorLanding from './pages/CorredorLanding.jsx';
@@ -156,6 +157,12 @@ export default function App() {
       {/* "Sube y Suma" — escaneo gamificado con código de campaña de una
           empresa cliente. Sin /activar: el jugador entra por magic link,
           nunca con contraseña. */}
+      {/* Va ANTES del comodín /suma/*, que exige sesión: esta es la
+          página pública que se manda por WhatsApp. Vive bajo /suma y no
+          en /descargar porque el manifiesto declara scope "/suma" — fuera
+          de ese ámbito el navegador no ofrece instalar nada. */}
+      <Route path="/suma/descargar" element={<DescargarSuma />} />
+      <Route path="/descargar" element={<Navigate to="/suma/descargar" replace />} />
       <Route path="/suma/login" element={<LoginSuma />} />
       <Route path="/suma/*" element={<JuegoApp />} />
 

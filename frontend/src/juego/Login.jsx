@@ -3,6 +3,7 @@ import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { api } from '../api.js';
 import BotonInstalar from '../components/BotonInstalar.jsx';
+import { useManifestSuma } from '../components/useManifest.js';
 
 // ============================================================
 // "Sube y Suma" — acceso sin contraseña: correo + código de invitación de
@@ -11,6 +12,10 @@ import BotonInstalar from '../components/BotonInstalar.jsx';
 // de una sesión efímera (ver auth.js).
 // ============================================================
 export default function LoginSuma() {
+  // Sin esto el botón de abajo instalaba el SITIO (start_url "/") en vez
+  // del juego: el manifiesto vigente al tocar "instalar" es el que manda,
+  // y esta pantalla no vive dentro de JuegoApp.
+  useManifestSuma();
   const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
   const [enviado, setEnviado] = useState(false);
