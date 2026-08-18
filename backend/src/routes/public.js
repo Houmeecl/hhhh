@@ -16,6 +16,7 @@ import {
   filtrarDocumentosPorVisibilidad, semaforoDocumental,
 } from '../services/pasaporteOrigen.js';
 import { sendMail, reporteEmail, enviarComprobantePos } from '../services/mailer.js';
+import { claveDeCodigo, registrarEntrega } from '../services/entrega.js';
 import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.js';
 import { bigquery } from '../services/bigquery.js';
 import { cargarCategorias, calcularFactura } from '../services/motorPropio.js';
@@ -692,12 +693,55 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
     eventosJuego.forEach((e) => bigquery.exportPuntosEvento(e));
 
     // Envío del informe por correo (no bloqueante: nunca afecta la respuesta).
+    //
+    // EL INFORME CONSOLIDADO ES EL ACTIVO, y sale CIFRADO cuando la carga
+    // se hizo con un código de acceso: la clave cuelga del código
+    // (migración 102), que es la identidad del comprador en este flujo
+    // público — acá no hay `proveedor_id` del que sacarla, que es la razón
+    // por la que este camino quedó sin cifrar cuando se hizo el de
+    // transporte.
+    //
+    // La clave NO va en este correo: viaja en el de credenciales, que no
+    // lleva adjunto (services/cobros.js). Mandar el archivo y su
+    // contraseña juntos dejaría el cifrado en decoración.
+    //
+    // Sin código —carga con sesión de cliente por magic link— no hay
+    // entidad que porte clave y el informe sale en claro. Eso NO es un
+    // fallo silencioso: el acuse lo anota con `cifrado: false` y queda
+    // constancia de cuáles salieron desnudos.
+    //
+    // Y NO SE CIFRA NUNCA LO DE UN JUGADOR DE "SUBE Y SUMA", por dos
+    // razones que se suman: (a) a un jugador el `codigo` que quedó en esta
+    // variable es el de su CAMPAÑA, compartido con todos los demás
+    // jugadores de esa empresa, así que una clave por código acá no
+    // protegería a nadie de nadie; y (b) el jugador entra por magic link y
+    // JAMÁS recibe una clave de informes —ese correo sale del flujo de
+    // cobros, que él no atraviesa—. Cifrarlo igual le mandaría un PDF que
+    // no puede abrir, que es peor que uno en claro: un archivo inutilizable
+    // no protege nada, solo se pierde.
     (async () => {
       try {
-        const pdf = await generateReport({ sesion: result, facturas });
+        const { rows: cRows } = codigo && !jugador
+          ? await query(`SELECT id FROM codigos_acceso WHERE upper(codigo) = upper($1)`, [codigo])
+          : { rows: [] };
+        const codigoId = cRows[0]?.id || null;
+        const clave = codigoId ? await claveDeCodigo(codigoId) : null;
+
+        const pdf = await generateReport({ sesion: result, facturas, clave });
+        await registrarEntrega({
+          tipo: 'informe_sesion',
+          codigoId,
+          destinatario: result.email_cliente,
+          archivo: pdf,
+          cifrado: Boolean(clave),
+          referencia: result.id,
+        });
         await sendMail({
           to: result.email_cliente,
-          ...reporteEmail({ nombre: result.nombre_cliente, totalCo2e: result.total_co2e, nFacturas: facturas.length }),
+          ...reporteEmail({
+            nombre: result.nombre_cliente, totalCo2e: result.total_co2e,
+            nFacturas: facturas.length, cifrado: Boolean(clave),
+          }),
           attachments: [{ filename: `sicr3p-informe-${result.id.slice(0, 8)}.pdf`, content: pdf }],
         });
       } catch (e) {

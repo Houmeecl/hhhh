@@ -6,9 +6,11 @@ import { runMigrations } from '../src/lib/migrate.js';
 import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 import {
   generarClaveInforme, opcionesCifrado, pdfEstaCifrado, hashArchivo,
-  claveDeProveedor, rotarClaveProveedor, registrarEntrega,
+  claveDeProveedor, claveDeCodigo, claveDeEntidad, rotarClaveProveedor, registrarEntrega,
 } from '../src/services/entrega.js';
 import { generateComprobanteTransporte } from '../src/services/transportePdf.js';
+import { generateReport } from '../src/services/pdf.js';
+import { reporteEmail, credencialesEmail } from '../src/services/mailer.js';
 import { descifrar } from '../src/services/cripto.js';
 
 // ============================================================
@@ -184,4 +186,178 @@ test('el acuse no tumba la entrega si falla', { skip: SALTO_PROD }, async () => 
   await assert.doesNotReject(registrarEntrega({
     tipo: 'inventado', destinatario: 'x@ejemplo.cl', archivo: Buffer.from('x'), cifrado: false,
   }));
+});
+
+// ---------- la clave del CÓDIGO DE ACCESO (flujo público del informe) ----------
+//
+// Este es el camino por el que sale el activo que se vende. Quedó sin
+// cifrar cuando se hizo el de transporte, por una razón concreta: acá no
+// hay `proveedor_id` —quien sube documentos se identifica con un código de
+// acceso— así que no había entidad de la que sacar la clave.
+
+async function codigoDePrueba(creditos = 5) {
+  const { rows } = await query(
+    `INSERT INTO codigos_acceso (codigo, creditos, empresa, email)
+     VALUES ($1,$2,$3,$4) RETURNING *`,
+    [`PRUEBA-${crypto.randomUUID().slice(0, 13).toUpperCase()}`, creditos,
+     'Empresa de prueba', 'prueba@ejemplo.cl']
+  );
+  return rows[0];
+}
+async function limpiarCodigo(id) {
+  await query(`DELETE FROM entregas WHERE codigo_id = $1`, [id]);
+  await query(`DELETE FROM codigos_acceso WHERE id = $1`, [id]);
+}
+
+test('la clave de un código se crea una vez y NO cambia entre envíos', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const primera = await claveDeCodigo(cod.id);
+    assert.ok(primera && primera.length === 16);
+    assert.equal(await claveDeCodigo(cod.id), primera, 'dos informes seguidos usan la MISMA clave');
+
+    // Misma carrera que la de proveedores: varias entregas a la vez no
+    // pueden dejar dos claves distintas, o el informe del mes pasado deja
+    // de abrirse.
+    const paralelas = await Promise.all([1, 2, 3, 4].map(() => claveDeCodigo(cod.id)));
+    assert.equal(new Set(paralelas).size, 1, 'la carrera dejó más de una clave');
+    assert.equal(paralelas[0], primera);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('la clave del código se guarda CIFRADA en reposo', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const clave = await claveDeCodigo(cod.id);
+    const { rows } = await query(`SELECT clave_informe FROM codigos_acceso WHERE id = $1`, [cod.id]);
+    assert.notEqual(rows[0].clave_informe, clave, 'la columna NO puede tener la clave en claro');
+    assert.equal(rows[0].clave_informe.includes(clave), false);
+    assert.equal(descifrar(rows[0].clave_informe), clave);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('una tabla que no porta clave es un error, no una consulta', () => {
+  // El nombre de tabla se interpola en el SQL (Postgres no admite bind de
+  // identificadores). La lista blanca es lo que impide que eso sea un
+  // agujero; si alguien la saltara, tiene que romperse fuerte y no armar
+  // una consulta con lo que venga.
+  assert.rejects(() => claveDeEntidad({ tabla: 'usuarios', id: crypto.randomUUID() }), /sin clave de informe/);
+  assert.rejects(() => claveDeEntidad({ tabla: 'proveedores; DROP TABLE x', id: '1' }), /sin clave de informe/);
+});
+
+test('EL CASO QUE FALTABA: el informe consolidado sale cifrado con AES-256', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const clave = await claveDeCodigo(cod.id);
+    const sesion = {
+      id: crypto.randomUUID(), rut_cliente: '11.111.111-1', nombre_cliente: 'Empresa de prueba',
+      email_cliente: 'prueba@ejemplo.cl', fecha: '2026-08-18', total_co2e: 1.5,
+    };
+    const facturas = [{
+      id: crypto.randomUUID(), proveedor: 'Proveedor X', monto: 100000, total_co2e: 1.5,
+      categoria: 'combustible', fecha: '2026-08-01', hash_documento: 'a'.repeat(64),
+    }];
+    const pdf = await generateReport({ sesion, facturas, declaracion: null, alcances: [], clave });
+    assert.equal(pdfEstaCifrado(pdf), true, 'el informe consolidado salió EN CLARO');
+    // AESV3 = AES-256. Sin `pdfVersion: 1.7ext3` pdfkit cae a AESV2 (128)
+    // o a RC4 y el archivo se ve idéntico por fuera.
+    assert.ok(pdf.includes(Buffer.from('AESV3')), 'no es AES-256');
+
+    // Y el mismo informe SIN clave sale en claro: es el caso de la carga
+    // por magic link, donde no hay código del que colgar una clave.
+    const enClaro = await generateReport({ sesion, facturas, declaracion: null, alcances: [] });
+    assert.equal(pdfEstaCifrado(enClaro), false);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('el acuse del informe anota con qué código se cifró', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const archivo = Buffer.from('informe consolidado cifrado');
+    await registrarEntrega({
+      tipo: 'informe_sesion', codigoId: cod.id, destinatario: 'prueba@ejemplo.cl',
+      archivo, cifrado: true, referencia: 'sesion-y',
+    });
+    const { rows } = await query(`SELECT * FROM entregas WHERE codigo_id = $1`, [cod.id]);
+    assert.equal(rows.length, 1);
+    // Sin esto el acuse no puede responder "¿con qué llave se abre esto?",
+    // que es justo la pregunta para la que la tabla existe.
+    assert.equal(rows[0].codigo_id, cod.id);
+    assert.equal(rows[0].proveedor_id, null);
+    assert.equal(rows[0].cifrado, true);
+    assert.equal(rows[0].hash_archivo, hashArchivo(archivo));
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('un informe sin código queda anotado como NO cifrado', { skip: SALTO_PROD }, async () => {
+  // La carga con sesión de cliente (magic link) no tiene código: el
+  // informe sale en claro y eso NO puede ser silencioso.
+  await registrarEntrega({
+    tipo: 'informe_sesion', destinatario: 'sincodigo@ejemplo.cl',
+    archivo: Buffer.from('en claro'), cifrado: false, referencia: 'sesion-z',
+  });
+  const { rows } = await query(
+    `SELECT * FROM entregas WHERE referencia = 'sesion-z' AND tipo = 'informe_sesion'`
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].cifrado, false);
+  assert.equal(rows[0].codigo_id, null);
+  assert.equal(rows[0].proveedor_id, null);
+  await query(`DELETE FROM entregas WHERE referencia = 'sesion-z'`);
+});
+
+// ---------- la regla que sostiene todo el cifrado ----------
+
+test('LA REGLA: la clave va en el correo de credenciales y NUNCA en el del informe', () => {
+  const clave = 'AbCdEfGh23456789';
+
+  // El correo de credenciales NO lleva adjunto — es el único que puede
+  // llevar la clave.
+  const cred = credencialesEmail({
+    empresa: 'Minera X', codigo: 'SICR3P-AAAA-BBBB-CCCC', creditos: 10,
+    link: 'https://sicr3p.cl/prueba', claveInforme: clave,
+  });
+  assert.ok(cred.html.includes(clave), 'la clave tiene que llegar por algún lado');
+
+  // Y sin clave el bloque simplemente no se dibuja (falta la llave
+  // maestra): no queda un recuadro vacío prometiendo algo que no está.
+  const sinClave = credencialesEmail({
+    empresa: 'Minera X', codigo: 'SICR3P-AAAA-BBBB-CCCC', creditos: 10, link: 'l',
+  });
+  assert.equal(/CLAVE PARA ABRIR/.test(sinClave.html), false);
+
+  // El correo del informe SÍ lleva el adjunto: avisa que va cifrado y NO
+  // trae la clave. Si esto se rompe, el cifrado queda en decoración.
+  const inf = reporteEmail({ nombre: 'Minera X', totalCo2e: 12.5, nFacturas: 3, cifrado: true });
+  assert.ok(/cifrado/i.test(inf.html), 'sin el aviso, un PDF con contraseña parece dañado');
+  assert.equal(inf.html.includes(clave), false, 'LA CLAVE VIAJÓ CON EL ARCHIVO');
+
+  // Sin cifrar no se avisa de nada.
+  assert.equal(/está cifrado/.test(reporteEmail({ nombre: 'X', totalCo2e: 1, nFacturas: 1 }).html), false);
+});
+
+test('un código de CAMPAÑA del juego nunca recibe clave de informes', { skip: SALTO_PROD }, async () => {
+  // Casi se rompe esto: en `POST /api/sesiones` un jugador de "Sube y
+  // Suma" carga con el código de SU CAMPAÑA, que comparten todos los
+  // jugadores de esa empresa. Cifrar con esa clave no protegería a ningún
+  // jugador de otro — y, peor, el jugador entra por magic link y NUNCA
+  // recibe una clave de informes, así que habría recibido un PDF que no
+  // puede abrir. Un archivo inutilizable no protege nada: solo se pierde.
+  const { rows } = await query(
+    `INSERT INTO codigos_acceso (codigo, creditos, empresa, email, modo_juego)
+     VALUES ($1, 20, 'Campaña', 'campana@ejemplo.cl', true) RETURNING *`,
+    [`CAMP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`]
+  );
+  const campana = rows[0];
+  try {
+    assert.equal(await claveDeCodigo(campana.id), null, 'una campaña NO puede portar clave');
+    // Y no se creó una en la base "por si acaso".
+    const { rows: k } = await query(`SELECT clave_informe FROM codigos_acceso WHERE id = $1`, [campana.id]);
+    assert.equal(k[0].clave_informe, null);
+  } finally { await limpiarCodigo(campana.id); }
+});
+
+test('un código inexistente no revienta ni inventa una clave', { skip: SALTO_PROD }, async () => {
+  assert.equal(await claveDeCodigo(crypto.randomUUID()), null);
+  assert.equal(await claveDeCodigo(null), null);
 });

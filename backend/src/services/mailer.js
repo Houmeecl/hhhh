@@ -111,14 +111,28 @@ export function activationEmail({ nombre, link, area }) {
   };
 }
 
-export function reporteEmail({ nombre, totalCo2e, nFacturas }) {
+export function reporteEmail({ nombre, totalCo2e, nFacturas, cifrado = false }) {
   const total = Number(totalCo2e || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Sin este aviso, quien recibe un PDF que pide contraseña cree que el
+  // archivo llegó dañado. Y la contraseña NO va acá a propósito: viaja en
+  // el correo de credenciales, que no lleva adjunto. Mandar el archivo y
+  // su clave en el mismo mensaje dejaría el cifrado en decoración.
+  const avisoCifrado = cifrado ? `
+        <div style="background:#f1f5f9;border-left:3px solid #0f1f2e;padding:12px 16px;margin:14px 0">
+          <b style="font-size:13px">El PDF adjunto está cifrado.</b>
+          <div style="font-size:13px;color:#475569;margin-top:4px">
+            Ábrelo con tu clave de informes — la que te llegó junto con tu código de acceso.
+            Nunca la enviamos en el mismo correo que el informe; si no la tienes a mano,
+            respóndenos y te la reenviamos.
+          </div>
+        </div>` : '';
   return {
     subject: 'Tu contabilidad de carbono · sicr3p',
     html: `
       <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
         <h2 style="color:#0f1f2e">Tu informe está listo</h2>
         <p>Hola ${nombre || ''}, adjuntamos tu informe consolidado de contabilidad de carbono.</p>
+        ${avisoCifrado}
         <div style="background:#eaf6ef;border:1px solid #28a745;border-radius:10px;padding:14px 18px;margin:12px 0">
           <div style="font-size:12px;color:#218838;font-weight:700">RESULTADO INCORPORADO</div>
           <div style="font-size:22px;font-weight:800">${total} t CO2e</div>
@@ -279,7 +293,25 @@ export function linkPagoEmail({ empresa, contacto, montoClp, creditos, campana, 
  * eso va SIEMPRE a la dirección registrada en el cobro y nunca a la que
  * usó quien pagó: el link de pago es compartible, la clave no.
  */
-export function credencialesEmail({ empresa, codigo, creditos, link }) {
+export function credencialesEmail({ empresa, codigo, creditos, link, claveInforme = null }) {
+  // LA CLAVE DE INFORMES VIAJA ACÁ Y EN NINGÚN OTRO LADO.
+  //
+  // Este correo es el único que puede llevarla, porque es el único que NO
+  // lleva adjunto: la regla que sostiene todo el cifrado es que la clave y
+  // el archivo nunca vayan en el mismo mensaje — no que la clave nunca se
+  // mande. Si nunca se mandara, nadie podría abrir su informe y el cliente
+  // terminaría pidiéndola por el mismo canal, o peor, nosotros se la
+  // mandaríamos de vuelta adjunta al PDF.
+  const bloqueInforme = claveInforme ? `
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:14px 18px;margin:16px 0">
+          <div style="font-size:12px;color:#64748b;font-weight:700;letter-spacing:.06em">CLAVE PARA ABRIR SUS INFORMES</div>
+          <div style="font-size:19px;font-weight:800;letter-spacing:.06em;margin:6px 0;font-family:ui-monospace,Menlo,Consolas,monospace">${esc(claveInforme)}</div>
+          <div style="font-size:13px;color:#475569">
+            Los informes en PDF salen cifrados. Esta clave los abre, es distinta de su
+            código de acceso y no cambia. <b>Guárdela aparte</b>: nunca la enviamos en el
+            mismo correo que un informe.
+          </div>
+        </div>` : '';
   return {
     subject: 'Su acceso a sicr3p está activo — clave adentro',
     html: `
@@ -291,6 +323,7 @@ export function credencialesEmail({ empresa, codigo, creditos, link }) {
           <div style="font-size:26px;font-weight:800;color:#fff;letter-spacing:.06em;margin:6px 0">${esc(codigo)}</div>
           <div style="font-size:13px;color:#94a3b8">${creditos} documento${creditos === 1 ? '' : 's'} disponibles</div>
         </div>
+        ${bloqueInforme}
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600">Entrar y subir mi primer documento</a></p>
         <p style="color:#64748b;font-size:13px">Guarde esta clave: es la que identifica el acceso de su
            empresa. Si la pierde, respóndanos este correo y se la reenviamos.</p>

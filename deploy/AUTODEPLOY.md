@@ -181,10 +181,24 @@ Dos scripts, dos frecuencias distintas:
   restauración ya está listo para leer un archivo bajado desde ahí igual que
   uno local.
 
-## Futuro (no implementado)
+## Aviso por correo cuando el deploy falla — HECHO
 
-Enviar el diagnóstico por correo al fallar (Resend o el webmail del VPS), para
-no depender de entrar por SSH a leer `/root/sicr3p-diagnostico-*.txt`.
+`deploy/avisar-deploy.mjs`, llamado desde los tres caminos de fallo de
+`actualizar.sh`. Manda el motivo y las últimas 60 líneas del log a
+`DEPLOY_NOTIFY_EMAIL` (o a `ADMIN_EMAIL` si no está definida), reusando el
+mailer del backend — el mismo SMTP que el resto de la plataforma, sin una
+segunda configuración que mantener.
+
+Por qué se construyó: el cron corre cada 30 minutos y, al fallar, escribía la
+razón SOLO en `/var/log/sicr3p-actualizar.log`. Nadie lo abría. Producción
+quedó decenas de commits atrás durante días mientras el cron reportaba su
+fracaso a un archivo que nadie leía. **Un despliegue que falla en silencio es
+peor que uno que no existe**: da la impresión de que lo que subiste está
+arriba.
+
+El script sale con código 0 pase lo que pase — se lo llama DESDE el manejo de
+un error, y hacerlo abortar ahí dejaría el deploy a medias por no haber podido
+mandar un correo.
 
 
 ## Requisito del motor propio para fotos y escaneos (OCR)

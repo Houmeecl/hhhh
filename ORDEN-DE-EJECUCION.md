@@ -114,13 +114,19 @@ registrado por la empresa. El sitio y la marca siguen siendo `sicr3p.cl`.
   todo ✓ (el DNS puede tardar minutos u horas en propagar).
 - [ ] Enviar un correo desde `contacto@sicrep.cl` a **mail-tester.com**
   hasta lograr nota ≥ 9/10.
-- [ ] Activar **Resend** (transaccional de la plataforma, hoy en modo
-  consola): cuenta en resend.com → agregar el dominio `sicrep.cl` (sus
-  registros van en subdominio propio, NO tocan el SPF raíz) →
-  `RESEND_API_KEY` y `MAIL_FROM="sicr3p <no-responder@sicrep.cl>"` en
-  `backend/.env` del VPS → `pm2 restart sicr3p-backend`. Paso a paso:
-  `deploy/WEBMAIL.md` §6.1. Esto también hace que "¿Olvidaste tu
-  contraseña?" del login admin llegue de verdad (hoy solo se logea).
+- [x] ~~Activar Resend~~ — **ya no hace falta**: el transaccional sale por
+  **SMTP propio**, que está configurado en el VPS y funcionando. El mailer
+  prioriza SMTP propio → Resend → consola (`services/mailer.js`), y el
+  arranque en producción es FATAL si no hay ninguno de los dos
+  (`lib/verificarProduccion.js`), así que el backend corriendo es la prueba
+  de que hay uno. La recuperación de contraseña del login admin llega de
+  verdad.
+- [ ] *(opcional)* Resend como **redundancia**, no como reemplazo: si algún
+  día el SMTP de DonWeb se cae o limita el envío, tener `RESEND_API_KEY`
+  puesta da un segundo camino. Cuenta en resend.com → agregar el dominio
+  `sicrep.cl` (sus registros van en subdominio propio, NO tocan el SPF raíz)
+  → `RESEND_API_KEY` en `backend/.env` del VPS → `pm2 restart
+  sicr3p-backend`. Paso a paso: `deploy/WEBMAIL.md` §6.1.
 
 Detalle completo, incluidas las alternativas descartadas (Zoho, Poste.io
 autoalojado): `deploy/WEBMAIL.md` §9.

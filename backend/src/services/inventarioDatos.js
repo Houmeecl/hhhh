@@ -100,6 +100,12 @@ export const INVENTARIO = {
   codigos_acceso: {
     clasificacion: PERSONAL,
     columnas: ['email'],
+    nota: '`clave_informe` (migración 102) NO es un dato de la persona sino un secreto de la '
+      + 'empresa titular del código: la contraseña con que se cifran los informes que se le '
+      + 'entregan. Mismo criterio y misma protección que `proveedores.clave_informe` — cifrada en '
+      + 'reposo con la llave maestra en env, así que un vaciado de la base no la expone. Cuelga '
+      + 'del código y no del proveedor porque en el flujo público de carga (POST /api/sesiones) el '
+      + 'código ES la identidad del comprador: no existe ningún proveedor del que sacarla.',
     finalidad: 'Entregar créditos de prueba a una empresa interesada.',
     base: BASE.CONSENTIMIENTO,
     cadena: CADENA.NINGUNA,

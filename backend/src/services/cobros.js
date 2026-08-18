@@ -5,6 +5,7 @@ import { credencialesEmail, linkPagoEmail } from './mailer.js';
 import { enviarYRegistrar, correosDadosDeBaja } from './correoLog.js';
 import { generarTokenPago, pasarelaActiva } from './pagos.js';
 import { primerEmail } from './tabla.js';
+import { claveDeCodigo } from './entrega.js';
 import { rutValido } from './dte.js';
 
 // ============================================================
@@ -349,10 +350,28 @@ async function marcarEntregado(cobroId) {
  * emite nada, solo vuelve a enviar lo que ya existe.
  */
 export async function enviarCredenciales(cobro, codigo) {
+  // La clave con que se abrirán sus informes. Se crea acá, en la primera
+  // entrega, y no cambia: si cambiara, los informes del mes pasado
+  // dejarían de abrirse con la clave que el cliente tiene anotada.
+  //
+  // Este es el momento correcto para entregarla —el único correo sin
+  // adjunto— y `claveDeCodigo` es idempotente, así que el botón "reenviar"
+  // del panel manda la MISMA clave, no una nueva. Devuelve null si falta
+  // la llave maestra; en ese caso el bloque simplemente no se dibuja y los
+  // informes saldrán en claro, con el acuse dejando constancia.
+  let claveInforme = null;
+  try {
+    claveInforme = await claveDeCodigo(codigo.id);
+  } catch (e) {
+    // Que falle la clave no puede impedir que llegue el acceso comprado.
+    console.error('[cobros] no se pudo preparar la clave de informes:', e.message);
+  }
+
   const plantilla = credencialesEmail({
     empresa: cobro.empresa,
     codigo: codigo.codigo,
     creditos: codigo.creditos,
+    claveInforme,
     // /prueba es la pantalla que canjea un código (Prueba.jsx). Con el
     // código en la URL entra sola: quien acaba de pagar no debería tener
     // que copiar nada a mano para empezar.
