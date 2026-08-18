@@ -6,6 +6,9 @@ import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandant
 import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
 import { crearCuentaEntidad, enviarActivacion } from '../services/cuentas.js';
 import { qrBufferDe, reciclarUrl } from '../services/qr.js';
+import { emitirClaveDeEntidad, rotarClaveEntidad } from '../services/entrega.js';
+import { claveInformeEmail } from '../services/mailer.js';
+import { enviarYRegistrar } from '../services/correoLog.js';
 
 // ============================================================
 // Administración de accesos externos:
@@ -339,7 +342,9 @@ router.get('/proveedores', requireSeccion('accesos_externos', 'proveedores'), as
   try {
     const { rows } = await query(
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo, p.ultimo_uso, p.created_at,
-              (u.id IS NOT NULL) AS tiene_cuenta_web
+              p.contacto_email,
+              (u.id IS NOT NULL) AS tiene_cuenta_web,
+              (p.clave_informe IS NOT NULL) AS tiene_clave_informe
        FROM proveedores p LEFT JOIN usuarios u ON u.proveedor_id = p.id
        ORDER BY p.created_at DESC`
     );
@@ -452,8 +457,15 @@ router.put('/proveedores/:id', requireSeccion('accesos_externos', 'proveedores')
 // ---------- CÓDIGOS DE ACCESO (créditos) ----------
 router.get('/codigos', requireSeccion('accesos_externos'), async (req, res, next) => {
   try {
+    // Columnas explícitas y NO `SELECT *`: con `*` viajaba al navegador el
+    // blob cifrado de `clave_informe`. Está cifrado, pero no tiene por qué
+    // salir del servidor — el panel solo necesita saber SI hay clave, no
+    // cuál es. La clave se muestra una única vez, al entregarla.
     const { rows } = await query(
-      `SELECT * FROM codigos_acceso ORDER BY created_at DESC LIMIT 300`
+      `SELECT id, codigo, creditos, creditos_usados, empresa, email, activo,
+              modo_juego, ultimo_uso, primera_conexion_at, created_at,
+              (clave_informe IS NOT NULL) AS tiene_clave_informe
+         FROM codigos_acceso ORDER BY created_at DESC LIMIT 300`
     );
     res.json({ codigos: rows });
   } catch (err) { next(err); }
@@ -500,6 +512,136 @@ router.put('/codigos/:id', requireSeccion('accesos_externos'), adminOnly, async 
     res.json({ codigo: rows[0] });
   } catch (err) { next(err); }
 });
+
+// ---------- ACUSE DE ENTREGAS ----------
+//
+// La tabla `entregas` (migración 101) existe para responder UNA pregunta:
+// "¿qué archivo exacto recibió esta empresa, y cuándo?". Hasta acá solo se
+// escribía —había INSERT y el DELETE de retención, y ningún SELECT—, o sea
+// que la pregunta no se le podía hacer sin entrar a psql. Un registro que
+// nadie puede leer no es un registro.
+//
+// NO devuelve el archivo ni su contenido: la tabla guarda el hash de lo que
+// salió, no el PDF. Sirve para comparar contra lo que el cliente diga que
+// recibió, no para volver a mandarlo.
+router.get('/entregas', requireSeccion('accesos_externos', 'proveedores'), async (req, res, next) => {
+  try {
+    const { empresa, desde, hasta, tipo } = req.query;
+    const limite = Math.min(500, Math.max(1, Number(req.query.limite) || 200));
+    const { rows } = await query(
+      `SELECT e.id, e.tipo, e.destinatario_email, e.hash_archivo, e.bytes, e.cifrado,
+              e.periodo, e.referencia, e.created_at,
+              p.nombre_empresa AS proveedor_empresa,
+              c.codigo AS codigo, c.empresa AS codigo_empresa
+         FROM entregas e
+         LEFT JOIN proveedores p ON p.id = e.proveedor_id
+         LEFT JOIN codigos_acceso c ON c.id = e.codigo_id
+        WHERE ($1::text IS NULL OR p.nombre_empresa ILIKE '%' || $1 || '%'
+                                OR c.empresa ILIKE '%' || $1 || '%'
+                                OR e.destinatario_email ILIKE '%' || $1 || '%')
+          AND ($2::date IS NULL OR e.created_at >= $2::date)
+          AND ($3::date IS NULL OR e.created_at < ($3::date + 1))
+          AND ($4::text IS NULL OR e.tipo = $4)
+        ORDER BY e.created_at DESC
+        LIMIT $5`,
+      [empresa || null, desde || null, hasta || null, tipo || null, limite]
+    );
+    // Cuántas salieron SIN cifrar: es el número que importa mirar. Si sube,
+    // hay empresas a las que nadie les entregó su clave.
+    const enClaro = rows.filter((r) => !r.cifrado).length;
+    res.json({ entregas: rows, en_claro: enClaro });
+  } catch (err) { next(err); }
+});
+
+// ---------- CLAVE DE INFORMES ----------
+//
+// POR QUÉ EXISTE ESTA SECCIÓN. Los PDF que sicr3p entrega salen cifrados
+// con una clave por empresa. Durante un tiempo esa clave se creaba SOLA al
+// mandar un archivo, y en dos de los tres caminos la empresa NUNCA la
+// recibía por ningún canal: le llegaba un PDF que no podía abrir. Un
+// archivo inutilizable no protege nada.
+//
+// La regla ahora es que la clave nace cuando alguien se la ENTREGA
+// (services/entrega.js). Esto es ese "alguien" para los casos que no pasan
+// por el flujo de cobros: códigos creados a mano y proveedores.
+//
+// LA CLAVE SE MUESTRA UNA SOLA VEZ, en la respuesta de este POST. Después
+// no hay forma de volver a verla desde el panel —solo reenviarla por
+// correo—, mismo criterio que las claves de tarjeta de viaje y de llave de
+// archivo. La bitácora de correos nunca guarda el cuerpo, así que anotar el
+// envío no la convierte en una copia de las claves emitidas.
+
+// Las dos entidades, con de dónde sale su nombre y su correo. Cerrado a
+// propósito: `tabla` termina interpolada en el SQL de entrega.js.
+const ENTIDADES_CLAVE = {
+  codigos: { tabla: 'codigos_acceso', nombre: 'empresa', email: 'email', etiqueta: 'Código' },
+  proveedores: { tabla: 'proveedores', nombre: 'nombre_empresa', email: 'contacto_email', etiqueta: 'Proveedor' },
+};
+
+async function entidadDeClave(clase, id) {
+  const cfg = ENTIDADES_CLAVE[clase];
+  if (!cfg) return null;
+  const { rows } = await query(
+    `SELECT id, ${cfg.nombre} AS nombre, ${cfg.email} AS email FROM ${cfg.tabla} WHERE id = $1`,
+    [id]
+  );
+  return rows[0] ? { ...rows[0], cfg } : null;
+}
+
+// POST = entregar la clave (la emite si no existe). Idempotente: repetirlo
+// reenvía la MISMA clave, no una nueva — si cambiara, los informes ya
+// entregados dejarían de abrirse.
+// DELETE = rotar: clave nueva de aquí en adelante. Los informes que ya
+// salieron siguen abriéndose con la anterior; no se re-cifran.
+for (const metodo of ['post', 'delete']) {
+  router[metodo]('/:clase(codigos|proveedores)/:id/clave-informe',
+    requireSeccion('accesos_externos', 'proveedores'), adminOnly, async (req, res, next) => {
+      try {
+        const rotar = metodo === 'delete';
+        const ent = await entidadDeClave(req.params.clase, req.params.id);
+        if (!ent) return res.status(404).json({ error: 'No encontrado.' });
+
+        const clave = rotar
+          ? await rotarClaveEntidad({ tabla: ent.cfg.tabla, id: ent.id })
+          : await emitirClaveDeEntidad({ tabla: ent.cfg.tabla, id: ent.id });
+
+        // null = no hay llave maestra (SII_CRED_KEY). Sin ella no se puede
+        // guardar el secreto cifrado en reposo, y guardarlo en claro sería
+        // peor que no tenerlo: se dice y no se inventa nada.
+        if (!clave) {
+          return res.status(503).json({
+            error: 'El cifrado de informes no está disponible: falta SII_CRED_KEY en el servidor. '
+              + 'Los informes seguirán saliendo sin cifrar hasta que se configure.',
+          });
+        }
+
+        // El correo es "mejor esfuerzo": si la empresa no tiene dirección
+        // registrada, la clave igual quedó emitida y el operador la dicta
+        // por teléfono desde la respuesta. Fallar acá obligaría a rotarla
+        // de nuevo para volver a intentar.
+        let correo = { ok: false, error: 'sin correo registrado' };
+        if (ent.email) {
+          correo = await enviarYRegistrar({
+            para: ent.email,
+            area: 'Informes',
+            tipo: 'clave_informe',
+            referencia: ent.id,
+            plantilla: claveInformeEmail({ empresa: ent.nombre, clave, rotada: rotar }),
+          });
+        }
+
+        await logActividad({
+          usuarioId: req.user.sub,
+          accion: rotar ? 'rotar_clave_informe' : 'entregar_clave_informe',
+          entidad: ent.cfg.tabla, entidadId: ent.id, ip: req.ip,
+        });
+
+        // `clave` viaja UNA vez. No se registra en el log de actividad ni
+        // en la bitácora de correos: ninguna de las dos guarda cuerpos.
+        res.json({ clave, rotada: rotar, enviada_a: correo.ok ? ent.email : null, correo });
+      } catch (err) { next(err); }
+    });
+}
 
 // ---------- PUNTOS LIMPIOS ("Sube y Suma" — reciclaje de envases) ----------
 // Lugares de entrega de envases con cartel QR imprimible. codigo_id NULL =

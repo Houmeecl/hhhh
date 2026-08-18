@@ -694,12 +694,17 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
 
     // Envío del informe por correo (no bloqueante: nunca afecta la respuesta).
     //
-    // EL INFORME CONSOLIDADO ES EL ACTIVO, y sale CIFRADO cuando la carga
-    // se hizo con un código de acceso: la clave cuelga del código
-    // (migración 102), que es la identidad del comprador en este flujo
-    // público — acá no hay `proveedor_id` del que sacarla, que es la razón
-    // por la que este camino quedó sin cifrar cuando se hizo el de
+    // EL INFORME CONSOLIDADO ES EL ACTIVO, y sale CIFRADO cuando el código
+    // con que se cargó YA TIENE una clave entregada: la clave cuelga del
+    // código (migración 102), que es la identidad del comprador en este
+    // flujo público — acá no hay `proveedor_id` del que sacarla, que es la
+    // razón por la que este camino quedó sin cifrar cuando se hizo el de
     // transporte.
+    //
+    // `claveDeCodigo` LEE, no crea. Si a esa empresa nadie le entregó su
+    // clave todavía (el correo de credenciales del flujo de cobros, o el
+    // botón del panel de accesos), el informe sale en claro. Crearla acá
+    // sería cifrar con un secreto que el destinatario nunca vio.
     //
     // La clave NO va en este correo: viaja en el de credenciales, que no
     // lleva adjunto (services/cobros.js). Mandar el archivo y su

@@ -121,9 +121,9 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas, cifrado = false }) 
         <div style="background:#f1f5f9;border-left:3px solid #0f1f2e;padding:12px 16px;margin:14px 0">
           <b style="font-size:13px">El PDF adjunto está cifrado.</b>
           <div style="font-size:13px;color:#475569;margin-top:4px">
-            Ábrelo con tu clave de informes — la que te llegó junto con tu código de acceso.
-            Nunca la enviamos en el mismo correo que el informe; si no la tienes a mano,
-            respóndenos y te la reenviamos.
+            Ábrelo con tu clave de informes, que te enviamos en un correo aparte.
+            Nunca la mandamos en el mismo correo que el informe —si lo hiciéramos, cifrarlo
+            no serviría de nada—. Si no la tienes a mano, respóndenos y te la reenviamos.
           </div>
         </div>` : '';
   return {
@@ -327,6 +327,49 @@ export function credencialesEmail({ empresa, codigo, creditos, link, claveInform
         <p><a href="${link}" style="background:#28a745;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:600">Entrar y subir mi primer documento</a></p>
         <p style="color:#64748b;font-size:13px">Guarde esta clave: es la que identifica el acceso de su
            empresa. Si la pierde, respóndanos este correo y se la reenviamos.</p>
+        <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad.</p>
+      </div>`,
+  };
+}
+
+/**
+ * Entrega de la clave con que se abren los informes cifrados.
+ *
+ * NO LLEVA ADJUNTO, y esa es toda la razón de que exista como correo
+ * aparte: la regla que sostiene el cifrado es que la clave y el archivo
+ * nunca viajen en el mismo mensaje. Si se mandara junto al informe, el
+ * cifrado sería decoración.
+ *
+ * Lo dispara una persona desde "Accesos externos" (o sale solo en el
+ * correo de credenciales de un cobro pagado). Hasta que alguien la
+ * entregue, los informes de esa empresa salen EN CLARO a propósito:
+ * cifrar con una clave que el destinatario nunca vio le dejaría un PDF
+ * que no puede abrir, que es peor que uno legible.
+ */
+export function claveInformeEmail({ empresa, clave, rotada = false }) {
+  return {
+    subject: rotada
+      ? 'Su clave de informes cambió · sicr3p'
+      : 'Su clave para abrir los informes · sicr3p',
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">${rotada ? 'Su clave de informes cambió' : 'Su clave para abrir los informes'}</h2>
+        <p>Hola${empresa ? `, <b>${esc(empresa)}</b>` : ''}. Los informes en PDF que le entregamos
+           salen cifrados. Esta es la clave que los abre.</p>
+        <div style="border:1px solid #cbd5e1;border-radius:10px;padding:16px 18px;margin:16px 0;text-align:center">
+          <div style="font-size:12px;color:#64748b;font-weight:700;letter-spacing:.06em">CLAVE DE INFORMES</div>
+          <div style="font-size:22px;font-weight:800;letter-spacing:.08em;margin:8px 0;font-family:ui-monospace,Menlo,Consolas,monospace">${esc(clave)}</div>
+        </div>
+        ${rotada ? `
+        <p style="font-size:13px;color:#475569">
+          <b>Los informes que ya recibió siguen abriéndose con la clave anterior.</b> No se
+          vuelven a cifrar: esta clave nueva aplica a los que le enviemos de ahora en adelante.
+        </p>` : ''}
+        <p style="font-size:13px;color:#475569">
+          Es distinta de su código de acceso y no cambia sola. <b>Guárdela aparte</b>: nunca se
+          la enviamos en el mismo correo que un informe, justamente para que el cifrado sirva
+          de algo. Si la pierde, pídanosla y se la reenviamos.
+        </p>
         <p style="color:#64748b;font-size:13px">Tu contabilidad, tu trazabilidad.</p>
       </div>`,
   };

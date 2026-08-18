@@ -197,11 +197,16 @@ router.post('/viajes', requireNivelOperador, uploadEvidencia, async (req, res, n
           viaje: rows[0],
           empresa: prov,
           modoNombre: mRows[0].nombre,
-          // El comprobante sale CIFRADO con la clave de esta empresa. La
-          // clave no viaja acá: se entrega una sola vez desde el panel.
-          // Si falta la llave maestra, `claveDeProveedor` devuelve null y
-          // el PDF sale en claro — pero el acuse lo deja anotado, para
-          // que no pase inadvertido.
+          // El comprobante sale cifrado SOLO si a esta empresa ya se le
+          // entregó su clave desde "Accesos externos → Entregar clave".
+          // `claveDeProveedor` LEE, no crea: si nadie se la entregó
+          // todavía, devuelve null y el PDF sale en claro.
+          //
+          // Y eso es lo correcto, no una degradación: durante un tiempo
+          // esto cifró con una clave que se creaba sola al mandar el
+          // archivo y que la empresa NUNCA recibía por ningún canal —le
+          // llegaba un PDF que no podía abrir. Mejor en claro y anotado
+          // como tal en el acuse, que ilegible.
           clave,
         });
         await registrarEntrega({

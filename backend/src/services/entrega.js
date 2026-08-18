@@ -98,15 +98,27 @@ export const hashArchivo = (buffer) => crypto.createHash('sha256').update(buffer
 const TABLAS_CON_CLAVE = new Set(['proveedores', 'codigos_acceso']);
 
 /**
- * Devuelve la clave de informe de una entidad, creándola la primera vez.
+ * LEE la clave de informe de una entidad. NO la crea.
  *
- * Idempotente y con bloqueo optimista: dos envíos simultáneos del mismo
- * mes no pueden dejar dos claves distintas —el `WHERE clave_informe IS
- * NULL` hace que solo el primero escriba, y el segundo relee la que quedó.
+ * Que leer y crear estén separados es lo que impide un error que ya se
+ * cometió: `claveDeEntidad` creaba la clave al pedirla, y quienes la pedían
+ * eran los caminos que ENTREGAN UN ARCHIVO. Resultado: se cifraban informes
+ * con una clave recién inventada que el destinatario nunca había visto ni
+ * tenía forma de conseguir. Un PDF que nadie puede abrir no protege nada:
+ * solo se pierde, y encima parece un archivo dañado.
  *
- * Devuelve `null` si el cifrado no está disponible (falta la llave maestra
- * en producción). El llamador decide: mejor mandar el informe sin cifrar y
- * decirlo, que no mandarlo — pero esa decisión no se toma acá.
+ * La regla, ahora sostenida por la forma del módulo y no por la memoria de
+ * quien escriba la próxima ruta:
+ *
+ *   LA CLAVE NACE CUANDO ALGUIEN SE LA ENTREGA A LA EMPRESA
+ *   (`emitirClaveDeEntidad`), NO CUANDO SE MANDA UN ARCHIVO.
+ *
+ * Así, si nadie entregó una clave, no hay clave, el archivo sale en claro y
+ * el acuse lo deja anotado con `cifrado: false` — que es justo para lo que
+ * existe esa bandera.
+ *
+ * Devuelve `null` si no hay clave emitida, si falta la llave maestra, o si
+ * lo guardado ya no se puede descifrar.
  */
 export async function claveDeEntidad({ tabla, id }) {
   if (!TABLAS_CON_CLAVE.has(tabla)) {
@@ -115,63 +127,98 @@ export async function claveDeEntidad({ tabla, id }) {
   if (!cifradoDisponible() || !id) return null;
 
   const { rows } = await query(`SELECT clave_informe FROM ${tabla} WHERE id = $1`, [id]);
-  if (!rows[0]) return null;
-  if (rows[0].clave_informe) {
-    try {
-      return descifrar(rows[0].clave_informe);
-    } catch (e) {
-      // La llave maestra cambió y lo guardado ya no se puede leer. Se
-      // avisa fuerte y se devuelve null: generar una clave nueva en
-      // silencio dejaría al cliente sin poder abrir sus informes viejos.
-      console.error(`[entrega] la clave de informe de ${tabla}/${id} no se puede descifrar: ${e.message}`);
-      return null;
-    }
+  if (!rows[0]?.clave_informe) return null;
+  try {
+    return descifrar(rows[0].clave_informe);
+  } catch (e) {
+    // La llave maestra cambió y lo guardado ya no se puede leer. Se avisa
+    // fuerte y se devuelve null: generar una clave nueva en silencio
+    // dejaría al cliente sin poder abrir sus informes viejos.
+    console.error(`[entrega] la clave de informe de ${tabla}/${id} no se puede descifrar: ${e.message}`);
+    return null;
   }
+}
 
+/**
+ * EMITE la clave de una entidad: la crea si no existe y la devuelve.
+ *
+ * El único que escribe. Lo llaman los caminos que le ENTREGAN la clave a la
+ * empresa —el correo de credenciales del flujo de cobros, y el botón
+ * "entregar clave" del panel—, nunca los que mandan un archivo.
+ *
+ * Idempotente y con bloqueo optimista: dos entregas simultáneas no pueden
+ * dejar dos claves distintas —el `WHERE clave_informe IS NULL` hace que
+ * solo la primera escriba, y la segunda relee la que quedó—. Si cambiara
+ * en cada llamada, el informe del mes pasado dejaría de abrirse con la
+ * clave que el cliente tiene anotada.
+ */
+export async function emitirClaveDeEntidad({ tabla, id }) {
+  if (!TABLAS_CON_CLAVE.has(tabla)) {
+    throw new Error(`[entrega] tabla sin clave de informe: ${tabla}`);
+  }
+  if (!cifradoDisponible() || !id) return null;
+
+  const yaHay = await claveDeEntidad({ tabla, id });
+  if (yaHay) return yaHay;
+
+  // Puede ser que la fila no exista, o que exista sin clave. Solo en el
+  // segundo caso el UPDATE toca algo.
   const nueva = generarClaveInforme();
   const { rows: act } = await query(
     `UPDATE ${tabla} SET clave_informe = $2
       WHERE id = $1 AND clave_informe IS NULL
-      RETURNING clave_informe`,
+      RETURNING id`,
     [id, cifrar(nueva)]
   );
   if (act[0]) return nueva;
 
-  // Otro proceso la creó entremedio: se lee la suya.
-  const { rows: otra } = await query(`SELECT clave_informe FROM ${tabla} WHERE id = $1`, [id]);
-  return otra[0]?.clave_informe ? descifrar(otra[0].clave_informe) : null;
+  // O la creó otro proceso entremedio, o la fila no existe. `claveDeEntidad`
+  // distingue los dos casos sin repetir la lógica de descifrado.
+  return claveDeEntidad({ tabla, id });
 }
 
-/** La clave de un proveedor. Envoltorio: es el caso de uso del panel. */
+/** Lee la clave de un proveedor (no la crea). */
 export const claveDeProveedor = (proveedorId) =>
   claveDeEntidad({ tabla: 'proveedores', id: proveedorId });
 
-/**
- * La clave del código con que se cargó una sesión (flujo público).
- *
- * NUNCA para un código de campaña de "Sube y Suma" (`modo_juego`), y esto
- * NO es una restricción de conveniencia:
- *
- *  · un código de campaña lo comparten TODOS los jugadores de esa empresa,
- *    así que una clave por código no protegería a ningún jugador de otro; y
- *  · el jugador entra por magic link y jamás recibe una clave de informes
- *    —ese correo sale del flujo de cobros, que él no atraviesa—.
- *
- * Cifrar igual le mandaría un PDF que no puede abrir. Un archivo
- * inutilizable no protege nada: solo se pierde. Mejor en claro y anotado
- * como tal en el acuse, que es justo para lo que existe `cifrado`.
- *
- * El guard vive acá y no solo en el llamador a propósito: la próxima ruta
- * que quiera entregar un informe no tiene por qué acordarse de esto.
- */
-export async function claveDeCodigo(codigoId) {
-  if (!codigoId) return null;
+/** Emite y devuelve la clave de un proveedor, para entregársela. */
+export const emitirClaveDeProveedor = (proveedorId) =>
+  emitirClaveDeEntidad({ tabla: 'proveedores', id: proveedorId });
+
+// Un código de campaña de "Sube y Suma" NUNCA porta clave, y no es una
+// restricción de conveniencia:
+//
+//  · lo comparten TODOS los jugadores de esa empresa, así que una clave por
+//    código no protegería a ningún jugador de otro; y
+//  · el jugador entra por magic link y jamás recibe una clave de informes
+//    —ese correo sale del flujo de cobros, que él no atraviesa—.
+//
+// El guard vive acá y no solo en el llamador a propósito: la próxima ruta
+// que quiera entregar un informe no tiene por qué acordarse de esto.
+async function esCampanaDeJuego(codigoId) {
   const { rows } = await query(`SELECT modo_juego FROM codigos_acceso WHERE id = $1`, [codigoId]);
-  if (!rows[0] || rows[0].modo_juego) return null;
+  return !rows[0] || rows[0].modo_juego === true;
+}
+
+/** Lee la clave del código con que se cargó una sesión (no la crea). */
+export async function claveDeCodigo(codigoId) {
+  if (!codigoId || await esCampanaDeJuego(codigoId)) return null;
   return claveDeEntidad({ tabla: 'codigos_acceso', id: codigoId });
 }
 
-/** Rota la clave. Los informes YA entregados siguen abriéndose con la anterior. */
+/** Emite y devuelve la clave de un código, para entregársela. */
+export async function emitirClaveDeCodigo(codigoId) {
+  if (!codigoId || await esCampanaDeJuego(codigoId)) return null;
+  return emitirClaveDeEntidad({ tabla: 'codigos_acceso', id: codigoId });
+}
+
+/**
+ * Rota la clave: la reemplaza por una nueva, exista o no una anterior.
+ *
+ * Los informes YA entregados siguen abriéndose con la clave con que
+ * salieron —no se re-cifran—. Rotar protege lo que viene, no lo que ya
+ * viajó, y la UI tiene que decirlo así.
+ */
 export async function rotarClaveEntidad({ tabla, id }) {
   if (!TABLAS_CON_CLAVE.has(tabla)) {
     throw new Error(`[entrega] tabla sin clave de informe: ${tabla}`);
@@ -187,6 +234,17 @@ export async function rotarClaveEntidad({ tabla, id }) {
 
 export const rotarClaveProveedor = (proveedorId) =>
   rotarClaveEntidad({ tabla: 'proveedores', id: proveedorId });
+
+/** ¿Tiene clave emitida? Para el panel, sin exponerla. */
+export async function tieneClaveInforme({ tabla, id }) {
+  if (!TABLAS_CON_CLAVE.has(tabla)) {
+    throw new Error(`[entrega] tabla sin clave de informe: ${tabla}`);
+  }
+  const { rows } = await query(
+    `SELECT clave_informe IS NOT NULL AS tiene FROM ${tabla} WHERE id = $1`, [id]
+  );
+  return Boolean(rows[0]?.tiene);
+}
 
 // ---------- el acuse ----------
 

@@ -48,6 +48,7 @@ export default function Accesos({ user }) {
           <button className={`btn btn-sm ${tab === 'trazadores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('trazadores')}>Trazadores</button>
           <button className={`btn btn-sm ${tab === 'proveedores' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('proveedores')}>Proveedores</button>
           <button className={`btn btn-sm ${tab === 'puntos_limpios' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('puntos_limpios')}>Puntos limpios</button>
+          <button className={`btn btn-sm ${tab === 'entregas' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setTab('entregas')}>Entregas</button>
         </div>
       )}
 
@@ -58,7 +59,182 @@ export default function Accesos({ user }) {
       {tab === 'trazadores' && puedeVerTodo && <Trazadores flash={flash} />}
       {tab === 'proveedores' && <Proveedores flash={flash} />}
       {tab === 'puntos_limpios' && puedeVerTodo && <PuntosLimpios flash={flash} />}
+      {tab === 'entregas' && <Entregas flash={flash} />}
       {toast && <div className={`toast ${toast.err ? 'err' : ''}`}>{toast.msg}</div>}
+    </div>
+  );
+}
+
+// ============================================================
+// Acuse de entregas: qué archivo exacto recibió cada empresa.
+//
+// La tabla `entregas` existe para responder esa pregunta y hasta acá solo
+// se escribía — había INSERT y purga por retención, y ningún SELECT. Un
+// registro que nadie puede leer no es un registro.
+//
+// El número que importa mirar es "salieron sin cifrar": si sube, hay
+// empresas a las que nadie les entregó su clave de informes.
+//
+// No guarda el archivo, solo su hash: sirve para comparar contra lo que el
+// cliente diga que recibió, no para volver a mandarlo.
+// ============================================================
+function Entregas({ flash }) {
+  const [datos, setDatos] = useState({ entregas: [], en_claro: 0 });
+  const [filtro, setFiltro] = useState({ empresa: '', desde: '', hasta: '' });
+  const [cargando, setCargando] = useState(false);
+
+  const cargar = () => {
+    setCargando(true);
+    api.accesosEntregas(filtro)
+      .then(setDatos)
+      .catch((e) => flash(e.message, true))
+      .finally(() => setCargando(false));
+  };
+  useEffect(() => { cargar(); }, []);
+
+  const TIPOS = {
+    informe_sesion: 'Informe consolidado',
+    informe_mensual: 'Informe mensual',
+    comprobante_transporte: 'Comprobante transporte',
+    carpeta_mandante: 'Carpeta mandante',
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div className="card card-pad">
+        <div className="form-row" style={{ gridTemplateColumns: '2fr 1fr 1fr auto', margin: 0, alignItems: 'end' }}>
+          <div className="field"><label>Empresa o correo</label>
+            <input value={filtro.empresa} onChange={(e) => setFiltro({ ...filtro, empresa: e.target.value })} /></div>
+          <div className="field"><label>Desde</label>
+            <input type="date" value={filtro.desde} onChange={(e) => setFiltro({ ...filtro, desde: e.target.value })} /></div>
+          <div className="field"><label>Hasta</label>
+            <input type="date" value={filtro.hasta} onChange={(e) => setFiltro({ ...filtro, hasta: e.target.value })} /></div>
+          <button className="btn btn-primary" onClick={cargar} disabled={cargando}>
+            {cargando ? <span className="spinner" /> : 'Buscar'}
+          </button>
+        </div>
+        {datos.en_claro > 0 && (
+          <p className="muted" style={{ fontSize: 13, marginTop: 12, marginBottom: 0 }}>
+            <b>{datos.en_claro}</b> de {datos.entregas.length} salieron <b>sin cifrar</b>. Suele
+            significar que a esa empresa nadie le entregó todavía su clave de informes — se hace
+            desde la pestaña de códigos o de proveedores.
+          </p>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr>
+              <th>Fecha</th><th>Tipo</th><th>Empresa</th><th>Enviado a</th>
+              <th>Cifrado</th><th className="num">Peso</th><th>Huella del archivo</th>
+            </tr></thead>
+            <tbody>
+              {datos.entregas.map((e) => (
+                <tr key={e.id}>
+                  <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(e.created_at)}</td>
+                  <td style={{ fontSize: 13 }}>{TIPOS[e.tipo] || e.tipo}{e.periodo && <div className="muted" style={{ fontSize: 12 }}>{e.periodo}</div>}</td>
+                  <td style={{ fontSize: 13 }}>{e.proveedor_empresa || e.codigo_empresa || '—'}
+                    {e.codigo && <div className="muted" style={{ fontFamily: 'monospace', fontSize: 11 }}>{e.codigo}</div>}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>{e.destinatario_email}</td>
+                  <td>
+                    <span className={`badge ${e.cifrado ? 'badge-green' : 'badge-yellow'}`}>
+                      {e.cifrado ? 'Cifrado' : 'En claro'}
+                    </span>
+                  </td>
+                  <td className="num muted" style={{ fontSize: 13 }}>{Math.round(e.bytes / 1024)} KB</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 11 }} title={e.hash_archivo}>
+                    {e.hash_archivo.slice(0, 16)}…
+                  </td>
+                </tr>
+              ))}
+              {datos.entregas.length === 0 && (
+                <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>
+                  Sin entregas registradas para ese filtro.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Clave de informes: entregarla y rotarla.
+//
+// POR QUÉ ESTA COLUMNA EXISTE. Los PDF que se le entregan a una empresa
+// salen cifrados con una clave suya. Durante un tiempo esa clave se creaba
+// SOLA al mandar el archivo y, salvo en el flujo de cobros, la empresa
+// nunca la recibía: le llegaba un PDF que no podía abrir. Ahora la clave
+// nace cuando alguien se la entrega — y este botón es ese "alguien".
+//
+// Mientras diga "Sin clave", los informes de esa empresa salen EN CLARO a
+// propósito. Es preferible a mandar un archivo ilegible, y el acuse de
+// entregas lo deja anotado.
+//
+// LA CLAVE SE VE UNA SOLA VEZ. Después solo se puede reenviar por correo o
+// rotar — mismo criterio que las claves de tarjeta de viaje y de llave de
+// archivo. No hay pantalla que la muestre de vuelta.
+// ============================================================
+function ClaveInforme({ clase, item, flash, onCambio }) {
+  const [ocupado, setOcupado] = useState(false);
+  const [reciente, setReciente] = useState(null);
+  const tiene = item.tiene_clave_informe;
+
+  async function accion(rotar) {
+    if (rotar && !window.confirm(
+      'Se genera una clave NUEVA y se le envía por correo.\n\n'
+      + 'Los informes que ya recibió siguen abriéndose con la clave anterior: '
+      + 'no se vuelven a cifrar. La nueva aplica solo a los que se envíen de ahora en adelante.\n\n'
+      + '¿Rotar la clave?'
+    )) return;
+    setOcupado(true);
+    try {
+      const r = rotar
+        ? await api.rotarClaveInforme(clase, item.id)
+        : await api.entregarClaveInforme(clase, item.id);
+      setReciente(r.clave);
+      flash(r.enviada_a
+        ? `Clave ${rotar ? 'rotada' : 'entregada'} y enviada a ${r.enviada_a}.`
+        : `Clave ${rotar ? 'rotada' : 'emitida'}. Esta empresa no tiene correo registrado: dictarla desde acá.`);
+      onCambio?.();
+    } catch (e) { flash(e.message, true); }
+    finally { setOcupado(false); }
+  }
+
+  return (
+    <div>
+      <span className={`badge ${tiene ? 'badge-green' : 'badge-gray'}`}>
+        {tiene ? 'Clave entregada' : 'Sin clave'}
+      </span>
+      <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button className="btn btn-outline btn-sm" onClick={() => accion(false)} disabled={ocupado}>
+          {tiene ? 'Reenviar' : 'Entregar clave'}
+        </button>
+        {tiene && (
+          <button className="btn btn-outline btn-sm" onClick={() => accion(true)} disabled={ocupado}>
+            Rotar
+          </button>
+        )}
+      </div>
+      {reciente && (
+        <div style={{
+          marginTop: 6, padding: '6px 8px', border: '1px solid var(--green)',
+          borderRadius: 6, fontFamily: 'monospace', fontWeight: 700, fontSize: 13,
+        }}>
+          {reciente}
+          <div className="muted" style={{ fontFamily: 'system-ui', fontWeight: 400, fontSize: 11, marginTop: 2 }}>
+            Anótala ahora: no se vuelve a mostrar.
+          </div>
+        </div>
+      )}
+      {!tiene && (
+        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+          Sus informes salen sin cifrar.
+        </div>
+      )}
     </div>
   );
 }
@@ -124,7 +300,7 @@ function Codigos({ flash }) {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Código</th><th>Empresa</th><th className="num">Créditos</th><th>Último uso</th><th>Conexión</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>Código</th><th>Empresa</th><th className="num">Créditos</th><th>Último uso</th><th>Conexión</th><th>Clave de informes</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             {items.map((c) => {
               const conexion = c.creditos_usados > 0
@@ -142,12 +318,21 @@ function Codigos({ flash }) {
                 <td className="num"><b>{c.creditos - c.creditos_usados}</b> / {c.creditos}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{c.ultimo_uso ? fmtFecha(c.ultimo_uso) : '—'}</td>
                 <td><span className={`badge ${conexion.clase}`}>{conexion.texto}</span></td>
+                <td>
+                  {/* Una campaña de "Sube y Suma" NUNCA porta clave: la
+                      comparten todos los jugadores y ellos entran por magic
+                      link, sin recibir clave alguna. Sus informes salen en
+                      claro a propósito. */}
+                  {c.modo_juego
+                    ? <span className="muted" style={{ fontSize: 12 }}>No aplica (campaña)</span>
+                    : <ClaveInforme clase="codigos" item={c} flash={flash} onCambio={cargar} />}
+                </td>
                 <td><span className={`badge ${c.activo ? 'badge-green' : 'badge-gray'}`}>{c.activo ? 'Activo' : 'Inactivo'}</span></td>
                 <td><button className="btn btn-outline btn-sm" onClick={() => toggle(c)}>{c.activo ? 'Desactivar' : 'Activar'}</button></td>
               </tr>
               );
             })}
-            {items.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin códigos generados.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin códigos generados.</td></tr>}
           </tbody>
         </table>
         </div>
@@ -795,11 +980,11 @@ function Proveedores({ flash }) {
       <div className="card">
         <div className="table-scroll">
         <table className="data">
-          <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th></th></tr></thead>
+          <thead><tr><th>Empresa</th><th>RUT</th><th>Último uso</th><th>Estado</th><th>Acceso web</th><th>Clave de informes</th><th></th></tr></thead>
           <tbody>
             {items.map((p) => (
               <tr key={p.id}>
-                <td><b>{p.nombre_empresa}</b></td>
+                <td><b>{p.nombre_empresa}</b>{p.contacto_email && <div className="muted" style={{ fontSize: 12 }}>{p.contacto_email}</div>}</td>
                 <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{p.rut}</td>
                 <td className="muted" style={{ fontSize: 13 }}>{p.ultimo_uso ? fmtFecha(p.ultimo_uso) : 'Nunca'}</td>
                 <td><span className={`badge ${p.activo ? 'badge-green' : 'badge-gray'}`}>{p.activo ? 'Activo' : 'Inactivo'}</span></td>
@@ -808,10 +993,13 @@ function Proveedores({ flash }) {
                     ? <span className="badge badge-green">Creada</span>
                     : <button className="btn btn-outline btn-sm" onClick={() => setCuentaWeb(p)}>Crear acceso web</button>}
                 </td>
+                {/* Sus comprobantes de transporte salen cifrados con esta
+                    clave. Sin entregarla, salen en claro. */}
+                <td><ClaveInforme clase="proveedores" item={p} flash={flash} onCambio={cargar} /></td>
                 <td><button className="btn btn-outline btn-sm" onClick={() => toggle(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button></td>
               </tr>
             ))}
-            {items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin proveedores registrados.</td></tr>}
+            {items.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin proveedores registrados.</td></tr>}
           </tbody>
         </table>
         </div>

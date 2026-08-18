@@ -20,7 +20,7 @@ import { sendMail, elegirTransporte } from './mailer.js';
 // de reenviar. Devuelve `{ ok, error }` para que el llamador decida.
 // ============================================================
 
-export const TIPOS_CORREO = ['link_pago', 'credenciales', 'recordatorio_pago'];
+export const TIPOS_CORREO = ['link_pago', 'credenciales', 'recordatorio_pago', 'clave_informe'];
 
 /**
  * Deja constancia de un envío. Tampoco lanza: si la bitácora falla, el

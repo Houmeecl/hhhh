@@ -7,10 +7,11 @@ import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 import {
   generarClaveInforme, opcionesCifrado, pdfEstaCifrado, hashArchivo,
   claveDeProveedor, claveDeCodigo, claveDeEntidad, rotarClaveProveedor, registrarEntrega,
+  emitirClaveDeEntidad, emitirClaveDeCodigo, emitirClaveDeProveedor, tieneClaveInforme,
 } from '../src/services/entrega.js';
 import { generateComprobanteTransporte } from '../src/services/transportePdf.js';
 import { generateReport } from '../src/services/pdf.js';
-import { reporteEmail, credencialesEmail } from '../src/services/mailer.js';
+import { reporteEmail, credencialesEmail, claveInformeEmail } from '../src/services/mailer.js';
 import { descifrar } from '../src/services/cripto.js';
 
 // ============================================================
@@ -97,18 +98,18 @@ async function limpiar(id) {
   await query(`DELETE FROM proveedores WHERE id = $1`, [id]);
 }
 
-test('la clave de una empresa se crea una vez y NO cambia entre envíos', { skip: SALTO_PROD }, async () => {
-  // Si cambiara en cada envío, el informe del mes pasado dejaría de
+test('la clave de una empresa se crea una vez y NO cambia entre entregas', { skip: SALTO_PROD }, async () => {
+  // Si cambiara en cada entrega, el informe del mes pasado dejaría de
   // abrirse con la clave que el cliente tiene anotada.
   const prov = await proveedorDePrueba();
   try {
-    const primera = await claveDeProveedor(prov.id);
+    const primera = await emitirClaveDeProveedor(prov.id);
     assert.ok(primera && primera.length === 16);
-    const segunda = await claveDeProveedor(prov.id);
-    assert.equal(segunda, primera, 'dos envíos seguidos tienen que usar la MISMA clave');
+    const segunda = await emitirClaveDeProveedor(prov.id);
+    assert.equal(segunda, primera, 'dos entregas seguidas tienen que dar la MISMA clave');
 
     // Y varias llamadas a la vez tampoco pueden dejar dos claves distintas.
-    const paralelas = await Promise.all([1, 2, 3, 4].map(() => claveDeProveedor(prov.id)));
+    const paralelas = await Promise.all([1, 2, 3, 4].map(() => emitirClaveDeProveedor(prov.id)));
     assert.equal(new Set(paralelas).size, 1, 'la carrera dejó más de una clave');
   } finally { await limpiar(prov.id); }
 });
@@ -116,7 +117,7 @@ test('la clave de una empresa se crea una vez y NO cambia entre envíos', { skip
 test('la clave se guarda CIFRADA en reposo, nunca en claro', { skip: SALTO_PROD }, async () => {
   const prov = await proveedorDePrueba();
   try {
-    const clave = await claveDeProveedor(prov.id);
+    const clave = await emitirClaveDeProveedor(prov.id);
     const { rows } = await query(`SELECT clave_informe FROM proveedores WHERE id = $1`, [prov.id]);
     const guardado = rows[0].clave_informe;
 
@@ -131,7 +132,7 @@ test('la clave se guarda CIFRADA en reposo, nunca en claro', { skip: SALTO_PROD 
 test('rotar la clave da una nueva, y los informes viejos siguen abriéndose con la anterior', { skip: SALTO_PROD }, async () => {
   const prov = await proveedorDePrueba();
   try {
-    const vieja = await claveDeProveedor(prov.id);
+    const vieja = await emitirClaveDeProveedor(prov.id);
     const nueva = await rotarClaveProveedor(prov.id);
     assert.notEqual(nueva, vieja);
     assert.equal(await claveDeProveedor(prov.id), nueva);
@@ -209,17 +210,17 @@ async function limpiarCodigo(id) {
   await query(`DELETE FROM codigos_acceso WHERE id = $1`, [id]);
 }
 
-test('la clave de un código se crea una vez y NO cambia entre envíos', { skip: SALTO_PROD }, async () => {
+test('la clave de un código se crea una vez y NO cambia entre entregas', { skip: SALTO_PROD }, async () => {
   const cod = await codigoDePrueba();
   try {
-    const primera = await claveDeCodigo(cod.id);
+    const primera = await emitirClaveDeCodigo(cod.id);
     assert.ok(primera && primera.length === 16);
     assert.equal(await claveDeCodigo(cod.id), primera, 'dos informes seguidos usan la MISMA clave');
 
     // Misma carrera que la de proveedores: varias entregas a la vez no
     // pueden dejar dos claves distintas, o el informe del mes pasado deja
     // de abrirse.
-    const paralelas = await Promise.all([1, 2, 3, 4].map(() => claveDeCodigo(cod.id)));
+    const paralelas = await Promise.all([1, 2, 3, 4].map(() => emitirClaveDeCodigo(cod.id)));
     assert.equal(new Set(paralelas).size, 1, 'la carrera dejó más de una clave');
     assert.equal(paralelas[0], primera);
   } finally { await limpiarCodigo(cod.id); }
@@ -228,7 +229,7 @@ test('la clave de un código se crea una vez y NO cambia entre envíos', { skip:
 test('la clave del código se guarda CIFRADA en reposo', { skip: SALTO_PROD }, async () => {
   const cod = await codigoDePrueba();
   try {
-    const clave = await claveDeCodigo(cod.id);
+    const clave = await emitirClaveDeCodigo(cod.id);
     const { rows } = await query(`SELECT clave_informe FROM codigos_acceso WHERE id = $1`, [cod.id]);
     assert.notEqual(rows[0].clave_informe, clave, 'la columna NO puede tener la clave en claro');
     assert.equal(rows[0].clave_informe.includes(clave), false);
@@ -248,7 +249,7 @@ test('una tabla que no porta clave es un error, no una consulta', () => {
 test('EL CASO QUE FALTABA: el informe consolidado sale cifrado con AES-256', { skip: SALTO_PROD }, async () => {
   const cod = await codigoDePrueba();
   try {
-    const clave = await claveDeCodigo(cod.id);
+    const clave = await emitirClaveDeCodigo(cod.id);
     const sesion = {
       id: crypto.randomUUID(), rut_cliente: '11.111.111-1', nombre_cliente: 'Empresa de prueba',
       email_cliente: 'prueba@ejemplo.cl', fecha: '2026-08-18', total_co2e: 1.5,
@@ -360,4 +361,126 @@ test('un código de CAMPAÑA del juego nunca recibe clave de informes', { skip: 
 test('un código inexistente no revienta ni inventa una clave', { skip: SALTO_PROD }, async () => {
   assert.equal(await claveDeCodigo(crypto.randomUUID()), null);
   assert.equal(await claveDeCodigo(null), null);
+});
+
+// ---------- LA REGLA: la clave nace al entregarse, no al mandar un archivo ----------
+//
+// El error que estos casos impiden que vuelva: `claveDeEntidad` creaba la
+// clave al pedirla, y quienes la pedían eran los caminos que ENTREGAN UN
+// ARCHIVO. Resultado: se cifraban informes con una clave que el
+// destinatario nunca había visto ni tenía forma de conseguir. Le llegaba un
+// PDF que no podía abrir — peor que uno en claro.
+
+test('LA REGLA: pedir la clave para cifrar un archivo NO la crea', { skip: SALTO_PROD }, async () => {
+  const prov = await proveedorDePrueba();
+  const cod = await codigoDePrueba();
+  try {
+    // Esto es exactamente lo que hacen routes/public.js y
+    // routes/transporteProveedor.js antes de generar el PDF.
+    assert.equal(await claveDeProveedor(prov.id), null);
+    assert.equal(await claveDeCodigo(cod.id), null);
+
+    // Y la columna sigue vacía: no se creó nada "por si acaso".
+    const { rows: p } = await query(`SELECT clave_informe FROM proveedores WHERE id = $1`, [prov.id]);
+    const { rows: c } = await query(`SELECT clave_informe FROM codigos_acceso WHERE id = $1`, [cod.id]);
+    assert.equal(p[0].clave_informe, null, 'leer la clave del proveedor la creó');
+    assert.equal(c[0].clave_informe, null, 'leer la clave del código la creó');
+
+    assert.equal(await tieneClaveInforme({ tabla: 'proveedores', id: prov.id }), false);
+    assert.equal(await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id }), false);
+  } finally { await limpiar(prov.id); await limpiarCodigo(cod.id); }
+});
+
+test('emitir SÍ la crea, y una vez emitida el archivo ya se puede cifrar', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const emitida = await emitirClaveDeCodigo(cod.id);
+    assert.ok(emitida && emitida.length === 16);
+    // Ahora el camino de entrega SÍ la ve — y es la misma que se le mandó
+    // a la empresa, no otra.
+    assert.equal(await claveDeCodigo(cod.id), emitida);
+    assert.equal(await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id }), true);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('emitir es idempotente, incluso en carrera', { skip: SALTO_PROD }, async () => {
+  // El botón "reenviar" del panel tiene que mandar LA MISMA clave: si
+  // cambiara, los informes ya entregados dejarían de abrirse.
+  const cod = await codigoDePrueba();
+  try {
+    const primera = await emitirClaveDeCodigo(cod.id);
+    assert.equal(await emitirClaveDeCodigo(cod.id), primera);
+    const paralelas = await Promise.all([1, 2, 3, 4].map(() => emitirClaveDeCodigo(cod.id)));
+    assert.equal(new Set(paralelas).size, 1, 'la carrera dejó más de una clave');
+    assert.equal(paralelas[0], primera);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('el informe de un código SIN clave emitida sale en claro', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    const sesion = {
+      id: crypto.randomUUID(), rut_cliente: '11.111.111-1', nombre_cliente: 'Sin clave',
+      email_cliente: 'sinclave@ejemplo.cl', fecha: '2026-08-18', total_co2e: 1,
+    };
+    const facturas = [{
+      id: crypto.randomUUID(), proveedor: 'X', monto: 1000, total_co2e: 1,
+      categoria: 'combustible', fecha: '2026-08-01', hash_documento: 'a'.repeat(64),
+    }];
+    const clave = await claveDeCodigo(cod.id);   // null: nadie la entregó
+    const pdf = await generateReport({ sesion, facturas, declaracion: null, alcances: [], clave });
+    assert.equal(pdfEstaCifrado(pdf), false, 'se cifró con una clave que nadie recibió');
+
+    // Y una vez entregada, el MISMO informe sale cifrado.
+    await emitirClaveDeCodigo(cod.id);
+    const pdf2 = await generateReport({
+      sesion, facturas, declaracion: null, alcances: [], clave: await claveDeCodigo(cod.id),
+    });
+    assert.equal(pdfEstaCifrado(pdf2), true);
+    assert.ok(pdf2.includes(Buffer.from('AESV3')));
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('emitir la clave de una campaña del juego sigue sin ser posible', { skip: SALTO_PROD }, async () => {
+  const { rows } = await query(
+    `INSERT INTO codigos_acceso (codigo, creditos, empresa, email, modo_juego)
+     VALUES ($1, 20, 'Campaña', 'c@ejemplo.cl', true) RETURNING *`,
+    [`CAMP-${crypto.randomUUID().slice(0, 8).toUpperCase()}`]
+  );
+  try {
+    assert.equal(await emitirClaveDeCodigo(rows[0].id), null);
+    const { rows: k } = await query(`SELECT clave_informe FROM codigos_acceso WHERE id = $1`, [rows[0].id]);
+    assert.equal(k[0].clave_informe, null);
+  } finally { await limpiarCodigo(rows[0].id); }
+});
+
+test('la clave de informes de un proveedor se emite y se lee igual', { skip: SALTO_PROD }, async () => {
+  const prov = await proveedorDePrueba();
+  try {
+    const emitida = await emitirClaveDeProveedor(prov.id);
+    assert.ok(emitida);
+    assert.equal(await claveDeProveedor(prov.id), emitida);
+    // Rotar da otra, y el comprobante viejo sigue abriéndose con la anterior.
+    const nueva = await rotarClaveProveedor(prov.id);
+    assert.notEqual(nueva, emitida);
+    assert.equal(await claveDeProveedor(prov.id), nueva);
+  } finally { await limpiar(prov.id); }
+});
+
+test('emitir sobre una tabla que no porta clave es un error', () => {
+  assert.rejects(() => emitirClaveDeEntidad({ tabla: 'usuarios', id: crypto.randomUUID() }), /sin clave de informe/);
+  assert.rejects(() => tieneClaveInforme({ tabla: 'facturas', id: crypto.randomUUID() }), /sin clave de informe/);
+});
+
+test('el correo de la clave no lleva adjunto y dice lo que corresponde', () => {
+  const clave = 'AbCdEfGh23456789';
+  const normal = claveInformeEmail({ empresa: 'Minera X', clave });
+  assert.ok(normal.html.includes(clave));
+  assert.equal(normal.attachments, undefined, 'este correo NO puede llevar adjunto');
+  assert.equal(/siguen abriéndose con la clave anterior/.test(normal.html), false);
+
+  // Al rotar hay que decir de frente que lo ya entregado no se re-cifra.
+  const rotada = claveInformeEmail({ empresa: 'Minera X', clave, rotada: true });
+  assert.ok(/siguen abriéndose con la clave anterior/.test(rotada.html));
+  assert.notEqual(rotada.subject, normal.subject);
 });

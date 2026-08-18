@@ -5,7 +5,7 @@ import { credencialesEmail, linkPagoEmail } from './mailer.js';
 import { enviarYRegistrar, correosDadosDeBaja } from './correoLog.js';
 import { generarTokenPago, pasarelaActiva } from './pagos.js';
 import { primerEmail } from './tabla.js';
-import { claveDeCodigo } from './entrega.js';
+import { emitirClaveDeCodigo } from './entrega.js';
 import { rutValido } from './dte.js';
 
 // ============================================================
@@ -354,14 +354,18 @@ export async function enviarCredenciales(cobro, codigo) {
   // entrega, y no cambia: si cambiara, los informes del mes pasado
   // dejarían de abrirse con la clave que el cliente tiene anotada.
   //
-  // Este es el momento correcto para entregarla —el único correo sin
-  // adjunto— y `claveDeCodigo` es idempotente, así que el botón "reenviar"
-  // del panel manda la MISMA clave, no una nueva. Devuelve null si falta
-  // la llave maestra; en ese caso el bloque simplemente no se dibuja y los
-  // informes saldrán en claro, con el acuse dejando constancia.
+  // Este es el momento correcto para EMITIRLA: es el único correo sin
+  // adjunto, o sea el único donde la clave puede viajar. Ese es justamente
+  // el criterio del módulo —la clave nace cuando se entrega, no cuando se
+  // manda un archivo—, así que acá se llama al que crea y no al que lee.
+  //
+  // `emitirClaveDeCodigo` es idempotente, así que el botón "reenviar" del
+  // panel manda la MISMA clave, no una nueva. Devuelve null si falta la
+  // llave maestra; en ese caso el bloque no se dibuja y los informes
+  // saldrán en claro, con el acuse dejando constancia.
   let claveInforme = null;
   try {
-    claveInforme = await claveDeCodigo(codigo.id);
+    claveInforme = await emitirClaveDeCodigo(codigo.id);
   } catch (e) {
     // Que falle la clave no puede impedir que llegue el acceso comprado.
     console.error('[cobros] no se pudo preparar la clave de informes:', e.message);

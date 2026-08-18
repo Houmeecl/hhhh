@@ -549,6 +549,21 @@ export const api = {
   codigos: () => request('/admin/accesos/codigos', { authed: true }),
   crearCodigos: (b) => request('/admin/accesos/codigos', { method: 'POST', body: b, authed: true }),
   editarCodigo: (id, b) => request(`/admin/accesos/codigos/${id}`, { method: 'PUT', body: b, authed: true }),
+  // Clave de informes: la contraseña con que se cifran los PDF que se le
+  // entregan a una empresa. `entregarClaveInforme` la emite si no existe y
+  // la manda por correo; devuelve la clave UNA sola vez —después no hay
+  // forma de volver a verla desde el panel, solo reenviarla o rotarla—.
+  // `rotarClaveInforme` genera una nueva: los informes ya entregados
+  // siguen abriéndose con la anterior.
+  entregarClaveInforme: (clase, id) =>
+    request(`/admin/accesos/${clase}/${id}/clave-informe`, { method: 'POST', authed: true }),
+  rotarClaveInforme: (clase, id) =>
+    request(`/admin/accesos/${clase}/${id}/clave-informe`, { method: 'DELETE', authed: true }),
+  // Acuse de entregas: qué archivo exacto recibió cada empresa y cuándo.
+  accesosEntregas: (q = {}) => {
+    const p = new URLSearchParams(Object.entries(q).filter(([, v]) => v));
+    return request(`/admin/accesos/entregas${p.toString() ? `?${p}` : ''}`, { authed: true });
+  },
   // Puntos limpios ("Sube y Suma" — reciclaje de envases con cartel QR).
   accesosPuntosLimpios: () => request('/admin/accesos/puntos-limpios', { authed: true }),
   accesosCrearPuntoLimpio: (b) => request('/admin/accesos/puntos-limpios', { method: 'POST', body: b, authed: true }),
