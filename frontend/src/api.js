@@ -555,8 +555,13 @@ export const api = {
   // forma de volver a verla desde el panel, solo reenviarla o rotarla—.
   // `rotarClaveInforme` genera una nueva: los informes ya entregados
   // siguen abriéndose con la anterior.
-  entregarClaveInforme: (clase, id) =>
-    request(`/admin/accesos/${clase}/${id}/clave-informe`, { method: 'POST', authed: true }),
+  // `aMano`: el operador afirma que la entregó por otro canal (dictada por
+  // teléfono a una empresa sin correo registrado). Sin eso, la clave solo
+  // se da por entregada si el correo salió — dar por entregado lo que nadie
+  // recibió es el error que creó las claves fantasma.
+  entregarClaveInforme: (clase, id, aMano = false) =>
+    request(`/admin/accesos/${clase}/${id}/clave-informe`,
+      { method: 'POST', body: { entregada_a_mano: aMano }, authed: true }),
   rotarClaveInforme: (clase, id) =>
     request(`/admin/accesos/${clase}/${id}/clave-informe`, { method: 'DELETE', authed: true }),
   // Acuse de entregas: qué archivo exacto recibió cada empresa y cuándo.

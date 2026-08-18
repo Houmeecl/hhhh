@@ -5,7 +5,7 @@ import { credencialesEmail, linkPagoEmail } from './mailer.js';
 import { enviarYRegistrar, correosDadosDeBaja } from './correoLog.js';
 import { generarTokenPago, pasarelaActiva } from './pagos.js';
 import { primerEmail } from './tabla.js';
-import { emitirClaveDeCodigo } from './entrega.js';
+import { emitirClaveDeCodigo, marcarClaveEntregada } from './entrega.js';
 import { rutValido } from './dte.js';
 
 // ============================================================
@@ -398,6 +398,16 @@ export async function enviarCredenciales(cobro, codigo) {
   // Solo si salió. Si falló, el cobro se queda en 'pagado' y el panel lo
   // muestra como "pagado · falta la clave" con su botón de reenvío.
   if (r.ok) await marcarEntregado(cobro.id);
+
+  // Y la clave de informes se marca entregada solo si el correo salió Y
+  // LLEVABA LA CLAVE ADENTRO. Las dos condiciones: sin `SII_CRED_KEY` el
+  // mensaje se manda igual pero sin el bloque de la clave
+  // (`credencialesEmail` no lo dibuja si viene null), así que darlo por
+  // entregado ahí dejaría a esa empresa recibiendo informes cifrados con
+  // algo que nunca vio — el bug original, otra vez.
+  if (r.ok && claveInforme) {
+    await marcarClaveEntregada({ tabla: 'codigos_acceso', id: codigo.id });
+  }
   return r;
 }
 

@@ -6,7 +6,9 @@ import { hashApiKey, normalizarRut, webhookUrlValida } from '../services/mandant
 import { sanearPuntoId, validarIdentidadProveedor } from '../services/pasaporteOrigen.js';
 import { crearCuentaEntidad, enviarActivacion } from '../services/cuentas.js';
 import { qrBufferDe, reciclarUrl } from '../services/qr.js';
-import { emitirClaveDeEntidad, rotarClaveEntidad } from '../services/entrega.js';
+import {
+  emitirClaveDeEntidad, rotarClaveEntidad, marcarClaveEntregada,
+} from '../services/entrega.js';
 import { claveInformeEmail } from '../services/mailer.js';
 import { enviarYRegistrar } from '../services/correoLog.js';
 
@@ -344,7 +346,7 @@ router.get('/proveedores', requireSeccion('accesos_externos', 'proveedores'), as
       `SELECT p.id, p.nombre_empresa, p.rut, p.activo, p.ultimo_uso, p.created_at,
               p.contacto_email,
               (u.id IS NOT NULL) AS tiene_cuenta_web,
-              (p.clave_informe IS NOT NULL) AS tiene_clave_informe
+              (p.clave_informe IS NOT NULL) AS tiene_clave_informe, p.clave_informe_entregada_at
        FROM proveedores p LEFT JOIN usuarios u ON u.proveedor_id = p.id
        ORDER BY p.created_at DESC`
     );
@@ -464,7 +466,7 @@ router.get('/codigos', requireSeccion('accesos_externos'), async (req, res, next
     const { rows } = await query(
       `SELECT id, codigo, creditos, creditos_usados, empresa, email, activo,
               modo_juego, ultimo_uso, primera_conexion_at, created_at,
-              (clave_informe IS NOT NULL) AS tiene_clave_informe
+              (clave_informe IS NOT NULL) AS tiene_clave_informe, clave_informe_entregada_at
          FROM codigos_acceso ORDER BY created_at DESC LIMIT 300`
     );
     res.json({ codigos: rows });
@@ -630,6 +632,23 @@ for (const metodo of ['post', 'delete']) {
           });
         }
 
+        // LA MARCA DE ENTREGA SE PONE SOLO SI LA CLAVE LLEGÓ A ALGUNA PARTE.
+        //
+        // Si el correo falló, la clave queda emitida y SIN entregar — y
+        // eso es exactamente lo que el panel tiene que mostrar. Marcarla
+        // igual sería repetir el error que originó todo esto: dar por
+        // entregado algo que nadie recibió, y volver a cifrar informes con
+        // una clave que el destinatario no tiene.
+        //
+        // `entregada_a_mano` cubre el caso real de dictarla por teléfono a
+        // una empresa sin correo registrado: es el operador afirmando que
+        // la entregó por otro canal. Tiene que ser un acto explícito suyo,
+        // no una suposición nuestra.
+        const aMano = req.body?.entregada_a_mano === true;
+        const entregadaAt = (correo.ok || aMano)
+          ? await marcarClaveEntregada({ tabla: ent.cfg.tabla, id: ent.id })
+          : null;
+
         await logActividad({
           usuarioId: req.user.sub,
           accion: rotar ? 'rotar_clave_informe' : 'entregar_clave_informe',
@@ -638,7 +657,12 @@ for (const metodo of ['post', 'delete']) {
 
         // `clave` viaja UNA vez. No se registra en el log de actividad ni
         // en la bitácora de correos: ninguna de las dos guarda cuerpos.
-        res.json({ clave, rotada: rotar, enviada_a: correo.ok ? ent.email : null, correo });
+        res.json({
+          clave, rotada: rotar,
+          enviada_a: correo.ok ? ent.email : null,
+          entregada_at: entregadaAt,
+          correo,
+        });
       } catch (err) { next(err); }
     });
 }

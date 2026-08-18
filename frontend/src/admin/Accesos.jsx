@@ -181,9 +181,16 @@ function Entregas({ flash }) {
 function ClaveInforme({ clase, item, flash, onCambio }) {
   const [ocupado, setOcupado] = useState(false);
   const [reciente, setReciente] = useState(null);
-  const tiene = item.tiene_clave_informe;
 
-  async function accion(rotar) {
+  // TRES estados, no dos. Antes esto era un booleano `IS NOT NULL` pintado
+  // como "Clave entregada", y por eso una clave fantasma —creada por el bug
+  // viejo, que nadie recibió— se veía EXACTAMENTE igual que una sana. El
+  // operador no tenía forma de saber a quién había que atender.
+  const tiene = item.tiene_clave_informe;
+  const entregada = item.clave_informe_entregada_at;
+  const fantasma = tiene && !entregada;
+
+  async function accion(rotar, aMano = false) {
     if (rotar && !window.confirm(
       'Se genera una clave NUEVA y se le envía por correo.\n\n'
       + 'Los informes que ya recibió siguen abriéndose con la clave anterior: '
@@ -194,11 +201,11 @@ function ClaveInforme({ clase, item, flash, onCambio }) {
     try {
       const r = rotar
         ? await api.rotarClaveInforme(clase, item.id)
-        : await api.entregarClaveInforme(clase, item.id);
+        : await api.entregarClaveInforme(clase, item.id, aMano);
       setReciente(r.clave);
-      flash(r.enviada_a
-        ? `Clave ${rotar ? 'rotada' : 'entregada'} y enviada a ${r.enviada_a}.`
-        : `Clave ${rotar ? 'rotada' : 'emitida'}. Esta empresa no tiene correo registrado: dictarla desde acá.`);
+      flash(r.entregada_at
+        ? `Clave ${rotar ? 'rotada' : 'entregada'}${r.enviada_a ? ` y enviada a ${r.enviada_a}` : ' (marcada como entregada a mano)'}.`
+        : 'La clave quedó emitida pero NO se pudo enviar: sigue sin entregar. Dictala y márcala a mano.');
       onCambio?.();
     } catch (e) { flash(e.message, true); }
     finally { setOcupado(false); }
@@ -206,12 +213,17 @@ function ClaveInforme({ clase, item, flash, onCambio }) {
 
   return (
     <div>
-      <span className={`badge ${tiene ? 'badge-green' : 'badge-gray'}`}>
-        {tiene ? 'Clave entregada' : 'Sin clave'}
+      <span className={`badge ${entregada ? 'badge-green' : fantasma ? 'badge-yellow' : 'badge-gray'}`}>
+        {entregada ? 'Entregada' : fantasma ? 'Emitida, sin entregar' : 'Sin clave'}
       </span>
+      {entregada && (
+        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{fmtFecha(entregada)}</div>
+      )}
+
       <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn btn-outline btn-sm" onClick={() => accion(false)} disabled={ocupado}>
-          {tiene ? 'Reenviar' : 'Entregar clave'}
+        <button className={`btn btn-sm ${fantasma ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => accion(false)} disabled={ocupado}>
+          {entregada ? 'Reenviar' : 'Entregar clave'}
         </button>
         {tiene && (
           <button className="btn btn-outline btn-sm" onClick={() => accion(true)} disabled={ocupado}>
@@ -219,6 +231,7 @@ function ClaveInforme({ clase, item, flash, onCambio }) {
           </button>
         )}
       </div>
+
       {reciente && (
         <div style={{
           marginTop: 6, padding: '6px 8px', border: '1px solid var(--green)',
@@ -228,6 +241,24 @@ function ClaveInforme({ clase, item, flash, onCambio }) {
           <div className="muted" style={{ fontFamily: 'system-ui', fontWeight: 400, fontSize: 11, marginTop: 2 }}>
             Anótala ahora: no se vuelve a mostrar.
           </div>
+          {/* Sin correo registrado, la clave se dicta por teléfono. Marcarla
+              como entregada tiene que ser un acto explícito del operador —
+              darlo por hecho es justo el error que causó las fantasma. */}
+          {!item.clave_informe_entregada_at && (
+            <button className="btn btn-outline btn-sm" style={{ marginTop: 6 }}
+                    onClick={() => accion(false, true)} disabled={ocupado}>
+              Ya se la entregué (marcar)
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Lo que significa en la práctica, en una línea. Sin esto el estado
+          intermedio no le dice nada a quien lo mira. */}
+      {fantasma && (
+        <div className="muted" style={{ fontSize: 11, marginTop: 3, lineHeight: 1.4 }}>
+          Sus informes salen <b>sin cifrar</b>, y los que ya recibió cifrados
+          <b> no los puede abrir</b> hasta que le entregues esta clave.
         </div>
       )}
       {!tiene && (
@@ -235,6 +266,24 @@ function ClaveInforme({ clase, item, flash, onCambio }) {
           Sus informes salen sin cifrar.
         </div>
       )}
+    </div>
+  );
+}
+
+// Cuántas empresas tienen clave emitida y sin entregar. Es la lista de
+// trabajo del operador: cada una es alguien que hoy no puede abrir lo que
+// le mandamos. En régimen normal esto tiene que ser cero.
+function AvisoClavesPendientes({ items }) {
+  const n = items.filter((i) => i.tiene_clave_informe && !i.clave_informe_entregada_at).length;
+  if (!n) return null;
+  return (
+    <div className="card card-pad" style={{ borderColor: 'var(--yellow, #d97706)', marginBottom: 12 }}>
+      <b>{n} {n === 1 ? 'empresa tiene' : 'empresas tienen'} una clave de informes sin entregar.</b>
+      <div className="muted" style={{ fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+        Se les generó una clave pero nunca se les envió, así que no pueden abrir los informes
+        cifrados que ya recibieron. Entregársela desde acá manda <b>la misma</b> clave, así que
+        esos archivos vuelven a ser legibles.
+      </div>
     </div>
   );
 }
@@ -297,6 +346,7 @@ function Codigos({ flash }) {
         )}
       </div>
 
+      <AvisoClavesPendientes items={items} />
       <div className="card">
         <div className="table-scroll">
         <table className="data">
@@ -977,6 +1027,7 @@ function Proveedores({ flash }) {
         </div>
       </div>
 
+      <AvisoClavesPendientes items={items} />
       <div className="card">
         <div className="table-scroll">
         <table className="data">

@@ -98,7 +98,8 @@ export const hashArchivo = (buffer) => crypto.createHash('sha256').update(buffer
 const TABLAS_CON_CLAVE = new Set(['proveedores', 'codigos_acceso']);
 
 /**
- * LEE la clave de informe de una entidad. NO la crea.
+ * LEE la clave de informe de una entidad. NO la crea, y NO la devuelve si
+ * nadie se la entregó todavía a la empresa.
  *
  * Que leer y crear estén separados es lo que impide un error que ya se
  * cometió: `claveDeEntidad` creaba la clave al pedirla, y quienes la pedían
@@ -117,8 +118,20 @@ const TABLAS_CON_CLAVE = new Set(['proveedores', 'codigos_acceso']);
  * el acuse lo deja anotado con `cifrado: false` — que es justo para lo que
  * existe esa bandera.
  *
- * Devuelve `null` si no hay clave emitida, si falta la llave maestra, o si
- * lo guardado ya no se puede descifrar.
+ * Y LA SEGUNDA MITAD DE LA MISMA REGLA: una clave que la empresa nunca
+ * recibió es, a todos los efectos, lo mismo que no tener clave. Si
+ * `clave_informe_entregada_at` es NULL, acá se devuelve `null` aunque la
+ * columna tenga un valor.
+ *
+ * Eso no es una precaución teórica: en producción quedaron filas con clave
+ * creada por el bug viejo —la que se generaba sola al mandar un archivo— y
+ * que nadie recibió jamás. Sin este chequeo se seguirían usando para
+ * cifrar, y esas empresas seguirían recibiendo PDF que no pueden abrir.
+ * Con él quedan desactivadas al desplegar, sin tocar un solo dato.
+ *
+ * Devuelve `null` si no hay clave emitida, si no consta que se haya
+ * entregado, si falta la llave maestra, o si lo guardado ya no se puede
+ * descifrar.
  */
 export async function claveDeEntidad({ tabla, id }) {
   if (!TABLAS_CON_CLAVE.has(tabla)) {
@@ -126,8 +139,11 @@ export async function claveDeEntidad({ tabla, id }) {
   }
   if (!cifradoDisponible() || !id) return null;
 
-  const { rows } = await query(`SELECT clave_informe FROM ${tabla} WHERE id = $1`, [id]);
+  const { rows } = await query(
+    `SELECT clave_informe, clave_informe_entregada_at FROM ${tabla} WHERE id = $1`, [id]
+  );
   if (!rows[0]?.clave_informe) return null;
+  if (!rows[0].clave_informe_entregada_at) return null;
   try {
     return descifrar(rows[0].clave_informe);
   } catch (e) {
@@ -158,7 +174,13 @@ export async function emitirClaveDeEntidad({ tabla, id }) {
   }
   if (!cifradoDisponible() || !id) return null;
 
-  const yaHay = await claveDeEntidad({ tabla, id });
+  // OJO: acá NO sirve `claveDeEntidad`, que exige que la clave ya se haya
+  // entregado. Emitir es justamente el paso previo a entregarla, así que
+  // tiene que poder leer una clave emitida-y-no-entregada — y devolver LA
+  // MISMA. De eso depende el rescate: entregar una clave fantasma manda la
+  // que ya se usó para cifrar, y los PDF que la empresa ya recibió pasan a
+  // poder abrirse.
+  const yaHay = await claveGuardada({ tabla, id });
   if (yaHay) return yaHay;
 
   // Puede ser que la fila no exista, o que exista sin clave. Solo en el
@@ -172,9 +194,54 @@ export async function emitirClaveDeEntidad({ tabla, id }) {
   );
   if (act[0]) return nueva;
 
-  // O la creó otro proceso entremedio, o la fila no existe. `claveDeEntidad`
+  // O la creó otro proceso entremedio, o la fila no existe. `claveGuardada`
   // distingue los dos casos sin repetir la lógica de descifrado.
-  return claveDeEntidad({ tabla, id });
+  return claveGuardada({ tabla, id });
+}
+
+/**
+ * La clave tal como está guardada, SIN exigir que se haya entregado.
+ *
+ * Uso restringido: solo los caminos que van a ENTREGARLA. Nunca los que
+ * cifran un archivo — para eso está `claveDeEntidad`, que sí exige la
+ * entrega. Por eso no se exporta.
+ */
+async function claveGuardada({ tabla, id }) {
+  const { rows } = await query(`SELECT clave_informe FROM ${tabla} WHERE id = $1`, [id]);
+  if (!rows[0]?.clave_informe) return null;
+  try {
+    return descifrar(rows[0].clave_informe);
+  } catch (e) {
+    console.error(`[entrega] la clave de informe de ${tabla}/${id} no se puede descifrar: ${e.message}`);
+    return null;
+  }
+}
+
+/**
+ * Sella que la clave se le entregó a la empresa. Lo llaman los caminos de
+ * entrega DESPUÉS de que el correo salió de verdad — si el envío falla, la
+ * clave queda emitida y sin entregar, que es la verdad y es lo que el panel
+ * tiene que mostrar.
+ *
+ * Idempotente por el `WHERE ... IS NULL`: un reenvío no reescribe la fecha
+ * de la primera entrega, que es el dato que interesa conservar.
+ */
+export async function marcarClaveEntregada({ tabla, id }) {
+  if (!TABLAS_CON_CLAVE.has(tabla)) {
+    throw new Error(`[entrega] tabla sin clave de informe: ${tabla}`);
+  }
+  if (!id) return null;
+  const { rows } = await query(
+    `UPDATE ${tabla} SET clave_informe_entregada_at = now()
+      WHERE id = $1 AND clave_informe IS NOT NULL AND clave_informe_entregada_at IS NULL
+      RETURNING clave_informe_entregada_at`,
+    [id]
+  );
+  if (rows[0]) return rows[0].clave_informe_entregada_at;
+  const { rows: ya } = await query(
+    `SELECT clave_informe_entregada_at FROM ${tabla} WHERE id = $1`, [id]
+  );
+  return ya[0]?.clave_informe_entregada_at || null;
 }
 
 /** Lee la clave de un proveedor (no la crea). */
@@ -226,7 +293,12 @@ export async function rotarClaveEntidad({ tabla, id }) {
   if (!cifradoDisponible()) return null;
   const nueva = generarClaveInforme();
   const { rows } = await query(
-    `UPDATE ${tabla} SET clave_informe = $2 WHERE id = $1 RETURNING id`,
+    // La marca de entrega se LIMPIA: la clave nueva no está entregada
+    // hasta que salga el correo que la lleva. Si el envío falla, queda
+    // emitida-sin-entregar y los informes vuelven a salir en claro — que
+    // es preferible a cifrarlos con algo que la empresa no tiene.
+    `UPDATE ${tabla} SET clave_informe = $2, clave_informe_entregada_at = NULL
+      WHERE id = $1 RETURNING id`,
     [id, cifrar(nueva)]
   );
   return rows[0] ? nueva : null;
@@ -235,15 +307,22 @@ export async function rotarClaveEntidad({ tabla, id }) {
 export const rotarClaveProveedor = (proveedorId) =>
   rotarClaveEntidad({ tabla: 'proveedores', id: proveedorId });
 
-/** ¿Tiene clave emitida? Para el panel, sin exponerla. */
+/**
+ * Estado de la clave, para el panel, sin exponerla.
+ *
+ * Devuelve las DOS cosas, porque el panel tiene que distinguir tres
+ * estados y antes solo mostraba dos: un `IS NOT NULL` pintado como "Clave
+ * entregada" hacía que una clave fantasma se viera idéntica a una sana.
+ */
 export async function tieneClaveInforme({ tabla, id }) {
   if (!TABLAS_CON_CLAVE.has(tabla)) {
     throw new Error(`[entrega] tabla sin clave de informe: ${tabla}`);
   }
   const { rows } = await query(
-    `SELECT clave_informe IS NOT NULL AS tiene FROM ${tabla} WHERE id = $1`, [id]
+    `SELECT clave_informe IS NOT NULL AS tiene, clave_informe_entregada_at
+       FROM ${tabla} WHERE id = $1`, [id]
   );
-  return Boolean(rows[0]?.tiene);
+  return { tiene: Boolean(rows[0]?.tiene), entregada_at: rows[0]?.clave_informe_entregada_at || null };
 }
 
 // ---------- el acuse ----------

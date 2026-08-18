@@ -8,6 +8,7 @@ import {
   generarClaveInforme, opcionesCifrado, pdfEstaCifrado, hashArchivo,
   claveDeProveedor, claveDeCodigo, claveDeEntidad, rotarClaveProveedor, registrarEntrega,
   emitirClaveDeEntidad, emitirClaveDeCodigo, emitirClaveDeProveedor, tieneClaveInforme,
+  marcarClaveEntregada,
 } from '../src/services/entrega.js';
 import { generateComprobanteTransporte } from '../src/services/transportePdf.js';
 import { generateReport } from '../src/services/pdf.js';
@@ -133,8 +134,13 @@ test('rotar la clave da una nueva, y los informes viejos siguen abriéndose con 
   const prov = await proveedorDePrueba();
   try {
     const vieja = await emitirClaveDeProveedor(prov.id);
+    await marcarClaveEntregada({ tabla: 'proveedores', id: prov.id });
     const nueva = await rotarClaveProveedor(prov.id);
     assert.notEqual(nueva, vieja);
+    // Rotar LIMPIA la marca de entrega: la clave nueva no la tiene nadie
+    // todavía, así que hasta entregarla los informes salen en claro.
+    assert.equal(await claveDeProveedor(prov.id), null, 'una clave recién rotada no está entregada');
+    await marcarClaveEntregada({ tabla: 'proveedores', id: prov.id });
     assert.equal(await claveDeProveedor(prov.id), nueva);
     // El informe que ya se entregó no se re-cifra: sigue abriéndose con la
     // clave con que salió. Rotar protege lo que viene, no lo entregado.
@@ -215,6 +221,7 @@ test('la clave de un código se crea una vez y NO cambia entre entregas', { skip
   try {
     const primera = await emitirClaveDeCodigo(cod.id);
     assert.ok(primera && primera.length === 16);
+    await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
     assert.equal(await claveDeCodigo(cod.id), primera, 'dos informes seguidos usan la MISMA clave');
 
     // Misma carrera que la de proveedores: varias entregas a la vez no
@@ -386,20 +393,31 @@ test('LA REGLA: pedir la clave para cifrar un archivo NO la crea', { skip: SALTO
     assert.equal(p[0].clave_informe, null, 'leer la clave del proveedor la creó');
     assert.equal(c[0].clave_informe, null, 'leer la clave del código la creó');
 
-    assert.equal(await tieneClaveInforme({ tabla: 'proveedores', id: prov.id }), false);
-    assert.equal(await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id }), false);
+    assert.equal((await tieneClaveInforme({ tabla: 'proveedores', id: prov.id })).tiene, false);
+    assert.equal((await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id })).tiene, false);
   } finally { await limpiar(prov.id); await limpiarCodigo(cod.id); }
 });
 
-test('emitir SÍ la crea, y una vez emitida el archivo ya se puede cifrar', { skip: SALTO_PROD }, async () => {
+test('emitir NO basta: hasta que se ENTREGUE, el archivo sale en claro', { skip: SALTO_PROD }, async () => {
   const cod = await codigoDePrueba();
   try {
     const emitida = await emitirClaveDeCodigo(cod.id);
     assert.ok(emitida && emitida.length === 16);
-    // Ahora el camino de entrega SÍ la ve — y es la misma que se le mandó
-    // a la empresa, no otra.
+
+    // ESTE ES EL ESTADO FANTASMA que quedó vivo en producción: clave
+    // creada, nadie la recibió. Cifrar con ella deja a la empresa con un
+    // PDF que no puede abrir, así que no se usa.
+    assert.equal(await claveDeCodigo(cod.id), null, 'una clave que nadie recibió NO puede cifrar');
+    let estado = await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id });
+    assert.equal(estado.tiene, true);
+    assert.equal(estado.entregada_at, null);
+
+    // Recién al entregarla el camino de cifrado la ve — y es LA MISMA que
+    // se le mandó a la empresa, no otra.
+    await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
     assert.equal(await claveDeCodigo(cod.id), emitida);
-    assert.equal(await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id }), true);
+    estado = await tieneClaveInforme({ tabla: 'codigos_acceso', id: cod.id });
+    assert.ok(estado.entregada_at instanceof Date);
   } finally { await limpiarCodigo(cod.id); }
 });
 
@@ -431,8 +449,9 @@ test('el informe de un código SIN clave emitida sale en claro', { skip: SALTO_P
     const pdf = await generateReport({ sesion, facturas, declaracion: null, alcances: [], clave });
     assert.equal(pdfEstaCifrado(pdf), false, 'se cifró con una clave que nadie recibió');
 
-    // Y una vez entregada, el MISMO informe sale cifrado.
+    // Y una vez ENTREGADA, el MISMO informe sale cifrado.
     await emitirClaveDeCodigo(cod.id);
+    await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
     const pdf2 = await generateReport({
       sesion, facturas, declaracion: null, alcances: [], clave: await claveDeCodigo(cod.id),
     });
@@ -459,10 +478,13 @@ test('la clave de informes de un proveedor se emite y se lee igual', { skip: SAL
   try {
     const emitida = await emitirClaveDeProveedor(prov.id);
     assert.ok(emitida);
+    await marcarClaveEntregada({ tabla: 'proveedores', id: prov.id });
     assert.equal(await claveDeProveedor(prov.id), emitida);
-    // Rotar da otra, y el comprobante viejo sigue abriéndose con la anterior.
+    // Rotar da otra, y hasta entregarla no se usa para cifrar.
     const nueva = await rotarClaveProveedor(prov.id);
     assert.notEqual(nueva, emitida);
+    assert.equal(await claveDeProveedor(prov.id), null);
+    await marcarClaveEntregada({ tabla: 'proveedores', id: prov.id });
     assert.equal(await claveDeProveedor(prov.id), nueva);
   } finally { await limpiar(prov.id); }
 });
@@ -483,4 +505,103 @@ test('el correo de la clave no lleva adjunto y dice lo que corresponde', () => {
   const rotada = claveInformeEmail({ empresa: 'Minera X', clave, rotada: true });
   assert.ok(/siguen abriéndose con la clave anterior/.test(rotada.html));
   assert.notEqual(rotada.subject, normal.subject);
+});
+
+// ---------- LAS CLAVES FANTASMA QUE QUEDARON EN PRODUCCIÓN ----------
+//
+// Entre que se desplegó el cifrado y que se separó "emitir" de "entregar",
+// el código creaba claves solas al mandar un archivo y nadie las recibía.
+// Esas filas siguen en la base. Estos casos fijan qué pasa con ellas.
+
+/** Reproduce una fila tal como quedó en producción: clave puesta, sin entregar. */
+async function codigoConClaveFantasma() {
+  const cod = await codigoDePrueba();
+  const clave = await emitirClaveDeCodigo(cod.id);   // emite y NO marca entrega
+  return { cod, clave };
+}
+
+test('EL CASO DE PRODUCCIÓN: una clave fantasma no se usa para cifrar', { skip: SALTO_PROD }, async () => {
+  const { cod, clave } = await codigoConClaveFantasma();
+  try {
+    assert.ok(clave, 'la fila quedó con clave, como en producción');
+    const { rows } = await query(
+      `SELECT clave_informe IS NOT NULL AS tiene, clave_informe_entregada_at
+         FROM codigos_acceso WHERE id = $1`, [cod.id]);
+    assert.equal(rows[0].tiene, true);
+    assert.equal(rows[0].clave_informe_entregada_at, null);
+
+    // Y aun así el camino de cifrado no la ve: los informes de esa empresa
+    // vuelven a salir en claro al desplegar, sin tocar un solo dato.
+    assert.equal(await claveDeCodigo(cod.id), null);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('EL RESCATE: entregar la clave fantasma abre los PDF ya enviados', { skip: SALTO_PROD }, async () => {
+  // Lo que hace que la remediación valga la pena: entregar manda LA MISMA
+  // clave con que ya se cifraron archivos, así que los PDF que la empresa
+  // recibió y no podía abrir pasan a abrirse. No solo arregla lo que viene.
+  const { cod, clave: fantasma } = await codigoConClaveFantasma();
+  try {
+    const sesion = {
+      id: crypto.randomUUID(), rut_cliente: '11.111.111-1', nombre_cliente: 'Rescate',
+      email_cliente: 'rescate@ejemplo.cl', fecha: '2026-08-01', total_co2e: 1,
+    };
+    const facturas = [{
+      id: crypto.randomUUID(), proveedor: 'X', monto: 1000, total_co2e: 1,
+      categoria: 'combustible', fecha: '2026-08-01', hash_documento: 'a'.repeat(64),
+    }];
+    // El PDF que ya salió, cifrado con la clave que nadie recibió.
+    const yaEnviado = await generateReport({ sesion, facturas, declaracion: null, alcances: [], clave: fantasma });
+    assert.equal(pdfEstaCifrado(yaEnviado), true);
+
+    // El operador aprieta "Entregar clave": emitir es idempotente, así que
+    // sale la MISMA, no una nueva.
+    const entregada = await emitirClaveDeCodigo(cod.id);
+    assert.equal(entregada, fantasma, 'entregar tiene que mandar la clave con que ya se cifró');
+    await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
+
+    // Y ahora el archivo viejo se abre con lo que la empresa acaba de recibir.
+    const { PDFParse } = await import('pdf-parse');
+    const r = await new PDFParse({ data: yaEnviado, password: entregada }).getText();
+    assert.ok(r.text.length > 0, 'el PDF que ya se había enviado sigue sin abrirse');
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('marcar la entrega no reescribe la fecha en un reenvío', { skip: SALTO_PROD }, async () => {
+  // La fecha que interesa es la de la PRIMERA entrega. Un reenvío no puede
+  // borrarla: es el dato con el que se responde "desde cuándo tiene su clave".
+  const { cod } = await codigoConClaveFantasma();
+  try {
+    const primera = await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
+    assert.ok(primera instanceof Date);
+    await new Promise((r) => setTimeout(r, 25));
+    const segunda = await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
+    assert.equal(+segunda, +primera, 'el reenvío pisó la fecha de la primera entrega');
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('marcar la entrega de algo sin clave no inventa una entrega', { skip: SALTO_PROD }, async () => {
+  const cod = await codigoDePrueba();
+  try {
+    assert.equal(await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id }), null);
+    const { rows } = await query(
+      `SELECT clave_informe_entregada_at FROM codigos_acceso WHERE id = $1`, [cod.id]);
+    assert.equal(rows[0].clave_informe_entregada_at, null);
+  } finally { await limpiarCodigo(cod.id); }
+});
+
+test('la migración se puede correr de nuevo sin pisar una entrega', { skip: SALTO_PROD }, async () => {
+  // lib/migrate.js no lleva registro: corre TODAS las migraciones en cada
+  // arranque. Un backfill sin guard borraría las entregas reales en cada
+  // reinicio del servidor.
+  const { runMigrations } = await import('../src/lib/migrate.js');
+  const { cod } = await codigoConClaveFantasma();
+  try {
+    const antes = await marcarClaveEntregada({ tabla: 'codigos_acceso', id: cod.id });
+    await runMigrations();
+    const { rows } = await query(
+      `SELECT clave_informe, clave_informe_entregada_at FROM codigos_acceso WHERE id = $1`, [cod.id]);
+    assert.equal(+rows[0].clave_informe_entregada_at, +antes, 'la migración pisó la fecha de entrega');
+    assert.ok(rows[0].clave_informe, 'la migración borró la clave');
+  } finally { await limpiarCodigo(cod.id); }
 });
