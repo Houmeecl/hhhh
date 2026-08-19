@@ -791,6 +791,20 @@ export const api = {
     request(`/panel-proveedor/expedientes/${id}/candidatos`, { authedProveedor: true }),
   proveedorExpedienteAgregarDoc: (id, body) =>
     request(`/panel-proveedor/expedientes/${id}/documentos`, { method: 'POST', body, authedProveedor: true }),
+  // El DATO trazable (migración 106). La unidad de registro no es el
+  // documento: «50 filtros» es el dato y la factura es su respaldo.
+  proveedorExpedienteDatos: (id) =>
+    request(`/panel-proveedor/expedientes/${id}/datos`, { authedProveedor: true }),
+  proveedorExpedienteVocabularioDatos: () =>
+    request('/panel-proveedor/expedientes/vocabulario/datos', { authedProveedor: true }),
+  proveedorExpedienteDatoCrear: (id, body) =>
+    request(`/panel-proveedor/expedientes/${id}/datos`, { method: 'POST', body, authedProveedor: true }),
+  proveedorExpedienteDatoEditar: (id, datoId, body) =>
+    request(`/panel-proveedor/expedientes/${id}/datos/${datoId}`, { method: 'PUT', body, authedProveedor: true }),
+  proveedorExpedienteDatoBorrar: (id, datoId) =>
+    request(`/panel-proveedor/expedientes/${id}/datos/${datoId}`, { method: 'DELETE', authedProveedor: true }),
+  proveedorExpedienteDatoHistorial: (id, datoId) =>
+    request(`/panel-proveedor/expedientes/${id}/datos/${datoId}/historial`, { authedProveedor: true }),
   proveedorExpedienteSoltarDoc: (id, docId) =>
     request(`/panel-proveedor/expedientes/${id}/documentos/${docId}`, { method: 'DELETE', authedProveedor: true }),
   descargarExpedientePdf: (id) =>

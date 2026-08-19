@@ -668,6 +668,90 @@ export const NOMBRE_NIVEL_CONFIANZA = {
 };
 
 // Resumen de un dato, con las cuatro dimensiones a la vista.
+// Validación de un DATO trazable, gemela de validarDocumento().
+//
+// Lo que defiende, y por qué cada regla existe:
+//
+//  · CANTIDAD > 0. Una cantidad de 0 no es un dato, es la ausencia de uno,
+//    y guardarla haría que verificarConsistencia() comparara contra nada.
+//    Mismo límite que el CHECK de la migración 106.
+//  · ETAPA SOLO AGUAS ABAJO. La etapa es la que decide la categoría del
+//    GHG Protocol para lo que ocurre DESPUÉS de la venta; aguas arriba no
+//    significa nada, y el esquema lo rechaza con
+//    datos_trazables_etapa_solo_abajo. Cazarlo acá da un mensaje legible
+//    en vez de un error crudo de Postgres.
+//  · UNIDAD OBLIGATORIA. Sin unidad, "50" no significa nada y el
+//    desacuerdo con un documento que diga "50" tampoco: podrían ser 50
+//    kilos contra 50 toneladas.
+//
+// Lo que NO valida acá, a propósito: el nivel de confianza y los campos de
+// validación en fuente. No se reciben — se calculan (nivelConfianza) o los
+// escribe el servidor. Validar un campo que no debería llegar sugeriría
+// que llega.
+export function validarDato(d) {
+  if (!d || typeof d !== 'object') return { ok: false, error: 'Falta el dato.' };
+
+  const direccion = d.direccion || 'arriba';
+  if (!DIRECCIONES.includes(direccion)) {
+    return { ok: false, error: `Dirección no válida. Usa: ${DIRECCIONES.join(' o ')}.` };
+  }
+  const eslabon = d.eslabon || 'proveedor';
+  if (!ESLABONES.includes(eslabon)) {
+    return { ok: false, error: `Eslabón no válido. Usa uno de: ${ESLABONES.join(', ')}.` };
+  }
+
+  const etapa = d.etapa || null;
+  if (etapa && !ETAPAS_AGUAS_ABAJO.includes(etapa)) {
+    return { ok: false, error: `Etapa no válida. Usa una de: ${ETAPAS_AGUAS_ABAJO.join(', ')}.` };
+  }
+  if (etapa && direccion !== 'abajo') {
+    return {
+      ok: false,
+      error: 'La etapa solo aplica aguas abajo: describe qué pasa con el producto DESPUÉS de la venta.',
+    };
+  }
+
+  if (!String(d.producto || '').trim()) {
+    return { ok: false, error: 'El dato necesita decir de qué producto es.' };
+  }
+  if (!String(d.unidad || '').trim()) {
+    return { ok: false, error: 'Falta la unidad: sin ella la cantidad no se puede comparar con nada.' };
+  }
+
+  const cantidad = Number(d.cantidad);
+  // NUMERIC(18,4) en la migración 106.
+  if (!Number.isFinite(cantidad) || cantidad <= 0 || cantidad >= 1e14) {
+    return { ok: false, error: 'La cantidad debe ser un número mayor que 0.' };
+  }
+
+  const cat = d.categoria_scope_potencial;
+  if (cat !== undefined && cat !== null && cat !== '') {
+    const n = Number(cat);
+    if (!Number.isInteger(n) || n < 1 || n > 15) {
+      return { ok: false, error: 'La categoría de Alcance 3 va del 1 al 15.' };
+    }
+  }
+
+  return {
+    ok: true,
+    valor: {
+      direccion, eslabon, etapa,
+      producto: String(d.producto).trim(),
+      unidad: String(d.unidad).trim(),
+      cantidad,
+      categoria_scope_potencial: cat === undefined || cat === null || cat === '' ? null : Number(cat),
+    },
+  };
+}
+
+// Los campos que un PUT puede tocar, y NADA más. Se declara acá y no en la
+// ruta para que la lista viva junto a la validación: `nivel_confianza` y
+// los `validado_*` quedan fuera a propósito — el primero se calcula, los
+// segundos los escribe el servidor cuando de verdad hay respaldo.
+export const CAMPOS_EDITABLES_DATO = [
+  'direccion', 'eslabon', 'etapa', 'producto', 'cantidad', 'unidad', 'categoria_scope_potencial',
+];
+
 export function resumenDato(dato, documentos = [], expediente = null) {
   const docs = (documentos || []).filter(Boolean);
   // El período vive en el expediente, no en el dato: se inyecta acá para

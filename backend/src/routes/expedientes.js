@@ -1,5 +1,5 @@
 import express from 'express';
-import { query } from '../lib/db.js';
+import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { normalizarRut } from '../services/mandante.js';
 import { rutValido } from '../services/dte.js';
@@ -7,6 +7,8 @@ import { generateExpedienteEvidencia } from '../services/pdf.js';
 import {
   TIPOS_EXPEDIENTE, ESTADOS_EXPEDIENTE, ROLES_DOCUMENTO, ROLES_ESPERADOS_POR_TIPO,
   NOMBRE_ROL, validarDocumento, resumenExpediente, resumenDato, NO_ACREDITA, NOTA_SCOPE,
+  validarDato, CAMPOS_EDITABLES_DATO, DIRECCIONES, ESLABONES, ETAPAS_AGUAS_ABAJO,
+  NOMBRE_NIVEL_CONFIANZA, estaRespaldado,
 } from '../services/expediente.js';
 
 // ============================================================
@@ -504,6 +506,179 @@ router.get('/:id/expediente.pdf', async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="sicr3p-expediente-${req.params.id.slice(0, 8)}.pdf"`);
     res.send(pdf);
+  } catch (err) { next(err); }
+});
+
+// ============================================================
+// EL DATO TRAZABLE (migración 106).
+//
+// La unidad de registro no es el documento, es el DATO: «50 filtros» es
+// el dato y la factura es su respaldo. Hasta acá la tabla existía, las
+// funciones puras existían y el PDF ya sabía imprimir datos — pero nada
+// los creaba. Una tabla que solo se lee es una tabla vacía para siempre.
+//
+// Cuelgan del expediente y no de un router propio para reusar
+// cargarExpediente(), que es donde vive el scoping por proveedor_id. Un
+// router aparte tendría que reimplementarlo, y esa es la garantía que
+// sostiene todo lo demás.
+// ============================================================
+
+// Vocabulario para que el formulario no tenga que repetirlo.
+router.get('/vocabulario/datos', (req, res) => {
+  res.json({
+    direcciones: DIRECCIONES,
+    eslabones: ESLABONES,
+    etapas_aguas_abajo: ETAPAS_AGUAS_ABAJO,
+    niveles: NOMBRE_NIVEL_CONFIANZA,
+  });
+});
+
+// Los documentos que respaldan un dato concreto. `dato_id` lo enlaza el
+// alta de documentos, que ya lo valida contra este expediente.
+const docsDelDato = (documentos, datoId) => documentos.filter((d) => d.dato_id === datoId);
+
+router.get('/:id/datos', async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+    const { rows } = await query(
+      'SELECT * FROM datos_trazables WHERE expediente_id = $1 ORDER BY created_at', [req.params.id]
+    );
+    res.json({
+      datos: rows.map((d) => ({ ...d, ...resumenDato(d, docsDelDato(cargado.documentos, d.id), cargado.expediente) })),
+      nota_scope: NOTA_SCOPE,
+      no_acredita: NO_ACREDITA,
+    });
+  } catch (err) { next(err); }
+});
+
+router.post('/:id/datos', requireNivelOperador, async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+
+    const val = validarDato(req.body);
+    if (!val.ok) return res.status(400).json({ error: val.error });
+    const v = val.valor;
+
+    // EL NIVEL DE CONFIANZA NO SE RECIBE. `resumenDato()` lo recalcula con
+    // los documentos que respalden el dato, así que la columna es una
+    // caché, no una declaración. Si el body pudiera fijarla, cualquiera se
+    // pondría en 5 —el nivel que el código NO emite por diseño— con un
+    // curl, y la escalera entera dejaría de significar algo.
+    //
+    // Los `validado_*` tampoco: un proveedor certificándose a sí mismo
+    // «validado en fuente» es exactamente lo que la escalera impide. Se
+    // insertan en 1 y el servidor los sube cuando hay respaldo real.
+    const { rows } = await query(
+      `INSERT INTO datos_trazables
+         (expediente_id, direccion, eslabon, etapa, producto, cantidad, unidad,
+          categoria_scope_potencial, nivel_confianza)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,1) RETURNING *`,
+      [req.params.id, v.direccion, v.eslabon, v.etapa, v.producto, v.cantidad, v.unidad,
+       v.categoria_scope_potencial]
+    );
+    const dato = rows[0];
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'crear_dato_trazable', entidad: 'dato_trazable',
+      entidadId: dato.id, detalle: { expediente_id: req.params.id, producto: v.producto }, ip: req.ip,
+    });
+    res.status(201).json({ dato: { ...dato, ...resumenDato(dato, [], cargado.expediente) } });
+  } catch (err) { next(err); }
+});
+
+router.put('/:id/datos/:datoId', requireNivelOperador, async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+    if (!UUID_RE.test(String(req.params.datoId))) return res.status(404).json({ error: 'Dato no encontrado.' });
+
+    const { rows: previas } = await query(
+      'SELECT * FROM datos_trazables WHERE id = $1 AND expediente_id = $2',
+      [req.params.datoId, req.params.id]
+    );
+    const antes = previas[0];
+    if (!antes) return res.status(404).json({ error: 'Dato no encontrado.' });
+
+    // Se valida el dato COMPLETO, no solo lo que viene: un PUT parcial que
+    // cambie la dirección a 'arriba' dejando una etapa vieja pasaría la
+    // validación de los campos enviados y chocaría contra el CHECK.
+    const propuesto = { ...antes, ...req.body };
+    const val = validarDato(propuesto);
+    if (!val.ok) return res.status(400).json({ error: val.error });
+    const v = val.valor;
+
+    const dato = await withTx(async (client) => {
+      const { rows } = await client.query(
+        `UPDATE datos_trazables
+            SET direccion = $3, eslabon = $4, etapa = $5, producto = $6, cantidad = $7,
+                unidad = $8, categoria_scope_potencial = $9, updated_at = now()
+          WHERE id = $1 AND expediente_id = $2 RETURNING *`,
+        [req.params.datoId, req.params.id, v.direccion, v.eslabon, v.etapa, v.producto,
+         v.cantidad, v.unidad, v.categoria_scope_potencial]
+      );
+
+      // EL HISTORIAL, CAMPO POR CAMPO. Sin esto, corregir «50» por «48»
+      // borraría que alguna vez dijo 50 — y el desacuerdo registrado es el
+      // producto. Se compara como texto porque es como se guarda: NUMERIC
+      // vuelve de pg como string y comparar 50 con '50.0000' marcaría un
+      // cambio que no ocurrió.
+      const norm = (x) => (x === null || x === undefined ? null : String(x));
+      for (const campo of CAMPOS_EDITABLES_DATO) {
+        const a = norm(antes[campo]);
+        const b = norm(rows[0][campo]);
+        if (a !== b) {
+          await client.query(
+            `INSERT INTO datos_trazables_historial (dato_id, campo, valor_anterior, valor_nuevo, usuario_id)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [req.params.datoId, campo, a, b, req.user.sub]
+          );
+        }
+      }
+      return rows[0];
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'editar_dato_trazable', entidad: 'dato_trazable',
+      entidadId: dato.id, detalle: { expediente_id: req.params.id }, ip: req.ip,
+    });
+    res.json({ dato: { ...dato, ...resumenDato(dato, docsDelDato(cargado.documentos, dato.id), cargado.expediente) } });
+  } catch (err) { next(err); }
+});
+
+router.get('/:id/datos/:datoId/historial', async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+    if (!UUID_RE.test(String(req.params.datoId))) return res.status(404).json({ error: 'Dato no encontrado.' });
+    // El expediente_id va en el WHERE: sin él, un datoId de otra empresa
+    // devolvería su historial con solo acertar el UUID.
+    const { rows } = await query(
+      `SELECT h.campo, h.valor_anterior, h.valor_nuevo, h.created_at
+         FROM datos_trazables_historial h
+         JOIN datos_trazables d ON d.id = h.dato_id
+        WHERE h.dato_id = $1 AND d.expediente_id = $2
+        ORDER BY h.created_at DESC`,
+      [req.params.datoId, req.params.id]
+    );
+    res.json({ historial: rows });
+  } catch (err) { next(err); }
+});
+
+router.delete('/:id/datos/:datoId', requireNivelOperador, async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+    if (!UUID_RE.test(String(req.params.datoId))) return res.status(404).json({ error: 'Dato no encontrado.' });
+    const { rowCount } = await query(
+      'DELETE FROM datos_trazables WHERE id = $1 AND expediente_id = $2',
+      [req.params.datoId, req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Dato no encontrado.' });
+    // Los documentos que lo respaldaban NO se borran: quedan en el
+    // expediente con dato_id en NULL (ON DELETE SET NULL en la 106). Un
+    // documento no deja de existir porque se corrija el dato que respaldaba.
+    res.json({ ok: true });
   } catch (err) { next(err); }
 });
 

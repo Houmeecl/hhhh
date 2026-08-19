@@ -437,6 +437,8 @@ function Detalle({ id, vocabulario, alCerrar, flash }) {
         </ul>
       )}
 
+      <DatosTrazables id={id} flash={flash} />
+
       <h4 style={{ marginTop: 20, marginBottom: 6 }}>Clasificación potencial</h4>
       {/* Cuando no hay categoría, no se inventa una: el mismo gris de la
           cobertura. Es la única parte del producto donde sicr3p dice algo
@@ -605,5 +607,198 @@ function NoAcredita({ lista, notaScope }) {
         <strong>{notaScope}</strong>
       </p>
     </div>
+  );
+}
+
+
+// ---------- El DATO trazable (migración 106) ----------
+//
+// La unidad de registro no es el documento, es el DATO: «50 filtros» es el
+// dato y la factura es su respaldo. Hasta acá la tabla existía y nada la
+// llenaba — una tabla que solo se lee es una tabla vacía para siempre.
+//
+// El nivel de confianza NO se elige en el formulario: lo calcula el
+// servidor con los documentos que respalden el dato. Ofrecerlo como campo
+// sugeriría que se declara, que es lo contrario de lo que significa.
+const COLOR_NIVEL_DATO = { 1: 'badge-gray', 2: 'badge-amber', 3: 'badge-green', 4: 'badge-green' };
+// NUMERIC(18,4) vuelve de pg como "50.0000". Mostrarlo crudo dice
+// «50.0000 unidades», que se lee como una precisión que nadie declaró — y
+// en este producto la precisión de un dato es justamente lo que está en
+// discusión. `fmt` no sirve acá: fuerza cuatro decimales siempre.
+const cantidadLegible = (n) => Number(n).toLocaleString('es-CL', { maximumFractionDigits: 4 });
+
+const DATO_VACIO = { direccion: 'arriba', eslabon: 'proveedor', etapa: '', producto: '', cantidad: '', unidad: '', categoria_scope_potencial: '' };
+
+function DatosTrazables({ id, flash }) {
+  const [datos, setDatos] = useState(null);
+  const [vocab, setVocab] = useState(null);
+  const [form, setForm] = useState(DATO_VACIO);
+  const [abriendo, setAbriendo] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [historial, setHistorial] = useState(null);
+
+  const cargar = () => api.proveedorExpedienteDatos(id).then(setDatos).catch((e) => flash(e.message, true));
+  useEffect(() => {
+    cargar();
+    api.proveedorExpedienteVocabularioDatos().then(setVocab).catch(() => {});
+  }, [id]);
+
+  const set = (k) => (ev) => setForm((f) => ({ ...f, [k]: ev.target.value }));
+
+  async function crear() {
+    setGuardando(true);
+    try {
+      await api.proveedorExpedienteDatoCrear(id, {
+        ...form,
+        etapa: form.direccion === 'abajo' ? (form.etapa || null) : null,
+        cantidad: Number(form.cantidad),
+        categoria_scope_potencial: form.categoria_scope_potencial === '' ? null : Number(form.categoria_scope_potencial),
+      });
+      setForm(DATO_VACIO); setAbriendo(false); cargar();
+      flash('Dato registrado. Engancha un documento para que suba de nivel.');
+    } catch (e) { flash(e.message, true); } finally { setGuardando(false); }
+  }
+
+  async function borrar(datoId) {
+    try {
+      await api.proveedorExpedienteDatoBorrar(id, datoId);
+      cargar();
+      flash('Dato borrado. Los documentos que lo respaldaban siguen en el expediente.');
+    } catch (e) { flash(e.message, true); }
+  }
+
+  if (!datos) return null;
+
+  return (
+    <>
+      <h4 style={{ marginTop: 22, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        Datos declarados
+        <button className="btn btn-outline btn-sm" onClick={() => setAbriendo((v) => !v)}>
+          {abriendo ? 'Cancelar' : 'Agregar dato'}
+        </button>
+      </h4>
+      <p className="muted" style={{ fontSize: 12.5, marginTop: 0, maxWidth: 640, lineHeight: 1.55 }}>
+        Lo que se declara no es el documento sino la cantidad: «50 filtros» es el dato, y la factura
+        es su respaldo. El nivel de confianza lo calcula sicr3p según lo que lo respalde — no se elige.
+      </p>
+
+      {abriendo && (
+        <div className="card card-pad form-dato" style={{ marginBottom: 12, background: "var(--bg)" }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+            <div className="field"><label>Producto</label>
+              <input value={form.producto} onChange={set('producto')} placeholder="Filtros industriales" /></div>
+            <div className="field"><label>Cantidad</label>
+              <input inputMode="decimal" value={form.cantidad} onChange={set('cantidad')} placeholder="50" /></div>
+            <div className="field"><label>Unidad</label>
+              <input value={form.unidad} onChange={set('unidad')} placeholder="unidades" /></div>
+            <div className="field"><label>Dirección</label>
+              <select value={form.direccion} onChange={set('direccion')}>
+                <option value="arriba">Aguas arriba (lo que compré)</option>
+                <option value="abajo">Aguas abajo (lo que vendí y lo que pasa después)</option>
+              </select></div>
+            {/* La etapa solo aparece aguas abajo: aguas arriba no significa
+                nada y el esquema la rechaza. Mostrarla siempre invitaría a
+                llenar un campo que va a dar error. */}
+            {form.direccion === 'abajo' && vocab && (
+              <div className="field"><label>Etapa</label>
+                <select value={form.etapa} onChange={set('etapa')}>
+                  <option value="">—</option>
+                  {vocab.etapas_aguas_abajo.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select></div>
+            )}
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={crear}
+            disabled={guardando || !form.producto || !form.cantidad || !form.unidad}>
+            {guardando ? <span className="spinner" /> : 'Registrar dato'}
+          </button>
+        </div>
+      )}
+
+      {datos.datos.length === 0 ? (
+        <p className="muted" style={{ fontSize: 13 }}>
+          Todavía no hay datos declarados en este expediente.
+        </p>
+      ) : (
+        <div className="table-scroll">
+          <table className="data">
+            <thead><tr><th>Dato</th><th>Confianza</th><th>Consistencia</th><th></th></tr></thead>
+            <tbody>
+              {datos.datos.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    <b>{cantidadLegible(d.cantidad)} {d.unidad}</b> de {d.producto}
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {d.direccion === 'arriba' ? 'Aguas arriba' : 'Aguas abajo'}
+                      {d.etapa ? ` · ${d.etapa}` : ''}
+                      {d.documentos_respaldo ? ` · ${d.documentos_respaldo} documento(s)` : ' · sin documentos'}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`badge ${COLOR_NIVEL_DATO[d.nivel_confianza] || 'badge-gray'}`}>
+                      {d.nivel_confianza} · {d.nombre_nivel}
+                    </span>
+                  </td>
+                  <td style={{ fontSize: 13 }}>
+                    {/* null NO es rojo: es que no había con qué comparar.
+                        Mismo gris que la cobertura documental. */}
+                    {d.consistente === null ? <span className="badge badge-gray">Sin comparar</span>
+                      : d.consistente ? <span className="badge badge-green">Coinciden</span>
+                        : <span className="badge badge-amber">Desacuerdo</span>}
+                    {d.desacuerdos?.length > 0 && (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 3, maxWidth: 260 }}>
+                        {d.desacuerdos.map((x) => x.detalle || x.campo).join(' · ')}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn btn-outline btn-sm" style={{ marginRight: 6 }}
+                      onClick={() => api.proveedorExpedienteDatoHistorial(id, d.id)
+                        .then((r) => setHistorial({ dato: d, lista: r.historial }))
+                        .catch((e) => flash(e.message, true))}>
+                      Historial
+                    </button>
+                    <button className="btn btn-outline btn-sm" onClick={() => borrar(d.id)}>Borrar</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {historial && (
+        <div className="modal-bg" onClick={(ev) => ev.target.className === 'modal-bg' && setHistorial(null)}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <h3 style={{ marginTop: 0 }}>Historial de «{historial.dato.producto}»</h3>
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+              Corregir un dato no borra lo que decía antes: el desacuerdo registrado es parte de la
+              evidencia.
+            </p>
+            {historial.lista.length === 0
+              ? <p className="muted" style={{ fontSize: 13 }}>Este dato no se ha corregido desde que se registró.</p>
+              : (
+                <div className="table-scroll">
+                  <table className="data">
+                    <thead><tr><th>Campo</th><th>Decía</th><th>Dice</th><th>Cuándo</th></tr></thead>
+                    <tbody>
+                      {historial.lista.map((h, i) => (
+                        <tr key={i}>
+                          <td style={{ fontSize: 13 }}>{h.campo}</td>
+                          <td className="muted" style={{ fontSize: 13 }}>{h.valor_anterior ?? '—'}</td>
+                          <td style={{ fontSize: 13 }}>{h.valor_nuevo ?? '—'}</td>
+                          <td className="muted" style={{ fontSize: 12 }}>{fmtFecha(h.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button className="btn btn-outline" onClick={() => setHistorial(null)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
