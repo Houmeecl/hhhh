@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   elegirTransporte, construirFrom, activationEmail, resetEmail, magicEmail,
 } from '../src/services/mailer.js';
+import { config } from '../src/config.js';
 import { PANEL_LABEL } from '../src/services/cuentas.js';
 
 // La lógica de selección de transporte es pura y no depende del entorno:
@@ -32,15 +33,26 @@ test('SMTP incompleto (sin pass) no cuenta como configurado', () => {
 // remitente y el asunto, sin cambiar la casilla real de envío.
 // ============================================================
 
+// El correo real del remitente depende de MAIL_FROM (dueño del `.env` de
+// cada entorno) — en dev/CI cae al default de config.js (sicrep.cl), en el
+// VPS de producción es el dominio propio (sicr3p.cl). Hardcodear un correo
+// literal aquí hacía que este test pasara en un entorno y reventara en
+// otro por una razón ajena a construirFrom(): se lee el mismo valor que lee
+// el código (config.resend.from) para verificar SOLO la lógica que importa
+// —el nombre visible cambia por área, el correo real nunca— sin acoplarse
+// a qué dominio esté configurado en cada `.env`.
+const FROM_EMAIL = config.resend.from.match(/<([^>]+)>/)?.[1] || config.resend.from;
+
 test('construirFrom: sin área, el FROM genérico de siempre', () => {
-  assert.equal(construirFrom(null), 'sicr3p <no-responder@sicrep.cl>');
-  assert.equal(construirFrom(undefined), 'sicr3p <no-responder@sicrep.cl>');
+  assert.equal(construirFrom(null), `sicr3p <${FROM_EMAIL}>`);
+  assert.equal(construirFrom(undefined), `sicr3p <${FROM_EMAIL}>`);
 });
 
 test('construirFrom: con área, mismo correo pero nombre distinguible', () => {
-  assert.equal(construirFrom('Proveedor'), 'sicr3p Proveedor <no-responder@sicrep.cl>');
-  assert.equal(construirFrom('Puerto'), 'sicr3p Puerto <no-responder@sicrep.cl>');
+  assert.equal(construirFrom('Proveedor'), `sicr3p Proveedor <${FROM_EMAIL}>`);
+  assert.equal(construirFrom('Puerto'), `sicr3p Puerto <${FROM_EMAIL}>`);
 });
+
 
 test('PANEL_LABEL: los 7 paneles con activación tienen etiqueta legible, cada una distinta', () => {
   const paneles = ['sicrep', 'aduana_verde', 'puerto', 'mandante', 'agencia', 'trazador', 'proveedor'];
