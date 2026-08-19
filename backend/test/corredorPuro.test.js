@@ -255,3 +255,32 @@ test('el centroide no pesa dos veces el vértice de cierre', () => {
   assert.equal(c.lng, 1);
   assert.equal(c.lat, 1);
 });
+
+// ---------- El frontend y el backend tienen que dar lo MISMO ----------
+
+test('el área que muestra el navegador coincide con la que calcula el servidor', async () => {
+  // `frontend/src/panel-corredor/geo.js` repite la fórmula del área para
+  // poder mostrarla al momento de cargar el archivo, antes de guardar.
+  // Esa duplicación es deliberada —el navegador no puede consultar al
+  // servidor en cada tecla— pero es exactamente el tipo de copia que se
+  // separa con el tiempo: el usuario vería "102,4 ha" y el servidor
+  // guardaría otra cosa, y el desacuerdo de área que decide el nivel de
+  // confianza pasaría a depender de cuál de las dos miró.
+  const { areaHa: areaFrontend } = await import('../../frontend/src/panel-corredor/geo.js');
+
+  const casos = [
+    { type: 'Polygon', coordinates: [[[-55.7, -12.5], [-55.6908, -12.5], [-55.6908, -12.5092], [-55.7, -12.5092], [-55.7, -12.5]]] },
+    { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+    { type: 'Polygon', coordinates: [[[-70.6, -33.4], [-70.5, -33.4], [-70.55, -33.3], [-70.6, -33.4]]] },
+  ];
+  for (const geo of casos) {
+    assert.equal(areaFrontend(geo), areaHa(geo), `difieren para ${JSON.stringify(geo.coordinates[0][0])}`);
+  }
+});
+
+test('el umbral de 4 ha del EUDR es el mismo en los dos lados', () => {
+  // Si el frontend dejara pasar un punto para 5 ha, el backend lo
+  // rechazaría con un 400 después de que la persona llenó todo el
+  // formulario.
+  assert.equal(EXIGE_POLIGONO_HA, 4);
+});

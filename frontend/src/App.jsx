@@ -32,6 +32,7 @@ import LoginMandante from './panel-mandante/LoginMandante.jsx';
 import LoginAgencia from './panel-agencia/LoginAgencia.jsx';
 import LoginTrazador from './panel-trazador/LoginTrazador.jsx';
 import LoginProveedor from './panel-proveedor/LoginProveedor.jsx';
+import LoginCorredor from './panel-corredor/LoginCorredor.jsx';
 
 // Code-splitting: los paneles admin son la mitad del bundle y solo los
 // usan operadores logueados — se cargan bajo demanda para que las
@@ -44,6 +45,7 @@ const MandanteApp = lazy(() => import('./panel-mandante/MandanteApp.jsx'));
 const AgenciaApp = lazy(() => import('./panel-agencia/AgenciaApp.jsx'));
 const TrazadorApp = lazy(() => import('./panel-trazador/TrazadorApp.jsx'));
 const ProveedorApp = lazy(() => import('./panel-proveedor/ProveedorApp.jsx'));
+const CorredorApp = lazy(() => import('./panel-corredor/CorredorApp.jsx'));
 // La torre de control carga Leaflet (mapa): chunk aparte por lo mismo.
 const Torre = lazy(() => import('./pages/Torre.jsx'));
 const TorreFlota = lazy(() => import('./pages/TorreFlota.jsx'));
@@ -64,13 +66,17 @@ const CargandoModulo = () => (
 // bajo ese host la raíz muestra la landing del Instituto en vez de la
 // portada general. Todas las demás rutas siguen operativas en ambos hosts.
 const ES_SUBDOMINIO_INSTITUTO = window.location.hostname.startsWith('instituto.');
+// corredor.sicr3p.cl aterriza en la landing del Corredor, igual que
+// instituto.sicr3p.cl en la suya. El Corredor es otro producto: otra
+// base, otro login, otra marca.
+const ES_SUBDOMINIO_CORREDOR = window.location.hostname.startsWith('corredor.');
 
 export default function App() {
   return (
     <Suspense fallback={<CargandoModulo />}>
     <Routes>
       {/* Flujo público (sin login) */}
-      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : <Landing />} />
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : <Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
@@ -153,6 +159,12 @@ export default function App() {
       <Route path="/panel-proveedor/login" element={<LoginProveedor />} />
       <Route path="/panel-proveedor/activar" element={<ActivarCuenta loginPath="/panel-proveedor/login" titulo="el panel de Proveedor" />} />
       <Route path="/panel-proveedor/*" element={<ProveedorApp />} />
+
+      {/* Corredor Bioceánico — panel del exportador. Sin ruta de
+          /activar: su backend entrega clave temporal y obliga a cambiarla
+          al entrar, no manda enlace de activación. */}
+      <Route path="/panel-corredor/login" element={<LoginCorredor />} />
+      <Route path="/panel-corredor/*" element={<CorredorApp />} />
 
       {/* "Sube y Suma" — escaneo gamificado con código de campaña de una
           empresa cliente. Sin /activar: el jugador entra por magic link,

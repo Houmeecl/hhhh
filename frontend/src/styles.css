@@ -78,6 +78,30 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
 .proveedor-tab.active { color: var(--navy); border-bottom-color: var(--proveedor-accent); }
 .proveedor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
 
+/* Corredor Bioceánico (/panel-corredor) — shell propio y no un tema del
+   panel de proveedor. Es OTRO producto, con su propia base de datos y su
+   propio login: tiene que poder cambiar de aspecto sin tocar el panel que
+   ya funciona. Verde de marca como acento, distinto del teal del
+   proveedor, para que se distingan de un vistazo. */
+.theme-corredor { --corredor-accent: #28A745; }
+.corredor-shell { min-height: 100vh; background: var(--bg); }
+.corredor-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; background: var(--navy); color: #fff; flex-wrap: wrap; gap: 10px;
+  border-bottom: 3px solid var(--corredor-accent);
+}
+.corredor-kicker { font-size: 12px; font-weight: 700; color: var(--corredor-accent); letter-spacing: .04em; }
+.corredor-tabs { background: #fff; border-bottom: 1px solid var(--line); }
+.corredor-tabs-inner { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
+.corredor-tab {
+  background: none; border: none; cursor: pointer; padding: 14px 16px;
+  font-size: 14px; font-weight: 600; color: #64748b; text-decoration: none;
+  border-bottom: 3px solid transparent; display: inline-block;
+}
+.corredor-tab:hover { text-decoration: none; color: var(--navy); }
+.corredor-tab.active { color: var(--navy); border-bottom-color: var(--corredor-accent); }
+.corredor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
 /* "Sube y Suma" (/suma) — app-shell propia con bottom-nav (uso desde el
    celular en terreno, no un panel de escritorio): NO reusa .admin-shell.
    Acento propio, distinto de --green (para no confundirse visualmente con
