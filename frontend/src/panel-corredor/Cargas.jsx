@@ -3,6 +3,7 @@ import { apiCorredor } from './api.js';
 
 const SEMAFORO = { verde: 'badge-green', amarillo: 'badge-amber', rojo: 'badge-red', gris: 'badge-gray' };
 const NOMBRE_REGIMEN = { eudr: 'EUDR', cbam: 'CBAM', exportacion: 'Exportación' };
+
 const VACIO = {
   codigo_nc: '', descripcion: '', cantidad: '', unidad: 't', pais_origen: 'BR', region_origen: '',
   instalacion: '', emisiones_directas_tco2e_t: '', emisiones_indirectas_tco2e_t: '', metodo_emisiones: '',
@@ -288,13 +289,168 @@ function Detalle({ d, flash, onCambio, onClose }) {
           </p>
         )}
 
+        <Tramo d={d} flash={flash} onCambio={onCambio} />
+
         <Produccion d={d} flash={flash} onCambio={onCambio} />
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
+          <button className="btn btn-outline"
+            onClick={() => apiCorredor.pasaporte(d.carga.id, d.carga.codigo).catch((err) => flash(err.message, true))}>
+            Descargar pasaporte (PDF)
+          </button>
           <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------- El tramo y sus documentos ----------
+//
+// El tramo se define con dos puntos del catálogo, que son lugares fijos y
+// públicos. De ahí salen los cruces de frontera, y de los cruces, qué
+// documentos pide ESTE viaje: antes la lista era una sola para toda carga
+// y por lo tanto no le decía nada a nadie.
+//
+// Lo que esta pantalla NO hace, y no va a hacer: mostrar dónde va la
+// carga. La carga cruza cuatro países y un rastro en vivo es el mapa que
+// necesita quien la quiera interceptar. Acá se dice por dónde VA A PASAR,
+// que es algo que el exportador ya sabe antes de salir.
+// El nombre legible del tipo de documento lo manda el backend
+// (services/corredorTramo.js): un segundo mapa acá se separaría del de
+// allá, y el PDF y la pantalla terminarían llamándole distinto al mismo
+// papel. Para un documento ya sellado se busca su etiqueta en la lista de
+// exigencias; si el tramo cambió y ya no figura, se muestra el slug legible.
+const etiquetaDeSubido = (slug, documental) =>
+  (documental?.items || []).find((i) => i.tipo_documento === slug)?.etiqueta
+  || String(slug || '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+function Tramo({ d, flash, onCambio }) {
+  const [puntos, setPuntos] = useState([]);
+  const [origen, setOrigen] = useState(d.tramo?.punto_origen || '');
+  const [destino, setDestino] = useState(d.tramo?.punto_destino || '');
+  const [ocupado, setOcupado] = useState(false);
+  const [subiendo, setSubiendo] = useState(null);
+
+  useEffect(() => { apiCorredor.puntos().then((r) => setPuntos(r.puntos)).catch(() => {}); }, []);
+
+  const doc = d.documental;
+
+  async function guardar() {
+    setOcupado(true);
+    try {
+      await apiCorredor.definirTramo(d.carga.id, { punto_origen: origen, punto_destino: destino });
+      onCambio();
+    } catch (err) { flash(err.message, true); } finally { setOcupado(false); }
+  }
+
+  async function sellar(tipo, archivo) {
+    if (!archivo) return;
+    setSubiendo(tipo);
+    try {
+      await apiCorredor.sellarDocumento(d.carga.id, { tipo_documento: tipo, archivo });
+      flash('Documento sellado. Se guardó su huella digital, no el archivo.');
+      onCambio();
+    } catch (err) { flash(err.message, true); } finally { setSubiendo(null); }
+  }
+
+  return (
+    <>
+      <h3 style={{ fontSize: 15, margin: '18px 0 8px' }}>Tramo y documentos</h3>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
+          <label>Sale de</label>
+          <select value={origen} onChange={(ev) => setOrigen(ev.target.value)}>
+            <option value="">Elige un punto…</option>
+            {puntos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        </div>
+        <div className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
+          <label>Llega a</label>
+          <select value={destino} onChange={(ev) => setDestino(ev.target.value)}>
+            <option value="">Elige un punto…</option>
+            {puntos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+          </select>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={guardar} disabled={ocupado || !origen || !destino}>
+          {d.tramo ? 'Actualizar tramo' : 'Definir tramo'}
+        </button>
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
+        Son los puntos por donde va a pasar, no dónde está. sicr3p no registra la posición de ningún vehículo.
+      </p>
+
+      {d.tramo?.cruces?.length > 0 && (
+        <p style={{ fontSize: 13, margin: '10px 0 0' }}>
+          Cruza {d.tramo.cruces.length} {d.tramo.cruces.length === 1 ? 'frontera' : 'fronteras'}:{' '}
+          {d.tramo.cruces.map((c) => `${c.pais_desde}→${c.pais_hasta}`).join(', ')}.
+        </p>
+      )}
+
+      <div className={`badge ${SEMAFORO[doc.semaforo]}`}
+        style={{ display: 'block', padding: 10, margin: '10px 0', fontSize: 13, lineHeight: 1.5 }}>
+        {doc.glosa}
+      </div>
+
+      {doc.items.length > 0 && (
+        <div className="table-scroll">
+          <table className="data">
+            <tbody>
+              {doc.items.map((i) => (
+                <tr key={i.tipo_documento}>
+                  <td style={{ width: 26 }}>
+                    <span className={`badge ${i.cumplido ? 'badge-green' : (i.obligatorio ? 'badge-red' : 'badge-gray')}`}
+                      style={{ padding: '2px 7px' }}>
+                      {i.cumplido ? '·' : '!'}
+                    </span>
+                  </td>
+                  <td>
+                    <b style={{ fontSize: 13.5 }}>{i.etiqueta}</b>
+                    {!i.obligatorio && <span className="muted" style={{ fontSize: 12 }}> · opcional</span>}
+                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{i.nota}</div>
+                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>Lo pide: {i.por.join(', ')}</div>
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {!i.cumplido && (
+                      <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
+                        {subiendo === i.tipo_documento ? 'Sellando…' : 'Sellar'}
+                        <input type="file" style={{ display: 'none' }} disabled={subiendo === i.tipo_documento}
+                          onChange={(ev) => sellar(i.tipo_documento, ev.target.files?.[0])} />
+                      </label>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {d.documentos?.length > 0 && (
+        <>
+          <p className="muted" style={{ fontSize: 12, margin: '10px 0 4px' }}>
+            De cada documento se guarda su huella digital (SHA-256) y queda encadenada. El archivo se
+            queda contigo: sicr3p no conserva una copia.
+          </p>
+          <div className="table-scroll">
+            <table className="data">
+              <tbody>
+                {d.documentos.map((x) => (
+                  <tr key={x.id}>
+                    <td><b style={{ fontSize: 13 }}>{etiquetaDeSubido(x.tipo_documento, d.documental)}</b>
+                      <div className="muted" style={{ fontSize: 12 }}>{x.archivo_original}</div></td>
+                    <td className="muted" style={{ fontSize: 11.5, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                      #{x.eslabon} · {String(x.sha256 || '').slice(0, 12)}…
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

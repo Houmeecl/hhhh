@@ -46,19 +46,52 @@ export function siguienteEslabon(estado, hashDoc) {
   return { hash_cadena, eslabon };
 }
 
+// Verificador incremental de la cadena.
+//
+// La verificación es inherentemente O(n): una alteración en un documento
+// viejo NO mueve el estado de la cadena (`cadena_estado` sigue con el mismo
+// último hash), así que no hay atajo ni caché posible — detectarla exige
+// recorrer los eslabones. Lo que sí se puede evitar es tener la cadena
+// entera en memoria a la vez: este verificador consume los eslabones por
+// tandas y conserva solo el hash esperado y el conteo.
+//
+// Se recorre SIEMPRE desde el génesis: verificar un tramo suelto no dice
+// nada del tramo anterior, y el informe promete la cadena completa.
+export function nuevoVerificadorDeCadena() {
+  let esperado = GENESIS;
+  let total = 0;
+  let roto = null;
+
+  return {
+    // Devuelve el fallo si la cadena ya se rompió (para cortar el recorrido),
+    // o null mientras siga íntegra. `eslabones` viene ordenado por eslabón asc.
+    agregar(eslabones) {
+      if (roto) return roto;
+      for (const e of eslabones || []) {
+        if ((e.hash_anterior || GENESIS) !== esperado) {
+          roto = { valido: false, rompe_en: e.id, motivo: 'hash_anterior no coincide con el eslabón previo' };
+          return roto;
+        }
+        const recalculado = hashCadena(e.hash_anterior, e.hash_documento);
+        if (recalculado !== e.hash_cadena) {
+          roto = { valido: false, rompe_en: e.id, motivo: 'hash_cadena no coincide con lo recalculado' };
+          return roto;
+        }
+        esperado = e.hash_cadena;
+        total += 1;
+      }
+      return null;
+    },
+    resultado() {
+      return roto || { valido: true, total_eslabones: total, ultimo_hash: esperado };
+    },
+  };
+}
+
 // Recalcula la cadena completa desde el génesis y confirma que no se
 // rompió en ningún punto. `eslabones` debe venir ordenado por `eslabon` asc.
 export function verificarCadenaCompleta(eslabones) {
-  let esperado = GENESIS;
-  for (const e of eslabones || []) {
-    if ((e.hash_anterior || GENESIS) !== esperado) {
-      return { valido: false, rompe_en: e.id, motivo: 'hash_anterior no coincide con el eslabón previo' };
-    }
-    const recalculado = hashCadena(e.hash_anterior, e.hash_documento);
-    if (recalculado !== e.hash_cadena) {
-      return { valido: false, rompe_en: e.id, motivo: 'hash_cadena no coincide con lo recalculado' };
-    }
-    esperado = e.hash_cadena;
-  }
-  return { valido: true, total_eslabones: (eslabones || []).length, ultimo_hash: esperado };
+  const v = nuevoVerificadorDeCadena();
+  v.agregar(eslabones);
+  return v.resultado();
 }

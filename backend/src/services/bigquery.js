@@ -56,6 +56,38 @@ async function getToken() {
   return tokenCache.token;
 }
 
+// El insertId es la llave de deduplicación de BigQuery: si el mismo
+// insertId llega dos veces (un reintento, un doble disparo del export),
+// BigQuery descarta la segunda en vez de duplicar la fila. Por eso TIENE
+// que ser estable para una misma fila: el respaldo anterior era
+// `crypto.randomUUID()`, que hacía justo lo contrario — cada reintento
+// entraba como fila nueva y el warehouse quedaba con duplicados que nadie
+// podía distinguir de dos hechos reales.
+//
+// Orden de preferencia:
+//  1. `insertId` explícito puesto por el llamador (las tablas que guardan
+//     una fila por VERSIÓN: declaraciones REP, compensaciones).
+//  2. El id de la fila, cuando lo hay.
+//  3. Un hash del contenido más la posición en la tanda. La posición evita
+//     que dos ítems idénticos de la misma factura (misma glosa, misma
+//     cantidad, mismo CO2e — perfectamente posible) colisionen y BigQuery
+//     se coma uno de los dos creyendo que es un reintento.
+export function insertIdDeFila(fila, i = 0) {
+  if (fila?.id != null && fila.id !== '') return String(fila.id);
+  const canonico = JSON.stringify(fila, Object.keys(fila || {}).sort());
+  return `${i}-${crypto.createHash('sha256').update(canonico).digest('hex').slice(0, 32)}`;
+}
+
+// Separa el insertId del contenido: `insertId` NO es una columna de
+// ninguna tabla del dataset (ver bigquery/schema.sql), así que mandarlo
+// dentro del `json` hacía fallar el insert entero con "no such field".
+export function filasParaInsertar(rows) {
+  return (rows || []).map((r, i) => {
+    const { insertId, ...json } = r || {};
+    return { insertId: insertId ? String(insertId) : insertIdDeFila(json, i), json };
+  });
+}
+
 // Streaming insert a una tabla del dataset.
 async function insertAll(table, rows) {
   const { projectId, dataset } = config.bigquery;
@@ -64,9 +96,7 @@ async function insertAll(table, rows) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      rows: rows.map((r) => ({ insertId: r.id || crypto.randomUUID(), json: r })),
-    }),
+    body: JSON.stringify({ rows: filasParaInsertar(rows) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.insertErrors?.length) {

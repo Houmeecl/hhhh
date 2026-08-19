@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { config } from '../config.js';
@@ -13,6 +14,12 @@ import {
   EXIGE_POLIGONO_HA, TOLERANCIA_AREA_PCT, NOMBRE_NIVEL_PARCELA,
 } from '../services/corredor.js';
 import { listoParaExportar, semaforoExportacion, glosaExportacion, urgenciaExportacion } from '../services/exportacion.js';
+import {
+  puntosDelTramo, crucesDelTramo, exigenciasDelTramo,
+  estadoDocumentalTramo, semaforoTramo, glosaTramo,
+} from '../services/corredorTramo.js';
+import { hashCadena } from '../services/cadenaHash.js';
+import { generatePasaporteCarga } from '../services/pdf.js';
 
 // ============================================================
 // API del Corredor Bioceánico — sobre su PROPIA base.
@@ -40,6 +47,28 @@ const router = express.Router();
 router.use(requireCorredorActivo);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// El archivo se recibe en memoria SOLO para calcular su sha256 y se
+// descarta: no se escribe a disco ni se guarda en la base. Ver el
+// comentario de POST /cargas/:id/documentos — sicr3p sella la huella, no
+// se queda con la documentación comercial de cuatro países.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    const ok = /\.(pdf|xml|jpe?g|png|zip)$/i.test(file.originalname);
+    cb(ok ? null : new Error('Formato no permitido'), ok);
+  },
+});
+
+// El adjunto es opcional: un exportador puede sellar el sha256 que calculó
+// él mismo sin mandarnos el archivo. Por eso multer no puede fallar la
+// petición cuando no viene multipart.
+const subirDocumento = (req, res, next) => upload.single('archivo')(req, res, (err) => {
+  if (!err) return next();
+  if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'El archivo supera los 25 MB.' });
+  return res.status(400).json({ error: err.message || 'No se pudo leer el archivo.' });
+});
 
 // ---------- Sesión ----------
 
@@ -380,6 +409,9 @@ router.get('/cargas/:id', requireAuthCorredor, requireClaveDefinida, async (req,
       parcelas: parcelas.map((p) => ({ ...p, ...resumenParcela(p) })),
       produccion: produccion[0] || null,
       pasos,
+      // El tramo y su expediente documental: qué pide este viaje en
+      // particular y qué llegó. Ver documentalDe() más abajo.
+      ...(await documentalDe(carga.id)),
       // Mismo helper que el listado. Cuando cada pantalla armaba su propia
       // evaluación, la lista y el detalle terminaron diciendo cosas
       // distintas de la misma carga.
@@ -504,6 +536,253 @@ router.put('/cargas/:id/produccion', requireAuthCorredor, requireClaveDefinida, 
       entidad: 'carga', entidadId: req.params.id, detalle: { libre_deforestacion: libre, emisor }, ip: req.ip,
     });
     res.json({ produccion: rows[0] });
+  } catch (err) { next(err); }
+});
+
+// ---------- El tramo y su expediente documental ----------
+//
+// El tramo se guarda como ORIGEN y DESTINO del catálogo de puntos: dos
+// lugares fijos y públicos. Con eso se deducen los cruces de frontera y,
+// de los cruces, qué documentos pide este viaje en particular — antes la
+// lista era una sola para toda carga, así que no le decía nada a nadie.
+//
+// Otra vez: esto NO dice dónde está la carga. Dice por dónde va a pasar,
+// que es información que el exportador ya tiene antes de salir.
+
+// Catálogo compartido por varias rutas de acá. Son 14 filas fijas.
+const catalogoPuntos = async () => (await queryCorredor(
+  'SELECT id, nombre, pais, lat, lng, orden, es_frontera FROM puntos_corredor WHERE activo ORDER BY orden'
+)).rows;
+
+// Arma el estado documental del tramo de una carga. Devuelve el gris
+// —`listo: null`— cuando la carga todavía no tiene tramo definido.
+async function documentalDe(cargaId) {
+  const [{ rows: tramoRows }, { rows: documentos }, { rows: reglas }] = await Promise.all([
+    queryCorredor('SELECT * FROM carga_tramo WHERE carga_id = $1', [cargaId]),
+    queryCorredor(
+      `SELECT id, tipo_documento, archivo_original, extension, tamano_bytes, sha256,
+              hash_cadena, eslabon, estado, created_at
+         FROM carga_documentos WHERE carga_id = $1 ORDER BY created_at`, [cargaId]),
+    queryCorredor('SELECT pais_desde, pais_hasta, tipo_documento, obligatorio, nota FROM documentos_por_tramo'),
+  ]);
+
+  const tramo = tramoRows[0] || null;
+  const definido = Boolean(tramo?.punto_origen && tramo?.punto_destino);
+  const puntos = definido
+    ? puntosDelTramo(await catalogoPuntos(), tramo.punto_origen, tramo.punto_destino)
+    : [];
+  const cruces = crucesDelTramo(puntos);
+  const exigencias = definido ? exigenciasDelTramo(cruces, reglas) : [];
+  const estado = estadoDocumentalTramo({ tramoDefinido: definido, exigencias, documentos });
+
+  return {
+    tramo: tramo ? { ...tramo, puntos, cruces } : null,
+    documentos,
+    documental: { ...estado, semaforo: semaforoTramo(estado), glosa: glosaTramo(estado) },
+  };
+}
+
+router.get('/puntos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    res.json({ puntos: await catalogoPuntos() });
+  } catch (err) { next(err); }
+});
+
+// El catálogo completo de reglas, para que la pantalla pueda explicar por
+// qué se pide cada documento sin tener el texto duplicado en el frontend.
+router.get('/tramos/documentos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const { rows } = await queryCorredor(
+      'SELECT pais_desde, pais_hasta, tipo_documento, obligatorio, nota FROM documentos_por_tramo ORDER BY pais_desde, pais_hasta, tipo_documento'
+    );
+    res.json({ reglas: rows });
+  } catch (err) { next(err); }
+});
+
+router.put('/cargas/:id/tramo', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const { rows: c } = await queryCorredor(
+      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
+    );
+    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+
+    const b = req.body || {};
+    const origen = String(b.punto_origen || '').trim();
+    const destino = String(b.punto_destino || '').trim();
+    if (!origen || !destino) {
+      return res.status(400).json({ error: 'Hay que indicar el punto de origen y el de destino.' });
+    }
+    if (origen === destino) {
+      return res.status(400).json({ error: 'El origen y el destino no pueden ser el mismo punto.' });
+    }
+    const puntos = await catalogoPuntos();
+    const tramo = puntosDelTramo(puntos, origen, destino);
+    if (!tramo.length) {
+      return res.status(400).json({ error: 'Alguno de los dos puntos no está en el catálogo del corredor.' });
+    }
+
+    const { rows } = await queryCorredor(
+      `INSERT INTO carga_tramo (carga_id, punto_origen, punto_destino)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (carga_id) DO UPDATE SET punto_origen = EXCLUDED.punto_origen,
+                                            punto_destino = EXCLUDED.punto_destino
+       RETURNING *`,
+      [req.params.id, origen, destino]
+    );
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'definir_tramo',
+      entidad: 'carga', entidadId: req.params.id, detalle: { origen, destino }, ip: req.ip,
+    });
+    res.json({ ...(await documentalDe(req.params.id)), tramo_guardado: rows[0] });
+  } catch (err) { next(err); }
+});
+
+router.get('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const { rows: c } = await queryCorredor(
+      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
+    );
+    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    res.json(await documentalDe(req.params.id));
+  } catch (err) { next(err); }
+});
+
+// Sella un documento de la carga.
+//
+// NO SE GUARDA EL ARCHIVO. Se guarda su SHA-256, su nombre y su tamaño, y
+// eso se encadena. El archivo se queda con el exportador, que es de quien
+// es: sicr3p custodia la huella digital que permite probar después que el
+// papel que muestra es el mismo que declaró, sin quedarse con una copia
+// de la documentación comercial de cuatro países. El cliente calcula el
+// sha256 y también lo recalcula el servidor cuando llega el archivo — si
+// no calzan, se rechaza.
+router.post('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida, subirDocumento, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const { rows: c } = await queryCorredor(
+      'SELECT id, codigo FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
+    );
+    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+
+    const b = req.body || {};
+    const tipo = String(b.tipo_documento || '').trim();
+    if (!tipo) return res.status(400).json({ error: 'Hay que decir qué tipo de documento es.' });
+
+    const archivo = req.file || null;
+    const nombre = String(b.archivo_original || archivo?.originalname || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'Hay que adjuntar el archivo o declarar su nombre.' });
+
+    const shaCalculado = archivo
+      ? crypto.createHash('sha256').update(archivo.buffer).digest('hex')
+      : null;
+    const shaDeclarado = String(b.sha256 || '').trim().toLowerCase() || null;
+    if (shaCalculado && shaDeclarado && shaCalculado !== shaDeclarado) {
+      return res.status(400).json({
+        error: 'El sha256 declarado no corresponde al archivo enviado.',
+        codigo: 'sha_no_calza',
+      });
+    }
+    const sha = shaCalculado || shaDeclarado;
+    if (!sha || !/^[0-9a-f]{64}$/.test(sha)) {
+      return res.status(400).json({ error: 'Falta el sha256 del documento (64 caracteres hexadecimales).' });
+    }
+
+    const extension = (nombre.match(/\.([a-z0-9]{1,8})$/i)?.[1] || '').toLowerCase() || null;
+    const tamano = archivo ? archivo.size : (Number(b.tamano_bytes) || null);
+
+    const doc = await withTxCorredor(async (client) => {
+      // Mismo lock global que usa sicr3p para encadenar facturas: sin él,
+      // dos subidas simultáneas se llevan el mismo eslabón.
+      const { rows: e } = await client.query('SELECT * FROM cadena_estado_corredor WHERE id = 1 FOR UPDATE');
+      const estado = e[0];
+      // El hash del documento es lo que se puede volver a calcular después
+      // con el archivo en la mano: carga, tipo, nombre y sha256.
+      const hashDoc = crypto.createHash('sha256')
+        .update([c[0].codigo, tipo, nombre, sha].join('|')).digest('hex');
+      const hashEnc = hashCadena(estado.ultimo_hash, hashDoc);
+      const eslabon = Number(estado.n_eslabones) + 1;
+
+      const { rows } = await client.query(
+        `INSERT INTO carga_documentos
+           (carga_id, tipo_documento, archivo_original, extension, tamano_bytes, sha256,
+            hash_documento, hash_anterior, hash_cadena, eslabon, estado, subido_por)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pendiente_revision',$11) RETURNING *`,
+        [req.params.id, tipo, nombre, extension, tamano, sha,
+         hashDoc, estado.ultimo_hash, hashEnc, eslabon, req.usuario.sub]
+      );
+      await client.query(
+        'UPDATE cadena_estado_corredor SET ultimo_hash = $1, n_eslabones = $2, updated_at = now() WHERE id = 1',
+        [hashEnc, eslabon]
+      );
+      return rows[0];
+    });
+
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'sellar_documento',
+      entidad: 'carga', entidadId: req.params.id, detalle: { tipo, eslabon: doc.eslabon }, ip: req.ip,
+    });
+    res.status(201).json({ documento: doc, ...(await documentalDe(req.params.id)) });
+  } catch (err) {
+    // El índice único (carga_id, sha256): el mismo archivo ya está sellado.
+    if (err?.code === '23505' && String(err.constraint || '').includes('carga_documentos_sha')) {
+      return res.status(409).json({
+        error: 'Ese mismo archivo ya está sellado en esta carga.',
+        codigo: 'documento_duplicado',
+      });
+    }
+    next(err);
+  }
+});
+
+// ---------- El pasaporte en PDF ----------
+//
+// El entregable: el estado de la evidencia de una carga, en papel, para
+// mandárselo al comprador europeo. Reusa exactamente los mismos helpers
+// que arman la respuesta JSON del detalle, para que el papel y la
+// pantalla no puedan decir cosas distintas de la misma carga.
+router.get('/cargas/:id/pasaporte.pdf', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportadorId = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const { rows } = await queryCorredor(
+      'SELECT * FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportadorId]
+    );
+    const carga = rows[0];
+    if (!carga) return res.status(404).json({ error: 'Carga no encontrada.' });
+
+    const [{ rows: emp }, { rows: parcelas }, { rows: produccion }] = await Promise.all([
+      queryCorredor('SELECT nombre_empresa, rut, eori, pais FROM exportadores WHERE id = $1', [carga.exportador_id]),
+      queryCorredor(
+        `SELECT p.*, cp.aporte_pct FROM carga_parcelas cp
+           JOIN parcelas p ON p.id = cp.parcela_id
+          WHERE cp.carga_id = $1`, [carga.id]),
+      queryCorredor('SELECT * FROM carga_produccion WHERE carga_id = $1', [carga.id]),
+    ]);
+    const documental = await documentalDe(carga.id);
+
+    const pdf = await generatePasaporteCarga({
+      carga,
+      exportador: emp[0] || null,
+      exportacion: conEstado(carga, parcelas, produccion[0] || null),
+      parcelas,
+      produccion: produccion[0] || null,
+      tramo: documental.tramo,
+      documental: documental.documental,
+      documentos: documental.documentos,
+    });
+
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'descargar_pasaporte',
+      entidad: 'carga', entidadId: carga.id, detalle: { codigo: carga.codigo }, ip: req.ip,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="pasaporte-${carga.codigo}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

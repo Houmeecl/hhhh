@@ -121,7 +121,7 @@ es `cargas`, y es otra tabla en otra base.
 | Polígono si la parcela supera 4 ha | Productor | ✅ `parcelas.poligono` (GeoJSON) |
 | Fecha o intervalo de producción | Productor | ✅ `carga_produccion.desde/hasta` |
 | Libre de deforestación posterior al **31-12-2020** | Productor, con determinación de un tercero | ✅ con emisor, línea base y fecha |
-| Legalidad en el país de producción | Productor | ⚠️ el flag sí; los documentos, pendientes |
+| Legalidad en el país de producción | Productor | ⚠️ el flag sí; el documento se sella por tramo, pero nadie lo lee |
 | Operador: nombre, dirección, EORI | Exportador | ✅ `exportadores.eori` |
 | Cantidad | Exportador | ✅ `cargas.cantidad` + `unidad` |
 | Proveedor y comprador de la operación | Exportador | ❌ pendiente |
@@ -481,15 +481,36 @@ entrega como archivo, no como acceso.
 | 3 | Captura de coordenadas: importar GeoJSON/KML, validar área, dibujar en el mapa | 1 | La parte más visible |
 | 4 | Migración 108 + panel del exportador (login, activación, shell) | 1 | El octavo panel |
 | 5 | Creación de pasaporte guiada por régimen | 1, 4 | Cierra el pedido original |
-| 6 | Documentos por tramo | 1 | Semáforo por frontera |
-| 7 | Informe EUDR en PDF | 1, 3 | El entregable que se vende |
+| ✅ | Documentos por tramo | 1 | Semáforo por frontera — `migrations-corredor/003` + `services/corredorTramo.js` |
+| ✅ | Pasaporte de exportación en PDF | 1, 3 | El entregable que se vende — `generatePasaporteCarga()` |
 
-Todo el backend del Corredor está construido: base, servicios puros, rutas y
-autenticación propia. Lo que queda es la pantalla.
+**Las siete tandas están construidas.** Base, servicios puros, rutas,
+autenticación propia, panel del exportador, tramo con sus documentos y el PDF
+descargable.
 
-**Pendiente de operación, no de código:** el respaldo del VPS hace `pg_dump` de
-`sicr3p` y no incluye la base nueva. Hay que ampliarlo antes de que el Corredor
-tenga datos que valga la pena perder.
+Lo que sigue abierto, y por qué:
+
+- **Legalidad en el país de producción**: la casilla existe y el documento que
+  la respalda ya se puede sellar por tramo (certificado fitosanitario, DOF,
+  guía forestal). Lo que no hay es una revisión de ESE documento: sicr3p sella
+  su huella, no lo lee.
+- **Proveedor y comprador de la operación**: sin columna todavía. Es dato de la
+  cadena comercial, no del predio, y merece su propia tanda.
+- **Nivel 5 de confianza**: sigue sin emitirse. Necesita un rol de auditor que
+  no existe en ninguno de los dos productos.
+
+**Pendiente de operación, no de código** (lo único que queda para encender el
+Corredor en el servidor):
+
+1. `sudo -u postgres createdb sicr3p_corredor` y
+   `ALTER DATABASE sicr3p_corredor OWNER TO sicr3p;`
+2. `DATABASE_URL_CORREDOR` y `JWT_SECRET_CORREDOR` en `backend/.env`. Sin
+   ellas el Corredor queda apagado y el resto de sicr3p arranca igual: las
+   rutas responden 503 con `codigo: 'corredor_no_configurado'`.
+3. **Ampliar el respaldo.** El `pg_dump` del VPS apunta a `sicr3p` y no incluye
+   la base nueva. Hay que ampliarlo antes de que el Corredor tenga datos que
+   valga la pena perder — y ahora los va a tener, porque la cadena de hash de
+   los documentos vive ahí y no se puede reconstruir desde la otra base.
 
 ---
 

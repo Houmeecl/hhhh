@@ -51,7 +51,12 @@ export const SECCIONES_ADMIN_NAV = [
       // Proveedores de esa pantalla (ver Accesos.jsx), sin mandantes/
       // puertos/agencias/trazadores. No otorga nada que
       // 'accesos_externos' no otorgara ya — ver migración 097.
-      { slug: 'proveedores', to: '/admin/accesos', ico: Icon.Building, label: 'Proveedores' },
+      //
+      // `redundanteCon`: apunta a la MISMA ruta que 'accesos_externos', así
+      // que una cuenta con los dos slugs veía la pantalla dos veces en el
+      // menú, con el mismo destino y dos nombres distintos. Cuando está el
+      // slug amplio, el angosto no agrega nada y no se lista.
+      { slug: 'proveedores', to: '/admin/accesos', ico: Icon.Building, label: 'Proveedores', redundanteCon: 'accesos_externos' },
     ],
   },
   {
@@ -84,4 +89,15 @@ export function puedeVerSeccion(user, slug) {
 // pantalla reimplemente su propio Array.isArray/.some ad hoc.
 export function puedeVerAlguna(user, ...slugs) {
   return slugs.some((s) => puedeVerSeccion(user, s));
+}
+
+// Los ítems de un grupo que esta cuenta debe VER en el menú.
+//
+// No es lo mismo que "puede entrar": dos slugs pueden llevar a la misma
+// pantalla (ver `redundanteCon`). Ahí el permiso sigue siendo de los dos
+// —quitarle uno no le quita el acceso— pero el menú muestra una sola
+// entrada, la más amplia.
+export function itemsVisiblesDe(seccion, user) {
+  const visibles = (seccion?.items || []).filter((i) => puedeVerSeccion(user, i.slug));
+  return visibles.filter((i) => !(i.redundanteCon && visibles.some((o) => o.slug === i.redundanteCon)));
 }

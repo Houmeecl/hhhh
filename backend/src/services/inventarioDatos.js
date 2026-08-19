@@ -827,6 +827,26 @@ export const INVENTARIO = {
     motivoSinPurga: 'Sellado por hash: borrar o editar una fila invalida todos los eslabones '
       + 'posteriores. Se anula la carga, nunca el documento.',
   },
+  cadena_estado_corredor: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Una sola fila con el último hash y el número de eslabones de la cadena del Corredor. '
+      + 'Es el contador que se bloquea con FOR UPDATE al sellar un documento. Tabla aparte de la '
+      + '`cadena_estado` de sicr3p a propósito: son dos cadenas de dos productos, y quien verifique '
+      + 'un documento del Corredor no tiene por qué poder recorrer las facturas de otra empresa.',
+    finalidad: 'Serializar el encadenado de documentos del Corredor.',
+    base: BASE.LEY, cadena: CADENA.PROPIA,
+    retencion: null,
+    motivoSinPurga: 'Borrarla dejaría la cadena sin origen: los eslabones ya emitidos no se podrían verificar.',
+  },
+  documentos_por_tramo: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Catálogo: qué documento pide cada cruce de frontera. No tiene datos de nadie; es la regla '
+      + 'contra la que se mide el expediente de una carga.',
+    finalidad: 'Decidir qué evidencia se le pide a cada tramo.',
+    base: BASE.LEY, cadena: CADENA.NINGUNA,
+    retencion: null,
+    motivoSinPurga: 'Catálogo de configuración, sin datos personales que purgar.',
+  },
   carga_pasos: {
     clasificacion: NO_PERSONAL, columnas: [],
     nota: 'DELIBERADAMENTE SIN POSICIÓN. Registra que la carga pasó por un punto de control conocido '

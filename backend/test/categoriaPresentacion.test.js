@@ -113,7 +113,14 @@ test('generateReport NO imprime alcance del catch-all, y declara lo que quedó f
   const texto = textoDelPdf(pdf);
   // La tabla existe pero el catch-all NO figura como Alcance: su CO2e cae
   // completo a "Sin alcance atribuido" con su causa impresa.
-  assert.ok(!/Alcance [123]\b/.test(texto.replace(/Alcance 3 . Cat/g, '')), 'un catch-all no aporta alcance al período');
+  //
+  // Se busca la ETIQUETA de los alcances del fixture y no el texto
+  // "Alcance N" suelto: el bloque "Límites y exclusiones declaradas" del
+  // informe nombra el Alcance 2 para decir con qué enfoque se calculó, y
+  // eso es una declaración de método, no una atribución al período.
+  for (const a of ALCANCES) {
+    assert.ok(!texto.includes(a.alcance_ghg), `un catch-all no aporta ${a.alcance_ghg} al período`);
+  }
   assert.match(texto, /Sin alcance atribuido/);
   assert.match(texto, /sin coincidencia con ninguna categor/);
   assert.match(texto, /no pudo clasificarse/, 'y no se esconde: su CO2e sí está en el total');

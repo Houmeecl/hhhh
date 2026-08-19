@@ -21,14 +21,16 @@ export const authCorredor = {
   clear() { localStorage.removeItem(CLAVE); },
 };
 
-async function pedir(ruta, { metodo = 'GET', body, conSesion = true } = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+async function pedir(ruta, { metodo = 'GET', body, conSesion = true, form = null } = {}) {
+  // Con `form` va un FormData: el navegador pone el Content-Type con su
+  // boundary, y ponerlo a mano rompe el multipart.
+  const headers = form ? {} : { 'Content-Type': 'application/json' };
   if (conSesion && authCorredor.access) headers.Authorization = `Bearer ${authCorredor.access}`;
 
   const res = await fetch(`/api/corredor${ruta}`, {
     method: metodo,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: form || (body === undefined ? undefined : JSON.stringify(body)),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -54,6 +56,34 @@ export const apiCorredor = {
   enlazarParcela: (cargaId, b) => pedir(`/cargas/${cargaId}/parcelas`, { metodo: 'POST', body: b }),
   soltarParcela: (cargaId, parcelaId) => pedir(`/cargas/${cargaId}/parcelas/${parcelaId}`, { metodo: 'DELETE' }),
   guardarProduccion: (cargaId, b) => pedir(`/cargas/${cargaId}/produccion`, { metodo: 'PUT', body: b }),
+
+  // El tramo y su expediente documental.
+  puntos: () => pedir('/puntos'),
+  reglasDeTramo: () => pedir('/tramos/documentos'),
+  definirTramo: (cargaId, b) => pedir(`/cargas/${cargaId}/tramo`, { metodo: 'PUT', body: b }),
+  documentos: (cargaId) => pedir(`/cargas/${cargaId}/documentos`),
+  // El archivo viaja SOLO para que el servidor calcule su sha256; no se
+  // guarda en ninguna parte. Ver POST /cargas/:id/documentos en el backend.
+  sellarDocumento: (cargaId, { tipo_documento, archivo }) => {
+    const fd = new FormData();
+    fd.append('tipo_documento', tipo_documento);
+    fd.append('archivo', archivo);
+    return pedir(`/cargas/${cargaId}/documentos`, { metodo: 'POST', form: fd });
+  },
+
+  // El PDF no pasa por `pedir`: la respuesta es un binario, no JSON.
+  async pasaporte(cargaId, codigo) {
+    const res = await fetch(`/api/corredor/cargas/${cargaId}/pasaporte.pdf`, {
+      headers: { Authorization: `Bearer ${authCorredor.access}` },
+    });
+    if (!res.ok) throw new Error('No se pudo generar el pasaporte.');
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pasaporte-${codigo}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 
   crearExportador: (b) => pedir('/exportadores', { metodo: 'POST', body: b }),
 };

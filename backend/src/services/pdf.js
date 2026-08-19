@@ -5,6 +5,7 @@ import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
+import { etiquetaDocumento } from './corredorTramo.js';
 import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
 import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
@@ -176,12 +177,14 @@ function fechaCorta(d) {
 }
 
 // Dibuja el logotipo "sicr3p" con el punto verde sobre la i.
-function drawLogo(doc, x, y, size = 22) {
-  doc.font('Helvetica-Bold').fontSize(size).fillColor(NAVY).text('sicr3p', x, y, { lineBreak: false });
+// `color` para las portadas de fondo oscuro: dibujarlo en NAVY sobre un
+// rectángulo NAVY dejaba solo el punto verde flotando, sin la palabra.
+function drawLogo(doc, x, y, size = 22, color = NAVY) {
+  doc.font('Helvetica-Bold').fontSize(size).fillColor(color).text('sicr3p', x, y, { lineBreak: false });
   const w = doc.widthOfString('s');
   // punto verde sobre la "i" (segunda letra)
   doc.circle(x + w + size * 0.13, y - size * 0.12, size * 0.09).fill(GREEN);
-  doc.fillColor(NAVY);
+  doc.fillColor(color);
 }
 
 function bufferDoc(doc) {
@@ -495,6 +498,44 @@ export async function generateReport({ sesion, facturas, declaracion, alcances, 
       // Nota: las fuentes core de pdfkit (WinAnsi) no tienen el glifo "≥"; se usa ">=".
       .text('Clasificación según composición declarada (umbrales: Alto >= 70%, Medio >= 50%, Bajo < 50%).', 48, y, { width: 499 });
     y = doc.y + 12;
+  }
+
+  // --- Límites y exclusiones declaradas ---
+  // El informe mensual es el documento que se vende y el que un tercero
+  // (verificador, mandante, banco) va a leer sin poder preguntarle nada a
+  // quien lo generó. Los límites tienen que estar A LA VISTA, no deducidos
+  // de lo que el informe omite: qué cubre este número y qué no. Los otros
+  // PDF de sicr3p ya lo traen (informe SII, transporte, CBAM); este, que es
+  // el principal, no lo tenía.
+  if (y > doc.page.height - 260) { doc.addPage(); y = 48; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text('Límites y exclusiones declaradas', 48, y, { width: 499 });
+  y = doc.y + 6;
+  const LIMITES = [
+    'Cobertura: el resultado se deriva de los documentos tributarios que la empresa registró en '
+      + 'sicr3p para este período. No incluye datos de actividad medidos directamente (litros de '
+      + 'combustible, kWh de generación propia, fugas de refrigerantes) salvo que consten en un '
+      + 'documento del período, ni documentos que la empresa no haya cargado.',
+    'Alcance 2: solo enfoque location-based (factor promedio del sistema eléctrico citado en la '
+      + 'metodología); no se aplica el enfoque market-based (contratos de suministro renovable).',
+    'Resultados en CO2e: sin desglose por gas individual (CO2, CH4, N2O).',
+    'Sin año base ni recálculo histórico: cada período se informa por separado.',
+    'Solo se atribuye alcance GHG al documento cuya categoría salió del detalle real de sus ítems '
+      + 'o de la corrección de un operador; el saldo restante se declara aparte con su causa.',
+    'Los factores de emisión citados son los de la versión del motor estampada en cada documento, '
+      + 'congelada al momento del cálculo: el informe no cambia si después se editan los factores.',
+  ];
+  if (decl && decl.nivel) {
+    LIMITES.push(
+      'La declaración de embalaje (REP Ley 20.920) es una declaración de la propia empresa sobre '
+      + 'la composición de sus envases: sicr3p la registra y la sella, no la verifica en terreno.'
+    );
+  }
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES) {
+    if (y > doc.page.height - 130) { doc.addPage(); y = 48; }
+    doc.text(`\u2022 ${l}`, 48, y, { width: 499 });
+    y = doc.y + 4;
   }
 
   // --- Pie de página en todas las páginas ---
@@ -2268,14 +2309,34 @@ export async function generateCarpetaMandante({ sesion, facturas, declaracion, a
     doc.font('Helvetica').fontSize(10).fillColor(NAVY).text(texto, 84, py, { width: W - 40 });
     py = doc.y + 14;
   }
-  const primera = (facturas || [])[0];
-  if (primera?.hash_cadena) {
+  // Sello de integridad de TODA la carpeta.
+  //
+  // Antes esta caja verificaba solo el primer documento y se pintaba verde
+  // con eso. El rótulo decía "primer documento", pero un mandante mira el
+  // color: una carpeta con el documento 1 intacto y el 7 alterado salía
+  // verde. Ahora se recorren todos los documentos sellados y el verde
+  // exige que ninguno falle; si alguno falla, se dice cuál.
+  const sellados = (facturas || []).filter((f) => f.hash_cadena);
+  if (sellados.length) {
+    const alterados = sellados.filter((f) => !eslabonValido(f));
+    const todoOk = alterados.length === 0;
     py += 6;
-    doc.roundedRect(48, py, W, 64, 8).fillAndStroke(LIGHT, eslabonValido(primera) ? GREEN : BORDER);
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('SELLO DE INTEGRIDAD (primer documento de la carpeta)', 60, py + 10);
-    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(`Eslabón #${primera.eslabon} de la cadena pública sicr3p:`, 60, py + 26);
-    doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(primera.hash_cadena), 60, py + 38, { width: W - 24 });
-    py += 78;
+    const alto = todoOk ? 64 : 78;
+    doc.roundedRect(48, py, W, alto, 8).fillAndStroke(LIGHT, todoOk ? GREEN : '#b91c1c');
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY)
+      .text(`SELLO DE INTEGRIDAD (${sellados.length - alterados.length} de ${sellados.length} documento${sellados.length === 1 ? '' : 's'} sellado${sellados.length === 1 ? '' : 's'} verificado${sellados.length === 1 ? '' : 's'})`, 60, py + 10);
+    if (todoOk) {
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+        .text(`Eslabón #${sellados[0].eslabon} de la cadena pública sicr3p (primer documento de la carpeta):`, 60, py + 26);
+      doc.font('Courier').fontSize(7.5).fillColor(NAVY).text(String(sellados[0].hash_cadena), 60, py + 38, { width: W - 24 });
+    } else {
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#b91c1c')
+        .text(`No verifica${alterados.length === 1 ? '' : 'n'}: ${alterados.map((f) => f.numero_venta || `eslabón #${f.eslabon}`).slice(0, 6).join(', ')}`
+          + `${alterados.length > 6 ? ` y ${alterados.length - 6} más` : ''}.`, 60, py + 26, { width: W - 24 });
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+        .text('Verifique en línea con el QR de cada documento antes de darlo por bueno.', 60, py + 50, { width: W - 24 });
+    }
+    py += alto + 14;
   }
   const pyPie = Math.max(py, 620);
   doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
@@ -2538,6 +2599,259 @@ export async function generateInformeApl({ acuerdo, metas = [], resumen = {}, ev
     'auditoría. Los datos de evidencia son agregados contables de la plataforma, verificables documento a documento.',
     48, doc.page.height - 100, { width: 499 }
   );
+
+  return bufferDoc(doc);
+}
+
+// ---------- PASAPORTE DE EXPORTACIÓN DEL CORREDOR ----------
+//
+// El entregable del Corredor Bioceánico: el estado de la evidencia de UNA
+// carga, en papel, para que el exportador lo mande al comprador europeo o
+// se lo lleve a la reunión donde le van a preguntar por el EUDR.
+//
+// TRES COSAS QUE ESTE DOCUMENTO NO HACE, y que están impresas adentro:
+//
+//  · NO es la Declaración de Diligencia Debida del EUDR ni la declaración
+//    CBAM. Esas las presenta el importador en la UE, en su sistema. Esto
+//    es el estado de la evidencia que él va a tener que citar.
+//  · NO certifica que el predio esté libre de deforestación. sicr3p no
+//    analiza imágenes satelitales: registra la determinación que hizo un
+//    tercero, con quién la emitió y contra qué línea base.
+//  · NO lleva QR de verificación pública. La cadena del Corredor no tiene
+//    página pública —a diferencia de las facturas de sicr3p—, y un QR que
+//    no lleva a ninguna parte es peor que ninguno.
+//
+// Y no imprime dónde está la carga, porque eso no se guarda en ninguna
+// parte. Imprime el tramo: por dónde va a pasar.
+//
+// Todo lo que se dibuja llega por parámetro. Esta función NO consulta
+// ninguna base: los datos vienen de la base del Corredor, que es otra, y
+// abrir esa conexión desde acá mezclaría justo lo que se separó.
+const NOMBRE_REGIMEN_PDF = { eudr: 'EUDR — Reglamento (UE) 2023/1115', cbam: 'CBAM — Reglamento (UE) 2023/956', exportacion: 'Exportación' };
+
+function tituloSeccion(doc, y, texto, ancho = 499) {
+  if (y > doc.page.height - 140) { doc.addPage(); y = 48; }
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text(texto, 48, y, { width: ancho });
+  return doc.y + 6;
+}
+
+export async function generatePasaporteCarga({ carga, exportador, exportacion, parcelas = [], produccion = null, tramo = null, documental = null, documentos = [] }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const W = 499;
+
+  // ---- Portada ----
+  doc.rect(0, 0, doc.page.width, 132).fill(NAVY);
+  drawLogo(doc, 48, 40, 24, '#ffffff');
+  doc.font('Helvetica').fontSize(9).fillColor('#94a3b8')
+    .text('CORREDOR BIOCEÁNICO', 48, 74, { characterSpacing: 1.5 });
+  doc.font('Helvetica-Bold').fontSize(17).fillColor('#ffffff')
+    .text('Pasaporte de exportación', 48, 90, { width: W });
+  doc.font('Helvetica').fontSize(9).fillColor('#94a3b8')
+    .text(fechaCorta(new Date()), 48, 112);
+  doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff')
+    .text(String(carga?.codigo || '—'), 340, 90, { width: 207, align: 'right' });
+
+  let y = 152;
+  doc.roundedRect(48, y, W, 92, 8).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('EXPORTADOR', 62, y + 12);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY)
+    .text(String(exportador?.nombre_empresa || '—').slice(0, 52), 62, y + 25, { width: 300 });
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`${exportador?.rut ? `RUT/ID ${exportador.rut}` : ''}${exportador?.eori ? ` · EORI ${exportador.eori}` : ''}`, 62, y + 43, { width: 300 });
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text('MERCANCÍA', 62, y + 60);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text(
+    `${String(carga?.descripcion || '—').slice(0, 46)} · ${nfp(carga?.cantidad)} ${carga?.unidad || 't'}`
+    + `${carga?.codigo_nc ? ` · NC ${carga.codigo_nc}` : ''}`,
+    62, y + 72, { width: W - 28 }
+  );
+  y += 108;
+
+  // ---- Régimen y semáforo ----
+  const semaforo = exportacion?.semaforo || 'gris';
+  const colorSemaforo = semaforo === 'verde' ? GREEN : (semaforo === 'gris' ? GRAY : (semaforo === 'rojo' ? '#b91c1c' : '#b45309'));
+  doc.roundedRect(48, y, W, 58, 8).fillAndStroke('#ffffff', colorSemaforo);
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text(exportacion?.glosa || 'Sin evaluar', 62, y + 12, { width: W - 28 });
+  doc.font('Helvetica').fontSize(8.5).fillColor(GRAY)
+    .text(exportacion?.por_que || '', 62, doc.y + 4, { width: W - 28 });
+  y += 74;
+
+  // La consecuencia, cuando hay algo pendiente: una prohibición de entrada
+  // y un sobrecosto no se leen igual, y el papel no puede mostrarlos con
+  // el mismo peso.
+  if (exportacion?.urgencia?.consecuencia) {
+    const esProhibicion = exportacion.urgencia.consecuencia.tipo === 'prohibicion';
+    doc.roundedRect(48, y, W, 52, 8).fillAndStroke(esProhibicion ? '#fef2f2' : '#fffbeb', esProhibicion ? '#b91c1c' : '#b45309');
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(esProhibicion ? '#b91c1c' : '#b45309')
+      .text(esProhibicion ? 'SI ESTO NO SE COMPLETA' : 'SI ESTO NO SE COMPLETA', 62, y + 10);
+    doc.font('Helvetica').fontSize(9).fillColor(NAVY)
+      .text(exportacion.urgencia.consecuencia.texto, 62, y + 24, { width: W - 28 });
+    y += 68;
+  }
+
+  // ---- Requisitos por régimen ----
+  for (const bloque of exportacion?.bloques || []) {
+    y = tituloSeccion(doc, y, `${NOMBRE_REGIMEN_PDF[bloque.regimen] || 'Falta declarar el código arancelario'} — ${bloque.cumplidos} de ${bloque.total}`);
+    doc.font('Helvetica').fontSize(8.5);
+    for (const r of bloque.requisitos || []) {
+      if (y > doc.page.height - 110) { doc.addPage(); y = 48; }
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(r.cumplido ? GREEN : '#b91c1c')
+        .text(r.cumplido ? 'OK' : 'FALTA', 48, y, { width: 40, lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text(r.etiqueta, 92, y, { width: W - 44 });
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+        .text(`${r.como_se_obtiene}${r.quien ? ` · Lo aporta: ${r.quien}` : ''}`, 92, doc.y + 1, { width: W - 44 });
+      y = doc.y + 7;
+    }
+    y += 6;
+  }
+
+  // ---- Predios de origen (la geolocalización que exige el EUDR) ----
+  if (parcelas.length) {
+    y = tituloSeccion(doc, y, 'Predios de origen');
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+      'El EUDR exige la geolocalización de cada predio donde se produjo. Sobre 4 hectáreas exige el '
+      + 'polígono completo, no un punto. El nivel de confianza lo calcula sicr3p a partir de la evidencia '
+      + 'presentada; nunca lo declara el exportador.', 48, y, { width: W });
+    y = doc.y + 8;
+    doc.rect(48, y, W, 16).fill(NAVY);
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff')
+      .text('Predio', 54, y + 4).text('País', 230, y + 4).text('Área (ha)', 280, y + 4)
+      .text('Ubicación', 350, y + 4).text('Nivel', 470, y + 4);
+    y += 16;
+    for (const p of parcelas) {
+      if (y > doc.page.height - 110) { doc.addPage(); y = 48; }
+      doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+        .text(String(p.nombre || '—').slice(0, 34), 54, y + 4, { width: 170 })
+        .text(String(p.pais || '—'), 230, y + 4, { width: 44 })
+        .text(p.area_ha != null ? nfp(p.area_ha) : '—', 280, y + 4, { width: 64 })
+        .text(p.poligono ? 'Polígono' : (p.lat != null && p.lng != null ? `${nf(p.lat, 4)}, ${nf(p.lng, 4)}` : '—'), 350, y + 4, { width: 115 })
+        .text(`${p.nivel_confianza ?? '—'}`, 470, y + 4, { width: 30 });
+      y += 15;
+    }
+    y += 8;
+  }
+
+  // ---- Producción ----
+  if (produccion) {
+    y = tituloSeccion(doc, y, 'Producción');
+    const lineas = [
+      ['Ventana de producción', produccion.desde || produccion.hasta
+        ? `${produccion.desde ? fechaCorta(produccion.desde) : '—'} a ${produccion.hasta ? fechaCorta(produccion.hasta) : '—'}`
+        : 'No declarada'],
+      ['Libre de deforestación', produccion.libre_deforestacion_declarado ? 'Declarado' : 'No declarado'],
+      ['Legalidad en el país de producción', produccion.legalidad_declarada ? 'Declarada' : 'No declarada'],
+      ['Determinación emitida por', produccion.determinacion_emisor || '—'],
+      ['Contra la línea base', produccion.determinacion_linea_base || '—'],
+      ['Fecha de la determinación', produccion.determinacion_at ? fechaCorta(produccion.determinacion_at) : '—'],
+    ];
+    for (const [etiqueta, valor] of lineas) {
+      if (y > doc.page.height - 110) { doc.addPage(); y = 48; }
+      doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(etiqueta, 48, y, { width: 220, lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(NAVY).text(String(valor), 272, y, { width: W - 224 });
+      y = doc.y + 5;
+    }
+    y += 8;
+  }
+
+  // ---- Tramo y documentos ----
+  y = tituloSeccion(doc, y, 'Tramo y expediente documental');
+  if (!tramo) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(GRAY)
+      .text('Todavía no se definió el tramo, así que no se puede decir qué documentos pide este viaje.', 48, y, { width: W });
+    y = doc.y + 10;
+  } else {
+    const puntos = tramo.puntos || [];
+    doc.font('Helvetica').fontSize(9).fillColor(NAVY).text(
+      `${puntos[0]?.nombre || '—'}  a  ${puntos.at(-1)?.nombre || '—'}`
+      // Sin la flecha "→": las fuentes core de pdfkit son WinAnsi y no
+      // tienen ese glifo — salía un "!" en medio de "BR!PY". Mismo
+      // tropiezo que el "≥" que ya está documentado más arriba.
+      + `${tramo.cruces?.length ? ` · cruza ${tramo.cruces.map((c) => `${c.pais_desde} a ${c.pais_hasta}`).join(', ')}` : ' · sin cruces de frontera'}`,
+      48, y, { width: W });
+    y = doc.y + 4;
+    doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(GRAY).text(
+      'Son los puntos de control por donde la carga va a pasar. sicr3p no registra la posición de '
+      + 'ningún vehículo, y este documento no dice dónde está la carga.', 48, y, { width: W });
+    y = doc.y + 8;
+
+    for (const item of documental?.items || []) {
+      if (y > doc.page.height - 110) { doc.addPage(); y = 48; }
+      doc.font('Helvetica-Bold').fontSize(8.5).fillColor(item.cumplido ? GREEN : (item.obligatorio ? '#b91c1c' : GRAY))
+        .text(item.cumplido ? 'OK' : (item.obligatorio ? 'FALTA' : 'OPC.'), 48, y, { width: 40, lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY)
+        .text(item.etiqueta || String(item.tipo_documento), 92, y, { width: W - 44 });
+      if (item.nota) {
+        doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(item.nota, 92, doc.y + 1, { width: W - 44 });
+      }
+      y = doc.y + 7;
+    }
+    y += 4;
+  }
+
+  // Los documentos sellados, con su eslabón: es lo que permite probar
+  // después que el papel que se muestra es el mismo que se declaró.
+  if (documentos.length) {
+    if (y > doc.page.height - 140) { doc.addPage(); y = 48; }
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(NAVY).text('Documentos sellados', 48, y, { width: W });
+    y = doc.y + 4;
+    doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+      'De cada documento se guarda su huella digital (SHA-256) encadenada a la anterior. sicr3p NO '
+      + 'conserva una copia del archivo: lo custodia el exportador, y esta huella permite comprobar '
+      + 'que el que muestre después es el mismo.', 48, y, { width: W });
+    y = doc.y + 6;
+    for (const d of documentos) {
+      if (y > doc.page.height - 100) { doc.addPage(); y = 48; }
+      doc.font('Helvetica').fontSize(8).fillColor(NAVY)
+        .text(etiquetaDocumento(d.tipo_documento), 48, y + 3, { width: 150, lineBreak: false });
+      doc.font('Courier').fontSize(7).fillColor(GRAY)
+        .text(`#${d.eslabon ?? '—'} · ${String(d.sha256 || '').slice(0, 24)}…`, 210, y + 3, { width: W - 162 });
+      y += 14;
+    }
+    y += 8;
+  }
+
+  // ---- Límites y exclusiones declaradas ----
+  // Mismo bloque que llevan el informe mensual y el informe SII, y por la
+  // misma razón: quien reciba este papel no va a poder preguntarle nada a
+  // quien lo generó.
+  y = tituloSeccion(doc, y, 'Límites y exclusiones declaradas');
+  const LIMITES = [
+    'Este documento NO es la Declaración de Diligencia Debida del EUDR ni la declaración CBAM. '
+      + 'Esas las presenta el importador en la Unión Europea, en su propio sistema. Acá se declara el '
+      + 'estado de la evidencia que esa declaración va a tener que citar.',
+    'sicr3p NO determina si un predio fue deforestado: eso exige análisis de imágenes satelitales '
+      + 'contra una línea base. Lo que consta es la determinación de un tercero, con quién la emitió '
+      + 'y contra qué.',
+    'El nivel de confianza de cada predio lo calcula sicr3p con la evidencia presentada, en una '
+      + 'escala de 1 a 4. El nivel 5 —revisión externa— no se emite nunca: exigiría un auditor '
+      + 'acreditado que no participa de este proceso.',
+    'Los trámites aduaneros —despacho, tránsito, ingreso— no están cubiertos: los ve el agente de '
+      + 'aduana. La lista de documentos por tramo es la evidencia del expediente de exportación, no '
+      + 'la lista de la aduana.',
+    'No se registra la posición de ningún vehículo. El tramo son los puntos de control por donde la '
+      + 'carga va a pasar, no dónde está.',
+    'Este documento no lleva verificación pública por QR: la cadena de hash del Corredor es interna '
+      + 'y no tiene página pública. Un código que no lleva a ninguna parte prometería una '
+      + 'comprobación que no existe.',
+  ];
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES) {
+    if (y > doc.page.height - 100) { doc.addPage(); y = 48; }
+    doc.text(`• ${l}`, 48, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  // ---- Pie en todas las páginas ----
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const oldBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text(`sicr3p · Corredor Bioceánico · ${carga?.codigo || ''}`, 48, 808, { width: 400, lineBreak: false });
+    doc.text(`Página ${i + 1} de ${range.count}`, 400, 808, { width: 147, align: 'right', lineBreak: false });
+    doc.page.margins.bottom = oldBottom;
+  }
 
   return bufferDoc(doc);
 }

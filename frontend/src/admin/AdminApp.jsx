@@ -30,7 +30,7 @@ import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
 import Cobros from './Cobros.jsx';
 import SelectorPanel from './SelectorPanel.jsx';
-import { SECCIONES_ADMIN_NAV, puedeVerSeccion, puedeVerAlguna } from './secciones.js';
+import { SECCIONES_ADMIN_NAV, itemsVisiblesDe, puedeVerAlguna } from './secciones.js';
 
 // El menú (23 entradas agrupadas por lo que la persona viene a hacer)
 // vive en secciones.js — misma fuente que los checkboxes de Usuarios.jsx.
@@ -137,7 +137,7 @@ export default function AdminApp() {
         <div className="brand"><Logo size={26} light tagline /></div>
         <nav>
           {SECCIONES_ADMIN_NAV.map((sec) => {
-            const visibles = sec.items.filter((n) => puedeVerSeccion(user, n.slug));
+            const visibles = itemsVisiblesDe(sec, user);
             if (!visibles.length) return null; // grupo sin nada que mostrar: ni el título
             return (
               <div key={sec.titulo}>
@@ -145,7 +145,7 @@ export default function AdminApp() {
                 {visibles.map((n) => {
                   const Ico = n.ico;
                   return (
-                    <NavLink key={n.to} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
+                    <NavLink key={n.slug} to={n.to} end={n.end} onClick={() => setMenuOpen(false)} className={({ isActive }) => (isActive ? 'active' : '')}>
                       <span className="icon-badge"><Ico size={18} /></span> {n.label}
                     </NavLink>
                   );

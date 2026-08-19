@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   rowFactura, rowLineItem, rowDocumentoCorredor, rowDeclaracionEmbalaje, rowCompensacion,
+  insertIdDeFila, filasParaInsertar,
   rowPuntosEvento, rowCanje, rowTrayecto, rowReciclaje, bigquery,
 } from '../src/services/bigquery.js';
 
@@ -258,4 +259,65 @@ test('exportReciclaje apagado es no-op silencioso', async () => {
     envases: [], total_envases: 0, puntos: 0,
   });
   assert.equal(res, false);
+});
+
+// ============================================================
+// El insertId — la llave de deduplicación de BigQuery.
+//
+// Si un reintento manda la misma fila con el mismo insertId, BigQuery la
+// descarta. El respaldo era `crypto.randomUUID()`: cada reintento entraba
+// como fila nueva, y en el warehouse quedaba un duplicado indistinguible
+// de dos hechos reales.
+// ============================================================
+
+test('el insertId de una misma fila es estable entre reintentos', () => {
+  const item = rowLineItem({ descripcion: 'kWh', cantidad: 2, co2e: 1.5, porcentaje_total: 50 }, 'f1');
+  assert.equal(insertIdDeFila(item, 0), insertIdDeFila({ ...item }, 0));
+  // Y no depende del orden en que se hayan armado las claves.
+  const alReves = Object.fromEntries(Object.entries(item).reverse());
+  assert.equal(insertIdDeFila(alReves, 0), insertIdDeFila(item, 0));
+});
+
+test('dos ítems idénticos de la misma factura NO comparten insertId', () => {
+  // Caso real: dos líneas iguales en un mismo documento. Si compartieran
+  // insertId, BigQuery se comería una creyendo que es un reintento.
+  const uno = rowLineItem({ descripcion: 'Flete', cantidad: 1, co2e: 0.2, porcentaje_total: 10 }, 'f1');
+  const otro = rowLineItem({ descripcion: 'Flete', cantidad: 1, co2e: 0.2, porcentaje_total: 10 }, 'f1');
+  const filas = filasParaInsertar([uno, otro]);
+  assert.notEqual(filas[0].insertId, filas[1].insertId);
+  // Pero la misma tanda reenviada entera sí deduplica.
+  const reintento = filasParaInsertar([uno, otro]);
+  assert.equal(reintento[0].insertId, filas[0].insertId);
+  assert.equal(reintento[1].insertId, filas[1].insertId);
+});
+
+test('una fila con id usa su id como insertId', () => {
+  assert.equal(insertIdDeFila({ id: 'abc', created_at: '2026-01-01T00:00:00.000Z' }), 'abc');
+});
+
+test('el insertId explícito manda y NO viaja dentro del json', () => {
+  // `insertId` no es columna de ninguna tabla del dataset: mandarlo dentro
+  // del json hacía fallar el insert entero con "no such field: insertId".
+  // Es el patrón de las declaraciones REP y las compensaciones, que guardan
+  // una fila por VERSIÓN del mismo id.
+  const decl = rowDeclaracionEmbalaje(
+    { id: 'd1', sesion_id: 's1', componentes: [], created_at: '2026-01-01T00:00:00.000Z' },
+    { rut_cliente: '76.123.456-0' }
+  );
+  decl.insertId = `${decl.id}-${decl.created_at}`;
+  const [fila] = filasParaInsertar([decl]);
+  assert.equal(fila.insertId, 'd1-2026-01-01T00:00:00.000Z');
+  assert.ok(!('insertId' in fila.json), 'insertId no es una columna del dataset');
+  assert.equal(fila.json.id, 'd1');
+});
+
+test('dos versiones de la misma declaración son dos filas distintas', () => {
+  const version = (created_at) => {
+    const r = rowDeclaracionEmbalaje({ id: 'd1', sesion_id: 's1', componentes: [], created_at }, {});
+    r.insertId = `${r.id}-${r.created_at}`;
+    return r;
+  };
+  const [a] = filasParaInsertar([version('2026-01-01T00:00:00.000Z')]);
+  const [b] = filasParaInsertar([version('2026-02-01T00:00:00.000Z')]);
+  assert.notEqual(a.insertId, b.insertId);
 });
