@@ -751,6 +751,120 @@ export const INVENTARIO = {
     base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
     retencion: 'Un admin la revoca cuando el pendrive se pierde; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
   },
+
+  // ---------- Corredor Bioceánico (base sicr3p_corredor) ----------
+  // Estas tablas viven en OTRA BASE (ver lib/dbCorredor.js). Se inventarían
+  // igual: la Ley 21.719 no distingue por base de datos, y dejar el
+  // producto nuevo fuera del inventario es justo la deriva que este
+  // archivo existe para impedir.
+  exportadores: {
+    clasificacion: PERSONAL, columnas: ['rut', 'contacto_email', 'contacto_nombre', 'direccion'],
+    nota: 'La razón social y el EORI son de la empresa. El RUT se inventaría por el mismo criterio '
+      + 'que en `mandantes`: en una empresa individual identifica a una persona.',
+    finalidad: 'Identificar a la empresa exportadora y a quién contactar por su carga.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras la empresa esté enrolada en el Corredor.',
+  },
+  usuarios_corredor: {
+    clasificacion: PERSONAL, columnas: ['email', 'nombre'],
+    nota: '`password_hash` es un hash bcrypt: no es recuperable y por eso no es un dato que se pueda '
+      + 'entregar ni rectificar. Mismo criterio que `usuarios` en la base de sicr3p.',
+    finalidad: 'Dar acceso al panel del Corredor y saber quién hizo cada cosa.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras la cuenta exista.',
+  },
+  tokens_password_corredor: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Solo el SHA-256 del token y su vencimiento. El correo al que se envió vive en '
+      + '`usuarios_corredor`, no acá.',
+    finalidad: 'Activar una cuenta o restablecer su contraseña por enlace de un solo uso.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'El token caduca en 48 h; la fila se conserva marcada como usada.',
+  },
+  actividad_corredor: {
+    clasificacion: PERSONAL, columnas: ['email', 'ip'],
+    nota: 'Sin clave foránea al usuario a propósito: lo que alguien hizo tiene que constar aunque '
+      + 'su cuenta se borre. Por eso el correo se guarda como texto y no como referencia.',
+    finalidad: 'Saber quién hizo qué en el Corredor, para seguridad y para responder reclamos.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Se purga con el mismo criterio que la bitácora de sicr3p.',
+  },
+  parcelas: {
+    clasificacion: PERSONAL, columnas: ['nombre', 'lat', 'lng'],
+    nota: 'DATO SENSIBLE POR CONTEXTO, y por eso se clasifica como personal aunque el titular sea '
+      + 'una empresa. La ubicación de un predio, cruzada con la carga que salió de él y su fecha de '
+      + 'embarque, dice "de este campo sale una cosecha valiosa por estas fechas". El EUDR obliga a '
+      + 'entregar las coordenadas a la AUTORIDAD, no a cada contraparte: el informe al comprador '
+      + 'tiene que poder acreditar la parcela sin publicar el polígono. Ver docs/CORREDOR-PLAN.md §4.1.b.',
+    finalidad: 'Cumplir la geolocalización de predios que exige el Reglamento (UE) 2023/1115.',
+    base: BASE.LEY, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras la empresa la use en alguna carga; después, según el plazo de conservación del reglamento.',
+  },
+  cargas: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Mercadería de una empresa: código arancelario, cantidad, emisiones. No hay persona acá — '
+      + 'quién la declaró queda en `actividad_corredor`.',
+    finalidad: 'Armar el pasaporte de exportación de cada carga.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras la empresa esté enrolada.',
+  },
+  carga_produccion: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Fechas de producción y la determinación de deforestación que hizo un tercero, con su '
+      + 'emisor y su línea base. El emisor es una organización, no una persona.',
+    finalidad: 'Respaldar los requisitos del EUDR sobre la producción de la carga.',
+    base: BASE.LEY, cadena: CADENA.NINGUNA,
+    retencion: 'Igual que la carga.',
+  },
+  carga_documentos: {
+    clasificacion: PERSONAL, columnas: ['archivo_original'],
+    nota: 'Lo personal está en `archivo_original` —el nombre con que se subió, que suele llevar el '
+      + 'de una persona— y DENTRO del archivo: una carta de porte lleva el nombre y la cédula del '
+      + 'conductor. Mismo criterio que `contratos`, donde el dato vive dentro del JSONB `datos`.',
+    finalidad: 'Guardar el expediente documental de la carga con su sello de integridad.',
+    base: BASE.LEY, cadena: CADENA.PROPIA,
+    retencion: null,
+    motivoSinPurga: 'Sellado por hash: borrar o editar una fila invalida todos los eslabones '
+      + 'posteriores. Se anula la carga, nunca el documento.',
+  },
+  carga_pasos: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'DELIBERADAMENTE SIN POSICIÓN. Registra que la carga pasó por un punto de control conocido '
+      + '—cuyas coordenadas son fijas y públicas— y a qué hora. No hay ni va a haber lat/lng del '
+      + 'vehículo: la carga cruza cuatro países y un rastro en vivo es el mapa que necesita quien la '
+      + 'quiera interceptar. Hay un test que falla si alguien agrega esas columnas.',
+    finalidad: 'Mostrar el avance de la carga por hitos, sin seguirla.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Igual que la carga.',
+  },
+  puntos_corredor: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Catálogo de aduanas, puertos y depósitos. Lugares públicos, no personas.',
+    finalidad: 'Definir los puntos de control del corredor.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Permanente: los pasos históricos referencian su identificador.',
+  },
+  carga_parcelas: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Solo el vínculo entre una carga y una parcela, con su porcentaje de aporte.',
+    finalidad: 'Declarar de qué predios salió cada carga.',
+    base: BASE.LEY, cadena: CADENA.NINGUNA,
+    retencion: 'Igual que la carga.',
+  },
+  carga_tramo: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Origen y destino, del catálogo de puntos fijos. No es un recorrido registrado.',
+    finalidad: 'Saber qué fronteras va a cruzar la carga y qué documentos le van a exigir.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Igual que la carga.',
+  },
+  documentos_por_tramo: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Reglas por par de países. No tiene datos de nadie.',
+    finalidad: 'Saber qué documento exige cada frontera.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Permanente.',
+  },
 };
 
 // Las tablas donde hay que buscar cuando alguien ejerce su derecho de

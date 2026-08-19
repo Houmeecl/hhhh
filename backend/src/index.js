@@ -34,6 +34,7 @@ import juegoRoutes from './routes/juego.js';
 import repProveedorRoutes from './routes/repProveedor.js';
 import expedientesRoutes from './routes/expedientes.js';
 import transporteProveedorRoutes from './routes/transporteProveedor.js';
+import corredorApiRoutes from './routes/corredorApi.js';
 import { adminRouter as cobrosAdminRoutes, publicRouter as pagarRoutes, webhookRouter as pagosWebhookRoutes } from './routes/cobros.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 import { iniciarPurgaAutomatica } from './services/retencion.js';
@@ -99,6 +100,11 @@ app.use('/api/tarjeta', apiLimiter, tarjetaRouter);
 app.use('/api/torre', apiLimiter, torreRouter);
 app.use('/api/firma-proveedor', apiLimiter, firmaProveedorRouter);
 app.use('/api/panel-proveedor', apiLimiter, proveedorPanelRouter);
+
+// Corredor Bioceánico — su propia base, su propio secreto de JWT, su
+// propio middleware. Si no está configurado, todo lo que cuelga de acá
+// responde 503 y el resto del backend ni se entera (routes/corredor.js).
+app.use('/api/corredor', apiLimiter, corredorApiRoutes);
 // Ley REP del propio proveedor (productos + ventas): router aparte para no
 // seguir engordando origen.js — misma autenticación de panel 'proveedor'.
 app.use('/api/panel-proveedor/rep', apiLimiter, repProveedorRoutes);

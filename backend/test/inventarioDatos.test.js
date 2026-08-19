@@ -8,7 +8,12 @@ import {
   tablasConDatosDe, retenidoPorLey,
 } from '../src/services/inventarioDatos.js';
 
-const MIGRACIONES = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
+const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
+// Las DOS bases. El Corredor vive en `sicr3p_corredor` (ver
+// lib/dbCorredor.js), pero la Ley 21.719 no distingue por base de datos:
+// dejar el producto nuevo fuera del inventario sería exactamente la deriva
+// que este archivo existe para impedir.
+const MIGRACIONES = [join(RAIZ, 'migrations'), join(RAIZ, 'migrations-corredor')];
 
 // Nombres de columna que delatan un dato de persona. Deliberadamente
 // amplio: prefiere marcar de más y obligar a decidir, antes que dejar
@@ -22,13 +27,24 @@ const TIPO = /^(\w+)\s+(TEXT|UUID|BOOLEAN|INT|BIGINT|NUMERIC|DATE|TIMESTAMPTZ|JS
 // fuente de verdad que la base real, sin necesitar una conexión.
 function escanearMigraciones() {
   const tablas = new Map();
+  // Dos conjuntos por tabla, y la distinción importa:
+  //   `personales` decide QUÉ TABLAS hay que clasificar (el test de deriva);
+  //   `todas` decide si una columna declarada en el inventario EXISTE.
+  // Antes había uno solo, filtrado por COLUMNA_PERSONAL, y eso hacía que
+  // declarar una columna real pero que el patrón no reconoce —`datos`,
+  // `archivo_original`— se leyera como "ausente en la base". El síntoma se
+  // había tapado con una excepción a mano para `datos`; la causa era esta.
   const marcar = (t, c) => {
-    if (!tablas.has(t)) tablas.set(t, new Set());
-    if (c && COLUMNA_PERSONAL.test(c)) tablas.get(t).add(c);
+    if (!tablas.has(t)) tablas.set(t, { todas: new Set(), personales: new Set() });
+    if (!c) return;
+    tablas.get(t).todas.add(c);
+    if (COLUMNA_PERSONAL.test(c)) tablas.get(t).personales.add(c);
   };
 
-  for (const archivo of readdirSync(MIGRACIONES).filter((f) => f.endsWith('.sql')).sort()) {
-    const sql = readFileSync(join(MIGRACIONES, archivo), 'utf8');
+  const archivos = MIGRACIONES.flatMap((dir) =>
+    readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => join(dir, f)));
+  for (const ruta of archivos) {
+    const sql = readFileSync(ruta, 'utf8');
     for (const [, tabla, cuerpo] of sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)\s*\(([\s\S]*?)\n\);/g)) {
       marcar(tabla, null);
       for (const linea of cuerpo.split('\n')) {
@@ -48,15 +64,25 @@ test('el escáner encuentra las migraciones y tablas conocidas', () => {
   const tablas = escanearMigraciones();
   assert.ok(tablas.size > 30, `esperaba >30 tablas, encontré ${tablas.size} — ¿cambió el formato de las migraciones?`);
   assert.ok(tablas.has('clientes') && tablas.has('facturas'));
-  assert.ok(tablas.get('clientes').has('contacto_email'));
+  assert.ok(tablas.get('clientes').personales.has('contacto_email'));
+});
+
+test('el escáner también mira la base del Corredor', () => {
+  // Sin esto, la clasificación de las tablas del Corredor existiría en el
+  // inventario pero no la vigilaría nadie: se podría agregar una columna
+  // con datos de persona y el test seguiría verde.
+  const tablas = escanearMigraciones();
+  assert.ok(tablas.has('exportadores'), 'no encontró las migraciones del Corredor');
+  assert.ok(tablas.has('parcelas'));
+  assert.ok(tablas.get('usuarios_corredor').personales.has('email'));
 });
 
 // ---------- el test que evita la deriva ----------
 
 test('toda tabla con columnas de persona está clasificada en el inventario', () => {
   const sinClasificar = [...escanearMigraciones()]
-    .filter(([tabla, cols]) => cols.size > 0 && !INVENTARIO[tabla])
-    .map(([tabla, cols]) => `${tabla} (${[...cols].join(', ')})`);
+    .filter(([tabla, cols]) => cols.personales.size > 0 && !INVENTARIO[tabla])
+    .map(([tabla, cols]) => `${tabla} (${[...cols.personales].join(', ')})`);
 
   assert.deepEqual(sinClasificar, [],
     'Hay tablas con columnas de dato personal que no están en INVENTARIO de '
@@ -92,9 +118,12 @@ test('las columnas declaradas existen de verdad en las migraciones', () => {
     const reales = tablas.get(tabla);
     assert.ok(reales, `${tabla}: está en el inventario pero no existe en las migraciones`);
     for (const col of e.columnas) {
-      // `datos` es JSONB: el escáner no puede ver adentro, se declara a mano.
-      if (col === 'datos') continue;
-      assert.ok(reales.has(col), `${tabla}.${col}: declarada en el inventario, ausente en la base`);
+      // Se contrasta contra TODAS las columnas de la tabla, no solo contra
+      // las que el patrón reconoce como personales: el inventario declara
+      // dónde está el dato, y a veces está en una columna cuyo nombre no lo
+      // delata (`datos` JSONB, `archivo_original`). Que el patrón no la
+      // marque no significa que no exista.
+      assert.ok(reales.todas.has(col), `${tabla}.${col}: declarada en el inventario, ausente en la base`);
     }
   }
 });

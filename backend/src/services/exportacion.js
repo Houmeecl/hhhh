@@ -195,9 +195,19 @@ function presente(lote, campo) {
       return lote?.emisiones_directas_tco2e_t != null || lote?.emisiones_indirectas_tco2e_t != null;
     // Una parcela sin coordenadas no es una parcela declarada, y se exige
     // el par completo: media coordenada no ubica nada.
+    //
+    // Un POLÍGONO también cuenta, y hay que decirlo explícitamente: sobre
+    // 4 ha el EUDR exige el perímetro y no admite el punto, así que exigir
+    // lat/lng dejaba fuera justo a las parcelas mejor declaradas. Basta
+    // con que tenga vértices — de su validez responde validarPoligono() en
+    // services/corredor.js, que es quien sabe de polígonos.
     case 'geolocalizacion':
       return Array.isArray(lote?.parcelas) && lote.parcelas.length > 0
-        && lote.parcelas.every((p) => coordenadaValida(p?.lat, 90) && coordenadaValida(p?.lng, 180));
+        && lote.parcelas.every((p) => {
+          const conPunto = coordenadaValida(p?.lat, 90) && coordenadaValida(p?.lng, 180);
+          const anillo = p?.poligono?.coordinates?.[0] ?? (Array.isArray(p?.poligono) ? p.poligono : null);
+          return conPunto || (Array.isArray(anillo) && anillo.length >= 4);
+        });
     // Sí explícito. Un `undefined` o un string no cuentan: "libre de
     // deforestación" es una afirmación que alguien tiene que hacer.
     case 'libre_deforestacion':

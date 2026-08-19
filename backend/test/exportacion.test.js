@@ -214,3 +214,28 @@ test('las emisiones indirectas las aporta el suministrador, no el exportador', (
 test('las coordenadas las aporta el productor, no el exportador', () => {
   assert.equal(REQUISITOS_EUDR.find((x) => x.campo === 'geolocalizacion').quien, 'productor');
 });
+
+// ---------- Un polígono también es geolocalización ----------
+
+test('una parcela con polígono y sin punto cuenta como geolocalizada', () => {
+  // Sobre 4 ha el EUDR exige el perímetro y NO admite el punto. Pedir
+  // lat/lng dejaba sin cumplir justo a la parcela mejor declarada.
+  const conPoligono = {
+    ...eudrCompleto,
+    parcelas: [{ poligono: { type: 'Polygon', coordinates: [[[-55.7, -12.5], [-55.69, -12.5], [-55.69, -12.51], [-55.7, -12.51], [-55.7, -12.5]]] } }],
+  };
+  assert.equal(listoParaExportar(conPoligono).listo, true);
+});
+
+test('un polígono con menos de un anillo cerrado no alcanza', () => {
+  const flojo = { ...eudrCompleto, parcelas: [{ poligono: { type: 'Polygon', coordinates: [[[-55.7, -12.5]]] } }] };
+  assert.ok(listoParaExportar(flojo).bloques[0].faltantes.includes('geolocalizacion'));
+});
+
+test('si UNA de varias parcelas no está ubicada, no se da por cumplido', () => {
+  const mixto = {
+    ...eudrCompleto,
+    parcelas: [{ lat: -12.5, lng: -55.7 }, { nombre: 'sin ubicar' }],
+  };
+  assert.ok(listoParaExportar(mixto).bloques[0].faltantes.includes('geolocalizacion'));
+});

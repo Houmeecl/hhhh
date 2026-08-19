@@ -484,8 +484,8 @@ entrega como archivo, no como acceso.
 | 6 | Documentos por tramo | 1 | Semáforo por frontera |
 | 7 | Informe EUDR en PDF | 1, 3 | El entregable que se vende |
 
-La tanda 1 no depende de nada y se puede probar sin base. De la 2 en adelante
-hace falta `DATABASE_URL_CORREDOR` configurado.
+Todo el backend del Corredor está construido: base, servicios puros, rutas y
+autenticación propia. Lo que queda es la pantalla.
 
 **Pendiente de operación, no de código:** el respaldo del VPS hace `pg_dump` de
 `sicr3p` y no incluye la base nueva. Hay que ampliarlo antes de que el Corredor
