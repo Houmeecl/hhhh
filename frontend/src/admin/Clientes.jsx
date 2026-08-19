@@ -53,6 +53,19 @@ export default function Clientes({ rol }) {
 
   const badge = (e) => e === 'activo' ? 'badge-green' : e === 'piloto' ? 'badge-amber' : 'badge-red';
 
+  // Alerta de vencimiento de contrato — se calcula solo con fecha_fin, ya
+  // presente en el registro (no requiere backend nuevo). Regla acordada:
+  // avisar a 7/3/1 días de vencer, y marcar el vencido que ya pasó la fecha
+  // y sigue en estado "activo" (contrato caído que nadie renovó).
+  const DIA_MS = 86400000;
+  function alertaVigencia(c) {
+    if (!c.fecha_fin) return null;
+    const dias = Math.ceil((new Date(c.fecha_fin).getTime() - Date.now()) / DIA_MS);
+    if (dias < 0 && c.estado_contrato === 'activo') return { texto: 'vencido', clase: 'badge-red' };
+    if (dias <= 7 && dias >= 0 && c.estado_contrato !== 'vencido') return { texto: `vence en ${dias}d`, clase: 'badge-amber' };
+    return null;
+  }
+
   return (
     <div>
       <div className="admin-head">
@@ -74,7 +87,12 @@ export default function Clientes({ rol }) {
                 <td className="muted">{c.contacto_email || '—'}</td>
                 <td><span className={`badge ${badge(c.estado_contrato)}`}>{c.estado_contrato}</span></td>
                 <td>{c.plan}</td>
-                <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}</td>
+                <td className="muted" style={{ fontSize: 13 }}>
+                  {fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}
+                  {alertaVigencia(c) && (
+                    <span className={`badge ${alertaVigencia(c).clase}`} style={{ marginLeft: 6 }}>{alertaVigencia(c).texto}</span>
+                  )}
+                </td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   {esAdmin && <>
                     <button className="btn btn-ghost btn-sm" onClick={() => setModal({ mode: 'editar', data: { ...c, fecha_inicio: c.fecha_inicio?.slice(0,10) || '', fecha_fin: c.fecha_fin?.slice(0,10) || '' } })}>Editar</button>

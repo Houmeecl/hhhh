@@ -5,6 +5,7 @@ import { Icon } from '../components/icons.jsx';
 import CalculadoraCompensacion from '../components/CalculadoraCompensacion.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { useScrollReveal } from '../lib/scrollReveal.js';
+import { useJsonLd } from '../lib/seo.js';
 
 // Franja de "números vivos" de la plataforma: prueba social honesta sin
 // testimonios ni cifras inventadas — muestra el estado real de la cadena de
@@ -100,6 +101,19 @@ export default function Landing() {
   const [footerVisible, setFooterVisible] = useState(false);
 
   useScrollReveal();
+
+  // FAQPage: mismas 4 preguntas/respuestas que la sección visible más
+  // abajo (i18n.js), serializadas para el buscador — el <details> ya es
+  // accesible pero un rich snippet de FAQ no se infiere solo del HTML.
+  useJsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: [1, 2, 3, 4].map((n) => ({
+      '@type': 'Question',
+      name: t(`landing.faq_q${n}`),
+      acceptedAnswer: { '@type': 'Answer', text: t(`landing.faq_a${n}`) },
+    })),
+  });
 
   // CTA flotante móvil: aparece tras scrollear pasado el hero y se oculta
   // cuando el footer entra en pantalla (así nunca lo tapa).

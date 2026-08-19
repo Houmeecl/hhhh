@@ -37,6 +37,7 @@ import transporteProveedorRoutes from './routes/transporteProveedor.js';
 import { adminRouter as cobrosAdminRoutes, publicRouter as pagarRoutes, webhookRouter as pagosWebhookRoutes } from './routes/cobros.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
 import { iniciarPurgaAutomatica } from './services/retencion.js';
+import { iniciarAlertasAutomaticas } from './services/alertas.js';
 
 const app = express();
 
@@ -160,6 +161,9 @@ async function start() {
     // Purga de datos personales vencidos (Ley 21.719). Ver
     // services/retencion.js: no toca nada encadenado por hash.
     if (config.env !== 'test') iniciarPurgaAutomatica();
+    // Recordatorio de vencimiento de contrato (7/3/1 día antes + vencido).
+    // Ver services/alertas.js.
+    if (config.env !== 'test') iniciarAlertasAutomaticas();
     const server = app.listen(config.port, () => {
       console.log(`\n  sicr3p backend escuchando en http://localhost:${config.port}`);
       console.log(`  Modo motor: ${config.simple.mock ? 'MOCK (simulado)' : 'PRODUCCIÓN (API real)'}`);

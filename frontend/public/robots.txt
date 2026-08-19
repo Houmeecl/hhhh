@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+# Paneles operativos y flujos privados: sin valor de indexación y con
+# login de por medio — no hay nada público que un buscador deba mostrar.
+Disallow: /admin
+Disallow: /panel-verde
+Disallow: /panel-puerto
+Disallow: /panel-mandante
+Disallow: /panel-agencia
+Disallow: /panel-trazador
+Disallow: /panel-proveedor
+Disallow: /suma
+Disallow: /impersonar
+
+Sitemap: https://sicr3p.cl/sitemap.xml

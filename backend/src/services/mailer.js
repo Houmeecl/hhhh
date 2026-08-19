@@ -143,6 +143,25 @@ export function reporteEmail({ nombre, totalCo2e, nFacturas, cifrado = false }) 
   };
 }
 
+// Recordatorio de vencimiento de contrato — el mismo aviso sirve para 7/3/1
+// día(s) antes y para "ya venció": solo cambia el texto según `dias`.
+// `dias < 0` es el caso vencido (nadie renovó y el contrato sigue 'activo').
+export function recordatorioVencimientoEmail({ empresa, dias, fechaFin }) {
+  const vencido = dias < 0;
+  const texto = vencido
+    ? `venció el ${fechaFin}`
+    : dias === 0 ? 'vence hoy' : `vence en ${dias} día${dias === 1 ? '' : 's'} (${fechaFin})`;
+  return {
+    subject: vencido ? `Contrato vencido — ${empresa} · sicr3p` : `Tu contrato ${texto} · sicr3p`,
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">${vencido ? 'Contrato vencido' : 'Recordatorio de vencimiento'}</h2>
+        <p>Hola, el contrato de <b>${empresa}</b> con sicr3p ${texto}.</p>
+        <p style="color:#64748b;font-size:13px">Si ya renovaste o la fecha registrada no corresponde, contáctanos para actualizarla y evitar nuevos avisos.</p>
+      </div>`,
+  };
+}
+
 // `area`: "Sube y Suma" cuando el magic link viene de un código de campaña
 // del juego (modo_juego=true), sin ella es el acceso genérico de cliente —
 // mismo mecanismo de token, pero el contenido que desbloquea es distinto

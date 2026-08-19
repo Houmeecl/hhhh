@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
+import { useSeo } from '../lib/seo.js';
 
 // Landing pública del servicio de trazabilidad para el Corredor Bioceánico
 // (Brasil–Paraguay–Argentina–Chile). A diferencia del mostrador presencial
@@ -51,6 +52,10 @@ function TorrePreview() {
 export default function CorredorLanding() {
   const { t } = useIdioma();
   useRevelar();
+  useSeo(
+    'Corredor Bioceánico — Trazabilidad documental | sicr3p',
+    'Pasaporte de Trazabilidad Documental, Tarjeta de Viaje con QR y Torre de Control en vivo para el corredor Brasil–Paraguay–Argentina–Chile.'
+  );
   return (
     <PublicLayout>
       {/* HERO — mismo sistema visual que la portada (navy + brillos),
