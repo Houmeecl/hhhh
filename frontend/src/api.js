@@ -791,6 +791,9 @@ export const api = {
     request(`/panel-proveedor/expedientes/${id}/documentos`, { method: 'POST', body, authedProveedor: true }),
   proveedorExpedienteSoltarDoc: (id, docId) =>
     request(`/panel-proveedor/expedientes/${id}/documentos/${docId}`, { method: 'DELETE', authedProveedor: true }),
+  descargarExpedientePdf: (id) =>
+    descargarAuth(`/api/panel-proveedor/expedientes/${id}/expediente.pdf`, authProveedor,
+      `sicr3p-expediente-${String(id).slice(0, 8)}.pdf`),
 };
 
 async function abrirPdfAuth(url, store = auth) {

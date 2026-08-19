@@ -245,6 +245,7 @@ function Detalle({ id, vocabulario, alCerrar, flash }) {
   // este vínculo el backend no tiene con qué probar la procedencia, y
   // /candidatos no tendría para qué existir.
   const [desdeRcv, setDesdeRcv] = useState(null);
+  const [bajando, setBajando] = useState(false);
 
   const cargar = () => api.proveedorExpediente(id).then(setDatos);
   useEffect(() => { cargar().catch((e) => flash(e.message, true)); }, [id]);
@@ -257,6 +258,15 @@ function Detalle({ id, vocabulario, alCerrar, flash }) {
   async function soltar(docId) {
     try { await api.proveedorExpedienteSoltarDoc(id, docId); await cargar(); flash('Documento soltado.'); }
     catch (e) { flash(e.message, true); }
+  }
+
+  // El PDF es lo que el proveedor le manda a su cliente. Lo genera él, no
+  // sicr3p: nada sale de la empresa sin que alguien lo mande.
+  async function descargarPdf() {
+    setBajando(true);
+    try { await api.descargarExpedientePdf(id); }
+    catch (e) { flash(e.message, true); }
+    finally { setBajando(false); }
   }
 
   async function cerrarExpediente() {
@@ -292,6 +302,9 @@ function Detalle({ id, vocabulario, alCerrar, flash }) {
           {e.glosa && <div style={{ fontSize: 13, marginTop: 6 }}>{e.glosa}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button className="btn btn-primary btn-sm" onClick={descargarPdf} disabled={bajando}>
+            {bajando ? 'Generando…' : 'Descargar expediente'}
+          </button>
           {e.estado === 'cerrado'
             ? <button className="btn btn-outline btn-sm" onClick={reabrir}>Reabrir</button>
             : <button className="btn btn-outline btn-sm" onClick={cerrarExpediente}>Cerrar expediente</button>}

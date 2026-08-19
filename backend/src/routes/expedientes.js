@@ -3,9 +3,10 @@ import { query } from '../lib/db.js';
 import { requireAuth, requireHomePanel, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { normalizarRut } from '../services/mandante.js';
 import { rutValido } from '../services/dte.js';
+import { generateExpedienteEvidencia } from '../services/pdf.js';
 import {
   TIPOS_EXPEDIENTE, ESTADOS_EXPEDIENTE, ROLES_DOCUMENTO, ROLES_ESPERADOS_POR_TIPO,
-  NOMBRE_ROL, validarDocumento, resumenExpediente, NO_ACREDITA, NOTA_SCOPE,
+  NOMBRE_ROL, validarDocumento, resumenExpediente, resumenDato, NO_ACREDITA, NOTA_SCOPE,
 } from '../services/expediente.js';
 
 // ============================================================
@@ -450,6 +451,59 @@ router.delete('/:id', requireNivelOperador, async (req, res, next) => {
       entidadId: req.params.id, detalle: {}, ip: req.ip,
     });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /:id/expediente.pdf — el documento que se le entrega al cliente ----------
+// El equivalente, para una venta, del expediente de lote del Corredor:
+// mismo lenguaje visual, misma casa. Lo genera el PROPIO proveedor para su
+// cliente — sicr3p no se lo manda a nadie por su cuenta.
+//
+// SIN QR DE VERIFICACIÓN PÚBLICA, a diferencia del expediente de lote: ese
+// apunta a /lote/:codigo, que es una página real y pública. Un expediente de
+// evidencia NO sale de la empresa que lo arma, así que un QR no llevaría a
+// ninguna parte. Lo que sí lleva es el hash de los documentos que están
+// encadenados en sicr3p, que son verificables uno a uno.
+router.get('/:id/expediente.pdf', async (req, res, next) => {
+  try {
+    const cargado = await cargarExpediente(req.params.id, req.user.proveedor_id);
+    if (!cargado) return res.status(404).json({ error: 'Expediente no encontrado.' });
+    const { expediente, documentos } = cargado;
+
+    const { rows: datos } = await query(
+      `SELECT * FROM datos_trazables WHERE expediente_id = $1 ORDER BY created_at`,
+      [req.params.id]
+    );
+
+    // El sello sale de las facturas REALES encadenadas, no de un campo
+    // guardado: si alguien tocó la fila, el hash que se imprime es el que
+    // está hoy en la cadena, no una copia vieja.
+    const facturaIds = documentos.map((d) => d.factura_id).filter(Boolean);
+    const { rows: sellos } = facturaIds.length
+      ? await query(
+        `SELECT id, numero_venta, archivo_original, hash_cadena FROM facturas WHERE id = ANY($1::uuid[])`,
+        [facturaIds]
+      )
+      : { rows: [] };
+    const porId = new Map(sellos.map((f) => [f.id, f]));
+
+    const pdf = await generateExpedienteEvidencia({
+      expediente,
+      documentos,
+      resumen: resumenExpediente(expediente, documentos),
+      datos: datos.map((d) => resumenDato(d, documentos, expediente)),
+      sellos: documentos
+        .filter((d) => d.factura_id && porId.has(d.factura_id))
+        .map((d) => ({ descripcion: d.descripcion, hash_cadena: porId.get(d.factura_id).hash_cadena })),
+    });
+
+    await logActividad({
+      usuarioId: req.user.sub, accion: 'expediente_pdf', entidad: 'expediente',
+      entidadId: req.params.id, detalle: {}, ip: req.ip,
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="sicr3p-expediente-${req.params.id.slice(0, 8)}.pdf"`);
+    res.send(pdf);
   } catch (err) { next(err); }
 });
 

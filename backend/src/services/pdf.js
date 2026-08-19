@@ -1050,6 +1050,276 @@ export async function generateCredencialTarjeta({ tarjeta, lote }) {
   return bufferDoc(doc);
 }
 
+// Vocabulario del expediente, IMPORTADO del servicio en vez de recopiado.
+// Si mañana se agrega un rol o cambia una frase de lo que no se acredita,
+// el PDF lo refleja solo — dos listas paralelas se habrían separado en el
+// primer cambio, y este documento va a un cliente.
+import {
+  NOMBRE_ROL as NOMBRE_ROL_EXPEDIENTE,
+  NO_ACREDITA as NO_ACREDITA_EXPEDIENTE,
+  NOTA_SCOPE as NOTA_SCOPE_EXPEDIENTE,
+} from './expediente.js';
+
+// Las fuentes base de pdfkit (Helvetica y Courier, WinAnsi) NO tienen
+// subíndices ni varios símbolos: un "₂" no sale como 2 pequeño, sale como
+// basura. En la muestra, "tCO₂e" se imprimió como "tCO ,e" — el texto venía
+// del servicio, donde en pantalla se ve perfecto.
+//
+// Por eso el saneo va acá y no en el servicio: en la UI el subíndice es
+// correcto y bonito, y quien escriba una constante nueva no tiene por qué
+// acordarse de que además va a un PDF. Se traduce al entrar al papel.
+const REEMPLAZOS_PDF = [
+  [/[₀₁₂₃₄₅₆₇₈₉]/g, (c) => '0123456789'['₀₁₂₃₄₅₆₇₈₉'.indexOf(c)]],
+  [/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, (c) => '0123456789'['⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)]],
+  [/\u2011/g, '-'],     // guion no separable
+  [/\u2009|\u202f/g, ' '],  // espacios finos
+];
+function pdfSafe(texto) {
+  let t = String(texto ?? '');
+  for (const [re, rep] of REEMPLAZOS_PDF) t = t.replace(re, rep);
+  return t;
+}
+
+// Corta a lo ancho SIN partir una palabra por la mitad. En la muestra salía
+// "Fabricante del Repuesto SpA — foli", que parece un dato truncado por un
+// error y no por falta de espacio.
+function recortar(texto, max) {
+  const t = pdfSafe(texto);
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max - 1);
+  const espacio = corte.lastIndexOf(' ');
+  return (espacio > max * 0.6 ? corte.slice(0, espacio) : corte).trimEnd() + '…';
+}
+
+const NOMBRE_TIPO_EXPEDIENTE = {
+  suministro: 'Suministro', servicio: 'Servicio', transporte: 'Transporte',
+  arriendo: 'Arriendo', otro: 'Otro',
+};
+
+// ---------- EXPEDIENTE DE EVIDENCIA DEL PROVEEDOR ----------
+// El equivalente, para una VENTA, de lo que generateExpedienteLote es para
+// un lote de carga: el documento que el proveedor le entrega a su cliente
+// cuando le preguntan con qué respalda un dato.
+//
+// Reusa el mismo lenguaje visual —código grande, chip de estado, cajas
+// grises, tablas con encabezado NAVY, sello al pie— porque son dos caras
+// del mismo producto y deben leerse como emitidos por la misma casa.
+//
+// TRES DIFERENCIAS DELIBERADAS CON EL EXPEDIENTE DE LOTE:
+//
+//  1. NO LLEVA QR DE VERIFICACIÓN PÚBLICA. El de lote apunta a
+//     /lote/:codigo, que existe y es público. Un expediente de evidencia
+//     NO sale de la empresa que lo arma —no hay endpoint que se lo muestre
+//     a un tercero, y no lo habrá hasta que exista el contrato de encargo
+//     de tratamiento— así que un QR ahí no llevaría a ninguna parte.
+//     Imprimir un código que no verifica nada sería justo la promesa vacía
+//     que este producto trata de no hacer.
+//  2. LLEVA UN BLOQUE DE LO QUE NO ACREDITA. El de lote no lo tiene; este
+//     sí, porque va a un cliente que podría leerlo como una certificación.
+//  3. EL ALCANCE SE IMPRIME COMO POTENCIAL, o no se imprime. Si el tipo de
+//     expediente no permite proponer categoría, dice "sin categoría" en vez
+//     de inventar la 1.
+export async function generateExpedienteEvidencia({ expediente, documentos, resumen, datos, sellos }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true });
+  const W = doc.page.width - 96;
+  const docs = documentos || [];
+
+  // ---- Carátula ----
+  drawLogo(doc, 48, 44);
+  doc.font('Helvetica').fontSize(9).fillColor(GRAY)
+    .text(`Emitido: ${fechaCorta(new Date())}`, 380, 48, { width: 167, align: 'right' });
+  doc.moveTo(48, 78).lineTo(547, 78).strokeColor(BORDER).stroke();
+
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(NAVY)
+    .text('EXPEDIENTE DE EVIDENCIA', 48, 96);
+  doc.font('Helvetica').fontSize(11).fillColor(GRAY)
+    .text('Documentos que respaldan una venta — y los que faltan', 48, 118);
+
+  // Identificador grande: la OC manda, porque es lo que el cliente reconoce.
+  // Sin OC, el cliente; sin cliente, el id. Nunca queda en blanco.
+  const titulo = expediente?.orden_compra || expediente?.cliente_nombre || 'Expediente';
+  doc.font('Courier-Bold').fontSize(22).fillColor(NAVY).text(recortar(titulo, 28), 48, 150);
+
+  // Chip de cobertura. El GRIS de "sin evaluar" es tan importante como los
+  // otros: dice que no hay base para opinar, que no es lo mismo que mal.
+  const cob = resumen?.cobertura_documental;
+  const chip = cob === null || cob === undefined
+    ? 'SIN EVALUAR — NO SE OPINA'
+    : `${resumen.estado_cobertura.toUpperCase()} — ${cob}% DE COBERTURA DOCUMENTAL`;
+  const chipColor = cob === null || cob === undefined ? GRAY
+    : cob >= 100 ? GREEN : cob > 0 ? '#b45309' : '#b91c1c';
+  doc.roundedRect(48, 186, doc.font('Helvetica-Bold').fontSize(10).widthOfString(chip) + 40, 22, 4)
+    .fillAndStroke(LIGHT, chipColor);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(chipColor).text(chip, 60, 192);
+
+  // ---- Identificación ----
+  let y = 224;
+  doc.roundedRect(48, y, W, 92, 6).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('IDENTIFICACIÓN DEL EXPEDIENTE', 60, y + 10);
+  const filas = [
+    ['Cliente', expediente?.cliente_nombre || '—', 'Orden de compra', expediente?.orden_compra || '—'],
+    ['Faena / destino', expediente?.faena || '—', 'Contrato', expediente?.contrato || '—'],
+    ['Período', expediente?.periodo || '—', 'Tipo', NOMBRE_TIPO_EXPEDIENTE[expediente?.tipo] || expediente?.tipo || '—'],
+  ];
+  let fy = y + 28;
+  for (const [l1, v1, l2, v2] of filas) {
+    doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(l1, 60, fy).text(l2, 310, fy);
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(NAVY)
+      .text(recortar(v1, 26), 150, fy - 1).text(recortar(v2, 22), 420, fy - 1);
+    fy += 20;
+  }
+  y += 106;
+  if (expediente?.glosa) {
+    doc.font('Helvetica').fontSize(9).fillColor(NAVY).text(pdfSafe(expediente.glosa), 48, y, { width: W });
+    y = doc.y + 18;   // aire antes del título siguiente; con 10 quedaba pegado
+  }
+
+  // ---- Documentos que lo respaldan ----
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('DOCUMENTOS QUE LO RESPALDAN', 48, y);
+  y += 18;
+  doc.rect(48, y, W, 18).fill(NAVY);
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff');
+  doc.text('Rol', 54, y + 5).text('Documento', 150, y + 5).text('Cantidad', 300, y + 5)
+    .text('Asociación', 370, y + 5).text('Respaldo', 470, y + 5);
+  y += 18;
+  let zebra = false;
+  for (const d of docs) {
+    if (y > 700) { doc.addPage(); y = 60; }
+    if (zebra) { doc.rect(48, y, W, 16).fill(LIGHT); }
+    zebra = !zebra;
+    const asoc = d.asociacion === 'directa' ? 'Directa'
+      : `${d.asociacion === 'confirmada' ? 'Confirmada' : 'Compartida'} ${nf(d.porcentaje, 0)}%`;
+    // "En sicr3p" vs "Declarado" es la distinción que sostiene todo el
+    // documento: uno tiene el DTE detrás, el otro es palabra del proveedor.
+    const respaldo = (d.factura_id || d.dte_proveedor_id) ? 'En sicr3p' : 'Declarado';
+    doc.font('Helvetica').fontSize(7.5).fillColor(NAVY)
+      .text(NOMBRE_ROL_EXPEDIENTE[d.rol] || d.rol, 54, y + 4, { width: 92 })
+      .text(recortar(d.descripcion, 34), 150, y + 4, { width: 146 })
+      .text(d.cantidad != null ? `${nf(d.cantidad, 0)} ${d.unidad || ''}`.trim() : '—', 300, y + 4, { width: 66 })
+      .text(asoc, 370, y + 4, { width: 96 })
+      .text(respaldo, 470, y + 4, { width: 73 });
+    y += 16;
+  }
+  if (!docs.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin documentos enganchados todavía.', 54, y + 4);
+    y += 20;
+  }
+  y += 14;
+
+  // ---- Qué falta ----
+  // Va DESPUÉS de los documentos y con el mismo peso tipográfico: las
+  // brechas no son letra chica, son la mitad del valor del expediente.
+  if (y > 640) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('QUÉ LE FALTA', 48, y);
+  y = doc.y + 6;
+  const pend = resumen?.pendientes || [];
+  if (!pend.length) {
+    doc.font('Helvetica').fontSize(9).fillColor(GRAY).text('Sin brechas registradas.', 48, y, { width: W });
+    y = doc.y + 8;
+  } else {
+    doc.font('Helvetica').fontSize(8.5).fillColor('#b45309');
+    for (const p of pend) {
+      if (y > doc.page.height - 120) { doc.addPage(); y = 60; }
+      doc.text(`• ${pdfSafe(p.detalle)}`, 48, y, { width: W });
+      y = doc.y + 4;
+    }
+    y += 6;
+  }
+
+  // ---- Datos trazables ----
+  const filasDatos = datos || [];
+  if (filasDatos.length) {
+    if (y > 620) { doc.addPage(); y = 60; }
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('DATOS RESPALDADOS', 48, y);
+    y += 18;
+    doc.rect(48, y, W, 18).fill(NAVY);
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff');
+    doc.text('Producto o servicio', 54, y + 5).text('Cantidad', 230, y + 5)
+      .text('Nivel de confianza', 310, y + 5).text('Documentos coinciden', 430, y + 5);
+    y += 18;
+    zebra = false;
+    for (const d of filasDatos) {
+      if (y > 700) { doc.addPage(); y = 60; }
+      if (zebra) { doc.rect(48, y, W, 16).fill(LIGHT); }
+      zebra = !zebra;
+      // Tres estados, no dos: "no se comparó" NO es "no coinciden".
+      const coincide = d.consistente === true ? 'Sí'
+        : d.consistente === false ? 'No — ver hallazgos' : 'No se comparó';
+      doc.font('Helvetica').fontSize(7.5).fillColor(NAVY)
+        .text(recortar(d.producto, 40), 54, y + 4, { width: 170 })
+        .text(`${nf(d.cantidad, 0)} ${d.unidad || ''}`.trim(), 230, y + 4, { width: 76 })
+        .text(`${d.nivel_confianza} · ${d.nombre_nivel}`, 310, y + 4, { width: 116 })
+        .text(coincide, 430, y + 4, { width: 113 });
+      y += 16;
+    }
+    y += 8;
+    doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text(
+      'Niveles: 1 Declarado · 2 Documentado · 3 Consistente · 4 Validado en fuente · '
+      + '5 Revisado externamente. El nivel 5 requiere la revisión de un tercero independiente y '
+      + 'sicr3p no lo emite.', 48, y, { width: W });
+    y = doc.y + 12;
+  }
+
+  // ---- Clasificación de alcance ----
+  if (y > doc.page.height - 200) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(NAVY).text('CLASIFICACIÓN DE ALCANCE POTENCIAL', 48, y);
+  y = doc.y + 6;
+  const cat = resumen?.scope?.cliente?.categoria_potencial;
+  doc.font('Helvetica').fontSize(9).fillColor(NAVY).text(
+    cat
+      ? `Para el cliente, esta operación correspondería a Alcance ${resumen.scope.cliente.alcance_potencial} · `
+        + `Categoría ${cat} — ${resumen.scope.cliente.nombre_categoria}.`
+      : 'Sin categoría: este tipo de expediente no permite proponer una categoría de Alcance 3.',
+    48, y, { width: W });
+  y = doc.y + 4;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+    .text(pdfSafe(`${resumen?.scope?.cliente?.nota || ''} ${NOTA_SCOPE_EXPEDIENTE}`), 48, y, { width: W });
+  y = doc.y + 12;
+
+  // ---- Sello de integridad ----
+  // Solo de los documentos que SÍ están encadenados en sicr3p. Un
+  // expediente con puros documentos declarados no tiene qué sellar, y el
+  // bloque lo dice en vez de mostrar una caja vacía que parezca un sello.
+  const conSello = (sellos || []).filter((x) => x?.hash_cadena);
+  if (y > doc.page.height - 160) { doc.addPage(); y = 60; }
+  doc.roundedRect(48, y, W, conSello.length ? 40 + conSello.length * 13 : 52, 6)
+    .fillAndStroke(LIGHT, conSello.length ? GREEN : BORDER);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor(NAVY).text('SELLO DE INTEGRIDAD', 60, y + 10);
+  if (conSello.length) {
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+      .text('Documentos encadenados por hash en sicr3p:', 60, y + 26);
+    let sy = y + 40;
+    for (const x of conSello) {
+      doc.font('Courier').fontSize(7.5).fillColor(NAVY)
+        .text(`${recortar(x.descripcion, 28).padEnd(30)} ${x.hash_cadena}`, 60, sy, { width: W - 24 });
+      sy += 13;
+    }
+    y = sy + 8;
+  } else {
+    doc.font('Helvetica').fontSize(8).fillColor(GRAY).text(
+      'Ningún documento de este expediente está encadenado en sicr3p todavía: todos son '
+      + 'declarados por la empresa.', 60, y + 26, { width: W - 24 });
+    y += 60;
+  }
+
+  // ---- Lo que este expediente NO acredita ----
+  // El bloque que separa ordenar evidencia de certificar. Va SIEMPRE, y va
+  // en el cuerpo del documento, no en un pie de página de 6 puntos.
+  if (y > doc.page.height - 190) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text('LO QUE ESTE EXPEDIENTE NO ACREDITA', 48, y, { width: W });
+  y = doc.y + 6;
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const linea of NO_ACREDITA_EXPEDIENTE) {
+    if (y > doc.page.height - 90) { doc.addPage(); y = 60; }
+    doc.text(`• ${pdfSafe(linea)}`, 48, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  avisoNoVerificacion(doc, 48, doc.page.height - 54, W);
+  return bufferDoc(doc);
+}
+
 // ---------- REPORTE CBAM PARA EL MANDANTE — export de apoyo, no certificación ----------
 // El mandante exportador pide evidencia de sus lotes (lotes_minerales) para
 // armar su propia declaración CBAM ante la UE. Reusa tal cual el cálculo de
