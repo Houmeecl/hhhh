@@ -55,6 +55,35 @@ log() {
   echo "$linea" >> "$LOG"
 }
 
+# ---------- Aviso por correo ----------
+# El cron corre cada 30 minutos y, hasta ahora, un deploy fallido escribía
+# su razón SOLO en este log. Nadie se enteraba: producción quedó decenas
+# de commits atrás durante días mientras el cron reportaba su fracaso a un
+# archivo que nadie abría. Un despliegue que falla en silencio es peor que
+# uno que no existe — da la impresión de que lo que subiste está arriba.
+#
+# `|| true` y un plazo corto: esto se invoca DESDE el manejo de un error.
+# No poder mandar un correo no puede dejar el deploy a medias.
+#
+# VA ACÁ ARRIBA, JUNTO A log(), Y NO MÁS ABAJO CON LOS OTROS HELPERS.
+# En bash una función tiene que estar DEFINIDA antes de invocarse: se
+# definía después del bloque de cuarentena que la usa, así que esa llamada
+# moría con "avisar: command not found". Y con `set -euo pipefail` eso no
+# es un mensaje feo, es fatal — código 127 mata el script en el acto:
+#
+#   · el correo de "producción congelada" nunca se mandaba;
+#   · el `touch "$AVISADO"` de la línea siguiente nunca corría, así que la
+#     marca de "ya avisé hoy" jamás se ponía;
+#   · el `exit 0` del bloque nunca se alcanzaba: el script salía con 127.
+#
+# Es decir: el aviso que este archivo agregó justamente para no fallar en
+# silencio era el único que nunca salía. Visto en producción el 19-08-2026:
+# "deploy/actualizar.sh: line 143: avisar: command not found".
+avisar() {
+  local asunto="$1"; local detalle="${2:-}"
+  timeout 45 node "$SCRIPT_DIR/avisar-deploy.mjs" "$asunto" "$detalle" "$LOG" >> "$LOG" 2>&1 || true
+}
+
 # ---------- 1. Instalar / desinstalar el cron (y salir) ----------
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [ "${1:-}" = "--instalar-cron" ]; then
@@ -246,20 +275,6 @@ anotar_cuarentena() {
   fi
   echo "$COMMIT_REMOTO" >> "$CUARENTENA" 2>/dev/null \
     || log "ADVERTENCIA: no se pudo escribir la cuarentena en $CUARENTENA; la operación sigue, pero el cron PUEDE reintentar este commit."
-}
-
-# ---------- Aviso por correo ----------
-# El cron corre cada 30 minutos y, hasta ahora, un deploy fallido escribía
-# su razón SOLO en este log. Nadie se enteraba: producción quedó decenas
-# de commits atrás durante días mientras el cron reportaba su fracaso a un
-# archivo que nadie abría. Un despliegue que falla en silencio es peor que
-# uno que no existe — da la impresión de que lo que subiste está arriba.
-#
-# `|| true` y un plazo corto: esto se invoca DESDE el manejo de un error.
-# No poder mandar un correo no puede dejar el deploy a medias.
-avisar() {
-  local asunto="$1"; local detalle="${2:-}"
-  timeout 45 node "$SCRIPT_DIR/avisar-deploy.mjs" "$asunto" "$detalle" "$LOG" >> "$LOG" 2>&1 || true
 }
 
 # ---------- 8. Rollback al commit previo ----------
