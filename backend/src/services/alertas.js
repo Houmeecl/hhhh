@@ -94,7 +94,7 @@ let timer = null;
 let inicial = null;
 
 export function iniciarAlertasAutomaticas() {
-  if (timer || inicial) return timer;
+  if (timer || inicial) return timer || inicial;
   const correr = () => correrAlertasVencimiento()
     .then((r) => { if (r.enviados) console.log(`[alertas] recordatorios de vencimiento: ${r.enviados}`); })
     .catch((e) => console.warn('[alertas]', e.message));

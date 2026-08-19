@@ -26,12 +26,14 @@ export function useSeo(title, description) {
 // página (ej. FAQPage en la portada) — independiente de los JSON-LD
 // estáticos (Organization/WebSite) que ya viven en index.html.
 export function useJsonLd(data) {
+  const json = data ? JSON.stringify(data) : undefined;
+
   useEffect(() => {
-    if (!data) return undefined;
+    if (!json) return undefined;
     const script = document.createElement('script');
     script.type = 'application/ld+json';
-    script.textContent = JSON.stringify(data);
+    script.textContent = json;
     document.head.appendChild(script);
     return () => { document.head.removeChild(script); };
-  }, [data]);
+  }, [json]);
 }

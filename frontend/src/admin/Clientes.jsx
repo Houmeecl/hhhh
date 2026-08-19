@@ -80,28 +80,31 @@ export default function Clientes({ rol }) {
             <tr><th>Empresa</th><th>RUT</th><th>Contacto</th><th>Contrato</th><th>Plan</th><th>Vigencia</th><th></th></tr>
           </thead>
           <tbody>
-            {clientes.map((c) => (
-              <tr key={c.id}>
-                <td><b>{c.nombre_empresa}</b></td>
-                <td>{c.rut}</td>
-                <td className="muted">{c.contacto_email || '—'}</td>
-                <td><span className={`badge ${badge(c.estado_contrato)}`}>{c.estado_contrato}</span></td>
-                <td>{c.plan}</td>
-                <td className="muted" style={{ fontSize: 13 }}>
-                  {fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}
-                  {alertaVigencia(c) && (
-                    <span className={`badge ${alertaVigencia(c).clase}`} style={{ marginLeft: 6 }}>{alertaVigencia(c).texto}</span>
-                  )}
-                </td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {esAdmin && <>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setModal({ mode: 'editar', data: { ...c, fecha_inicio: c.fecha_inicio?.slice(0,10) || '', fecha_fin: c.fecha_fin?.slice(0,10) || '' } })}>Editar</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setCuenta({ id: c.id, email: c.contacto_email || '' })}>Crear cuenta</button>
-                    <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => eliminar(c.id)}>Eliminar</button>
-                  </>}
-                </td>
-              </tr>
-            ))}
+            {clientes.map((c) => {
+              const alerta = alertaVigencia(c);
+              return (
+                <tr key={c.id}>
+                  <td><b>{c.nombre_empresa}</b></td>
+                  <td>{c.rut}</td>
+                  <td className="muted">{c.contacto_email || '—'}</td>
+                  <td><span className={`badge ${badge(c.estado_contrato)}`}>{c.estado_contrato}</span></td>
+                  <td>{c.plan}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>
+                    {fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}
+                    {alerta && (
+                      <span className={`badge ${alerta.clase}`} style={{ marginLeft: 6 }}>{alerta.texto}</span>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {esAdmin && <>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setModal({ mode: 'editar', data: { ...c, fecha_inicio: c.fecha_inicio?.slice(0,10) || '', fecha_fin: c.fecha_fin?.slice(0,10) || '' } })}>Editar</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setCuenta({ id: c.id, email: c.contacto_email || '' })}>Crear cuenta</button>
+                      <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => eliminar(c.id)}>Eliminar</button>
+                    </>}
+                  </td>
+                </tr>
+              );
+            })}
             {clientes.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin clientes aún.</td></tr>}
           </tbody>
         </table>
