@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 import { Donut } from '../components/Charts.jsx';
+import { useMaestroDetalle } from '../lib/useMaestroDetalle.js';
 
 // Proveedores que le han emitido documentos a ESTE mandante (backend ya
 // filtra por su propio RUT receptor — nunca ve datos de otro mandante) +
@@ -9,31 +10,15 @@ import { Donut } from '../components/Charts.jsx';
 export default function Proveedores() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [seleccionado, setSeleccionado] = useState(null);
-  const [resumen, setResumen] = useState(null);
-  const [cargandoResumen, setCargandoResumen] = useState(false);
-  const [errorResumen, setErrorResumen] = useState('');
+  const {
+    seleccionado, detalle: resumen, cargando: cargandoResumen, error: errorResumen, abrir,
+  } = useMaestroDetalle(api.mandanteProveedorResumen);
   const [exportando, setExportando] = useState('');
   const [errorExport, setErrorExport] = useState('');
 
   useEffect(() => {
     api.mandanteProveedores().then(setData).catch((e) => setError(e.message));
   }, []);
-
-  async function abrir(rut) {
-    setSeleccionado(rut);
-    setResumen(null);
-    setErrorResumen('');
-    setCargandoResumen(true);
-    try {
-      const r = await api.mandanteProveedorResumen(rut);
-      setResumen(r);
-    } catch (e) {
-      setErrorResumen(e.message);
-    } finally {
-      setCargandoResumen(false);
-    }
-  }
 
   async function exportar(fn, nombre) {
     setExportando(nombre);

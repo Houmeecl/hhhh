@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, fmt, fmtInt, fmtFecha } from '../api.js';
+import { useMaestroDetalle } from '../lib/useMaestroDetalle.js';
 
 // El trazador solo puede consultar los RUT que el admin le autorizó desde
 // Accesos.jsx (whitelist) — por eso esta pantalla no es un buscador libre:
@@ -9,29 +10,13 @@ import { api, fmt, fmtInt, fmtFecha } from '../api.js';
 export default function Buscar() {
   const [permitidos, setPermitidos] = useState(null);
   const [error, setError] = useState('');
-  const [seleccionado, setSeleccionado] = useState(null);
-  const [cruces, setCruces] = useState(null);
-  const [cargandoCruces, setCargandoCruces] = useState(false);
-  const [errorCruces, setErrorCruces] = useState('');
+  const {
+    seleccionado, detalle: cruces, cargando: cargandoCruces, error: errorCruces, abrir,
+  } = useMaestroDetalle((rut) => api.trazadorBuscar(rut).then((r) => r.cruces));
 
   useEffect(() => {
     api.trazadorRutasPermitidas().then(setPermitidos).catch((e) => setError(e.message));
   }, []);
-
-  async function abrir(rut) {
-    setSeleccionado(rut);
-    setCruces(null);
-    setErrorCruces('');
-    setCargandoCruces(true);
-    try {
-      const r = await api.trazadorBuscar(rut);
-      setCruces(r.cruces);
-    } catch (e) {
-      setErrorCruces(e.message);
-    } finally {
-      setCargandoCruces(false);
-    }
-  }
 
   if (error) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{error}</div>;
   if (!permitidos) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;

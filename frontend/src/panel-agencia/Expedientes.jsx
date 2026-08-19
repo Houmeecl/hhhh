@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
+import { useMaestroDetalle } from '../lib/useMaestroDetalle.js';
 
 const TIPO_DOCUMENTO_LABEL = {
   factura: 'Factura comercial', packing_list: 'Packing list', carta_porte: 'Carta de porte',
@@ -49,29 +50,13 @@ function EtapaStepper({ etapa }) {
 export default function Expedientes() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [seleccionado, setSeleccionado] = useState(null);
-  const [detalle, setDetalle] = useState(null);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
-  const [errorDetalle, setErrorDetalle] = useState('');
+  const {
+    seleccionado, detalle, cargando: cargandoDetalle, error: errorDetalle, abrir,
+  } = useMaestroDetalle(api.agenciaExpediente);
 
   useEffect(() => {
     api.agenciaExpedientes().then(setData).catch((e) => setError(e.message));
   }, []);
-
-  async function abrir(codigo) {
-    setSeleccionado(codigo);
-    setDetalle(null);
-    setErrorDetalle('');
-    setCargandoDetalle(true);
-    try {
-      const d = await api.agenciaExpediente(codigo);
-      setDetalle(d);
-    } catch (e) {
-      setErrorDetalle(e.message);
-    } finally {
-      setCargandoDetalle(false);
-    }
-  }
 
   if (error) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{error}</div>;
   if (!data) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;
