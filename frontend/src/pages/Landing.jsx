@@ -94,6 +94,13 @@ function BentoCard({ accent, extraClass, img, alt, icon: Ico, title, desc, chip 
   );
 }
 
+// Las preguntas del FAQ, en un solo lugar. Antes el número 4 estaba escrito
+// a mano DOS veces —el bucle visible y el JSON-LD de FAQPage— y agregar una
+// quinta pregunta al i18n la dejaba muerta: ni se mostraba ni entraba al
+// rich snippet, sin que nada fallara. Con la constante, agregar una pregunta
+// es tocar este número y nada más.
+const FAQ_N = [1, 2, 3, 4, 5];
+
 function PasoFlujo({ step, title, text }) {
   return (
     <div className="card" style={{ padding: 22, borderRadius: 18, minHeight: 170 }}>
@@ -114,13 +121,14 @@ export default function Landing() {
 
   useScrollReveal();
 
-  // FAQPage: mismas 4 preguntas/respuestas que la sección visible más
-  // abajo (i18n.js), serializadas para el buscador — el <details> ya es
-  // accesible pero un rich snippet de FAQ no se infiere solo del HTML.
+  // FAQPage: las MISMAS preguntas que la sección visible más abajo — las dos
+  // recorren FAQ_N, así que no pueden discrepar—, serializadas para el
+  // buscador: el <details> ya es accesible, pero un rich snippet de FAQ no
+  // se infiere solo del HTML.
   useJsonLd({
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: [1, 2, 3, 4].map((n) => ({
+    mainEntity: FAQ_N.map((n) => ({
       '@type': 'Question',
       name: t(`landing.faq_q${n}`),
       acceptedAnswer: { '@type': 'Answer', text: t(`landing.faq_a${n}`) },
@@ -276,6 +284,47 @@ export default function Landing() {
                 <b>Pasaporte público con hash y trazabilidad.</b>
                 <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>Todo queda visible para verificar el origen, la evidencia y la cadena que respalda el resultado final.</p>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Expediente de evidencia: cada venta con los documentos que la
+          respaldan. Va con el mismo patrón de bloque que Corredor e
+          Instituto —kicker, título, sub y chips— y NO con una card de
+          captura: la regla de la casa es que una imagen de producto sea
+          una pantalla real, y esta función recién sale a producción. Un
+          mock dibujado aquí sería justo la ilustración aspiracional que
+          el chip "pantalla real de la plataforma" existe para evitar.
+
+          La nota de cierre no es letra chica defensiva: es la línea que
+          separa ordenar evidencia de certificar, y va en la portada
+          porque es donde se forma la expectativa. */}
+      <section className="sec-pad">
+        <div className="container">
+          <div className="land-corr av2-reveal">
+            <div>
+              <span className="land-corr-kicker"><Icon.Doc size={16} /> {t('landing.exp_kicker')}</span>
+              <h3 className="land-corr-titulo">{t('landing.exp_titulo')}<span style={{ color: 'var(--green)' }}>.</span></h3>
+              <p className="land-corr-sub">{t('landing.exp_sub')}</p>
+              {/* NO usa .muted: esa clase es var(--gray), pensada para fondo
+                  claro, y este bloque va sobre el fondo oscuro de .land-corr
+                  — quedaba con contraste insuficiente. Se reusa el mismo
+                  #94a3b8 que ya valida .land-corr-sub para este fondo, y la
+                  jerarquía la da el tamaño, no un gris más apagado. */}
+              <p style={{ fontSize: 13, lineHeight: 1.7, marginTop: 14, marginBottom: 0, color: '#94a3b8' }}>
+                {t('landing.exp_nota')}
+              </p>
+            </div>
+            <div className="land-corr-lado">
+              <div className="land-corr-chips">
+                <span>{t('landing.exp_chip1')}</span>
+                <span>{t('landing.exp_chip2')}</span>
+                <span>{t('landing.exp_chip3')}</span>
+              </div>
+              <Link to="/inscripcion" className="btn btn-primary">
+                {t('landing.cta_inscribir')} <Icon.ArrowRight size={16} />
+              </Link>
             </div>
           </div>
         </div>
@@ -465,7 +514,7 @@ export default function Landing() {
         <div className="container" style={{ maxWidth: 760 }}>
           <h2 className="sec-head" style={{ marginBottom: 28 }}>{t('landing.faq_titulo')}</h2>
           <div className="av2-faq">
-            {[1, 2, 3, 4].map((n) => (
+            {FAQ_N.map((n) => (
               <details key={n} className="av2-faq-item av2-reveal">
                 <summary>{t(`landing.faq_q${n}`)}</summary>
                 <p>{t(`landing.faq_a${n}`)}</p>
