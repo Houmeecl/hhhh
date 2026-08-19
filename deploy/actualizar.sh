@@ -150,13 +150,25 @@ else
 fi
 
 # ---------- Helpers de build / restart / health ----------
+# OJO CON EL `9>&-` DE CADA SUBSHELL PESADO. El lock de más arriba se toma
+# con `exec 9>"$LOCK"` + `flock -n 9`, y TODO proceso hijo hereda ese
+# descriptor. npm y vite dejan workers vivos con facilidad: basta uno
+# huérfano para que el lock siga tomado DESPUÉS de que este script murió, y
+# desde ahí cada corrida del cron sale con "otra corrida en curso", `exit 0`
+# y una sola línea de log — o sea, producción congelada mientras el
+# monitoreo por código de salida ve verde.
+#
+# Visto en producción: el deploy terminó con rollback a las 03:30:17 y a las
+# 03:30:44 el lock seguía tomado, 27 segundos después de que el script ya no
+# existía. Cerrando el fd en los hijos, el lock lo sostiene solo este
+# proceso y se suelta cuando termina, pase lo que pase con los npm.
 construir() {
   # SICR3P_SKIP_BUILD=1: SOLO para ensayos locales (evita npm ci real).
   if [ "${SICR3P_SKIP_BUILD:-0}" = "1" ]; then
     log "SICR3P_SKIP_BUILD=1 → se omite npm ci / vite build (modo ensayo)."
     return 0
   fi
-  ( cd "$REPO_DIR/backend" && npm ci --omit=dev ) >> "$LOG" 2>&1 || return 1
+  ( cd "$REPO_DIR/backend" && npm ci --omit=dev ) >> "$LOG" 2>&1 9>&- || return 1
   # CI propio del VPS: los tests del backend corren ANTES de reiniciar.
   # Con NODE_ENV=production (el .env del VPS) los tests de integración
   # que tocan la BD SE SALTAN SOLOS (ver backend/test/util/soloDev.js):
@@ -166,18 +178,20 @@ construir() {
   # rollback — el código malo jamás llega a producción, sin depender
   # del CI de GitHub. SICR3P_SKIP_TESTS=1 lo omite.
   if [ "${SICR3P_SKIP_TESTS:-0}" != "1" ]; then
-    if ( cd "$REPO_DIR/backend" && npm test ) >> "$LOG" 2>&1; then
+    if ( cd "$REPO_DIR/backend" && npm test ) >> "$LOG" 2>&1 9>&-; then
       log "tests del backend: OK (CI propio del VPS)."
     else
       log "ERROR: tests del backend FALLARON — el deploy no avanza (detalle arriba en $LOG)."
       return 1
     fi
   fi
-  ( cd "$REPO_DIR/frontend" && npm ci && npx vite build ) >> "$LOG" 2>&1 || return 1
+  ( cd "$REPO_DIR/frontend" && npm ci && npx vite build ) >> "$LOG" 2>&1 9>&- || return 1
 }
 
 reiniciar() {
-  eval "$RESTART_CMD" >> "$LOG" 2>&1
+  # pm2 deja un daemon vivo a propósito: sin cerrar el fd, ESE se queda
+  # con el lock para siempre.
+  eval "$RESTART_CMD" >> "$LOG" 2>&1 9>&-
 }
 
 health_ok() {
