@@ -32,6 +32,7 @@ import agenciaRoutes from './routes/agencia.js';
 import trazadorRoutes from './routes/trazador.js';
 import juegoRoutes from './routes/juego.js';
 import repProveedorRoutes from './routes/repProveedor.js';
+import expedientesRoutes from './routes/expedientes.js';
 import transporteProveedorRoutes from './routes/transporteProveedor.js';
 import { adminRouter as cobrosAdminRoutes, publicRouter as pagarRoutes, webhookRouter as pagosWebhookRoutes } from './routes/cobros.js';
 import { iniciarDolarAutomatico } from './services/tipoCambio.js';
@@ -103,6 +104,10 @@ app.use('/api/panel-proveedor/rep', apiLimiter, repProveedorRoutes);
 // Transporte de personal (Cat. 7) del propio proveedor: router aparte,
 // mismo criterio que rep — no seguir engordando origen.js.
 app.use('/api/panel-proveedor/transporte', apiLimiter, transporteProveedorRoutes);
+// Expedientes de evidencia (migración 105): la venta como carpeta, con sus
+// documentos relacionados y sus brechas. Mismo criterio de router aparte y
+// misma autenticación de panel 'proveedor'.
+app.use('/api/panel-proveedor/expedientes', apiLimiter, expedientesRoutes);
 app.use('/api/admin/cobros', cobrosAdminRoutes);
 // Página pública de pago. Va con apiLimiter como todo lo público: el
 // token es largo, pero el endpoint igual es adivinable y no hay motivo

@@ -776,6 +776,21 @@ export const api = {
     descargarAuth(`/api/panel-proveedor/transporte/viajes/${id}/archivo`, authProveedor, nombre || 'evidencia'),
   descargarProveedorTransporteInformePdf: (periodo) =>
     descargarAuth(`/api/panel-proveedor/transporte/informe/${periodo}.pdf`, authProveedor, `transporte-${periodo}.pdf`),
+  // --- Expedientes de evidencia: cada venta con los documentos que la respaldan ---
+  proveedorExpedientes: () => request('/panel-proveedor/expedientes', { authedProveedor: true }),
+  proveedorExpediente: (id) => request(`/panel-proveedor/expedientes/${id}`, { authedProveedor: true }),
+  proveedorExpedienteCrear: (body) =>
+    request('/panel-proveedor/expedientes', { method: 'POST', body, authedProveedor: true }),
+  proveedorExpedienteEditar: (id, body) =>
+    request(`/panel-proveedor/expedientes/${id}`, { method: 'PUT', body, authedProveedor: true }),
+  proveedorExpedienteBorrar: (id) =>
+    request(`/panel-proveedor/expedientes/${id}`, { method: 'DELETE', authedProveedor: true }),
+  proveedorExpedienteCandidatos: (id) =>
+    request(`/panel-proveedor/expedientes/${id}/candidatos`, { authedProveedor: true }),
+  proveedorExpedienteAgregarDoc: (id, body) =>
+    request(`/panel-proveedor/expedientes/${id}/documentos`, { method: 'POST', body, authedProveedor: true }),
+  proveedorExpedienteSoltarDoc: (id, docId) =>
+    request(`/panel-proveedor/expedientes/${id}/documentos/${docId}`, { method: 'DELETE', authedProveedor: true }),
 };
 
 async function abrirPdfAuth(url, store = auth) {

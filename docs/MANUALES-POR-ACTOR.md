@@ -97,12 +97,38 @@ HuellaChile del MMA, que reconoce a la empresa titular — nunca a sicr3p).
    avisa cuántas ventas del RCV faltan por pegar (las de servicios o sin
    envase no van).
 
-**4c. Lotes por firmar** — firma (atesta) los lotes que el admin le
+**4c. Transporte Cat. 7** — registra los traslados de su personal, con
+evidencia opcional, y descarga su informe mensual.
+
+**4d. Expedientes** — cada factura de venta abre un **expediente**: la
+carpeta que la respalda.
+1. Abre el expediente con su cliente, la **orden de compra**, el contrato,
+   la faena y el período. El **tipo** de venta decide qué documentos se
+   esperan; «Otro» no define ninguno, y entonces el expediente queda
+   **sin porcentaje** (no en 0%).
+2. **Engancha documentos**. Desde «Ver compras de mi RCV» elige una compra
+   que ya bajó del SII y queda **con respaldo en sicr3p**. También puede
+   escribir un documento a mano: se registra igual, marcado **«solo
+   declarado»**, y aparece como brecha. Una compra que respalda varias
+   ventas se asocia por porcentaje, declarando **la base del prorrateo**.
+3. Ve su **cobertura documental** y, sobre todo, **qué le falta** — antes
+   que se lo pida su cliente.
+
+**Lo que un expediente NO acredita**, y está impreso en la pantalla: que
+el producto se haya usado en la faena, que toda declaración de la empresa
+sea verdadera, que el servicio se haya ejecutado bien, ni cumplimiento
+ambiental. No es una certificación. Una factura acredita una operación
+documental; no demuestra por sí sola entrega, uso ni desempeño. Y la
+clasificación de alcance que se muestra es **potencial**: sicr3p prepara
+la evidencia, no calcula las tCO₂e del cliente.
+
+**4e. Lotes por firmar** — firma (atesta) los lotes que el admin le
 asignó; su identidad sale siempre de su ficha, nunca la declara ella.
 
 **No puede**: declarar ante el MMA a través de sicr3p (la declaración
-formal la hace la empresa), ver datos de otra empresa, ni tocar la cadena
-de un lote fuera de su firma asignada.
+formal la hace la empresa), ver datos de otra empresa, tocar la cadena
+de un lote fuera de su firma asignada, ni **compartir un expediente con
+su cliente** — hoy los expedientes no salen de la empresa que los arma.
 
 ## 5. Administrador sicr3p — `/admin`
 

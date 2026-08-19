@@ -394,6 +394,31 @@ Sin dependencias nuevas: autenticación JWT RS256 + streaming `insertAll` vía R
   informativa, nunca entra al cálculo de CO2e), y un informe mensual consolidado en
   PDF por período — mismos modos y cálculo que el admin.
 
+### Expedientes de evidencia (panel de la empresa)
+
+Cada factura de venta abre un **expediente**: cliente → orden de compra →
+factura de venta → compras relacionadas → **brechas**. La empresa lo arma con
+lo que ya tiene —su RCV descargado del SII— y ve qué le falta para que ese
+número quede respaldado, antes que se lo pida su cliente.
+
+- Cada documento se asocia como **directa**, **confirmada** o **compartida**
+  con su porcentaje y **la base del prorrateo**. Un prorrateo aporta su
+  proporción, no el eje entero: una compra al 70% cuenta 0,70.
+- Un documento que sicr3p no tiene se registra igual, marcado **«solo
+  declarado»**, y aparece como brecha. Verlo es mejor que no verlo.
+- La **cobertura documental** es `null` —no 0— cuando el tipo de expediente
+  no define qué documentos esperar: gris es «no se opina», que no es «no
+  cumple».
+- **No es contabilidad de carbono del cliente.** sicr3p prepara la evidencia;
+  la clasificación de alcance que muestra es **potencial** y confirmarla es
+  del cliente. Un expediente no acredita que el producto se haya usado, ni
+  que el servicio se haya ejecutado bien, ni cumplimiento ambiental, y no es
+  una certificación.
+- Hoy **nada sale de la empresa**: no hay endpoint que le muestre un
+  expediente a un mandante. La divulgación selectiva es una pieza aparte y su
+  prerrequisito no es de software, sino el contrato de encargo de tratamiento
+  que exige la Ley 21.719.
+
 ### Acceso de prueba con códigos (créditos)
 
 Los invitados entran en **`/prueba`** con un código (`SICR3P-XXXXXX`) generado desde el

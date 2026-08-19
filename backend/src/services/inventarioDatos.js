@@ -662,6 +662,66 @@ export const INVENTARIO = {
     base: BASE.CONSENTIMIENTO, cadena: CADENA.NINGUNA,
     retencion: 'El proveedor puede re-descargar un período en cualquier momento (UPSERT); se borra al dar de baja la cuenta (ON DELETE CASCADE).',
   },
+  expedientes: {
+    clasificacion: PERSONAL, columnas: ['cliente_rut'],
+    nota: 'La carátula del expediente de evidencia (migración 105): a quién le vendió el proveedor, '
+      + 'con qué orden de compra, contrato, faena y período. `cliente_rut` casi siempre es de una '
+      + 'empresa minera, pero se clasifica como personal por el mismo criterio que `clientes` y '
+      + '`dte_proveedor`: un cliente puede ser persona natural y, si se excluyera, esa persona no '
+      + 'podría encontrar su propia ficha al ejercer su derecho de acceso. `glosa` es texto libre que '
+      + 'escribe el proveedor sobre lo que vendió — no se pide ni se espera dato de persona ahí, y por '
+      + 'eso no está en `columnas`.\n\n'
+      + 'IMPORTANTE — LÍMITE DE LA FINALIDAD: hoy el expediente NO sale del proveedor. Ningún endpoint '
+      + 'se lo muestra a su cliente. El día que se agregue divulgación selectiva hacia el mandante, esa '
+      + 'es una finalidad NUEVA que esta entrada no cubre y que además exige el contrato de encargo de '
+      + 'tratamiento (art. 15 bis Ley 21.719): proveedor responsable, sicr3p encargado. Ampliar el '
+      + 'código sin ampliar acá sería tratar datos para algo que el registro no declara.',
+    finalidad: 'Ordenar la evidencia documental de cada venta del propio proveedor y mostrarle sus brechas.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras el proveedor mantenga su cuenta; se borra al darla de baja (ON DELETE CASCADE).',
+  },
+  expediente_documentos: {
+    clasificacion: PERSONAL, columnas: ['emisor_rut'],
+    nota: 'Los documentos enganchados a un expediente (migración 105). No guarda el archivo: guarda el '
+      + 'VÍNCULO al DTE que ya está en sicr3p (`factura_id`) o en el RCV del propio proveedor '
+      + '(`dte_proveedor_id`), más la identidad legible del documento para que siga siendo legible si '
+      + 'ese vínculo se pierde. `emisor_rut` puede ser de una persona natural (un contratista '
+      + 'individual), mismo criterio que `dte_proveedor.rut_contraparte`. `descripcion` y '
+      + '`base_prorrateo` son texto libre del proveedor sobre documentos, no sobre personas.',
+    finalidad: 'Registrar qué documentos respaldan una venta y con qué grado de asociación.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Junto con su expediente (ON DELETE CASCADE).',
+  },
+  datos_trazables: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'OJO CON EL NOMBRE DE UNA COLUMNA: `direccion` NO es un domicilio. Acá significa el '
+      + 'sentido de la cadena de valor — «arriba» (lo que la empresa compró para poder vender) o '
+      + '«abajo» (lo que pasa después de que vendió) — y su CHECK admite exactamente esos dos '
+      + 'valores, nada más. El escáner del inventario la marca por el nombre, y está bien que lo '
+      + 'haga: es justamente el tipo de columna que hay que mirar antes de decidir.\n\n'
+      + 'El resto de la tabla (migración 106) es la cantidad que respalda una venta: producto, '
+      + 'cantidad, unidad, nivel de confianza. Datos de una operación entre empresas, no de una '
+      + 'persona. `validado_por` es el nombre o cargo de quien revisó — se pide para que el nivel '
+      + '4 sea verificable, no como dato de contacto: no se piden ni se guardan correo, teléfono '
+      + 'ni RUT de esa persona, y por eso no se clasifica como identificador. Si algún día se '
+      + 'agregara el contacto del revisor, esta entrada cambia a PERSONAL.',
+    finalidad: 'Registrar la cantidad que una venta afirma y con qué evidencia está respaldada.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Junto con su expediente (ON DELETE CASCADE).',
+  },
+  datos_trazables_historial: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Bitácora de modificaciones de un dato trazable (migración 106): qué campo cambió, de '
+      + 'qué valor a cuál y quién lo hizo. Solo guarda `usuario_id`: la persona está en '
+      + '`usuarios`, mismo criterio que `tokens_password`. `valor_anterior`/`valor_nuevo` llevan '
+      + 'cantidades y unidades, no datos de persona.\n\n'
+      + '`usuario_id` es ON DELETE SET NULL por el mismo criterio que `actividad_log`: el derecho '
+      + 'de supresión de una persona no puede quedar bloqueado por una bitácora, y el hecho '
+      + 'registrado sobrevive aunque el autor se borre.',
+    finalidad: 'Poder responder quién cambió una cantidad y cuándo.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Junto con su dato (ON DELETE CASCADE); el autor se desvincula al borrar la cuenta.',
+  },
   credenciales_sii_proveedor: {
     clasificacion: PERSONAL, columnas: ['rut_sii'],
     nota: 'La clave tributaria del SII que el proveedor autoriza guardar (migración 072). Se guarda '

@@ -386,10 +386,18 @@ router.get('/export/cbam', async (req, res, next) => {
       res.setHeader('Content-Disposition', `attachment; filename="cbam_${rn}.csv"`);
       res.send('\uFEFF' + csv + filaMeta);
     } else {
+      // El descargo va también en JSON. Antes vivía SOLO en la fila final
+      // del CSV: quien consumía la API —que es el camino por donde este
+      // dato entra a un sistema ajeno y se propaga— recibía las emisiones
+      // sin una sola línea sobre qué son y qué no. Es el mismo hueco que
+      // tenía el PDF, en la rama que quedaba.
       res.json({
         mandante: { rut: req.mandante.rut, empresa: req.mandante.nombre_empresa },
         periodo: { generado: new Date().toISOString() },
         metodologia,
+        advertencia: 'Datos de apoyo, no sustituye verificación acreditada. Este reporte NO es '
+          + 'la declaración CBAM: la presenta el declarante autorizado —la empresa titular—, '
+          + 'nunca sicr3p ni a través de sicr3p.',
         lotes,
       });
     }

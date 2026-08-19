@@ -1120,6 +1120,56 @@ export async function generateReporteCbam({ mandante, lotes }) {
     y += 20;
   }
 
+  // ---- Límites y descargo ----
+  // ESTE PDF SE ACOMPAÑA A UNA DECLARACIÓN ANTE UN REGULADOR DE LA UE y
+  // hasta acá salía sin una sola línea de descargo. El texto existía en la
+  // rama CSV de GET /export/cbam (routes/mandante.js) —un endpoint DISTINTO
+  // de este, que se sirve desde GET /export/cbam.pdf—, así que el mandante
+  // que descargaba el PDF, el formato que efectivamente se adjunta y se
+  // reenvía, recibía una tabla de emisiones sin ninguna advertencia sobre
+  // qué es y qué no es. De los tres informes con destinatario externo, este
+  // era el único sin el bloque, y el de destinatario más exigente. (La rama
+  // JSON tenía el mismo hueco; se cerró en el mismo commit.) Mismo criterio
+  // y mismas palabras que el bloque "Límites y exclusiones declaradas" del
+  // informe SII, más abajo en este archivo.
+  y += 14;
+  if (y > doc.page.height - 220) { doc.addPage(); y = 60; }
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(NAVY)
+    .text('Límites y exclusiones declaradas', 48, y, { width: W });
+  y = doc.y + 6;
+  const LIMITES_CBAM = [
+    'Datos de apoyo: este reporte NO es la declaración CBAM. La declaración ante la autoridad de la UE '
+      + 'la presenta el declarante autorizado —la empresa titular—, nunca sicr3p ni a través de sicr3p.',
+    'Emisiones incorporadas: se informan tal como fueron declaradas o calculadas para cada lote, con el '
+      + 'método indicado en la columna «Método». sicr3p no recalcula ni verifica esos valores en este documento.',
+    'Un lote marcado «Incompleto» tiene datos faltantes declarados; un lote «No aplica» quedó fuera del '
+      + 'ámbito CBAM por su código NC. Ninguno de los dos estados es un juicio sobre el cumplimiento del titular.',
+    'La trazabilidad que respalda cada lote acredita procedencia e integridad documental. No acredita que el '
+      + 'proceso productivo declarado sea el efectivamente ejecutado.',
+  ];
+  doc.font('Helvetica').fontSize(8).fillColor(GRAY);
+  for (const l of LIMITES_CBAM) {
+    if (y > doc.page.height - 130) { doc.addPage(); y = 60; }
+    doc.text(`• ${l}`, 48, y, { width: W });
+    y = doc.y + 4;
+  }
+
+  // La cita del Reglamento va con las mismas palabras que ya usa la rama
+  // CSV de este endpoint — una sola frase para el mismo dato, no dos.
+  if (y > doc.page.height - 120) { doc.addPage(); y = 60; }
+  y += 6;
+  doc.roundedRect(48, y, W, 40, 6).fillAndStroke(LIGHT, BORDER);
+  doc.font('Helvetica').fontSize(7.5).fillColor(NAVY).text(
+    `${citaFuente({
+      organismo: 'Unión Europea',
+      documento: 'Reglamento (UE) 2023/956 — Mecanismo de Ajuste en Frontera por Carbono (CBAM)',
+      version_anio: '2023',
+    })} — datos de apoyo, no sustituye verificación acreditada.`,
+    48 + 10, y + 8, { width: W - 20 }
+  );
+
+  avisoNoVerificacion(doc, 48, doc.page.height - 54, W);
+
   return bufferDoc(doc);
 }
 

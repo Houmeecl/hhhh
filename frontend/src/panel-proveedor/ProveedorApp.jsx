@@ -7,9 +7,10 @@ import LotesPorFirmar from './LotesPorFirmar.jsx';
 import AnalisisSii from './AnalisisSii.jsx';
 import Rep from './Rep.jsx';
 import Transporte from './Transporte.jsx';
+import Expedientes from './Expedientes.jsx';
 import MisDatos from './MisDatos.jsx';
 
-// Shell mínimo, sin sidebar: cinco pestañas alcanzan. Cada una es una
+// Shell mínimo, sin sidebar: seis pestañas alcanzan. Cada una es una
 // ruta real (NavLink + <Routes> anidadas) — mismo patrón que los otros 7
 // shells del proyecto (admin, terreno, puerto, mandante, agencia,
 // trazador, Sube y Suma): antes eran useState('sii')+onClick, sin URL
@@ -22,6 +23,7 @@ const TABS = [
   { to: '/panel-proveedor', end: true, label: 'Compras y ventas (SII)' },
   { to: '/panel-proveedor/rep', label: 'Ley REP' },
   { to: '/panel-proveedor/transporte', label: 'Transporte Cat. 7' },
+  { to: '/panel-proveedor/expedientes', label: 'Expedientes' },
   { to: '/panel-proveedor/lotes', label: 'Lotes por firmar' },
   { to: '/panel-proveedor/datos', label: 'Datos de la empresa' },
 ];
@@ -128,6 +130,7 @@ export default function ProveedorApp() {
               <Route index element={<AnalisisSii />} />
               <Route path="rep" element={<Rep />} />
               <Route path="transporte" element={<Transporte />} />
+              <Route path="expedientes" element={<Expedientes />} />
               <Route path="lotes" element={<LotesPorFirmar />} />
               <Route path="datos" element={<MisDatos />} />
               <Route path="*" element={<Navigate to="/panel-proveedor" replace />} />
