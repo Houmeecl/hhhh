@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 // Patrón repetido en los paneles de solo-lectura (Puerto, Mandante, Agencia,
 // Trazador): una lista maestra a la izquierda y, al elegir una fila, su
@@ -11,18 +11,27 @@ export function useMaestroDetalle(cargarDetalle) {
   const [detalle, setDetalle] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const requestIdRef = useRef(0);
 
   async function abrir(clave) {
+    const requestId = ++requestIdRef.current;
+
     setSeleccionado(clave);
     setDetalle(null);
     setError('');
     setCargando(true);
+
     try {
-      setDetalle(await cargarDetalle(clave));
+      const siguienteDetalle = await cargarDetalle(clave);
+      if (requestId !== requestIdRef.current) return;
+      setDetalle(siguienteDetalle);
     } catch (e) {
+      if (requestId !== requestIdRef.current) return;
       setError(e.message);
     } finally {
-      setCargando(false);
+      if (requestId === requestIdRef.current) {
+        setCargando(false);
+      }
     }
   }
 
