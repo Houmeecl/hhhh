@@ -251,3 +251,124 @@ test('credenciales malas no distinguen entre correo inexistente y clave errada',
     assert.equal(claveMala.status, 401);
     assert.equal(inexistente.d.error, claveMala.d.error);
   });
+
+// ---------- 5. Enlazar predios y declarar producción ----------
+
+test('el listado y el detalle NO pueden contradecirse sobre la misma carga',
+  { skip: SIN_CORREDOR }, async () => {
+    // El listado evaluaba solo la carga y el detalle evaluaba la carga más
+    // sus predios: la lista decía "faltan 4 datos" de una carga que el
+    // detalle mostraba completa. Dos pantallas del mismo producto
+    // discrepando sobre si algo cumple es peor que cualquier consulta de más.
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201', descripcion: 'Soya coherencia', cantidad: 200, pais_origen: 'BR' });
+    const parcela = await pedir('POST', '/api/corredor/parcelas', tkA,
+      { nombre: 'Predio coherencia', pais: 'BR', poligono: PREDIO, area_ha: 102.4, origen_coordenada: 'archivo' });
+
+    await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA,
+      { parcela_id: parcela.d.parcela.id });
+    await pedir('PUT', `/api/corredor/cargas/${carga.d.carga.id}/produccion`, tkA, {
+      desde: '2026-02-01', hasta: '2026-04-30',
+      libre_deforestacion_declarado: true, legalidad_declarada: true,
+      determinacion_emisor: 'Consultora Ejemplo', determinacion_linea_base: 'MapBiomas 2020',
+    });
+
+    const detalle = await pedir('GET', `/api/corredor/cargas/${carga.d.carga.id}`, tkA);
+    const lista = await pedir('GET', '/api/corredor/cargas', tkA);
+    const enLista = lista.d.cargas.find((c) => c.id === carga.d.carga.id);
+
+    assert.equal(detalle.d.exportacion.listo, true);
+    assert.equal(enLista.exportacion.listo, detalle.d.exportacion.listo);
+    assert.equal(enLista.exportacion.glosa, detalle.d.exportacion.glosa);
+  });
+
+test('no se puede enlazar el predio de otra empresa',
+  { skip: SIN_CORREDOR }, async () => {
+    // Sin este chequeo, una carga quedaría "geolocalizada" con las
+    // coordenadas de un predio ajeno.
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201', descripcion: 'Soya ajena', cantidad: 10, pais_origen: 'BR' });
+    const deB = await pedir('POST', '/api/corredor/parcelas', tkB,
+      { nombre: 'Predio de B', pais: 'BR', lat: -12.5, lng: -55.7, area_ha: 2 });
+
+    const intento = await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA,
+      { parcela_id: deB.d.parcela.id });
+    assert.equal(intento.status, 400);
+    assert.match(intento.d.error, /no existe entre los tuyos/);
+  });
+
+test('un aporte de 0% no es un origen',
+  { skip: SIN_CORREDOR }, async () => {
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Aporte cero', cantidad: 5, pais_origen: 'BR' });
+    const parcela = await pedir('POST', '/api/corredor/parcelas', tkA,
+      { nombre: 'Predio aporte', pais: 'BR', lat: -12.5, lng: -55.7, area_ha: 2 });
+    const r = await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA,
+      { parcela_id: parcela.d.parcela.id, aporte_pct: 0 });
+    assert.equal(r.status, 400);
+  });
+
+test('declarar "libre de deforestación" exige decir QUIÉN lo determinó',
+  { skip: SIN_CORREDOR }, async () => {
+    // sicr3p no analiza imágenes satelitales. Aceptar un "sí" suelto sería
+    // exactamente la declaración sin respaldo que el producto existe para
+    // evitar — misma doctrina que "el nivel más alto nunca se emite solo".
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201', descripcion: 'Sin emisor', cantidad: 10, pais_origen: 'BR' });
+    const r = await pedir('PUT', `/api/corredor/cargas/${carga.d.carga.id}/produccion`, tkA,
+      { libre_deforestacion_declarado: true });
+    assert.equal(r.status, 400);
+    assert.equal(r.d.codigo, 'falta_emisor_determinacion');
+  });
+
+test('un intervalo de producción al revés se rechaza',
+  { skip: SIN_CORREDOR }, async () => {
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Fechas al revés', cantidad: 5, pais_origen: 'BR' });
+    const r = await pedir('PUT', `/api/corredor/cargas/${carga.d.carga.id}/produccion`, tkA,
+      { desde: '2026-06-01', hasta: '2026-02-01' });
+    assert.equal(r.status, 400);
+  });
+
+test('enlazar dos veces el mismo predio actualiza el aporte, no falla',
+  { skip: SIN_CORREDOR }, async () => {
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Doble enlace', cantidad: 5, pais_origen: 'BR' });
+    const parcela = await pedir('POST', '/api/corredor/parcelas', tkA,
+      { nombre: 'Predio doble', pais: 'BR', lat: -12.5, lng: -55.7, area_ha: 2 });
+    const p1 = await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA,
+      { parcela_id: parcela.d.parcela.id, aporte_pct: 40 });
+    const p2 = await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA,
+      { parcela_id: parcela.d.parcela.id, aporte_pct: 60 });
+    assert.equal(p1.status, 201);
+    assert.equal(p2.status, 201);
+    const det = await pedir('GET', `/api/corredor/cargas/${carga.d.carga.id}`, tkA);
+    assert.equal(det.d.parcelas.length, 1);
+    assert.equal(Number(det.d.parcelas[0].aporte_pct), 60);
+  });
+
+test('soltar un predio lo saca de la carga',
+  { skip: SIN_CORREDOR }, async () => {
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Para soltar', cantidad: 5, pais_origen: 'BR' });
+    const parcela = await pedir('POST', '/api/corredor/parcelas', tkA,
+      { nombre: 'Predio a soltar', pais: 'BR', lat: -12.5, lng: -55.7, area_ha: 2 });
+    await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA, { parcela_id: parcela.d.parcela.id });
+    const r = await pedir('DELETE', `/api/corredor/cargas/${carga.d.carga.id}/parcelas/${parcela.d.parcela.id}`, tkA);
+    assert.equal(r.status, 200);
+    const det = await pedir('GET', `/api/corredor/cargas/${carga.d.carga.id}`, tkA);
+    assert.equal(det.d.parcelas.length, 0);
+  });
+
+test('la otra empresa no puede soltar un predio de una carga ajena',
+  { skip: SIN_CORREDOR }, async () => {
+    const carga = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Ajena para soltar', cantidad: 5, pais_origen: 'BR' });
+    const parcela = await pedir('POST', '/api/corredor/parcelas', tkA,
+      { nombre: 'Predio protegido', pais: 'BR', lat: -12.5, lng: -55.7, area_ha: 2 });
+    await pedir('POST', `/api/corredor/cargas/${carga.d.carga.id}/parcelas`, tkA, { parcela_id: parcela.d.parcela.id });
+    const intento = await pedir('DELETE', `/api/corredor/cargas/${carga.d.carga.id}/parcelas/${parcela.d.parcela.id}`, tkB);
+    assert.equal(intento.status, 404);
+    const det = await pedir('GET', `/api/corredor/cargas/${carga.d.carga.id}`, tkA);
+    assert.equal(det.d.parcelas.length, 1); // sigue enlazado
+  });

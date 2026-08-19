@@ -51,6 +51,9 @@ export const apiCorredor = {
   cargas: () => pedir('/cargas'),
   carga: (id) => pedir(`/cargas/${id}`),
   crearCarga: (b) => pedir('/cargas', { metodo: 'POST', body: b }),
+  enlazarParcela: (cargaId, b) => pedir(`/cargas/${cargaId}/parcelas`, { metodo: 'POST', body: b }),
+  soltarParcela: (cargaId, parcelaId) => pedir(`/cargas/${cargaId}/parcelas/${parcelaId}`, { metodo: 'DELETE' }),
+  guardarProduccion: (cargaId, b) => pedir(`/cargas/${cargaId}/produccion`, { metodo: 'PUT', body: b }),
 
   crearExportador: (b) => pedir('/exportadores', { metodo: 'POST', body: b }),
 };

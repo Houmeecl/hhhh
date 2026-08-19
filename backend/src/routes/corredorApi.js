@@ -216,6 +216,31 @@ router.post('/parcelas', requireAuthCorredor, requireClaveDefinida, async (req, 
 
 // ---------- Cargas ----------
 
+// Arma lo que `listoParaExportar` necesita: la carga MÁS sus predios y su
+// producción. Sin esto una carga de soya siempre diría que le falta la
+// geolocalización, aunque tenga sus predios declarados.
+function paraEvaluar(carga, parcelas = [], produccion = null) {
+  return {
+    ...carga,
+    // `puntoDe` resuelve el centroide cuando el predio se declaró solo con
+    // polígono, que es el caso obligatorio sobre 4 ha.
+    parcelas: parcelas.map((p) => ({ ...puntoDe(p), poligono: p.poligono })),
+    fecha_produccion: produccion?.desde || null,
+    libre_deforestacion: produccion?.libre_deforestacion_declarado === true,
+    legalidad: produccion?.legalidad_declarada === true,
+  };
+}
+
+const conEstado = (carga, parcelas, produccion) => {
+  const estado = listoParaExportar(paraEvaluar(carga, parcelas, produccion));
+  return {
+    ...estado,
+    semaforo: semaforoExportacion(estado),
+    glosa: glosaExportacion(estado),
+    urgencia: urgenciaExportacion(estado),
+  };
+};
+
 router.get('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
     const exportador = exportadorDeLaSesion(req);
@@ -223,11 +248,38 @@ router.get('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, res
     const { rows } = await queryCorredor(
       `SELECT * FROM cargas WHERE exportador_id = $1 ORDER BY created_at DESC LIMIT 300`, [exportador]
     );
+    const ids = rows.map((c) => c.id);
+
+    // Dos consultas para todas las cargas, no dos POR carga: con 300
+    // cargas, el N+1 serían 600 idas a la base para pintar una tabla.
+    //
+    // Y se traen SIEMPRE, aunque cueste: evaluar el listado solo con la
+    // carga —como estaba— hacía que la lista dijera "faltan 4 datos" de
+    // una carga que el detalle mostraba completa. Dos pantallas del mismo
+    // producto contradiciéndose sobre si algo cumple o no es peor que
+    // cualquier consulta de más.
+    const [{ rows: vinculos }, { rows: producciones }] = ids.length
+      ? await Promise.all([
+        queryCorredor(
+          `SELECT cp.carga_id, p.lat, p.lng, p.poligono
+             FROM carga_parcelas cp JOIN parcelas p ON p.id = cp.parcela_id
+            WHERE cp.carga_id = ANY($1::uuid[])`, [ids]),
+        queryCorredor('SELECT * FROM carga_produccion WHERE carga_id = ANY($1::uuid[])', [ids]),
+      ])
+      : [{ rows: [] }, { rows: [] }];
+
+    const porCarga = new Map();
+    for (const v of vinculos) {
+      if (!porCarga.has(v.carga_id)) porCarga.set(v.carga_id, []);
+      porCarga.get(v.carga_id).push(v);
+    }
+    const prodPorCarga = new Map(producciones.map((p) => [p.carga_id, p]));
+
     res.json({
-      cargas: rows.map((c) => {
-        const estado = listoParaExportar(c);
-        return { ...c, exportacion: { ...estado, semaforo: semaforoExportacion(estado), glosa: glosaExportacion(estado) } };
-      }),
+      cargas: rows.map((c) => ({
+        ...c,
+        exportacion: conEstado(c, porCarga.get(c.id) || [], prodPorCarga.get(c.id) || null),
+      })),
     });
   } catch (err) { next(err); }
 });
@@ -247,24 +299,43 @@ router.post('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, re
     }
 
     const carga = await withTxCorredor(async (client) => {
+      await client.query('SAVEPOINT antes_de_insertar');
       const anio = new Date().getFullYear();
-      // El correlativo se toma DENTRO de la transacción y con el año en el
-      // LIKE: sin eso, dos altas simultáneas se llevan el mismo número y
-      // choca el UNIQUE del código.
-      const { rows: n } = await client.query(
-        `SELECT count(*)::int + 1 AS n FROM cargas WHERE codigo LIKE $1`, [`CB-${anio}-%`]
-      );
-      const { rows } = await client.query(
-        `INSERT INTO cargas
-           (codigo, exportador_id, codigo_nc, descripcion, cantidad, unidad, pais_origen,
-            region_origen, instalacion, emisiones_directas_tco2e_t, emisiones_indirectas_tco2e_t, metodo_emisiones)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-        [generarCodigoCarga(anio, n[0].n), exportador, b.codigo_nc || null, descripcion, cantidad,
-         b.unidad || 't', String(b.pais_origen).toUpperCase(), b.region_origen || null,
-         b.instalacion || null, b.emisiones_directas_tco2e_t ?? null,
-         b.emisiones_indirectas_tco2e_t ?? null, b.metodo_emisiones || null]
-      );
-      return rows[0];
+      // El correlativo sale de un count(), y un count() NO bloquea nada:
+      // dos altas simultáneas se llevan el mismo número y la segunda choca
+      // contra el UNIQUE del código. Estar dentro de la transacción no lo
+      // evita —eso fue un error del comentario anterior, no una defensa—.
+      // Se reintenta, igual que emitirContrato() en la base de sicr3p, y
+      // solo ante la colisión del código: cualquier otro 23505 es un error
+      // real que tiene que subir.
+      for (let intento = 0; intento < 5; intento += 1) {
+        const { rows: n } = await client.query(
+          `SELECT count(*)::int + 1 + $2 AS n FROM cargas WHERE codigo LIKE $1`,
+          [`CB-${anio}-%`, intento]
+        );
+        try {
+          const { rows } = await client.query(
+            `INSERT INTO cargas
+               (codigo, exportador_id, codigo_nc, descripcion, cantidad, unidad, pais_origen,
+                region_origen, instalacion, emisiones_directas_tco2e_t, emisiones_indirectas_tco2e_t, metodo_emisiones)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+            [generarCodigoCarga(anio, n[0].n), exportador, b.codigo_nc || null, descripcion, cantidad,
+             b.unidad || 't', String(b.pais_origen).toUpperCase(), b.region_origen || null,
+             b.instalacion || null, b.emisiones_directas_tco2e_t ?? null,
+             b.emisiones_indirectas_tco2e_t ?? null, b.metodo_emisiones || null]
+          );
+          return rows[0];
+        } catch (err) {
+          // Postgres aborta la transacción entera ante cualquier error, así
+          // que hay que soltar el savepoint para poder reintentar adentro.
+          if (err.code === '23505' && String(err.constraint || '').includes('codigo')) {
+            await client.query('ROLLBACK TO SAVEPOINT antes_de_insertar').catch(() => {});
+            continue;
+          }
+          throw err;
+        }
+      }
+      throw new Error('No se pudo generar un código de carga único.');
     });
 
     await logCorredor({
@@ -304,33 +375,135 @@ router.get('/cargas/:id', requireAuthCorredor, requireClaveDefinida, async (req,
           WHERE cp.carga_id = $1 ORDER BY cp.registrado_at`, [carga.id]),
     ]);
 
-    // El estado de exportación se arma con la carga MÁS lo que cuelga de
-    // ella: sin las parcelas y la producción, una carga de soya siempre
-    // diría que le falta la geolocalización.
-    const paraEvaluar = {
-      ...carga,
-      // `puntoDe` resuelve el centroide cuando la parcela se declaró solo
-      // con polígono, que es el caso obligatorio sobre 4 ha. Sin esto, la
-      // parcela mejor declarada de todas figuraba como sin geolocalizar.
-      parcelas: parcelas.map((p) => ({ ...puntoDe(p), poligono: p.poligono })),
-      fecha_produccion: produccion[0]?.desde || null,
-      libre_deforestacion: produccion[0]?.libre_deforestacion_declarado === true,
-      legalidad: produccion[0]?.legalidad_declarada === true,
-    };
-    const estado = listoParaExportar(paraEvaluar);
-
     res.json({
       carga,
       parcelas: parcelas.map((p) => ({ ...p, ...resumenParcela(p) })),
       produccion: produccion[0] || null,
       pasos,
-      exportacion: {
-        ...estado,
-        semaforo: semaforoExportacion(estado),
-        glosa: glosaExportacion(estado),
-        urgencia: urgenciaExportacion(estado),
-      },
+      // Mismo helper que el listado. Cuando cada pantalla armaba su propia
+      // evaluación, la lista y el detalle terminaron diciendo cosas
+      // distintas de la misma carga.
+      exportacion: conEstado(carga, parcelas, produccion[0] || null),
     });
+  } catch (err) { next(err); }
+});
+
+// ---------- Enlazar predios a una carga ----------
+//
+// Sin esto, `carga_parcelas` era una tabla que solo se leía: el exportador
+// podía registrar predios y crear cargas, y no había forma de conectarlos.
+// O sea que el EUDR no se podía cumplir desde el producto, que es lo único
+// para lo que existe este panel.
+router.post('/cargas/:id/parcelas', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const parcelaId = String(req.body?.parcela_id || '');
+    if (!UUID_RE.test(parcelaId)) return res.status(400).json({ error: 'Falta el predio a enlazar.' });
+
+    const aporte = req.body?.aporte_pct === undefined ? 100 : Number(req.body.aporte_pct);
+    if (!Number.isFinite(aporte) || aporte <= 0 || aporte > 100) {
+      // Mayor que 0, no "entre 0 y 100": un predio que aporta 0% no es un
+      // origen, y registrarlo diría lo contrario de lo que significa.
+      return res.status(400).json({ error: 'El aporte del predio debe ser mayor que 0 y hasta 100.' });
+    }
+
+    // Las DOS puntas se verifican contra el exportador de la sesión. Sin
+    // el chequeo del predio, alguien enlazaría el de otra empresa y su
+    // carga quedaría "geolocalizada" con coordenadas ajenas.
+    const [{ rows: c }, { rows: p }] = await Promise.all([
+      queryCorredor('SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]),
+      queryCorredor('SELECT id FROM parcelas WHERE id = $1 AND exportador_id = $2', [parcelaId, exportador]),
+    ]);
+    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    if (!p[0]) return res.status(400).json({ error: 'Ese predio no existe entre los tuyos.' });
+
+    await queryCorredor(
+      `INSERT INTO carga_parcelas (carga_id, parcela_id, aporte_pct) VALUES ($1,$2,$3)
+       ON CONFLICT (carga_id, parcela_id) DO UPDATE SET aporte_pct = EXCLUDED.aporte_pct`,
+      [req.params.id, parcelaId, aporte]
+    );
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'enlazar_predio',
+      entidad: 'carga', entidadId: req.params.id, detalle: { parcela_id: parcelaId, aporte_pct: aporte }, ip: req.ip,
+    });
+    res.status(201).json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+router.delete('/cargas/:id/parcelas/:parcelaId', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.parcelaId)) {
+      return res.status(404).json({ error: 'No encontrado.' });
+    }
+    const { rowCount } = await queryCorredor(
+      `DELETE FROM carga_parcelas cp USING cargas c
+        WHERE cp.carga_id = c.id AND c.exportador_id = $3
+          AND cp.carga_id = $1 AND cp.parcela_id = $2`,
+      [req.params.id, req.params.parcelaId, exportador]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Ese predio no estaba enlazado a esta carga.' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// ---------- Datos de producción (los otros requisitos del EUDR) ----------
+router.put('/cargas/:id/produccion', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const { rows: c } = await queryCorredor(
+      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
+    );
+    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+
+    const b = req.body || {};
+    const fecha = (v) => (v ? String(v).slice(0, 10) : null);
+    const desde = fecha(b.desde);
+    const hasta = fecha(b.hasta);
+    if (desde && hasta && desde > hasta) {
+      return res.status(400).json({ error: 'La fecha de inicio de producción no puede ser posterior al término.' });
+    }
+
+    // "Libre de deforestación" es una afirmación que alguien tiene que
+    // hacer: se exige el true explícito, no cualquier valor con verdad.
+    // Y no se acepta declararlo SIN decir quién lo determinó: sicr3p no
+    // hace análisis satelital, registra la determinación de un tercero.
+    // Un "sí" suelto sería exactamente la declaración sin respaldo que
+    // este producto existe para evitar.
+    const libre = b.libre_deforestacion_declarado === true;
+    const emisor = String(b.determinacion_emisor || '').trim();
+    if (libre && !emisor) {
+      return res.status(400).json({
+        error: 'Para declarar el predio libre de deforestación hay que decir quién hizo la determinación. '
+          + 'sicr3p no analiza imágenes satelitales: registra la de un tercero.',
+        codigo: 'falta_emisor_determinacion',
+      });
+    }
+
+    const { rows } = await queryCorredor(
+      `INSERT INTO carga_produccion
+         (carga_id, desde, hasta, libre_deforestacion_declarado, legalidad_declarada,
+          determinacion_emisor, determinacion_linea_base, determinacion_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now())
+       ON CONFLICT (carga_id) DO UPDATE SET
+         desde = EXCLUDED.desde, hasta = EXCLUDED.hasta,
+         libre_deforestacion_declarado = EXCLUDED.libre_deforestacion_declarado,
+         legalidad_declarada = EXCLUDED.legalidad_declarada,
+         determinacion_emisor = EXCLUDED.determinacion_emisor,
+         determinacion_linea_base = EXCLUDED.determinacion_linea_base,
+         determinacion_at = EXCLUDED.determinacion_at,
+         updated_at = now()
+       RETURNING *`,
+      [req.params.id, desde, hasta, libre, b.legalidad_declarada === true,
+       emisor || null, b.determinacion_linea_base || null, fecha(b.determinacion_at)]
+    );
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'declarar_produccion',
+      entidad: 'carga', entidadId: req.params.id, detalle: { libre_deforestacion: libre, emisor }, ip: req.ip,
+    });
+    res.json({ produccion: rows[0] });
   } catch (err) { next(err); }
 });
 
