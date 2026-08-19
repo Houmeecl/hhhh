@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { query } from '../src/lib/db.js';
+import { SALTO_PROD } from './util/soloDev.js';
 
 // ============================================================
 // Migración 078 — dos valores más para `facturas.categoria_origen`.
@@ -18,6 +19,14 @@ import { query } from '../src/lib/db.js';
 //
 //  · 'operador' — la asignó una persona en la bandeja de revisión manual.
 //    Nadie lo escribe todavía; el CHECK se amplía para que pueda existir.
+//
+// LOS DOS ÚLTIMOS CASOS TOCAN LA BASE Y POR ESO SE SALTAN EN PRODUCCIÓN.
+// `deploy/actualizar.sh` corre `npm test` en el VPS ANTES de reiniciar, con
+// backend/.env apuntando a la base REAL: sin esta guarda, cada despliegue
+// insertaba una sesión «Prueba 078» y sus facturas en producción y después
+// las borraba. `facturas` está encadenada por hash — crear y borrar filas
+// ahí en cada deploy no es un detalle cosmético. Los dos primeros casos
+// leen el .sql y siguen corriendo en todas partes.
 // ============================================================
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,7 +43,7 @@ test('078: no hace backfill (no hay forma de saber hacia atrás cuál era cuál)
   assert.ok(!/UPDATE\s+facturas/i.test(sql), 'reinterpretar filas ya guardadas sería inventar');
 });
 
-test('078: el CHECK vigente en la base admite los cuatro valores y rechaza el resto', async () => {
+test('078: el CHECK vigente en la base admite los cuatro valores y rechaza el resto', { skip: SALTO_PROD }, async () => {
   const { rows } = await query(
     `SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint
       WHERE conname = 'facturas_categoria_origen_check'`
@@ -46,7 +55,7 @@ test('078: el CHECK vigente en la base admite los cuatro valores y rechaza el re
   assert.ok(!rows[0].def.includes("'razon_social'"), 'ese vocabulario es de dte_proveedor, no de facturas');
 });
 
-test('078: la base acepta un INSERT con los valores nuevos y rechaza uno inventado', async () => {
+test('078: la base acepta un INSERT con los valores nuevos y rechaza uno inventado', { skip: SALTO_PROD }, async () => {
   const { rows: sRows } = await query(
     `INSERT INTO sesiones (nombre_cliente, rut_cliente) VALUES ('Prueba 078', '11.111.111-1') RETURNING id`
   );

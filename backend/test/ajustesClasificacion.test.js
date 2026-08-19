@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { query, withTx } from '../src/lib/db.js';
+import { EN_PRODUCCION, SALTO_PROD } from './util/soloDev.js';
 import { eslabonValido, hashDocumento } from '../src/services/cadenaHash.js';
 import {
   ESTADOS_REVISABLES, recalcularPorGasto, hashAjuste, anexarAjuste, verificarCadenaAjustes,
@@ -105,7 +106,20 @@ test('solo dos estados entran a la bandeja', () => {
 
 let sesionId, facturaId, usuarioId, hashOriginal;
 
+// ---------- Desde acá, todo toca la BASE ----------
+// `deploy/actualizar.sh` corre `npm test` en el VPS ANTES de reiniciar, con
+// backend/.env apuntando a la base REAL. Sin esta guarda, CADA DESPLIEGUE
+// dejaba rastro permanente en producción: el `after` de más abajo dice, con
+// todas sus letras, que los ajustes NO se borran ni siquiera al terminar
+// (son append-only: borrar un eslabón parte la cadena). O sea que se
+// acumulaban asientos huérfanos en `ajustes_clasificacion` deploy tras
+// deploy, más la cuenta 'operador.ajustes.test@ejemplo.cl' que el before
+// crea y nadie borra, más una factura encadenada que sí se borra —dejando
+// su hueco en la cadena de `facturas`.
+//
+// En desarrollo no cambia nada: la suite completa sigue corriendo igual.
 before(async () => {
+  if (EN_PRODUCCION) return;
   const { rows: uRows } = await query(
     // Se REUSA entre corridas: `ajustes_clasificacion.usuario_id` es ON DELETE
     // RESTRICT a propósito —borrar la cuenta de un operador no puede dejar un
@@ -140,6 +154,7 @@ before(async () => {
 });
 
 after(async () => {
+  if (EN_PRODUCCION) return;
   // Los AJUSTES no se borran, ni siquiera acá: son append-only y borrar un
   // eslabón parte la cadena para todos los demás. Quedan huérfanos
   // (factura_id NULL por el ON DELETE SET NULL) y siguen verificando, que es
@@ -149,7 +164,7 @@ after(async () => {
   // El usuario NO se borra: firma asientos que sobreviven a esta prueba.
 });
 
-test('el hash del documento original NO cambia al registrar un ajuste', async () => {
+test('el hash del documento original NO cambia al registrar un ajuste', { skip: SALTO_PROD }, async () => {
   await withTx((client) => anexarAjuste(client, {
     factura_id: facturaId, categoria_codigo: 'electricidad', categoria: 'Energía eléctrica',
     co2e_ajustado: 1.5, co2e_original: 3, usuario_id: usuarioId,
@@ -170,7 +185,7 @@ test('el hash del documento original NO cambia al registrar un ajuste', async ()
   assert.ok(eslabonValido(f), 'y la verificación sigue dando el mismo resultado que antes');
 });
 
-test('la vista `facturas_vigentes` sí muestra la clasificación del operador', async () => {
+test('la vista `facturas_vigentes` sí muestra la clasificación del operador', { skip: SALTO_PROD }, async () => {
   const { rows } = await query(
     `SELECT total_co2e::float AS total_co2e, categoria, categoria_codigo, categoria_origen,
             total_co2e_original::float AS total_co2e_original, categoria_original,
@@ -191,7 +206,7 @@ test('la vista `facturas_vigentes` sí muestra la clasificación del operador', 
   assert.equal(v.hash_cadena, hashOriginal.hash_cadena);
 });
 
-test('append-only: un segundo ajuste no borra el primero, y manda el último', async () => {
+test('append-only: un segundo ajuste no borra el primero, y manda el último', { skip: SALTO_PROD }, async () => {
   await withTx((client) => anexarAjuste(client, {
     factura_id: facturaId, categoria_codigo: 'agua', categoria: 'Agua',
     co2e_ajustado: 2, co2e_original: 3, usuario_id: usuarioId, motivo: 'Corrijo: era agua',
@@ -207,13 +222,13 @@ test('append-only: un segundo ajuste no borra el primero, y manda el último', a
   assert.equal(rows[0].categoria, 'Agua', 'vale el de mayor eslabón');
 });
 
-test('la cadena de ajustes verifica por separado', async () => {
+test('la cadena de ajustes verifica por separado', { skip: SALTO_PROD }, async () => {
   const r = await verificarCadenaAjustes((sql) => query(sql));
   assert.equal(r.valido, true);
   assert.ok(r.total_eslabones >= 2);
 });
 
-test('borrar la factura NO parte la cadena de ajustes', async () => {
+test('borrar la factura NO parte la cadena de ajustes', { skip: SALTO_PROD }, async () => {
   // El FK es ON DELETE SET NULL y no CASCADE: con CASCADE, purgar un
   // documento por retención (migración 048) borraba sus eslabones y la
   // verificación pasaba a denunciar una alteración que nunca ocurrió.
@@ -244,7 +259,7 @@ test('borrar la factura NO parte la cadena de ajustes', async () => {
   assert.equal((await verificarCadenaAjustes((sql) => query(sql))).valido, true);
 });
 
-test('alterar un ajuste rompe SU cadena, no la de las facturas', async () => {
+test('alterar un ajuste rompe SU cadena, no la de las facturas', { skip: SALTO_PROD }, async () => {
   const { rows } = await query(
     `SELECT id, hash_documento FROM ajustes_clasificacion WHERE factura_id = $1 ORDER BY eslabon LIMIT 1`,
     [facturaId]
@@ -266,7 +281,7 @@ test('alterar un ajuste rompe SU cadena, no la de las facturas', async () => {
   }
 });
 
-test('reescribir el contenido firmado sin tocar los hash SÍ se detecta', async () => {
+test('reescribir el contenido firmado sin tocar los hash SÍ se detecta', { skip: SALTO_PROD }, async () => {
   // La verificación anterior solo comprobaba el enlace, así que un UPDATE de
   // co2e_ajustado a 999 pasaba con `valido: true`. El asiento es precisamente
   // lo que una persona firmó: tiene que verificarse su contenido.
