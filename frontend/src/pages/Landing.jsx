@@ -94,6 +94,18 @@ function BentoCard({ accent, extraClass, img, alt, icon: Ico, title, desc, chip 
   );
 }
 
+function PasoFlujo({ step, title, text }) {
+  return (
+    <div className="card" style={{ padding: 22, borderRadius: 18, minHeight: 170 }}>
+      <div style={{ display: 'inline-flex', width: 32, height: 32, borderRadius: '50%', background: 'var(--green-50)', color: 'var(--green-700)', alignItems: 'center', justifyContent: 'center', fontWeight: 700, marginBottom: 12 }}>
+        {step}
+      </div>
+      <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{title}</h3>
+      <p className="muted" style={{ margin: 0, lineHeight: 1.7, fontSize: 14 }}>{text}</p>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { t } = useIdioma();
   const heroRef = useRef(null);
@@ -213,6 +225,58 @@ export default function Landing() {
               title={t('landing.serv4_t')} desc={t('landing.serv4_d')}
               chip={t('landing.shot_chip')}
             />
+          </div>
+        </div>
+      </section>
+
+      <section className="sec-pad" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <h2 className="sec-head">Cómo funciona el motor</h2>
+          <p className="sec-head-sub">Un flujo simple y verificable: recopilar, calcular, publicar y auditar.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+            <PasoFlujo
+              step="1"
+              title="Recoge el documento"
+              text="La operación entra con su origen, cantidad, material y documento base. No hay suposiciones ocultas ni cifras que se “adivinen” en el último paso."
+            />
+            <PasoFlujo
+              step="2"
+              title="Calcula emisiones"
+              text="El motor usa factores reales, categoría y método de cálculo para convertir el dato físico o de gasto en t CO2e, con el desglose visible en cada pasaporte."
+            />
+            <PasoFlujo
+              step="3"
+              title="Publica trazabilidad"
+              text="La evidencia, el hash y la cadena quedan visibles para terceros. El pasaporte es el comprobante público del proceso, no solo un PDF bonito."
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="sec-pad" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div className="card card-pad av-card-hover" style={{ background: 'linear-gradient(180deg, rgba(15, 118, 110, 0.08), rgba(15, 23, 42, 0.02))' }}>
+            <div style={{ marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--green-700)', fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase', fontSize: 12 }}>
+              <Icon.CheckCircle size={15} /> Resultado real del motor
+            </div>
+            <h3 style={{ margin: '0 0 10px', fontSize: 24 }}>No es un mock ni un placeholder: calcula, emite y entrega.</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>1. Cálculo</div>
+                <b>CO2e real por documento, categoría y factor.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>El número se genera desde la operación registrada, no desde una cifra fija ni una demostración visual.</p>
+              </div>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>2. Informes</div>
+                <b>Informe del período y export auditable.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>La misma base de cálculo alimenta el informe mensual, el resumen GHG y el paquete entregable al cliente.</p>
+              </div>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>3. Verificación</div>
+                <b>Pasaporte público con hash y trazabilidad.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>Todo queda visible para verificar el origen, la evidencia y la cadena que respalda el resultado final.</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>

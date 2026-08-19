@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtFecha } from '../api.js';
 import { Icon } from '../components/icons.jsx';
+import { useMaestroDetalle } from '../lib/useMaestroDetalle.js';
 
 // Lista de tránsitos del Corredor Bioceánico que pasan por el punto de
 // ESTE puerto (backend ya filtra por punto_id de la sesión — nunca se
@@ -9,29 +10,13 @@ import { Icon } from '../components/icons.jsx';
 export default function Transitos() {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [seleccionado, setSeleccionado] = useState(null);
-  const [detalle, setDetalle] = useState(null);
-  const [cargandoDetalle, setCargandoDetalle] = useState(false);
-  const [errorDetalle, setErrorDetalle] = useState('');
+  const {
+    seleccionado, detalle, cargando: cargandoDetalle, error: errorDetalle, abrir,
+  } = useMaestroDetalle(api.puertoTransito);
 
   useEffect(() => {
     api.puertoTransitos().then(setData).catch((e) => setError(e.message));
   }, []);
-
-  async function abrir(codigo) {
-    setSeleccionado(codigo);
-    setDetalle(null);
-    setErrorDetalle('');
-    setCargandoDetalle(true);
-    try {
-      const d = await api.puertoTransito(codigo);
-      setDetalle(d);
-    } catch (e) {
-      setErrorDetalle(e.message);
-    } finally {
-      setCargandoDetalle(false);
-    }
-  }
 
   if (error) return <div className="badge badge-red" style={{ display: 'block', padding: 14 }}>{error}</div>;
   if (!data) return <div style={{ padding: 40, textAlign: 'center' }}><span className="spinner dark" /> Cargando…</div>;

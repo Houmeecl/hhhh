@@ -142,6 +142,20 @@ export default function Pasaporte() {
               <div className="muted" style={{ fontSize: 12, margin: '4px 0 10px' }}>
                 {t('pas.metodo')}: {String(data.producto.motor || '').startsWith('propio') ? t('pas.motor_propio') : t('pas.motor_externo')}
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
+                <div className="card" style={{ padding: '12px 14px', borderRadius: 12 }}>
+                  <div className="pas-lbl">Motor</div>
+                  <b>{String(data.producto.motor || '').startsWith('propio') ? t('pas.motor_propio') : t('pas.motor_externo')}</b>
+                </div>
+                <div className="card" style={{ padding: '12px 14px', borderRadius: 12 }}>
+                  <div className="pas-lbl">Base de cálculo</div>
+                  <b>{data.producto.clasificacion_ghg || data.producto.categoria_nombre || 'Documento registrado'}</b>
+                </div>
+                <div className="card" style={{ padding: '12px 14px', borderRadius: 12 }}>
+                  <div className="pas-lbl">Evidencia</div>
+                  <b>{data.producto.documento || 'Sin documento'}</b>
+                </div>
+              </div>
               {data.clima.items.length > 0 && (
                 <div className="table-scroll">
                   <table className="data">
