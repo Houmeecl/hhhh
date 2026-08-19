@@ -6,6 +6,7 @@ import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, requireSeccion, requireNivelOperador, logActividad, signAccess } from '../middleware/auth.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
 import { verificarCadenaCompleta, GENESIS, hashCadena } from '../services/cadenaHash.js';
+import { listoParaExportar, semaforoExportacion, glosaExportacion, urgenciaExportacion } from '../services/exportacion.js';
 import { generarClave, generarSerial } from '../services/posTerminal.js';
 import { generateCredencialTarjeta, generateCredencialProveedor, generateInformeCarbono } from '../services/pdf.js';
 import { leerDocumentoGenerico } from '../services/lecturaDocumentoGenerico.js';
@@ -178,6 +179,26 @@ router.get('/lotes/:id', async (req, res, next) => {
       balance: balanceMasas(lote, eslabones),
       emisiones: emisionesIncorporadasPorTonelada(lote, eslabones),
       normativo: resumenNormativo(lote, declaraciones),
+      // Estado de exportación: QUÉ régimen le toca a esta carga y qué le
+      // falta. Va aparte de `normativo` y no dentro, porque `normativo.cbam`
+      // lo consumen el export del mandante (routes/mandante.js) y el PDF, y
+      // ahí no se toca nada.
+      //
+      // `n_eslabones` se arma acá: el SELECT del lote no lo trae y el
+      // requisito "actores" lo necesita. Sin esto, un lote con tres
+      // eslabones diría "sin actores registrados".
+      exportacion: (() => {
+        const estado = listoParaExportar({ ...lote, n_eslabones: eslabones.length });
+        return {
+          ...estado,
+          semaforo: semaforoExportacion(estado),
+          glosa: glosaExportacion(estado),
+          // Lo primero que hay que atender: una prohibición de entrada
+          // (EUDR) pesa más que un sobrecosto (CBAM), y la pantalla no
+          // puede mostrarlos con la misma urgencia.
+          urgencia: urgenciaExportacion(estado),
+        };
+      })(),
       integridad: verificarCadenaCompleta(eslabones),
     });
   } catch (err) { next(err); }
