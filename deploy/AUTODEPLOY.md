@@ -8,6 +8,10 @@
 > Usa el mismo SMTP que el resto de la plataforma; no hay una segunda
 > configuración que mantener.
 
+> **REGLA: en `/opt/sicr3p` NO SE COMMITEA.** Este repo solo RECIBE código. Ver
+> «Nunca commitees en el VPS» más abajo — es la causa del incidente del
+> 19-08-2026, que tuvo el despliegue trabado un día entero.
+
 Actualización automática de producción: un cron revisa cada 30 minutos si la rama
 de producción tiene commits nuevos y, si los hay, actualiza el VPS solo — con
 respaldo previo, health check y **rollback automático** si algo sale mal.
@@ -290,3 +294,60 @@ registro parcial) y se pide reescanear el documento — todos los datos de
 una factura salen siempre de la lectura automática, nunca de un tipeo
 humano. Con la tasa de rechazo bajo control, `SIMPLE_API_KEY` puede
 eliminarse del .env.
+
+---
+
+## Nunca commitees en el VPS
+
+`/opt/sicr3p` es un repo de **solo lectura en la práctica**: recibe código, no lo
+crea. Hay dos razones y las dos son duras.
+
+**1. Lo que commitees ahí no tiene respaldo en ninguna parte.** El VPS puede
+*leer* de GitHub pero **no puede escribir**: no tiene credenciales de push. Un
+commit hecho en producción queda atrapado en esa máquina — ni siquiera se puede
+rescatar con un `git push` — y desaparece con el primer `reset --hard`, o con el
+`checkout -B` que hace el rollback automático de `actualizar.sh`.
+
+**2. Divergir la historia deja el despliegue muerto, y el síntoma engaña.**
+`actualizar.sh` hace `git pull --ff-only` a propósito: nunca merge, nunca force.
+Con la historia divergida ese pull **no puede avanzar jamás**, así que cada
+deploy falla y manda el commit a cuarentena. Lo que se lee en el log es
+`commit XXXXXXX EN CUARENTENA`, que apunta al commit **equivocado**: el problema
+no es ese commit, es el repo.
+
+### Qué pasó el 19-08-2026
+
+Alguien commiteó a mano en `/opt/sicr3p` a las 05:44. La historia divergió y
+**todos** los deploys posteriores fallaron. Se perdieron horas persiguiendo
+causas que no eran —un test acoplado al `.env`, un lock heredado por un proceso
+huérfano, una función llamada antes de definirse—, todas reales pero ninguna la
+principal. El repo se reconcilió recién a las 08:15.
+
+El commit se pudo rescatar de milagro: `git reset --hard` no borra el objeto en
+el acto, sigue en el reflog hasta que corre un `git gc`.
+
+### Qué hacer si tienes que tocar código con urgencia
+
+1. Trabaja en un clon aparte (tu máquina, otro directorio), commitea y **sube a
+   GitHub**.
+2. En el VPS: `bash deploy/actualizar.sh`.
+
+Si de verdad no hay otra vía y hay que parchar en caliente, **súbelo apenas
+puedas** y avisa. Desde el 19-08-2026 `actualizar.sh` **detecta y avisa** cuando
+el repo tiene commits que no están en origin — por log y por correo, en la
+primera línea de cada corrida. **Avisa, no bloquea**: en una emergencia lo último
+que se necesita es un deploy que se niegue a correr.
+
+### Cómo rescatar un commit atrapado
+
+```bash
+cd /opt/sicr3p
+git log origin/<rama>..HEAD --oneline        # qué hay solo acá
+git branch rescate-<sha> <sha>               # ánclalo: lo salva del gc
+git format-patch -1 <sha> -o /root/backups/  # sácalo a un archivo
+```
+
+El `git branch` es lo urgente: mientras el commit solo viva en el reflog, un
+`git gc` puede borrarlo. Con una rama apuntándolo deja de ser alcanzable por el
+recolector. Después, el `.patch` se copia fuera del servidor y se aplica desde
+un clon con permisos de push.

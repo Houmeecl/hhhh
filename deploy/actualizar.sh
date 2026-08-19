@@ -152,6 +152,30 @@ else
   git fetch --quiet origin "$RAMA"
   COMMIT_PREVIO="$(git rev-parse HEAD)"
   COMMIT_REMOTO="$(git rev-parse "origin/$RAMA")"
+
+  # ---------- Commits que solo existen en este servidor ----------
+  # AVISA, NO BLOQUEA. Este repo debería solo RECIBIR código: lo que se
+  # commitea acá no está respaldado en ninguna parte, y el VPS tiene acceso
+  # de LECTURA a GitHub pero no de escritura — o sea que ese trabajo queda
+  # atrapado y ni siquiera se puede rescatar con un push.
+  #
+  # Pasó el 19-08-2026 y costó un día entero: alguien commiteó a mano en
+  # /opt/sicr3p a las 05:44, la historia divergió, y como `git pull
+  # --ff-only` no puede avanzar sobre una historia divergida, TODOS los
+  # deploys posteriores fallaron y se fueron a cuarentena. El síntoma que
+  # se veía era "commit XXXX EN CUARENTENA", que apunta al commit
+  # equivocado: el problema no era ese commit, era este repo.
+  #
+  # Con este aviso se habría visto a las 05:45 en vez de a las 10:00.
+  # No bloquea a propósito: si alguien tuvo que parchar producción en una
+  # emergencia, lo último que necesita es que el deploy se niegue a correr.
+  LOCALES="$(git rev-list --count "origin/$RAMA..HEAD" 2>/dev/null || echo 0)"
+  if [ "${LOCALES:-0}" -gt 0 ]; then
+    log "AVISO: este repo tiene $LOCALES commit(s) que NO están en origin/$RAMA. Se hicieron acá y no hay copia en ninguna otra parte. Rescátalos antes de que un rollback o un reset los borre: git log origin/$RAMA..HEAD --oneline"
+    avisar "hay $LOCALES commit(s) solo en el VPS, sin respaldo" \
+      "El repo de /opt/sicr3p tiene trabajo que no está en GitHub. Mientras la historia esté divergida, git pull --ff-only no puede avanzar y todos los deploys van a fallar. Revisar con: git log origin/$RAMA..HEAD --oneline"
+  fi
+
   if [ "$COMMIT_PREVIO" = "$COMMIT_REMOTO" ]; then
     log "sin cambios (HEAD ya es origin/$RAMA en ${COMMIT_PREVIO:0:7})."
     exit 0

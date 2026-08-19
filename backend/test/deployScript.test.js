@@ -52,7 +52,15 @@ function invocacionesDeNivelSuperior(nombre) {
   const usos = [];
   let profundidad = 0;
   lineas.forEach((l, i) => {
-    const sinComentario = l.replace(/#.*$/, '');
+    // Fuera comentarios Y contenido de cadenas: un mensaje de log que
+    // MENCIONA "rollback" no es una invocación de rollback(). Sin esto el
+    // chequeo daba un falso positivo en cuanto alguien escribía el nombre
+    // de una función dentro de un texto — y un test que grita en falso se
+    // termina ignorando, que es peor que no tenerlo.
+    const sinComentario = l
+      .replace(/#.*$/, '')
+      .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+      .replace(/'(?:[^'\\]|\\.)*'/g, "''");
     if (/^[a-zA-Z_][a-zA-Z0-9_]*\s*\(\)\s*\{/.test(l)) profundidad = 1;
     else if (profundidad > 0) {
       profundidad += (sinComentario.match(/\{/g) || []).length;
@@ -105,7 +113,9 @@ test('el bloque de cuarentena termina en exit 0, no a mitad de camino', () => {
   // La guarda de cuarentena existe para que el cron NO reintente un commit
   // roto cada 30 minutos. Si muere antes del `exit 0` —como pasaba— el
   // script sale con error y la marca de "ya avisé" nunca se pone.
-  const i = lineas.findIndex((l) => l.includes('EN CUARENTENA'));
+  // La línea de CÓDIGO, no un comentario que mencione la cuarentena: hay
+  // comentarios más arriba que explican el incidente y citan ese texto.
+  const i = lineas.findIndex((l) => l.includes('EN CUARENTENA') && !l.trim().startsWith('#'));
   assert.ok(i > 0, 'no se encontró el bloque de cuarentena');
   const bloque = lineas.slice(i, i + 8).join('\n');
   assert.match(bloque, /touch "\$AVISADO"/, 'el bloque ya no marca que avisó');
