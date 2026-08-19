@@ -253,6 +253,34 @@ export default function Landing() {
         </div>
       </section>
 
+      <section className="sec-pad" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div className="card card-pad av-card-hover" style={{ background: 'linear-gradient(180deg, rgba(15, 118, 110, 0.08), rgba(15, 23, 42, 0.02))' }}>
+            <div style={{ marginBottom: 14, display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--green-700)', fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase', fontSize: 12 }}>
+              <Icon.CheckCircle size={15} /> Resultado real del motor
+            </div>
+            <h3 style={{ margin: '0 0 10px', fontSize: 24 }}>No es un mock ni un placeholder: calcula, emite y entrega.</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14 }}>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>1. Cálculo</div>
+                <b>CO2e real por documento, categoría y factor.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>El número se genera desde la operación registrada, no desde una cifra fija ni una demostración visual.</p>
+              </div>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>2. Informes</div>
+                <b>Informe del período y export auditable.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>La misma base de cálculo alimenta el informe mensual, el resumen GHG y el paquete entregable al cliente.</p>
+              </div>
+              <div className="card" style={{ padding: 16, borderRadius: 14 }}>
+                <div className="pas-lbl" style={{ marginBottom: 8 }}>3. Verificación</div>
+                <b>Pasaporte público con hash y trazabilidad.</b>
+                <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>Todo queda visible para verificar el origen, la evidencia y la cadena que respalda el resultado final.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Corredor Bioceánico: la línea transfronteriza, con landing propia */}
       <section className="sec-pad sec-alt">
         <div className="container">
