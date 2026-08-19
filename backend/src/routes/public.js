@@ -408,6 +408,79 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
       lecturas = lecturas.filter((_, i) => !fuera.has(i));
     }
 
+    // Documento que YA ESTÁ en la plataforma: se rechaza solo el
+    // duplicado, igual que el de RUT que no calza.
+    //
+    // POR QUÉ IMPORTA TANTO. Hasta acá el sha256 de cada archivo se
+    // calculaba, se guardaba y NUNCA se consultaba. Subir dos veces el
+    // mismo PDF creaba dos facturas, DOS ESLABONES en la cadena de hash,
+    // dos cargos en Capital Natural y doblaba el CO2e del cliente — una
+    // huella inflada y, peor, sellada.
+    //
+    // Se mira por dos caminos porque atrapan cosas distintas:
+    //  · `sha256` — el mismo ARCHIVO. El caso común: alguien reenvía el
+    //    mismo adjunto.
+    //  · `(rut_emisor, tipo_dte, folio)` — el mismo DOCUMENTO TRIBUTARIO
+    //    aunque el archivo sea otro (re-escaneado, convertido, bajado del
+    //    SII). El folio es correlativo por emisor y tipo: los tres juntos
+    //    son la identidad real de un DTE en Chile.
+    //
+    // Va ANTES de la transacción, como el chequeo de créditos: no tiene
+    // sentido consumir un crédito por un documento que ya está adentro.
+    const shas = files.map((f) => crypto.createHash('sha256').update(f.buffer).digest('hex'));
+    const clavesDte = lecturas.map((l) => (l?.dte?.folio && l?.dte?.tipo_dte && l?.dte?.rut_emisor
+      ? { rut: l.dte.rut_emisor, tipo: Number(l.dte.tipo_dte), folio: String(l.dte.folio) }
+      : null));
+
+    const { rows: yaSha } = await query(
+      `SELECT f.sha256, f.sesion_id, f.archivo_original, s.fecha
+         FROM facturas f JOIN sesiones s ON s.id = f.sesion_id
+        WHERE f.sha256 = ANY($1::text[])`,
+      [shas]
+    );
+    const porSha = new Map(yaSha.map((r) => [r.sha256, r]));
+
+    const conDte = clavesDte.filter(Boolean);
+    const { rows: yaDte } = conDte.length
+      ? await query(
+        `SELECT f.rut_emisor, f.tipo_dte, f.folio, f.sesion_id, f.archivo_original, s.fecha
+           FROM facturas f JOIN sesiones s ON s.id = f.sesion_id
+          WHERE (regexp_replace(f.rut_emisor, '[^0-9kK]', '', 'g'), f.tipo_dte, f.folio)
+                IN (${conDte.map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`).join(', ')})`,
+        conDte.flatMap((c) => [normalizarRut(c.rut), c.tipo, c.folio])
+      )
+      : { rows: [] };
+    const porDte = new Map(yaDte.map((r) => [`${normalizarRut(r.rut_emisor)}|${r.tipo_dte}|${r.folio}`, r]));
+
+    const indicesRepetidos = files
+      .map((_, i) => {
+        const c = clavesDte[i];
+        const previo = porSha.get(shas[i])
+          || (c ? porDte.get(`${normalizarRut(c.rut)}|${c.tipo}|${c.folio}`) : null);
+        return previo ? i : -1;
+      })
+      .filter((i) => i >= 0);
+
+    let rechazadosDup = [];
+    if (indicesRepetidos.length > 0) {
+      await registrarRechazos(
+        indicesRepetidos.map((i) => filaRechazo(files[i], lecturas[i], rut, 'duplicado'))
+      );
+      rechazadosDup = indicesRepetidos.map((i) => files[i].originalname);
+      const plural = rechazadosDup.length > 1;
+      if (indicesRepetidos.length === files.length) {
+        return res.status(409).json({
+          error: `${plural ? 'Estos documentos ya están' : `"${rechazadosDup[0]}" ya está`} `
+            + `en tu contabilidad, así que no se ${plural ? 'vuelven' : 'vuelve'} a incorporar: `
+            + `contarlo dos veces inflaría tus emisiones. Si crees que es un documento distinto, escríbenos.`,
+          rechazados: rechazadosDup,
+        });
+      }
+      const fuera = new Set(indicesRepetidos);
+      files = files.filter((_, i) => !fuera.has(i));
+      lecturas = lecturas.filter((_, i) => !fuera.has(i));
+    }
+
     const result = await withTx(async (client) => {
       // Código de acceso con créditos (1 crédito = 1 factura procesada).
       // Se valida y consume DENTRO de la transacción (con lock de fila).
@@ -557,6 +630,7 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
         // retenida, no parte de lo que la cadena atestigua.
         const extension = (file.originalname.match(/\.([a-z0-9]+)$/i)?.[1] || '').toLowerCase() || null;
         const archivoBinario = gzipSync(file.buffer);
+        // Ya calculado arriba para el chequeo de duplicados: no se rehace.
         const sha256Archivo = crypto.createHash('sha256').update(file.buffer).digest('hex');
 
         const { rows: fRows } = await client.query(
@@ -565,8 +639,8 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
               rut_emisor, rut_receptor, total_co2e, categoria, categoria_codigo,
               categoria_origen, status, motor,
               hash_documento, hash_anterior, hash_cadena, eslabon, motor_version_id,
-              archivo_binario, extension, tamano_bytes, sha256)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING *`,
+              archivo_binario, extension, tamano_bytes, sha256, tipo_dte, folio)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING *`,
           [
             sesion.id,
             analysis.invoice_id_simple,
@@ -594,6 +668,13 @@ router.post('/sesiones', cargaLimiter, uploadArchivos, async (req, res, next) =>
             extension,
             file.buffer.length,
             sha256Archivo,
+            // Identidad tributaria del documento (migración 104). Solo la
+            // hay cuando vino XML: un escaneo no la tiene, y por eso el
+            // índice es parcial. Sin esto, el único rastro del folio era
+            // `numero_venta` como texto ('F-1234'), del que no se puede
+            // recuperar el tipo ni comparar de forma fiable.
+            lectura.dte?.tipo_dte ? Number(lectura.dte.tipo_dte) : null,
+            lectura.dte?.folio ? String(lectura.dte.folio) : null,
           ]
         );
         hashAnterior = hCad;
