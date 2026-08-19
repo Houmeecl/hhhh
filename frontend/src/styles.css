@@ -303,6 +303,22 @@ table.data tr:hover td { background: #f3f8f5; }
 .admin-overlay { display: none; }
 .admin-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
 .admin-head h1 { margin: 0; font-size: 26px; }
+.quick-links-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0 0 20px;
+}
+.quick-link {
+  display: flex; align-items: center; gap: 12px; padding: 16px 18px; min-height: 86px;
+}
+.quick-link strong {
+  display: block; font-size: 14px; margin-bottom: 2px; color: var(--navy);
+}
+.quick-link span {
+  display: block; font-size: 12px; color: var(--gray); line-height: 1.4;
+}
+.quick-link-ico {
+  width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center;
+  background: var(--green-50); color: var(--green-600); flex-shrink: 0;
+}
 
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
 .two-col-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -316,6 +332,7 @@ table.data tr:hover td { background: #f3f8f5; }
    interno y sigue desbordando aunque el grid ya haya colapsado a 1 columna. */
 .two-col-grid > *, .form-content-grid > * { min-width: 0; }
 .stat { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+a.stat { cursor: pointer; }
 .stat .n { font-size: 30px; font-weight: 800; color: var(--navy); }
 .stat .n.green { color: var(--green-600); }
 .stat .l { color: var(--gray); font-size: 13px; margin-top: 2px; }
@@ -381,6 +398,7 @@ table.data tr:hover td { background: #f3f8f5; }
 
 @media (max-width: 900px) {
   .form-row, .result-cards, .resultado-grid, .two-col-grid, .form-content-grid { grid-template-columns: 1fr; }
+  .quick-links-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-head { flex-wrap: wrap; gap: 10px; }
 
   /* Admin: barra superior + menú lateral deslizante (drawer).
@@ -404,6 +422,7 @@ table.data tr:hover td { background: #f3f8f5; }
   .pub-header { padding: 14px 16px; flex-wrap: wrap; gap: 10px; }
   /* El nav (idiomas + CTA) también puede quebrar línea: cero desborde a 375px */
   .pub-header nav { gap: 10px; flex-wrap: wrap; }
+  .quick-links-grid { grid-template-columns: 1fr; }
   .pub-footer { padding: 20px 16px; flex-direction: column; align-items: flex-start; text-align: left; }
   .narrow-page { margin: 28px auto; padding: 0 14px; }
   .dropzone { padding: 28px 16px; }

@@ -13,18 +13,20 @@ import { Icon } from '../components/icons.jsx';
 
 export const SECCIONES_ADMIN_NAV = [
   {
-    titulo: 'Operación',
+    titulo: 'Operación y seguimiento',
     items: [
       { slug: 'dashboard', to: '/admin', end: true, ico: Icon.Chart, label: 'Dashboard', siempre: true },
-      { slug: 'enrolar', to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
       { slug: 'clientes', to: '/admin/clientes', ico: Icon.Building, label: 'Clientes y contratos' },
+      { slug: 'enrolar', to: '/admin/enrolar', ico: Icon.Users, label: 'Enrolar cliente' },
       { slug: 'sesiones', to: '/admin/sesiones', ico: Icon.Doc, label: 'Sesiones e informes' },
       { slug: 'buscar', to: '/admin/buscar', ico: Icon.Search, label: 'Búsqueda' },
+      { slug: 'prospectos', to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
+      { slug: 'cobros', to: '/admin/cobros', ico: Icon.Tag, label: 'Cobros y campañas' },
       { slug: 'metricas', to: '/admin/metricas', ico: Icon.Chart, label: 'Métricas' },
     ],
   },
   {
-    titulo: 'Módulos',
+    titulo: 'Procesos de negocio',
     items: [
       // 'tambien': hoy la pantalla de SII es 100% sobre empresas
       // proveedoras (conexión SII, generar, contrato) — una cuenta con
@@ -40,9 +42,8 @@ export const SECCIONES_ADMIN_NAV = [
     ],
   },
   {
-    titulo: 'Comercial',
+    titulo: 'Acceso y comercial',
     items: [
-      { slug: 'prospectos', to: '/admin/prospectos', ico: Icon.Target, label: 'Prospectos' },
       { slug: 'auspiciadores', to: '/admin/auspiciadores', ico: Icon.Users, label: 'Auspiciadores' },
       { slug: 'juego', to: '/admin/juego', ico: Icon.Sparkles, label: 'Sube y Suma' },
       { slug: 'accesos_externos', to: '/admin/accesos', ico: Icon.Qr, label: 'Accesos externos' },
@@ -51,10 +52,6 @@ export const SECCIONES_ADMIN_NAV = [
       // puertos/agencias/trazadores. No otorga nada que
       // 'accesos_externos' no otorgara ya — ver migración 097.
       { slug: 'proveedores', to: '/admin/accesos', ico: Icon.Building, label: 'Proveedores' },
-      // Sección propia y no una pestaña de 'accesos_externos': quien
-      // opera la campaña mueve dinero y ve la lista completa de empresas
-      // contactadas — justo lo que un admin de soporte no necesita ver.
-      { slug: 'cobros', to: '/admin/cobros', ico: Icon.Tag, label: 'Cobros y campañas' },
     ],
   },
   {

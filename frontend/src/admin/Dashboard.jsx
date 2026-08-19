@@ -76,32 +76,54 @@ export default function Dashboard({ user }) {
   }));
 
   const motorPropioTotal = motor ? (motor.propio + motor.propio_texto + motor.propio_ocr + motor.propio_revisado) : 0;
+  const accesosRapidos = [
+    { to: '/admin/clientes', label: 'Clientes', note: 'Contratos y estado', ico: Icon.Building },
+    { to: '/admin/prospectos', label: 'Prospectos', note: 'Leads por atender', ico: Icon.Target },
+    { to: '/admin/corredor', label: 'Corredor', note: 'Operación y tránsitos', ico: Icon.Target },
+    { to: '/admin/trazabilidad', label: 'Trazabilidad', note: 'Inventario y verificación', ico: Icon.Doc },
+  ];
 
   return (
     <div>
       <div className="admin-head"><h1>Dashboard</h1></div>
 
+      <div className="quick-links-grid">
+        {accesosRapidos.map(({ to, label, note, ico: Ico }) => (
+          <Link key={to} to={to} className="card quick-link" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className="quick-link-ico"><Ico size={18} /></div>
+            <div>
+              <strong>{label}</strong>
+              <span>{note}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
       <div className="stat-grid">
-        <div className="stat">
+        {/* Los 4 stats de arriba antes eran solo lectura — un numero sin
+            ninguna accion asociada. Ahora, mismo criterio que "Leads por
+            atender": cada uno enlaza a la pantalla donde ese dato se
+            explica y se puede accionar. */}
+        <Link to="/admin/sesiones" className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="n green">{fmt(d.co2e_mes, 2)}</div>
           <div className="l">t CO2e este mes</div>
           <Variacion v={d.co2e_mes_var} />
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/admin/sesiones" className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="n">{fmtInt(d.sesiones_mes)}</div>
           <div className="l">Sesiones del mes</div>
           <Variacion v={d.sesiones_mes_var} />
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/admin/sesiones" className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="n">{fmtInt(d.facturas_mes)}</div>
           <div className="l">Facturas del mes</div>
           <Variacion v={d.facturas_mes_var} />
-        </div>
-        <div className="stat">
+        </Link>
+        <Link to="/admin/clientes" className="stat" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="n">{fmtInt(clientesTotales)}</div>
           <div className="l">Clientes totales</div>
           <span className="muted" style={{ fontSize: 12.5 }}>{fmt(d.co2e_acumulado, 1)} t CO2e acumulado</span>
-        </div>
+        </Link>
         {/* Leads sin atender: inscripciones pendientes + interesados de las
             landings/calculadora. Antes esto no se veía en ninguna parte del
             dashboard y un lead podía enfriarse días sin que nadie lo notara. */}

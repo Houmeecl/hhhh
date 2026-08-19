@@ -5,6 +5,7 @@ import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { useScrollReveal } from '../lib/scrollReveal.js';
+import { useSeo } from '../lib/seo.js';
 import { api } from '../api.js';
 
 // Cursos cuyo contenido cita normativa de un país específico: se marca en
@@ -23,6 +24,10 @@ export default function InstitutoLanding() {
   const { t } = useIdioma();
   const navigate = useNavigate();
   useScrollReveal();
+  useSeo(
+    'Instituto sicr3p — Capacitación en Ley REP y carbono | sicr3p',
+    'Cursos breves sobre cómo operar sicr3p: Ley REP, contabilidad de carbono y captura documental, con constancia sellada y verificable por serial.'
+  );
   const [cursos, setCursos] = useState([]);
   const [error, setError] = useState(false);
   const [serial, setSerial] = useState('');

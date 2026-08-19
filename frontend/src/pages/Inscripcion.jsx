@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import Logo from '../components/Logo.jsx';
 import { Icon } from '../components/icons.jsx';
 import { useIdioma } from '../lib/i18n.js';
+import { useSeo } from '../lib/seo.js';
 import { api } from '../api.js';
 import { validarRut } from '../lib/rut.js';
 
@@ -32,6 +33,10 @@ const BENEFICIOS = [
 
 export default function Inscripcion() {
   const { t } = useIdioma();
+  useSeo(
+    'Inscripción de empresas — sicr3p',
+    'Inscribe tu empresa en sicr3p: contabilidad de carbono, trazabilidad documental y declaración REP desde una misma carga de facturas.'
+  );
   const [f, setF] = useState(VACIO);
   const [enviando, setEnviando] = useState(false);
   const [listo, setListo] = useState(null);

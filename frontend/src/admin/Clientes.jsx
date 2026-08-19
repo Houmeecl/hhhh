@@ -53,6 +53,19 @@ export default function Clientes({ rol }) {
 
   const badge = (e) => e === 'activo' ? 'badge-green' : e === 'piloto' ? 'badge-amber' : 'badge-red';
 
+  // Alerta de vencimiento de contrato — se calcula solo con fecha_fin, ya
+  // presente en el registro (no requiere backend nuevo). Regla acordada:
+  // avisar a 7/3/1 días de vencer, y marcar el vencido que ya pasó la fecha
+  // y sigue en estado "activo" (contrato caído que nadie renovó).
+  const DIA_MS = 86400000;
+  function alertaVigencia(c) {
+    if (!c.fecha_fin) return null;
+    const dias = Math.ceil((new Date(c.fecha_fin).getTime() - Date.now()) / DIA_MS);
+    if (dias < 0 && c.estado_contrato === 'activo') return { texto: 'vencido', clase: 'badge-red' };
+    if (dias <= 7 && dias >= 0 && c.estado_contrato !== 'vencido') return { texto: `vence en ${dias}d`, clase: 'badge-amber' };
+    return null;
+  }
+
   return (
     <div>
       <div className="admin-head">
@@ -67,23 +80,31 @@ export default function Clientes({ rol }) {
             <tr><th>Empresa</th><th>RUT</th><th>Contacto</th><th>Contrato</th><th>Plan</th><th>Vigencia</th><th></th></tr>
           </thead>
           <tbody>
-            {clientes.map((c) => (
-              <tr key={c.id}>
-                <td><b>{c.nombre_empresa}</b></td>
-                <td>{c.rut}</td>
-                <td className="muted">{c.contacto_email || '—'}</td>
-                <td><span className={`badge ${badge(c.estado_contrato)}`}>{c.estado_contrato}</span></td>
-                <td>{c.plan}</td>
-                <td className="muted" style={{ fontSize: 13 }}>{fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}</td>
-                <td style={{ whiteSpace: 'nowrap' }}>
-                  {esAdmin && <>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setModal({ mode: 'editar', data: { ...c, fecha_inicio: c.fecha_inicio?.slice(0,10) || '', fecha_fin: c.fecha_fin?.slice(0,10) || '' } })}>Editar</button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => setCuenta({ id: c.id, email: c.contacto_email || '' })}>Crear cuenta</button>
-                    <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => eliminar(c.id)}>Eliminar</button>
-                  </>}
-                </td>
-              </tr>
-            ))}
+            {clientes.map((c) => {
+              const alerta = alertaVigencia(c);
+              return (
+                <tr key={c.id}>
+                  <td><b>{c.nombre_empresa}</b></td>
+                  <td>{c.rut}</td>
+                  <td className="muted">{c.contacto_email || '—'}</td>
+                  <td><span className={`badge ${badge(c.estado_contrato)}`}>{c.estado_contrato}</span></td>
+                  <td>{c.plan}</td>
+                  <td className="muted" style={{ fontSize: 13 }}>
+                    {fmtFecha(c.fecha_inicio)} → {fmtFecha(c.fecha_fin)}
+                    {alerta && (
+                      <span className={`badge ${alerta.clase}`} style={{ marginLeft: 6 }}>{alerta.texto}</span>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {esAdmin && <>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setModal({ mode: 'editar', data: { ...c, fecha_inicio: c.fecha_inicio?.slice(0,10) || '', fecha_fin: c.fecha_fin?.slice(0,10) || '' } })}>Editar</button>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setCuenta({ id: c.id, email: c.contacto_email || '' })}>Crear cuenta</button>
+                      <button className="btn btn-ghost btn-sm" style={{ color: '#b91c1c' }} onClick={() => eliminar(c.id)}>Eliminar</button>
+                    </>}
+                  </td>
+                </tr>
+              );
+            })}
             {clientes.length === 0 && <tr><td colSpan={7} className="muted" style={{ textAlign: 'center', padding: 30 }}>Sin clientes aún.</td></tr>}
           </tbody>
         </table>

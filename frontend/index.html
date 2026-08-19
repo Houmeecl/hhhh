@@ -6,16 +6,64 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f1f2e'/%3E%3Ctext x='15' y='25' font-family='Arial' font-size='22' font-weight='bold' fill='white' text-anchor='middle'%3E3%3C/text%3E%3Ccircle cx='25' cy='8' r='3.4' fill='%2328a745'/%3E%3C/svg%3E" />
     <title>sicr3p · Contabilidad de carbono trazable</title>
     <meta name="description" content="Sube tus facturas, descarga tu contabilidad de carbono. Tu contabilidad, tu trazabilidad." />
-    <!-- PWA: instalable en tablet (terminal del mostrador presencial) — requiere HTTPS -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#0f1f2e" />
-    <link rel="apple-touch-icon" href="/icons/icono-192.png" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+  <link rel="canonical" href="https://sicr3p.cl/" />
+  <!-- es-CL es el único mercado servido hoy (factores y RUT chilenos);
+       el selector 'pe' reusa los mismos factores con RUC/soles, así que
+       no es un locale propio todavía — ver comentario en lib/i18n.js. -->
+  <link rel="alternate" hreflang="es-CL" href="https://sicr3p.cl/" />
+  <link rel="alternate" hreflang="x-default" href="https://sicr3p.cl/" />
+
+  <!-- Open Graph / Twitter cards — antes ausentes: compartir el link en
+       WhatsApp, LinkedIn o Slack mostraba una vista previa vacía. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="sicr3p" />
+  <meta property="og:locale" content="es_CL" />
+  <meta property="og:url" content="https://sicr3p.cl/" />
+  <meta property="og:title" content="sicr3p · Contabilidad de carbono trazable" />
+  <meta property="og:description" content="Sube tus facturas, descarga tu contabilidad de carbono. Tu contabilidad, tu trazabilidad." />
+  <meta property="og:image" content="https://sicr3p.cl/img/plataforma/pasaporte-real.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="sicr3p · Contabilidad de carbono trazable" />
+  <meta name="twitter:description" content="Sube tus facturas, descarga tu contabilidad de carbono. Tu contabilidad, tu trazabilidad." />
+  <meta name="twitter:image" content="https://sicr3p.cl/img/plataforma/pasaporte-real.webp" />
+
+  <!-- JSON-LD: Organization + WebSite, la info estructurada mínima que
+       un buscador necesita para entender qué es sicr3p sin depender
+       solo del texto de la portada (SPA renderizada en el cliente). -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "sicr3p",
+      "legalName": "SICR3P SpA",
+      "url": "https://sicr3p.cl/",
+      "logo": "https://sicr3p.cl/icons/icono-512.png",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Antofagasta",
+        "addressCountry": "CL"
+      }
+    }
+  </script>
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "sicr3p",
+      "url": "https://sicr3p.cl/"
+    }
+  </script>
+
+  <!-- PWA: instalable en tablet (terminal del mostrador presencial) — requiere HTTPS -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0f1f2e" />
+  <link rel="apple-touch-icon" href="/icons/icono-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
 </html>

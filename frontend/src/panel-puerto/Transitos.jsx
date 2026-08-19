@@ -39,6 +39,16 @@ export default function Transitos() {
   const nAbiertos = data.transitos.filter((t) => t.estado === 'abierto').length;
   const nCerrados = data.transitos.length - nAbiertos;
 
+  // Mismo criterio que Expedientes.jsx (panel de Agencia): abiertos
+  // primero y, entre ellos, el más estancado primero — evita que un
+  // tránsito parado hace días quede enterrado en una lista larga.
+  const AHORA = Date.now();
+  const HORA_MS = 3600 * 1000;
+  const transitosOrdenados = [...data.transitos].sort((a, b) => {
+    if ((a.estado === 'abierto') !== (b.estado === 'abierto')) return a.estado === 'abierto' ? -1 : 1;
+    return new Date(a.updated_at) - new Date(b.updated_at);
+  });
+
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Tránsitos por {data.puerto.nombre}</h1>
@@ -62,16 +72,27 @@ export default function Transitos() {
               <table className="data">
                 <thead><tr><th>Código</th><th>Material</th><th>Estado</th><th>Eslabones</th><th>Actualizado</th><th></th></tr></thead>
                 <tbody>
-                  {data.transitos.map((t) => (
-                    <tr key={t.id} className={seleccionado === t.codigo ? 'active' : ''}>
-                      <td style={{ fontFamily: 'monospace' }}>{t.codigo}</td>
-                      <td>{t.material}</td>
-                      <td><span className={`badge ${t.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{t.estado}</span></td>
-                      <td>{t.n_eslabones}</td>
-                      <td>{fmtFecha(t.updated_at)}</td>
-                      <td><button className="btn btn-sm btn-outline" onClick={() => abrir(t.codigo)}>Ver</button></td>
-                    </tr>
-                  ))}
+                  {transitosOrdenados.map((t) => {
+                    const horasSinMover = (AHORA - new Date(t.updated_at).getTime()) / HORA_MS;
+                    const estancado = t.estado === 'abierto' && horasSinMover >= 72;
+                    return (
+                      <tr key={t.id} className={seleccionado === t.codigo ? 'active' : ''}>
+                        <td style={{ fontFamily: 'monospace' }}>{t.codigo}</td>
+                        <td>{t.material}</td>
+                        <td>
+                          <span className={`badge ${t.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{t.estado}</span>
+                          {estancado && (
+                            <span className="badge badge-amber" style={{ marginLeft: 6 }} title="Sin movimiento hace más de 72 horas">
+                              <Icon.Alert size={11} /> estancado
+                            </span>
+                          )}
+                        </td>
+                        <td>{t.n_eslabones}</td>
+                        <td>{fmtFecha(t.updated_at)}</td>
+                        <td><button className="btn btn-sm btn-outline" onClick={() => abrir(t.codigo)}>Ver</button></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

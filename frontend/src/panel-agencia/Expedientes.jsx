@@ -11,6 +11,37 @@ const TIPO_DOCUMENTO_LABEL = {
 const SEMAFORO_BADGE = { verde: 'badge-green', amarillo: 'badge-amber', rojo: 'badge-red', gris: 'badge-gray' };
 const SEMAFORO_LABEL = { verde: 'Completo', amarillo: 'Parcial', rojo: 'Sin documentos', gris: 'Sin criterio' };
 
+// Etapa del ciclo del expediente — se calcula solo a partir de datos que
+// YA llegan con el detalle (semáforo de documentos + estado del lote):
+// no se inventa ningún campo nuevo de backend. Documentos incompletos
+// bloquea visualmente las etapas siguientes (Validación/Trazabilidad no
+// se marcan "alcanzadas" mientras el semáforo no esté en verde), para que
+// nadie asuma un expediente listo para entrega sin estarlo.
+const ETAPAS = ['Documentos', 'Validación', 'Trazabilidad', 'Entrega'];
+function etapaActual(lote, semaforo) {
+  if (lote?.estado === 'cerrado') return 3;
+  const color = semaforo?.color;
+  if (color === 'verde') return 2; // documentos completos → listo para firma/trazabilidad
+  if (color === 'amarillo') return 1; // documentos parciales → en validación
+  return 0; // rojo/gris/sin semáforo → falta cargar documentos
+}
+
+function EtapaStepper({ etapa }) {
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+      {ETAPAS.map((label, i) => (
+        <span
+          key={label}
+          className={`badge ${i < etapa ? 'badge-green' : i === etapa ? 'badge-amber' : 'badge-gray'}`}
+          style={i > etapa ? { opacity: 0.55 } : undefined}
+        >
+          {i + 1}. {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Lista de expedientes (lotes documentales) de ESTA agencia — el backend
 // ya filtra por agencia_id de la sesión, nunca se ve el expediente de otra
 // agencia — + detalle con documentos, semáforo y cadena de custodia.
@@ -48,6 +79,17 @@ export default function Expedientes() {
   const nAbiertos = data.expedientes.filter((l) => l.estado === 'abierto').length;
   const nCerrados = data.expedientes.length - nAbiertos;
 
+  // Prioriza lo que exige acción: abiertos primero y, dentro de ellos, el
+  // más estancado primero (mismo criterio que la alerta de inactividad
+  // 72h) — así la fila que lleva más tiempo sin moverse no se pierde al
+  // final de una lista larga en orden arbitrario del backend.
+  const AHORA = Date.now();
+  const HORA_MS = 3600 * 1000;
+  const expedientesOrdenados = [...data.expedientes].sort((a, b) => {
+    if ((a.estado === 'abierto') !== (b.estado === 'abierto')) return a.estado === 'abierto' ? -1 : 1;
+    return new Date(a.updated_at) - new Date(b.updated_at);
+  });
+
   return (
     <div>
       <h1 style={{ marginTop: 0 }}>Expedientes de {data.agencia.nombre}</h1>
@@ -70,16 +112,27 @@ export default function Expedientes() {
               <table className="data">
                 <thead><tr><th>Código</th><th>Material</th><th>Estado</th><th>Docs.</th><th>Actualizado</th><th></th></tr></thead>
                 <tbody>
-                  {data.expedientes.map((l) => (
-                    <tr key={l.id} className={seleccionado === l.codigo ? 'active' : ''}>
-                      <td style={{ fontFamily: 'monospace' }}>{l.codigo}</td>
-                      <td>{l.material}</td>
-                      <td><span className={`badge ${l.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{l.estado}</span></td>
-                      <td>{l.doc_n_documentos}</td>
-                      <td>{fmtFecha(l.updated_at)}</td>
-                      <td><button className="btn btn-sm btn-outline" onClick={() => abrir(l.codigo)}>Ver</button></td>
-                    </tr>
-                  ))}
+                  {expedientesOrdenados.map((l) => {
+                    const horasSinMover = (AHORA - new Date(l.updated_at).getTime()) / HORA_MS;
+                    const estancado = l.estado === 'abierto' && horasSinMover >= 72;
+                    return (
+                      <tr key={l.id} className={seleccionado === l.codigo ? 'active' : ''}>
+                        <td style={{ fontFamily: 'monospace' }}>{l.codigo}</td>
+                        <td>{l.material}</td>
+                        <td>
+                          <span className={`badge ${l.estado === 'abierto' ? 'badge-green' : 'badge-gray'}`}>{l.estado}</span>
+                          {estancado && (
+                            <span className="badge badge-amber" style={{ marginLeft: 6 }} title="Sin movimiento hace más de 72 horas">
+                              <Icon.Alert size={11} /> estancado
+                            </span>
+                          )}
+                        </td>
+                        <td>{l.doc_n_documentos}</td>
+                        <td>{fmtFecha(l.updated_at)}</td>
+                        <td><button className="btn btn-sm btn-outline" onClick={() => abrir(l.codigo)}>Ver</button></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -99,6 +152,7 @@ export default function Expedientes() {
               <p className="muted" style={{ fontSize: 13 }}>
                 {detalle.lote.material} · {detalle.lote.cantidad} {detalle.lote.unidad} · origen {detalle.lote.pais_origen}
               </p>
+              <EtapaStepper etapa={etapaActual(detalle.lote, detalle.semaforo)} />
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
                 <span className={`badge ${detalle.integridad.valido ? 'badge-green' : 'badge-red'}`}>
                   <Icon.Shield size={12} /> {detalle.integridad.valido ? 'Cadena íntegra' : 'Cadena alterada'}
