@@ -94,6 +94,18 @@ function BentoCard({ accent, extraClass, img, alt, icon: Ico, title, desc, chip 
   );
 }
 
+function PasoFlujo({ step, title, text }) {
+  return (
+    <div className="card" style={{ padding: 22, borderRadius: 18, minHeight: 170 }}>
+      <div style={{ display: 'inline-flex', width: 32, height: 32, borderRadius: '50%', background: 'var(--green-50)', color: 'var(--green-700)', alignItems: 'center', justifyContent: 'center', fontWeight: 700, marginBottom: 12 }}>
+        {step}
+      </div>
+      <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>{title}</h3>
+      <p className="muted" style={{ margin: 0, lineHeight: 1.7, fontSize: 14 }}>{text}</p>
+    </div>
+  );
+}
+
 export default function Landing() {
   const { t } = useIdioma();
   const heroRef = useRef(null);
@@ -212,6 +224,30 @@ export default function Landing() {
               icon={Icon.Users}
               title={t('landing.serv4_t')} desc={t('landing.serv4_d')}
               chip={t('landing.shot_chip')}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section className="sec-pad" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <h2 className="sec-head">Cómo funciona el motor</h2>
+          <p className="sec-head-sub">Un flujo simple y verificable: recopilar, calcular, publicar y auditar.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+            <PasoFlujo
+              step="1"
+              title="Recoge el documento"
+              text="La operación entra con su origen, cantidad, material y documento base. No hay suposiciones ocultas ni cifras que se “adivinen” en el último paso."
+            />
+            <PasoFlujo
+              step="2"
+              title="Calcula emisiones"
+              text="El motor usa factores reales, categoría y método de cálculo para convertir el dato físico o de gasto en t CO2e, con el desglose visible en cada pasaporte."
+            />
+            <PasoFlujo
+              step="3"
+              title="Publica trazabilidad"
+              text="La evidencia, el hash y la cadena quedan visibles para terceros. El pasaporte es el comprobante público del proceso, no solo un PDF bonito."
             />
           </div>
         </div>
