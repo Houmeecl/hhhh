@@ -51,6 +51,27 @@ export const config = {
 
   databaseUrl: process.env.DATABASE_URL,
 
+  // ---------- Corredor Bioceánico: base APARTE ----------
+  // Producto distinto, base distinta. `sicr3p_corredor` vive en el mismo
+  // Postgres que `sicr3p` pero es otra base, y eso importa: Postgres NO
+  // puede hacer JOIN entre bases distintas, así que "no se mezclan" queda
+  // garantizado por el motor y no por la disciplina de quien escriba la
+  // próxima consulta.
+  //
+  // Secreto de JWT propio, por lo mismo. Compartirlo haría que un token
+  // del Corredor verificara contra la app principal —lo rechazarían los
+  // guardias de panel, sí, pero el token sería estructuralmente válido—.
+  // Con secretos distintos ni siquiera verifica.
+  //
+  // TODO opcional a propósito: sin DATABASE_URL_CORREDOR el subsistema
+  // queda apagado y la app principal arranca igual. El Corredor es
+  // producto nuevo; que su ausencia tumbe el backend de una empresa que
+  // solo usa la contabilidad sería el peor intercambio posible.
+  corredor: {
+    databaseUrl: process.env.DATABASE_URL_CORREDOR || '',
+    jwtSecret: process.env.JWT_SECRET_CORREDOR || '',
+  },
+
   // El cobro de compensación es 100% simulado hoy: no hay pasarela conectada
   // ni socio ambiental formalizado (VirtualPos, Kontax — ver ETAPA3.md). Con
   // esto en false el paso se oculta del flujo de carga y sus métricas dejan

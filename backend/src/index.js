@@ -2,7 +2,7 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import { config } from './config.js';
-import { runMigrations } from './lib/migrate.js';
+import { runMigrations, runMigrationsCorredor } from './lib/migrate.js';
 import { verificarConfigProduccion } from './lib/verificarProduccion.js';
 import { estaSano } from './lib/health.js';
 import { apiLimiter } from './middleware/rateLimit.js';
@@ -155,6 +155,22 @@ async function start() {
     }
     // Aplica migraciones al arrancar (idempotente).
     await runMigrations();
+
+    // El Corredor Bioceánico vive en OTRA BASE (ver lib/dbCorredor.js), y
+    // su migración NO es fatal a propósito. Este bloque está dentro del
+    // try que hace process.exit(1): si `sicr3p_corredor` no existe todavía
+    // en el servidor, o una migración suya falla, dejar caer el backend
+    // sacaría de línea a todas las empresas que solo usan la contabilidad
+    // de carbono — por un producto que ellas no usan. Se avisa fuerte y
+    // las rutas del Corredor responden 503 hasta que se arregle.
+    const corredor = await runMigrationsCorredor();
+    if (corredor.estado === 'apagado') {
+      console.log('[corredor] apagado en este entorno (sin DATABASE_URL_CORREDOR).');
+    } else if (corredor.estado === 'error') {
+      console.warn('[corredor] con problemas: sus rutas van a responder 503. El resto del backend sigue normal.');
+    } else {
+      console.log(`[corredor] base lista (${corredor.archivos} migraciones).`);
+    }
     // Dólar observado automático: solo actúa si el admin activó el modo
     // auto en config_pos (si no, cada tick es un SELECT y nada más).
     if (config.env !== 'test') iniciarDolarAutomatico();

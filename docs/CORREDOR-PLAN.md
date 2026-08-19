@@ -40,59 +40,109 @@ const ES_SUBDOMINIO_CORREDOR = window.location.hostname.startsWith('corredor.');
 | Activación | `/panel-corredor/activar` | Nuevo — `RUTA_ACTIVAR` en `services/cuentas.js:27` |
 | Panel | `/panel-corredor/*` | Nuevo — octavo shell |
 
-### Una base, no dos
+### Bases separadas
 
-**La base de datos sigue siendo una.** Es la decisión más importante de esta
-sección y va contra la intuición de «producto aparte, base aparte».
+`sicr3p_corredor` vive en el mismo servidor Postgres que `sicr3p`, pero es
+**otra base**. Son productos distintos y sus datos no se mezclan.
 
-El activo de sicr3p es la cadena encadenada **entre empresas**: subproveedor →
-proveedor → exportador → comprador. Una base separada corta exactamente eso,
-y con ello se pierde lo único que un competidor no puede copiar. Además el
-exportador de una carga es, muchas veces, el proveedor de otra: duplicarlo en
-dos bases obliga a reconciliar identidades a mano.
+Que sean dos bases y no dos esquemas es lo que hace que la separación no
+dependa de nadie: **Postgres no puede hacer un JOIN entre bases distintas**.
+Con un esquema aparte, `corredor.cargas JOIN public.facturas` compila
+perfecto y la separación queda a merced de quien escriba la próxima
+consulta. Con dos bases el motor la rechaza:
 
-Lo que sí se separa: **la superficie** (dominio, landing, login, marca) y **el
-alcance de lectura** (una cuenta de corredor ve sus cargas y nada más, por el
-mismo mecanismo de `usuarios.<entidad>_id` que ya aísla a los otros siete
-paneles).
+```
+ERROR: cross-database references are not implemented
+```
 
----
+**Lo que eso implica al escribir código del Corredor:**
+
+- No existen claves foráneas entre los dos mundos. El Corredor tiene sus
+  propios `usuarios_corredor`, sus propias `cargas` y su propia cadena de
+  hash.
+- Secreto de JWT propio (`JWT_SECRET_CORREDOR`). Compartirlo haría que un
+  token del Corredor verificara contra la app principal — lo rechazarían
+  los guardias de panel, sí, pero el token sería estructuralmente válido.
+- Si alguna vez hace falta cruzar los dos mundos, se hace **por RUT a nivel
+  de aplicación** y se declara como cruce, nunca con una FK que no puede
+  existir.
+
+### El Corredor es opcional, y eso protege al resto
+
+`index.js` mata el proceso ante cualquier error de arranque, y las
+migraciones corren ahí adentro. Por eso `runMigrationsCorredor()`
+**devuelve un estado en vez de lanzar**: que la base del Corredor no exista
+todavía en el servidor, o que una migración suya falle, no puede dejar sin
+backend a una empresa que solo usa la contabilidad de carbono.
+
+| Situación | Qué pasa |
+|---|---|
+| Sin `DATABASE_URL_CORREDOR` | `[corredor] apagado en este entorno`. El backend arranca normal |
+| Configurado y sano | `[corredor] base lista (N migraciones)` |
+| Configurado y roto | Aviso fuerte, rutas del Corredor en **503**, el resto del backend intacto |
+
+### Puesta en marcha en el servidor
+
+```bash
+sudo -u postgres createdb sicr3p_corredor
+sudo -u postgres psql -c "ALTER DATABASE sicr3p_corredor OWNER TO sicr3p;"
+# en backend/.env
+DATABASE_URL_CORREDOR=postgresql://sicr3p:...@localhost:5432/sicr3p_corredor
+JWT_SECRET_CORREDOR=<uno distinto del de sicr3p>
+```
+
+Las migraciones se aplican solas en el próximo arranque. **El respaldo hay
+que ampliarlo**: el `pg_dump` actual apunta a `sicr3p` y no incluye la base
+nueva.
+
+### Lo que ya existía se queda donde está
+
+Se empieza limpio. Las cargas que hoy viven en `lotes_minerales` con
+`tipo = 'documental'` no se migran: mover una cadena de hash a otra base
+obliga a resellarla, y resellar rompe la verificación o arrastra hashes que
+ya no se pueden comprobar contra su origen. Dejan de crearse por ahí y
+listo.
 
 ## 3. Requisitos, campo por campo
 
-Leyenda de «Dónde vive»: ✅ ya existe · ⚠️ existe pero incompleto · ❌ hay que crearlo.
+Leyenda: ✅ ya construido en la base del Corredor · ⚠️ parcial · ❌ pendiente.
+
+Todo esto vive en `sicr3p_corredor`, no en `lotes_minerales`. La tabla del
+otro lado sigue existiendo para minerales y productos; la carga del Corredor
+es `cargas`, y es otra tabla en otra base.
 
 ### EUDR — Reglamento (UE) 2023/1115, art. 9
 
 | Requisito | Quién lo aporta | Dónde vive |
 |---|---|---|
-| Código arancelario | Exportador | ✅ `lotes_minerales.codigo_nc` |
-| País y región de producción | Exportador | ⚠️ `pais_origen` sí; región no |
-| **Geolocalización de cada parcela** | Productor | ❌ tabla `parcelas` |
-| Polígono si la parcela supera 4 ha | Productor | ❌ |
-| Fecha o intervalo de producción | Productor | ❌ |
-| Libre de deforestación posterior al **31-12-2020** | Productor (con determinación de un tercero) | ❌ |
-| Legalidad en el país de producción | Productor | ❌ documentos |
-| Operador: nombre, dirección, EORI | Exportador | ❌ tabla de entidad |
-| Cantidad | Exportador | ✅ `cantidad` + `unidad` |
-| Proveedor y comprador de la operación | Exportador | ⚠️ `lote_eslabones` los tiene como cadena |
+| Código arancelario | Exportador | ✅ `cargas.codigo_nc` |
+| País y región de producción | Exportador | ✅ `pais_origen` + `region_origen` |
+| **Geolocalización de cada parcela** | Productor | ✅ tabla `parcelas`, con su nivel de confianza |
+| Polígono si la parcela supera 4 ha | Productor | ✅ `parcelas.poligono` (GeoJSON) |
+| Fecha o intervalo de producción | Productor | ✅ `carga_produccion.desde/hasta` |
+| Libre de deforestación posterior al **31-12-2020** | Productor, con determinación de un tercero | ✅ con emisor, línea base y fecha |
+| Legalidad en el país de producción | Productor | ⚠️ el flag sí; los documentos, pendientes |
+| Operador: nombre, dirección, EORI | Exportador | ✅ `exportadores.eori` |
+| Cantidad | Exportador | ✅ `cargas.cantidad` + `unidad` |
+| Proveedor y comprador de la operación | Exportador | ❌ pendiente |
 
-**Cuatro de los seis requisitos centrales no tienen dónde guardarse.** Hoy
-aparecen como faltantes en `listoParaExportar()`, que es honesto, pero no se
-pueden completar.
+**Ya tienen dónde guardarse.** Era el hueco más grande del plan original —
+cuatro de los seis requisitos centrales del EUDR no tenían columna— y lo cierra
+`migrations-corredor/002_corredor_cargas.sql`. Lo que falta ahora son las rutas
+y la pantalla, no el modelo.
 
 ### CBAM — Reglamento (UE) 2023/956
 
 | Requisito | Quién lo aporta | Dónde vive |
 |---|---|---|
-| Código NC | Exportador | ✅ |
-| Instalación de origen | Exportador | ✅ `faena_origen` |
+| Código NC | Exportador | ✅ `cargas.codigo_nc` |
+| Instalación de origen | Exportador | ✅ `cargas.instalacion` |
 | Emisiones directas (t CO₂e/t) | Operador de la instalación | ✅ |
 | Emisiones indirectas (t CO₂e/t) | **Proveedor de electricidad** | ✅ |
 | Método (reales / defecto / mixto) | Exportador | ✅ |
 
-CBAM está completo en el esquema desde la migración 021. Lo que falta no es
-modelo: es que el formulario lo pida en vez de ofrecerlo como «(opcional)».
+CBAM está completo en el esquema del Corredor. Lo que falta no es modelo: es
+que el formulario lo pida en vez de ofrecerlo como «(opcional)».
 
 ### Exportación (cuando no aplica ninguno)
 
@@ -250,69 +300,45 @@ control ya tiene las suyas en `puntos_corredor`, que son fijas y públicas.
 
 ## 5. Modelo de datos
 
-### Migración 107 — parcelas, producción y tramo
+Construido y probado. Vive en `backend/migrations-corredor/`, con numeración
+propia desde `001` — no se mezcla con las migraciones de sicr3p.
 
-```
-parcelas
-  id, exportador_id, nombre, pais, region
-  area_ha                       NUMERIC — decide si se exige polígono
-  lat, lng                      NUMERIC(9,6)   ← mismo tipo que puntos_corredor
-  poligono                      JSONB          — GeoJSON; NULL si ≤ 4 ha
-  precision_declarada_m         NUMERIC        — la que trae el archivo, si trae
-  origen_coordenada             CHECK (archivo|registro|mapa)
-                                -- sin 'gps' ni 'perimetro': ver 4.0
-  nivel_confianza               SMALLINT 1..4  ← calculado, NUNCA recibido
-  validado_por / _fuente / _at  — solo el servidor los escribe
+### `001_corredor_init.sql` — identidad y acceso
 
-lote_parcelas                   — una carga puede venir de varias parcelas
-  lote_id, parcela_id, aporte_pct
+| Tabla | Qué guarda |
+|---|---|
+| `exportadores` | La empresa cuya mercadería sale. Incluye el **EORI** que exige el EUDR |
+| `usuarios_corredor` | Sus propios usuarios. No se puede apuntar a `sicr3p.usuarios`: es otra base |
+| `tokens_password_corredor` | Activación y reset. Solo el SHA-256, nunca el token |
+| `actividad_corredor` | Bitácora, **sin FK al usuario** — lo que alguien hizo tiene que constar aunque su cuenta se borre |
 
-lote_produccion
-  lote_id, desde, hasta
-  libre_deforestacion_declarado BOOLEAN
-  determinacion_emisor          TEXT   — quién la hizo (no sicr3p)
-  determinacion_linea_base      TEXT   — contra qué
-  determinacion_at              DATE
-  determinacion_documento_id    → lote_documentos
-  legalidad_declarada           BOOLEAN
+### `002_corredor_cargas.sql` — el pasaporte
 
-lote_tramo
-  lote_id, punto_origen, punto_destino  → puntos_corredor
+| Tabla | Qué guarda |
+|---|---|
+| `puntos_corredor` | Copia propia del catálogo. Coordenadas fijas y públicas de aduanas y puertos |
+| `parcelas` | El predio del EUDR, con `origen_coordenada`, `nivel_confianza` 1–4 y sus validadores |
+| `cargas` | La carga: código `CB-`, código arancelario, cantidad, y los cinco datos de CBAM |
+| `carga_parcelas` | De qué predios salió, con su aporte |
+| `carga_produccion` | Fechas, libre de deforestación y legalidad — con **quién** hizo la determinación |
+| `carga_tramo` | Origen y destino, del catálogo de puntos |
+| `documentos_por_tramo` | Qué exige cada par de países |
+| `carga_documentos` | Expediente con **cadena de hash propia** |
+| `carga_pasos` | El hito: pasó por tal punto, a tal hora. **Sin latitud ni longitud** |
 
-documentos_por_tramo            — qué exige cada par de países
-  pais_desde, pais_hasta, tipo_documento, obligatorio
-```
+Tres restricciones que el esquema defiende por sí solo, y que tienen su test:
 
-**Reglas de la migración** (`migrate.js` no tiene registro y corre todos los
-`.sql` en cada arranque, así que una migración que falla tumba el arranque):
+- **Una parcela sin ubicación no entra** (`parcelas_con_ubicacion`): o hay
+  punto, o hay polígono. Aceptar ninguna dejaría filas que se ven completas
+  y no ubican nada.
+- **El nivel 4 exige quién, contra qué y cuándo**
+  (`parcelas_nivel4_exige_validador`). Sin los tres, «validado en fuente» es
+  una etiqueta que no se puede comprobar.
+- **`carga_pasos` no tiene columna de posición**, y hay un test que falla si
+  alguien le agrega `lat`, `lng`, `posicion` o `accuracy`.
 
-- Todo `CREATE TABLE IF NOT EXISTS`.
-- **`CREATE TABLE IF NOT EXISTS` NO agrega columnas a una tabla existente** —
-  cada columna posterior necesita su `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-  explícito. Ya se pagó ese error dos veces (`base_prorrateo` en la 105,
-  `etapa` en la 106).
-- Los CHECK con nombre, en bloque `DO $$ ... IF NOT EXISTS` idempotente.
-- Registrar las tablas nuevas en `services/inventarioDatos.js`: hay un test
-  que falla si una tabla con datos personales no queda clasificada (Ley
-  21.719). `parcelas` lleva la ubicación de un predio y, por la vía del
-  catastro, la identidad de su dueño — se clasifica como dato sensible y con
-  acceso restringido, por lo de 4.1.b.
-- **Ninguna tabla nueva guarda posición de vehículos.** `lote_tramo` referencia
-  puntos fijos del catálogo, no coordenadas capturadas en ruta.
-
-### Migración 108 — el exportador como entidad
-
-Molde de los siete paneles existentes: tabla de entidad,
-`usuarios.exportador_id`, `panel = 'corredor'` en el CHECK, y la ruta en
-`RUTA_ACTIVAR`.
-
-```
-exportadores
-  id, nombre_empresa, rut, pais
-  eori                          — lo exige EUDR para el operador
-  direccion, contacto_email
-  onboarding_completado_at
-```
+Y `origen_coordenada` acepta `archivo | registro | mapa` — **sin `gps` ni
+`perimetro`**, descartados por la regla de seguridad de §4.0.
 
 ### El código de la carga
 
@@ -458,8 +484,12 @@ entrega como archivo, no como acceso.
 | 6 | Documentos por tramo | 1 | Semáforo por frontera |
 | 7 | Informe EUDR en PDF | 1, 3 | El entregable que se vende |
 
-Las tandas 1 y 2 son independientes entre sí y de todo lo demás: se pueden
-hacer en cualquier orden.
+La tanda 1 no depende de nada y se puede probar sin base. De la 2 en adelante
+hace falta `DATABASE_URL_CORREDOR` configurado.
+
+**Pendiente de operación, no de código:** el respaldo del VPS hace `pg_dump` de
+`sicr3p` y no incluye la base nueva. Hay que ampliarlo antes de que el Corredor
+tenga datos que valga la pena perder.
 
 ---
 
