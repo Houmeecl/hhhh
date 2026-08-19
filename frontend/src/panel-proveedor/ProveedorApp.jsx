@@ -64,6 +64,23 @@ export default function ProveedorApp() {
     return () => { vigente = false; };
   }, []);
 
+  // El cartel de "Cuenta en revisión" promete que la cuenta se activa sola
+  // en cuanto emitamos el contrato. No era verdad: `contrato_vigente` solo
+  // se consultaba al montar, así que la empresa tenía que adivinar y
+  // recargar. Mientras la puerta esté cerrada se vuelve a preguntar cada 30
+  // s; en cuanto se abre, el intervalo se corta solo (el efecto depende de
+  // `contratoVigente`) y no queda una consulta en loop por cada empresa
+  // conectada.
+  useEffect(() => {
+    if (contratoVigente !== false || onboarding !== false) return undefined;
+    const id = setInterval(() => {
+      api.proveedorPerfil()
+        .then((p) => { if (p.contrato_vigente) setContratoVigente(true); })
+        .catch(() => {}); // una caída de red no tiene por qué sacarlo de la pantalla
+    }, 30000);
+    return () => clearInterval(id);
+  }, [contratoVigente, onboarding]);
+
   function salir() { authProveedor.clear(); nav('/panel-proveedor/login'); }
 
   if (checking) return <div style={{ padding: 60 }}><span className="spinner dark" /> Cargando panel…</div>;

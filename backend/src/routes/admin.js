@@ -19,6 +19,7 @@ import { rutValido } from '../services/dte.js';
 import { empresa as clayEmpresa, dtes as clayDtes, productosPorDocumento as clayProductos } from '../services/clay.js';
 import { auspiciadorDesdeSolicitud } from '../services/auspicio.js';
 import { prospectoDesdeInscripcion } from '../services/inscripcion.js';
+import { colaOnboarding } from '../services/onboarding.js';
 import {
   MOTOR_CLAY, SII_EXCLUIDOS, datosDeDte, admiteDte, itemsDeDte,
   agruparLineas, resumirImportacion,
@@ -2013,6 +2014,41 @@ router.get('/sii/:proveedorId/contrato.pdf', requireSeccion('sii', 'proveedores'
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="contrato-${rows[0].numero}.pdf"`);
     res.send(await pdfDeContrato(rows[0]));
+  } catch (err) { next(err); }
+});
+
+// GET /api/admin/onboarding/empresas — las empresas que están a medio
+// enrolar, y en qué puerta quedaron paradas.
+//
+// Existe porque la última puerta —el contrato— solo se abre desde otra
+// pantalla (Contabilidad → la empresa → "Emitir contrato") y nada avisaba:
+// una empresa podía activar, completar sus datos y quedarse semanas en
+// "Cuenta en revisión" sin que nadie lo supiera. La clasificación vive en
+// services/onboarding.js (pura); acá solo se junta la fila.
+//
+// Columnas explícitas, nunca `SELECT *`: `proveedores` trae `clave_informe`
+// cifrada y no tiene por qué salir del servidor (mismo criterio que
+// routes/accesos.js en la lista de proveedores).
+router.get('/onboarding/empresas', requireSeccion('enrolar', 'proveedores'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT p.id, p.nombre_empresa, p.rut, p.created_at, p.onboarding_completado_at,
+              u.id AS usuario_id, u.email, u.estado AS usuario_estado, u.must_reset_password,
+              (SELECT max(t.expira_at) FROM tokens_password t
+                WHERE t.usuario_id = u.id AND t.tipo = 'activacion' AND t.usado = false
+              ) AS invitacion_expira,
+              (c.id IS NOT NULL) AS con_contrato
+         FROM proveedores p
+         LEFT JOIN usuarios u ON u.proveedor_id = p.id AND u.panel = 'proveedor'
+         LEFT JOIN LATERAL (
+           SELECT id FROM contratos WHERE proveedor_id = p.id AND estado <> 'anulado' LIMIT 1
+         ) c ON true
+        WHERE p.activo
+        ORDER BY p.created_at`
+    );
+    // Una empresa desactivada a propósito no es un pendiente: el WHERE la
+    // deja fuera para que la cola no se llene de bajas antiguas.
+    res.json(colaOnboarding(rows));
   } catch (err) { next(err); }
 });
 

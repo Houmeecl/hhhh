@@ -450,6 +450,8 @@ export const api = {
   adminSiiSesion: (b) => request('/admin/sii/sesion', { method: 'POST', body: b, authed: true }),
   adminSiiEmpresas: () => request('/admin/sii/empresas', { authed: true }),
   adminSiiCrearEmpresa: (b) => request('/admin/sii/empresas', { method: 'POST', body: b, authed: true }),
+  // Cola de empresas a medio enrolar (sección 'enrolar'/'proveedores').
+  onboardingEmpresas: () => request('/admin/onboarding/empresas', { authed: true }),
   adminSiiDescargar: (proveedorId, b) => request(`/admin/sii/${proveedorId}/descargar`, { method: 'POST', body: b, authed: true }),
   adminSiiAnalisis: (proveedorId, periodo) => request(`/admin/sii/${proveedorId}/analisis/${periodo}`, { authed: true }),
   adminSiiPeriodos: (proveedorId) => request(`/admin/sii/${proveedorId}/periodos`, { authed: true }),

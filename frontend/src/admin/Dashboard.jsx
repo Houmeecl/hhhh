@@ -28,6 +28,7 @@ const ACCION_LABEL = {
 export default function Dashboard({ user }) {
   const [d, setD] = useState(null);
   const [alertas, setAlertas] = useState([]);
+  const [onboarding, setOnboarding] = useState(null); // cola de empresas a medio enrolar
   const [cadena, setCadena] = useState(null);
   const [motor, setMotor] = useState(null);
   const [verificacion, setVerificacion] = useState(null); // null | 'cargando' | resultado
@@ -51,6 +52,10 @@ export default function Dashboard({ user }) {
     }
     if (puedeVerSeccion(user, 'motor_propio')) {
       api.motorEstadisticas().then(setMotor).catch(() => {});
+    }
+    // Igual que los dos de arriba: el endpoint exige 'enrolar'/'proveedores'.
+    if (puedeVerSeccion(user, 'enrolar') || puedeVerSeccion(user, 'proveedores')) {
+      api.onboardingEmpresas().then(setOnboarding).catch(() => {});
     }
   }, [user]);
 
@@ -263,6 +268,25 @@ export default function Dashboard({ user }) {
           </div>
         </div>
       </div>
+
+      {/* El aviso que faltaba: una empresa podía quedarse semanas en
+          "Cuenta en revisión" porque el contrato se emite desde otra
+          pantalla y nadie lo recordaba. Solo se muestra lo que depende de
+          NOSOTROS — las que esperan por la empresa no son una tarea. */}
+      {onboarding?.esperando_por_nosotros > 0 && (
+        <div className="card card-pad" style={{ marginTop: 16 }}>
+          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8, color: '#b45309' }}>
+            <Icon.Alert size={18} />
+            <span style={{ color: 'var(--navy)' }}>Empresas esperando por nosotros</span>
+          </h3>
+          <p className="muted" style={{ fontSize: 14, marginTop: 0 }}>
+            {onboarding.esperando_por_nosotros === 1
+              ? 'Hay 1 empresa a medio enrolar que no avanza hasta que hagamos algo.'
+              : `Hay ${onboarding.esperando_por_nosotros} empresas a medio enrolar que no avanzan hasta que hagamos algo.`}
+          </p>
+          <Link className="btn btn-outline btn-sm" to="/admin/enrolar">Ver la cola</Link>
+        </div>
+      )}
 
       {alertas.length > 0 && (
         <div className="card card-pad" style={{ marginTop: 16 }}>
