@@ -58,7 +58,10 @@ export const apiCorredor = {
   guardarProduccion: (cargaId, b) => pedir(`/cargas/${cargaId}/produccion`, { metodo: 'PUT', body: b }),
 
   // El tramo y su expediente documental.
-  puntos: () => pedir('/puntos'),
+  // '/catalogo/puntos': '/corredor/puntos' a secas es el catálogo PÚBLICO
+  // del mapa de la torre, que sale de la base de sicr3p. Este trae los del
+  // Corredor, que son los que valida el guardado del tramo.
+  puntos: () => pedir('/catalogo/puntos'),
   reglasDeTramo: () => pedir('/tramos/documentos'),
   definirTramo: (cargaId, b) => pedir(`/cargas/${cargaId}/tramo`, { metodo: 'PUT', body: b }),
   documentos: (cargaId) => pedir(`/cargas/${cargaId}/documentos`),

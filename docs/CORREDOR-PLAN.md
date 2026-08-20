@@ -84,16 +84,12 @@ backend a una empresa que solo usa la contabilidad de carbono.
 ### Puesta en marcha en el servidor
 
 ```bash
-sudo -u postgres createdb sicr3p_corredor
-sudo -u postgres psql -c "ALTER DATABASE sicr3p_corredor OWNER TO sicr3p;"
-# en backend/.env
-DATABASE_URL_CORREDOR=postgresql://sicr3p:...@localhost:5432/sicr3p_corredor
-JWT_SECRET_CORREDOR=<uno distinto del de sicr3p>
+bash deploy/encender-corredor.sh --admin tu-correo@dominio.cl
 ```
 
-Las migraciones se aplican solas en el próximo arranque. **El respaldo hay
-que ampliarlo**: el `pg_dump` actual apunta a `sicr3p` y no incluye la base
-nueva.
+Crea la base, agrega las dos variables a `backend/.env`, reinicia para que
+corran las migraciones y verifica que quedó encendido. El detalle está en §8.
+El respaldo del VPS ya incluye la base nueva.
 
 ### Lo que ya existía se queda donde está
 
@@ -499,18 +495,43 @@ Lo que sigue abierto, y por qué:
 - **Nivel 5 de confianza**: sigue sin emitirse. Necesita un rol de auditor que
   no existe en ninguno de los dos productos.
 
-**Pendiente de operación, no de código** (lo único que queda para encender el
-Corredor en el servidor):
+### Encenderlo en el servidor
 
-1. `sudo -u postgres createdb sicr3p_corredor` y
-   `ALTER DATABASE sicr3p_corredor OWNER TO sicr3p;`
-2. `DATABASE_URL_CORREDOR` y `JWT_SECRET_CORREDOR` en `backend/.env`. Sin
-   ellas el Corredor queda apagado y el resto de sicr3p arranca igual: las
-   rutas responden 503 con `codigo: 'corredor_no_configurado'`.
-3. **Ampliar el respaldo.** El `pg_dump` del VPS apunta a `sicr3p` y no incluye
-   la base nueva. Hay que ampliarlo antes de que el Corredor tenga datos que
-   valga la pena perder — y ahora los va a tener, porque la cadena de hash de
-   los documentos vive ahí y no se puede reconstruir desde la otra base.
+Un solo comando, como root en el VPS:
+
+```bash
+bash deploy/encender-corredor.sh --admin tu-correo@dominio.cl
+```
+
+Hace las cuatro cosas que antes había que acordarse de hacer a mano: crea
+`sicr3p_corredor` con el rol que ya existe, agrega `DATABASE_URL_CORREDOR` y
+`JWT_SECRET_CORREDOR` a `backend/.env`, reinicia el backend para que corran las
+migraciones, y **verifica** — sonda una ruta que es realmente del Corredor y
+distingue 401 (encendido, solo falta el token) de 503 (apagado). Al final
+comprueba que la base del Corredor no vea las tablas de sicr3p: si esa
+separación no estuviera, todo lo demás de este documento sería falso.
+
+Es idempotente: no rota el secreto de firma ni pisa la base si ya existen.
+Correrlo dos veces no rompe nada, y `--verificar` solo diagnostica sin escribir.
+
+Sin las dos variables el Corredor queda apagado y el resto de sicr3p arranca
+igual: las rutas responden 503 con `codigo: 'corredor_no_configurado'`.
+
+**El primer administrador** no sale de `seed.js` —ese siembra la base de
+sicr3p, que es otra—: lo crea `--admin`, o después
+`node scripts/crear-admin-corredor.mjs correo@dominio.cl "Nombre"`. Sin él no
+se pueden crear exportadores. Su clave temporal se imprime una vez y nace
+marcada: con ella no se puede operar, solo cambiarla.
+
+**El respaldo ya incluye la base nueva** (`deploy/respaldo.sh`), con un nombre
+—`sicr3p_corredor-AAAA-MM-DD.sql.gz`, con guión BAJO— que a propósito no calza
+con el patrón del respaldo diario de sicr3p. Si calzaran, `restaurar.sh` podría
+poner el dump de una base sobre la otra; ahora se niega a hacerlo salvo que se
+le nombre la base explícitamente:
+
+```bash
+SICR3P_DB=sicr3p_corredor bash deploy/restaurar.sh          # ensayo, no destructivo
+```
 
 ---
 

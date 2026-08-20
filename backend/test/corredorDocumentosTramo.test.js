@@ -92,7 +92,10 @@ after(async () => {
 });
 
 test('el catálogo de puntos viene del Corredor, no de sicr3p', { skip: SIN_CORREDOR }, async () => {
-  const r = await pedir('GET', '/api/corredor/puntos', tkA);
+  // '/catalogo/puntos' y no '/puntos': ese último lo atiende routes/public.js
+  // —el catálogo del mapa de la torre, que sale de la OTRA base— y está
+  // montado antes. Ver test/corredorRutasSinTapar.test.js.
+  const r = await pedir('GET', '/api/corredor/catalogo/puntos', tkA);
   assert.equal(r.status, 200);
   assert.ok(r.d.puntos.length >= 14);
   assert.ok(r.d.puntos.some((p) => p.id === 'paso-de-jama' && p.es_frontera));

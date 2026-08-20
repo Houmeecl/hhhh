@@ -582,7 +582,15 @@ async function documentalDe(cargaId) {
   };
 }
 
-router.get('/puntos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+// '/catalogo/puntos' y NO '/puntos': `routes/public.js` ya publica
+// `GET /api/corredor/puntos` (el catálogo del mapa de la torre) y está
+// montado ANTES en index.js, así que se quedaba con la ruta. El panel
+// terminaba mostrando los puntos de la base de SICR3P mientras
+// `PUT /cargas/:id/tramo` los valida contra la del Corredor: un punto que
+// existe allá y no acá se ofrecía en el selector y después se rechazaba.
+// Hay un test que vigila que ninguna ruta de este archivo vuelva a quedar
+// tapada (test/corredorRutasSinTapar.test.js).
+router.get('/catalogo/puntos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
     res.json({ puntos: await catalogoPuntos() });
   } catch (err) { next(err); }

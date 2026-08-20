@@ -17,8 +17,11 @@
 #     lo que haya en "sicr3p" ahora mismo (si existe), y exige escribir
 #     la palabra REEMPLAZAR para confirmar.
 #
-# Sin argumentos, usa el respaldo más reciente de /root/backups
-# (sicr3p-*.sql.gz, el diario — no un pre-deploy).
+# Sin argumentos, usa el respaldo más reciente de /root/backups para la
+# base elegida (sicr3p-*.sql.gz, el diario — no un pre-deploy).
+#
+# Para el Corredor Bioceánico, que vive en su propia base:
+#   SICR3P_DB=sicr3p_corredor bash deploy/restaurar.sh
 #
 # Variables sobreescribibles: SICR3P_BACKUP_DIR, SICR3P_DB (default: sicr3p)
 # ============================================================
@@ -38,14 +41,44 @@ for arg in "$@"; do
   esac
 done
 
+# El patrón depende de la BASE, no es fijo. Los respaldos del Corredor se
+# llaman "sicr3p_corredor-AAAA-MM-DD.sql.gz" (guión bajo), justamente para
+# que no calcen con "sicr3p-*.sql.gz". Sin esto, pedir el respaldo del
+# Corredor sin nombrar el archivo agarraba el dump de sicr3p y lo
+# restauraba encima: dos bases distintas, mismo comando, y el error solo
+# se nota cuando ya pasó.
+PATRON="$BACKUP_DIR/${DB}-*.sql.gz"
+
 if [ -z "$ARCHIVO" ]; then
-  ARCHIVO="$(ls -t "$BACKUP_DIR"/sicr3p-*.sql.gz 2>/dev/null | head -1 || true)"
+  ARCHIVO="$(ls -t $PATRON 2>/dev/null | head -1 || true)"
   if [ -z "$ARCHIVO" ]; then
-    echo "No se encontró ningún respaldo en $BACKUP_DIR/sicr3p-*.sql.gz y no se indicó un archivo. Uso: bash deploy/restaurar.sh ARCHIVO.sql.gz [--reemplazar]" >&2
+    echo "No se encontró ningún respaldo en $PATRON y no se indicó un archivo. Uso: bash deploy/restaurar.sh ARCHIVO.sql.gz [--reemplazar]" >&2
     exit 1
   fi
-  echo "==> Sin archivo indicado: usando el más reciente: $ARCHIVO"
+  echo "==> Sin archivo indicado: usando el más reciente de \"$DB\": $ARCHIVO"
 fi
+
+# Guarda contra el error más caro de este script: restaurar el respaldo de
+# una base sobre la OTRA. El nombre del archivo lleva el de su base, así
+# que se puede comprobar antes de tocar nada.
+BASE_ARCHIVO="$(basename "$ARCHIVO")"
+# `pre-deploy-*` lo genera deploy/actualizar.sh y es SIEMPRE de la base
+# principal, así que solo se acepta cuando se está restaurando esa.
+PERMITIDOS_EXTRA=""
+[ "$DB" = "sicr3p" ] && PERMITIDOS_EXTRA="pre-deploy"
+case "$BASE_ARCHIVO" in
+  "${DB}-"*|"pre-restaurar-${DB}-"*) : ;;
+  pre-deploy-*) [ "$PERMITIDOS_EXTRA" = "pre-deploy" ] || {
+      echo "\"$BASE_ARCHIVO\" es un respaldo pre-deploy de la base principal, no de \"$DB\"." >&2
+      exit 1
+    } ;;
+  *)
+    echo "El archivo \"$BASE_ARCHIVO\" no parece un respaldo de la base \"$DB\": los respaldos de esa base se llaman \"${DB}-AAAA-MM-DD.sql.gz\"." >&2
+    echo "Restaurar el dump de una base sobre la otra es el error más caro de este script, así que no se hace solo." >&2
+    echo "Si el archivo es de otra base, restáuralo en la suya: SICR3P_DB=<la base del archivo> bash deploy/restaurar.sh $ARCHIVO" >&2
+    exit 1
+    ;;
+esac
 
 if [ ! -f "$ARCHIVO" ]; then
   echo "No existe el archivo: $ARCHIVO" >&2
@@ -66,7 +99,10 @@ if [ "$REEMPLAZAR" = "1" ]; then
   # Respaldo de seguridad de lo que haya AHORA, antes de tocar nada — si el
   # archivo a restaurar resulta corrupto o es el equivocado, esto no se pierde.
   if sudo -u postgres psql -lqt | cut -d '|' -f 1 | grep -qw "$DB"; then
-    PRE="$BACKUP_DIR/pre-restaurar-$(date +%F-%H%M%S).sql.gz"
+    # Con el nombre de la base adentro: un "pre-restaurar-*" suelto no
+    # decía de cuál de las dos era, y ese archivo existe justamente para
+    # el momento en que alguien restauró el respaldo equivocado.
+    PRE="$BACKUP_DIR/pre-restaurar-${DB}-$(date +%F-%H%M%S).sql.gz"
     mkdir -p "$BACKUP_DIR"
     echo "==> Respaldo de seguridad de \"$DB\" antes de reemplazar: $PRE"
     sudo -u postgres pg_dump "$DB" | gzip > "$PRE"
@@ -97,7 +133,7 @@ if [ "$REEMPLAZAR" = "1" ]; then
 fi
 
 # ---------- Modo ENSAYO (default, no destructivo) ----------
-DB_ENSAYO="sicr3p_restaurado_$(date +%Y%m%d-%H%M%S)"
+DB_ENSAYO="${DB}_restaurado_$(date +%Y%m%d-%H%M%S)"
 echo "==> Modo ENSAYO: restaurando $ARCHIVO en una base nueva ($DB_ENSAYO), sin tocar \"$DB\"."
 
 sudo -u postgres createdb "$DB_ENSAYO"
@@ -124,10 +160,27 @@ echo "    Tablas en el respaldo restaurado: $TABLAS_ENSAYO"
 if sudo -u postgres psql -lqt | cut -d '|' -f 1 | grep -qw "$DB"; then
   TABLAS_ACTUAL=$(sudo -u postgres psql -d "$DB" -Atc \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'")
-  FACTURAS_ENSAYO=$(sudo -u postgres psql -d "$DB_ENSAYO" -Atc "SELECT count(*) FROM facturas" 2>/dev/null || echo "?")
-  FACTURAS_ACTUAL=$(sudo -u postgres psql -d "$DB" -Atc "SELECT count(*) FROM facturas" 2>/dev/null || echo "?")
+  # Tabla testigo: la que de verdad importa en cada base. En sicr3p es
+  # `facturas`; en la del Corredor esa tabla no existe y la evidencia
+  # sellada vive en `carga_documentos`. Se ELIGE MIRANDO cuál existe, no
+  # por el nombre de la base: una base de ensayo o un rename dejarían la
+  # comparación en "? · ?" y el ensayo pasaría sin haber comprobado nada,
+  # que es exactamente lo que este script existe para no hacer.
+  TESTIGO=""
+  for CANDIDATA in facturas carga_documentos; do
+    if sudo -u postgres psql -d "$DB_ENSAYO" -Atc "SELECT 1 FROM $CANDIDATA LIMIT 1" >/dev/null 2>&1; then
+      TESTIGO="$CANDIDATA"
+      break
+    fi
+  done
   echo "    Tablas en \"$DB\" (vigente): $TABLAS_ACTUAL"
-  echo "    Filas en facturas — respaldo: $FACTURAS_ENSAYO · vigente: $FACTURAS_ACTUAL"
+  if [ -n "$TESTIGO" ]; then
+    FILAS_ENSAYO=$(sudo -u postgres psql -d "$DB_ENSAYO" -Atc "SELECT count(*) FROM $TESTIGO" 2>/dev/null || echo "?")
+    FILAS_ACTUAL=$(sudo -u postgres psql -d "$DB" -Atc "SELECT count(*) FROM $TESTIGO" 2>/dev/null || echo "?")
+    echo "    Filas en $TESTIGO — respaldo: $FILAS_ENSAYO · vigente: $FILAS_ACTUAL"
+  else
+    echo "    ! Ni 'facturas' ni 'carga_documentos' existen en el respaldo: no se pudo comparar contenido."
+  fi
 else
   echo "    (\"$DB\" no existe en este Postgres; sin comparación posible.)"
 fi
