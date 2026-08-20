@@ -119,6 +119,29 @@ const aplicaA = (regla, cruce) => {
 // basta que una sola regla lo marque obligatorio para que lo sea —
 // rebajarlo porque otro cruce lo pide opcional sería quedarse con la
 // exigencia más floja de las dos.
+// Separa los cruces del tramo entre los que sicr3p ya definió y los que
+// todavía está armando. El corredor se incorpora UNA FRONTERA A LA VEZ y
+// hoy Chile no está: exigirle a una carga los documentos de un cruce sin
+// revisar es presentar como obligación algo que nadie contrastó contra
+// fuente. Ver migrations-corredor/004.
+export function separarCruces(cruces, definiciones) {
+  const estadoDe = new Map(
+    (definiciones || []).map((d) => [`${texto(d.pais_desde)}→${texto(d.pais_hasta)}`, d])
+  );
+  const definidos = [];
+  const pendientes = [];
+  for (const c of cruces || []) {
+    const d = estadoDe.get(`${c.pais_desde}→${c.pais_hasta}`);
+    // Sin fila en `cruces_corredor` el cruce NO está definido. El default
+    // es el gris: que falte la definición no puede leerse como que está
+    // lista, o alcanzaría con olvidarse de cargarla para que un cruce
+    // pase por revisado.
+    if (d?.estado === 'definido') definidos.push(c);
+    else pendientes.push({ ...c, nota: d?.nota || null });
+  }
+  return { definidos, pendientes };
+}
+
 export function exigenciasDelTramo(cruces, catalogo) {
   const porTipo = new Map();
   const listaCruces = cruces?.length ? cruces : [];
@@ -162,7 +185,7 @@ export function exigenciasDelTramo(cruces, catalogo) {
 // `listo` es null —no false— cuando el tramo no está definido: sin origen
 // ni destino no hay contra qué comparar, y decir "no está listo" sería
 // opinar sin base. Misma doctrina del gris que semaforoExportacion().
-export function estadoDocumentalTramo({ tramoDefinido, exigencias, documentos }) {
+export function estadoDocumentalTramo({ tramoDefinido, exigencias, documentos, crucesPendientes = [] }) {
   const subidos = new Set(
     (documentos || [])
       .filter((d) => d && d.estado !== 'rechazado')
@@ -172,6 +195,24 @@ export function estadoDocumentalTramo({ tramoDefinido, exigencias, documentos })
   const items = (exigencias || []).map((e) => ({ ...e, cumplido: subidos.has(e.tipo_documento) }));
   const faltantes = items.filter((i) => !i.cumplido && i.obligatorio);
   const opcionalesFaltantes = items.filter((i) => !i.cumplido && !i.obligatorio);
+  const pendientes = crucesPendientes || [];
+
+  // Tres respuestas distintas, y el orden importa:
+  //
+  //  false → faltan documentos de los cruces YA definidos. Eso es
+  //          accionable y no puede quedar en gris: el gris se comería
+  //          al rojo y el exportador no sabría que le falta algo suyo.
+  //  null  → está todo lo juzgable, pero queda un cruce sin definir.
+  //          No se puede decir "listo" de un tramo cuyo último cruce
+  //          nadie revisó; un verde que no se sostiene cuesta más caro
+  //          que un gris incómodo.
+  //  true  → todo lo obligatorio y ningún cruce pendiente.
+  let listo = null;
+  if (tramoDefinido) {
+    if (faltantes.length) listo = false;
+    else if (pendientes.length) listo = null;
+    else listo = true;
+  }
 
   return {
     definido: Boolean(tramoDefinido),
@@ -180,7 +221,14 @@ export function estadoDocumentalTramo({ tramoDefinido, exigencias, documentos })
     opcionales_faltantes: opcionalesFaltantes.map((i) => i.tipo_documento),
     obligatorios: items.filter((i) => i.obligatorio).length,
     cumplidos: items.filter((i) => i.cumplido && i.obligatorio).length,
-    listo: tramoDefinido ? faltantes.length === 0 : null,
+    // Los cruces que el tramo atraviesa y sicr3p todavía no definió, con
+    // su motivo. Se muestran: "todavía no está" sin decir qué falta es
+    // una excusa, no una razón.
+    cruces_pendientes: pendientes.map((c) => ({
+      cruce: `${c.pais_desde}→${c.pais_hasta}`,
+      nota: c.nota || null,
+    })),
+    listo,
   };
 }
 
@@ -193,6 +241,18 @@ export function semaforoTramo(estado) {
 }
 
 export function glosaTramo(estado) {
+  // Dos grises distintos, y decir cuál es importa: "no definiste el
+  // tramo" lo resuelve el exportador en diez segundos; "sicr3p todavía no
+  // incorporó ese cruce" no lo resuelve él, y merece que se lo digamos
+  // sin disfrazarlo de tarea suya.
+  if (estado?.definido && estado.cruces_pendientes?.length) {
+    const cuales = estado.cruces_pendientes.map((c) => c.cruce).join(' y ');
+    const faltan = estado.faltantes?.length || 0;
+    const suyo = faltan
+      ? `Faltan ${faltan} ${faltan === 1 ? 'documento obligatorio' : 'documentos obligatorios'} de los cruces ya definidos. `
+      : 'Está todo lo de los cruces ya definidos. ';
+    return `${suyo}El cruce ${cuales} todavía no está incorporado en sicr3p: no se te exige nada por ahí, y tampoco se puede dar por completo el tramo.`;
+  }
   if (!estado || estado.listo === null) {
     return 'Falta definir el tramo (origen y destino) para saber qué documentos se piden.';
   }

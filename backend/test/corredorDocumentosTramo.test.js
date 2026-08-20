@@ -120,9 +120,49 @@ test('definir el tramo cambia lo que se pide', { skip: SIN_CORREDOR }, async () 
   );
   const tipos = r.d.documental.items.map((i) => i.tipo_documento);
   assert.ok(tipos.includes('certificado_fitosanitario'), 'el cruce BR→PY lo exige');
-  assert.ok(tipos.includes('declaracion_jurada_origen'), 'el cruce AR→CL lo exige');
   assert.equal(r.d.documental.semaforo, 'rojo', 'todavía no llegó ninguno');
+
+  // EL CORREDOR SE INCORPORA UNA FRONTERA A LA VEZ (migración 004), y
+  // Chile todavía no está. El cruce AR→CL se REPORTA como pendiente y no
+  // exige nada: sus reglas están escritas pero nadie las contrastó contra
+  // el SAG ni el SENASA. Presentarlas como obligación sería exactamente
+  // lo que el resto del producto evita — no definido no es lo mismo que
+  // faltante.
+  assert.ok(
+    !tipos.includes('declaracion_jurada_origen'),
+    'el cruce AR→CL no está definido: no puede exigir nada'
+  );
+  assert.deepEqual(
+    r.d.documental.cruces_pendientes.map((c) => c.cruce), ['AR→CL']
+  );
+  assert.match(r.d.documental.cruces_pendientes[0].nota, /Chile todav.a no est./,
+    'y se dice POR QUÉ está pendiente: "todavía no está" sin motivo es una excusa');
 });
+
+test('con un cruce sin definir, el tramo NO puede darse por completo',
+  { skip: SIN_CORREDOR }, async () => {
+    // Aunque llegaran todos los documentos de los cruces ya definidos, el
+    // tramo entero no se declara listo: nadie revisó qué pide el último
+    // cruce. Un verde que no se puede sostener cuesta más caro que un gris.
+    const c = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201', descripcion: `Soya completa ${suf}`, cantidad: 20, pais_origen: 'BR' });
+    const id = c.d.carga.id;
+    await pedir('PUT', `/api/corredor/cargas/${id}/tramo`, tkA,
+      { punto_origen: 'campo-grande', punto_destino: 'puerto-antofagasta' });
+
+    const antes = await pedir('GET', `/api/corredor/cargas/${id}`, tkA);
+    for (const tipo of antes.d.documental.items.filter((i) => i.obligatorio).map((i) => i.tipo_documento)) {
+      await subirArchivo(`/api/corredor/cargas/${id}/documentos`, tkA,
+        { tipo, nombre: `${tipo}.pdf`, contenido: `${tipo} de ${suf}` });
+    }
+
+    const r = await pedir('GET', `/api/corredor/cargas/${id}`, tkA);
+    assert.equal(r.d.documental.faltantes.length, 0, 'no falta ninguno de los definidos');
+    assert.equal(r.d.documental.listo, null, 'y aun así no está listo: queda un cruce sin definir');
+    assert.equal(r.d.documental.semaforo, 'gris');
+    assert.match(r.d.documental.glosa, /Est. todo lo de los cruces ya definidos/);
+    assert.match(r.d.documental.glosa, /todav.a no est. incorporado en sicr3p/);
+  });
 
 test('un tramo sin fronteras pide menos que uno que cruza tres', { skip: SIN_CORREDOR }, async () => {
   const c = await pedir('POST', '/api/corredor/cargas', tkA,

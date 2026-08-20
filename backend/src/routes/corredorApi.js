@@ -19,7 +19,7 @@ import {
 } from '../services/exportacion.js';
 import {
   puntosDelTramo, crucesDelTramo, exigenciasDelTramo,
-  estadoDocumentalTramo, semaforoTramo, glosaTramo,
+  estadoDocumentalTramo, semaforoTramo, glosaTramo, separarCruces,
 } from '../services/corredorTramo.js';
 import { hashCadena } from '../services/cadenaHash.js';
 import { generatePasaporteCarga } from '../services/pdf.js';
@@ -916,13 +916,14 @@ const catalogoPuntos = async () => (await queryCorredor(
 // Arma el estado documental del tramo de una carga. Devuelve el gris
 // —`listo: null`— cuando la carga todavía no tiene tramo definido.
 async function documentalDe(cargaId) {
-  const [{ rows: tramoRows }, { rows: documentos }, { rows: reglas }] = await Promise.all([
+  const [{ rows: tramoRows }, { rows: documentos }, { rows: reglas }, { rows: definiciones }] = await Promise.all([
     queryCorredor('SELECT * FROM carga_tramo WHERE carga_id = $1', [cargaId]),
     queryCorredor(
       `SELECT id, tipo_documento, archivo_original, extension, tamano_bytes, sha256,
               hash_cadena, eslabon, estado, created_at
          FROM carga_documentos WHERE carga_id = $1 ORDER BY created_at`, [cargaId]),
     queryCorredor('SELECT pais_desde, pais_hasta, tipo_documento, obligatorio, nota FROM documentos_por_tramo'),
+    queryCorredor('SELECT pais_desde, pais_hasta, estado, vigente_desde, nota FROM cruces_corredor'),
   ]);
 
   const tramo = tramoRows[0] || null;
@@ -931,8 +932,14 @@ async function documentalDe(cargaId) {
     ? puntosDelTramo(await catalogoPuntos(), tramo.punto_origen, tramo.punto_destino)
     : [];
   const cruces = crucesDelTramo(puntos);
-  const exigencias = definido ? exigenciasDelTramo(cruces, reglas) : [];
-  const estado = estadoDocumentalTramo({ tramoDefinido: definido, exigencias, documentos });
+  // El corredor se incorpora UNA FRONTERA A LA VEZ (migración 004). Solo
+  // los cruces ya definidos generan exigencias; los pendientes se
+  // reportan aparte y dejan el tramo en gris, con su motivo.
+  const { definidos, pendientes } = separarCruces(cruces, definiciones);
+  const exigencias = definido ? exigenciasDelTramo(definidos, reglas) : [];
+  const estado = estadoDocumentalTramo({
+    tramoDefinido: definido, exigencias, documentos, crucesPendientes: pendientes,
+  });
 
   return {
     tramo: tramo ? { ...tramo, puntos, cruces } : null,
