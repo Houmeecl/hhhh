@@ -138,7 +138,12 @@ test('sin código arancelario no se opina: no cae a "exportación" por defecto',
     exportacion: evaluacion({ codigo_nc: null }),
   }));
   assert.match(texto, /Falta declarar el c.digo arancelario/);
-  assert.ok(!/2023\/1115/.test(texto), 'no se afirma un régimen que todavía no se sabe');
+  // Lo que no puede aparecer es un régimen presentado como APLICABLE —el
+  // encabezado "EUDR — Reglamento (UE) 2023/1115 — N de M"—. El número del
+  // reglamento sí aparece más abajo, en la viñeta de límites que explica
+  // contra qué se hace la determinación; eso no afirma que le aplique.
+  assert.ok(!/EUDR — Reglamento/.test(texto), 'no se afirma un régimen que todavía no se sabe');
+  assert.ok(!/CBAM — Reglamento/.test(texto));
 });
 
 // Las fuentes core de PDFKit son WinAnsi: la flecha "→" no existe en esa
@@ -156,4 +161,20 @@ test('no se imprime ningún glifo que WinAnsi no tenga', async () => {
     assert.ok(!texto.includes(glifo), `el glifo ${JSON.stringify(glifo)} no existe en WinAnsi`);
   }
   assert.match(texto, /cruza BR a PY/);
+});
+
+// El límite que más cuesta admitir: la lista de códigos con la que se
+// determina el régimen es un subconjunto mantenido a mano, y se armó con
+// fuentes secundarias. El registro de docs/official/manifest.json sabe
+// cuántas normas están contrastadas contra el texto oficial; el papel lo
+// dice. Callarlo dejaría que el lector suponga que se leyó el Diario
+// Oficial de la UE.
+test('el pasaporte declara cuántas de sus fuentes están verificadas', async () => {
+  const texto = textoDelPdf(await armar());
+  assert.match(texto, /subconjunto de los\s*Anexos I/);
+  assert.match(texto, /no acredita que no aplique/,
+    'que un régimen no aparezca no es lo mismo que no aplicarle');
+  // Hoy ninguna norma está contrastada (el egreso de red bloquea EUR-Lex),
+  // así que el papel tiene que decir cuántas faltan.
+  assert.match(texto, /todav.a no/);
 });

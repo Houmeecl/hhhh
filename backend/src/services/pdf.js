@@ -6,6 +6,7 @@ import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasa
 import { eslabonValido } from './cadenaHash.js';
 import { verificarCadenaGlobal } from './cadenaGlobal.js';
 import { etiquetaDocumento } from './corredorTramo.js';
+import { revisarFuentes } from './fuentesOficiales.js';
 import { hashCorto } from './cadenaPublica.js';
 import { metodologiaDeVersiones } from './motorVersiones.js';
 import { esAtribuible, categoriaParaMostrar, MOTIVOS_SIN_ALCANCE } from './categoriaPresentacion.js';
@@ -2834,6 +2835,47 @@ export async function generatePasaporteCarga({ carga, exportador, exportacion, p
       + 'y no tiene página pública. Un código que no lleva a ninguna parte prometería una '
       + 'comprobación que no existe.',
   ];
+
+  // EL LÍMITE QUE MÁS CUESTA ADMITIR, y por eso se imprime.
+  //
+  // El régimen se determina contra un subconjunto de los Anexos I que
+  // sicr3p mantiene a mano. Ese subconjunto se armó con fuentes
+  // secundarias: el registro de `docs/official/manifest.json` dice cuáles
+  // de las normas citadas están contrastadas contra el texto oficial y
+  // cuáles no. Mientras haya pendientes, el papel lo dice — callarlo sería
+  // dejar que el lector suponga que se leyó el Diario Oficial.
+  //
+  // Cuando todas queden verificadas, esta viñeta cambia sola de texto: no
+  // hay que acordarse de sacarla.
+  try {
+    const fuentes = revisarFuentes();
+    if (fuentes.pendientes.length) {
+      LIMITES.push(
+        `El régimen se determina contrastando el código arancelario contra un subconjunto de los `
+        + `Anexos I de los Reglamentos (UE) 2023/1115 y 2023/956 que sicr3p mantiene. De las `
+        + `${fuentes.total} normas que este documento cita, ${fuentes.verificadas.length} están `
+        + `contrastadas contra el texto oficial y ${fuentes.pendientes.length} todavía no. Los anexos `
+        + `se enmiendan y tienen exclusiones por subpartida que este contraste no distingue: que un `
+        + `régimen no aparezca acá no acredita que no aplique. La determinación final es del operador `
+        + `y su asesor.`
+      );
+    } else {
+      LIMITES.push(
+        'El régimen se determina contrastando el código arancelario contra los Anexos I de los '
+        + 'Reglamentos (UE) 2023/1115 y 2023/956, sobre los textos oficiales verificados por sicr3p. '
+        + 'Los anexos se enmiendan y tienen exclusiones por subpartida que este contraste no '
+        + 'distingue: que un régimen no aparezca acá no acredita que no aplique.'
+      );
+    }
+  } catch {
+    // Que no se pueda leer el registro no puede impedir emitir el
+    // pasaporte: se cae al texto más conservador, que es el que no
+    // promete nada.
+    LIMITES.push(
+      'El régimen se determina contra un subconjunto de los Anexos I que sicr3p mantiene, no contra '
+      + 'el texto oficial vigente. Que un régimen no aparezca acá no acredita que no aplique.'
+    );
+  }
   doc.font('Helvetica').fontSize(8).fillColor(GRAY);
   for (const l of LIMITES) {
     if (y > doc.page.height - 100) { doc.addPage(); y = 48; }

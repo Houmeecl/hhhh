@@ -9,7 +9,8 @@
     "dev": "node --watch src/index.js",
     "migrate": "node src/lib/migrate.js",
     "seed": "node src/seed.js",
-    "test": "node --test"
+    "test": "node --test",
+    "fuentes": "node scripts/verificar-fuentes.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",

@@ -1,0 +1,111 @@
+{
+  "$comentario": [
+    "Registro de las fuentes oficiales que sicr3p cita. Una entrada por norma o",
+    "documento, con su URL, la fecha en que se recuperó y el SHA-256 del archivo",
+    "efectivamente guardado en docs/official/<PAIS>/.",
+    "",
+    "POR QUÉ EXISTE. El 20-08-2026 una revisión normativa del Corredor produjo",
+    "veinte hallazgos con sus citas, y ninguna pudo contrastarse contra el texto",
+    "oficial: el proxy de egreso bloquea eur-lex.europa.eu y los sitios de los",
+    "organismos. Las conclusiones salieron de fuentes secundarias y quedaron",
+    "marcadas como no verificadas... en un informe que nadie vuelve a leer.",
+    "",
+    "Este archivo convierte esa nota al pie en un estado del sistema. Cada fuente",
+    "tiene uno de tres:",
+    "",
+    "  verificada  el archivo está guardado y su hash calza. Se puede citar.",
+    "  pendiente   se sabe cuál es y de dónde bajarla, pero todavía no está.",
+    "              Se puede seguir trabajando; NO se puede afirmar que se",
+    "              verificó.",
+    "  rota        el archivo está pero el hash no calza, o se declara",
+    "              verificada sin archivo. Eso es FATAL: rompe la suite.",
+    "",
+    "Que una fuente esté pendiente no bloquea nada. Que se declare verificada",
+    "sin poder demostrarlo, sí — es exactamente la afirmación sin respaldo que",
+    "este producto existe para no hacer.",
+    "",
+    "Para agregar una fuente: bajar el PDF a docs/official/<PAIS>/<archivo>,",
+    "correr `node scripts/verificar-fuentes.mjs --sellar <id>` y commitear las",
+    "dos cosas juntas."
+  ],
+  "fuentes": [
+    {
+      "id": "UE-2023-1115",
+      "pais": "UE",
+      "autoridad": "Parlamento Europeo y Consejo",
+      "titulo": "Reglamento (UE) 2023/1115 — productos libres de deforestación (EUDR)",
+      "sourceUrl": "https://eur-lex.europa.eu/legal-content/ES/TXT/?uri=CELEX%3A32023R1115",
+      "estado": "pendiente",
+      "motivo": "El proxy de egreso de la sesión bloquea eur-lex.europa.eu. Hay que bajarlo desde una red sin ese proxy.",
+      "sostiene": [
+        "Las siete commodities del Anexo I",
+        "La fecha de corte 2020-12-31",
+        "El umbral de 4 ha para exigir polígono",
+        "Los requisitos de información del art. 9"
+      ]
+    },
+    {
+      "id": "UE-2023-956",
+      "pais": "UE",
+      "autoridad": "Parlamento Europeo y Consejo",
+      "titulo": "Reglamento (UE) 2023/956 — mecanismo de ajuste en frontera por carbono (CBAM)",
+      "sourceUrl": "https://eur-lex.europa.eu/legal-content/ES/TXT/?uri=CELEX%3A32023R0956",
+      "estado": "pendiente",
+      "motivo": "Mismo bloqueo de egreso.",
+      "sostiene": [
+        "Los seis sectores del Anexo I",
+        "Que el cobre y el litio NO están cubiertos",
+        "Los datos que exige la declaración"
+      ]
+    },
+    {
+      "id": "UE-2025-2650",
+      "pais": "UE",
+      "autoridad": "Parlamento Europeo y Consejo",
+      "titulo": "Reglamento (UE) 2025/2650 — segundo aplazamiento del EUDR",
+      "sourceUrl": "https://eur-lex.europa.eu/legal-content/ES/TXT/?uri=OJ%3AL_202502650",
+      "estado": "pendiente",
+      "motivo": "Mismo bloqueo. Es la fuente de las fechas de aplicación vigentes, que por eso NO se codifican.",
+      "sostiene": [
+        "Las fechas de aplicación del EUDR vigentes hoy"
+      ]
+    },
+    {
+      "id": "BR-DOF",
+      "pais": "BR",
+      "autoridad": "IBAMA",
+      "titulo": "Documento de Origem Florestal — Portaria MMA 253/2006, módulo SINAFLOR",
+      "sourceUrl": "https://www.gov.br/ibama/pt-br/assuntos/biodiversidade/flora-e-madeira/documento-de-origem-florestal-dof",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso a gov.br. Hasta tenerlo, la landing NO nombra al organismo emisor: la migración 003 lo atribuye al MAPA y la revisión dice que es del IBAMA.",
+      "sostiene": [
+        "Quién emite el DOF y para qué madera aplica"
+      ]
+    },
+    {
+      "id": "PY-DNA-494-2017",
+      "pais": "PY",
+      "autoridad": "DNIT",
+      "titulo": "Resolución DNA N° 494/2017 — carga terrestre, SINTIA/TES",
+      "sourceUrl": "https://www.dnit.gov.py/",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso a dnit.gov.py. La migración 003 la cita como base del régimen de tránsito paraguayo y del certificado del SENAVE; hasta tenerla, ese cruce se sostiene en fuentes secundarias.",
+      "sostiene": [
+        "El régimen de tránsito terrestre paraguayo"
+      ]
+    },
+    {
+      "id": "CL-LEY-21719",
+      "pais": "CL",
+      "autoridad": "Congreso Nacional de Chile",
+      "titulo": "Ley 21.719 — protección de datos personales",
+      "sourceUrl": "https://www.bcn.cl/leychile/navegar?idNorma=1208650",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso a bcn.cl. Rige el 01-12-2026 y gobierna el inventario de tratamientos de services/inventarioDatos.js, incluida la clasificación de `parcelas` como dato personal por contexto.",
+      "sostiene": [
+        "El registro de tratamientos",
+        "El derecho de acceso y la transferencia internacional"
+      ]
+    }
+  ]
+}
