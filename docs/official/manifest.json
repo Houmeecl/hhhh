@@ -86,12 +86,13 @@
       "id": "PY-DNA-494-2017",
       "pais": "PY",
       "autoridad": "DNIT",
-      "titulo": "Resolución DNA N° 494/2017 — carga terrestre, SINTIA/TES",
-      "sourceUrl": "https://www.dnit.gov.py/",
+      "titulo": "Resolución DNA N° 494/2017 (08-09-2017) — obligatoriedad de SINTIA para exportación terrestre, MIC/DTA electrónico",
+      "sourceUrl": "https://www.dnit.gov.py/documents/20123/1096588/Resolucion_DNA_N_%2B494_2017.pdf/a3f97009-1d17-8b52-50ae-c452e90ed9eb?t=1727117322923",
       "estado": "pendiente",
-      "motivo": "Bloqueo de egreso a dnit.gov.py. La migración 003 la cita como base del régimen de tránsito paraguayo y del certificado del SENAVE; hasta tenerla, ese cruce se sostiene en fuentes secundarias.",
+      "motivo": "Bloqueo de egreso a dnit.gov.py: el proxy responde 403 al CONNECT. Ya se tiene la URL exacta del PDF oficial, así que sellarla desde una red sin ese bloqueo es un solo comando.",
       "sostiene": [
-        "El régimen de tránsito terrestre paraguayo"
+        "La obligatoriedad de SINTIA en exportación terrestre a MERCOSUR",
+        "Que el MIC/DTA del Anexo I es el formato impreso del MIC/DTA electrónico"
       ]
     },
     {
@@ -105,6 +106,81 @@
       "sostiene": [
         "El registro de tratamientos",
         "El derecho de acceso y la transferencia internacional"
+      ]
+    },
+    {
+      "id": "PY-TES-MANUAL",
+      "pais": "PY",
+      "autoridad": "DNIT",
+      "titulo": "Tránsito Electrónico SOFIA (TES) — Manual del Usuario v1.0",
+      "sourceUrl": "https://www.dnit.gov.py/documents/20123/1096588/TES-Manual-del-usuario.pdf/03512b82-5fdc-e22c-829f-20e9846afeec?t=1727128122232.pdf",
+      "estado": "pendiente",
+      "motivo": "Mismo bloqueo de egreso a dnit.gov.py. Es fuente OPERATIVA, no normativa: describe cómo se carga el MIC/DTA, no de qué documentos hay obligación. De él NO se puede inferir exigibilidad.",
+      "sostiene": [
+        "Los campos del MIC/DTA electrónico: propietario, transportista, vehículo, conductor",
+        "La ruta informática: aduana de origen, entrada, destino y país de paso",
+        "Carta de Porte / CRT, despacho e ítems asociados"
+      ]
+    },
+    {
+      "id": "PY-DNA-292-2019",
+      "pais": "PY",
+      "autoridad": "DNIT",
+      "titulo": "Resolución DNA N° 292/2019 — uso obligatorio de SINTIA en importaciones terrestres",
+      "sourceUrl": "https://www.dnit.gov.py/web/portal-institucional/carga-terrestre-sintia",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso. Entra al registro porque es POSTERIOR a la 494/2017: sin ella el paquete paraguayo queda congelado en 2017 y nadie se entera de que quedó viejo. Cubre importación, no exportación.",
+      "sostiene": [
+        "El régimen SINTIA en importaciones terrestres paraguayas"
+      ]
+    },
+    {
+      "id": "AR-RG-2619-2009",
+      "pais": "AR",
+      "autoridad": "ARCA (ex AFIP)",
+      "titulo": "RG AFIP 2619/2009 — incorporación de SINTIA e intercambio electrónico del MIC/DTA",
+      "sourceUrl": "https://www.argentina.gob.ar/normativa",
+      "estado": "pendiente",
+      "motivo": "No verificada. Es la base normativa que se cita para el tramo argentino, y el cruce AR a CL sigue en definición en cruces_corredor.",
+      "sostiene": [
+        "La base normativa del MIC/DTA argentino y el rol del Agente de Transporte Aduanero"
+      ]
+    },
+    {
+      "id": "AR-MICDTA-MANUAL",
+      "pais": "AR",
+      "autoridad": "ARCA (ex AFIP)",
+      "titulo": "Manual MIC/DTA Usuarios Externos — versión en disputa (v10.2 feb-2026 vs v9.0 publicada)",
+      "sourceUrl": "https://www.argentina.gob.ar/arca",
+      "estado": "pendiente",
+      "motivo": "CONFLICTO DE VERSIÓN SIN RESOLVER, y por eso entra explícitamente. Se citó un manual v10.2 de febrero de 2026 mientras la página pública exponía v9.0. No se fabrica la URL de v10.2 por inferencia: hay que guardar el archivo realmente obtenido, con su URL final y su fecha, y recién ahí decidir cuál supera a cuál.",
+      "sostiene": [
+        "Los campos y el flujo del MIC/DTA argentino"
+      ]
+    },
+    {
+      "id": "BR-RFB-SINTIA",
+      "pais": "BR",
+      "autoridad": "Receita Federal do Brasil",
+      "titulo": "Documentación SINTIA aduanera de Brasil",
+      "sourceUrl": "https://www.gov.br/receitafederal",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso a gov.br. Se separa de la ANTT a propósito: la autoridad ADUANERA es Receita Federal y la reguladora del TRANSPORTE es ANTT. Tratarlas como un solo actor \"Brasil\" es el error que hace atribuir un documento al organismo equivocado, como ya pasó con el DOF.",
+      "sostiene": [
+        "El régimen aduanero SINTIA brasileño"
+      ]
+    },
+    {
+      "id": "BR-ANTT-FISCALIZACION",
+      "pais": "BR",
+      "autoridad": "ANTT",
+      "titulo": "Regulación de fiscalización del transporte internacional de cargas",
+      "sourceUrl": "https://www.gov.br/antt",
+      "estado": "pendiente",
+      "motivo": "Bloqueo de egreso a gov.br. Sostiene los modelos CRT/MIC-DTA y CITV/CITV-PP. Se indica que fue consolidada nuevamente en 2026, que es justamente la razón por la que estas reglas no se codifican como constantes eternas.",
+      "sostiene": [
+        "Los modelos CRT y MIC/DTA del MERCOSUR",
+        "CITV / CITV-PP y su vigencia"
       ]
     }
   ]
