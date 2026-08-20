@@ -5,7 +5,7 @@ import {
   validarSolicitud, dondeBuscar, limitesDeSupresion,
   diasEsperando, fueraDePlazo, armarPaquete,
 } from '../src/services/arcop.js';
-import { INVENTARIO, PERSONAL } from '../src/services/inventarioDatos.js';
+import { INVENTARIO, INVENTARIO_CORREDOR, PERSONAL } from '../src/services/inventarioDatos.js';
 
 const RUT = '76.570.751-K';
 
@@ -107,8 +107,21 @@ test('sin identificador no se busca en ninguna parte', () => {
 
 test('nunca se busca en una tabla clasificada como no personal', () => {
   for (const d of dondeBuscar({ rut: RUT, email: 'a@b.cl' })) {
-    assert.equal(INVENTARIO[d.tabla].clasificacion, PERSONAL, `${d.tabla} no es personal`);
+    const e = (d.bd === 'corredor' ? INVENTARIO_CORREDOR : INVENTARIO)[d.tabla];
+    assert.ok(e, `${d.bd}:${d.tabla} no está en su inventario`);
+    assert.equal(e.clasificacion, PERSONAL, `${d.tabla} no es personal`);
   }
+});
+
+test('dondeBuscar dice en qué base vive cada tabla', () => {
+  // Sin este dato la ruta no puede elegir pool, y elegir mal significa que
+  // la tabla no aparece: es como el Corredor quedó fuera del derecho de
+  // acceso sin que nadie se enterara.
+  const destinos = dondeBuscar({ rut: RUT, email: 'a@b.cl' });
+  for (const d of destinos) {
+    assert.ok(['principal', 'corredor'].includes(d.bd), `${d.tabla}: base "${d.bd}" desconocida`);
+  }
+  assert.ok(destinos.some((d) => d.bd === 'corredor'), 'ninguna tabla del Corredor: volvió el punto ciego');
 });
 
 // ---------- límites de la supresión ----------

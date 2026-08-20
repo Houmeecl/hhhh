@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  INVENTARIO, PERSONAL, NO_PERSONAL, CADENA,
+  INVENTARIO, INVENTARIO_CORREDOR, PERSONAL, NO_PERSONAL, CADENA,
   tablasConDatosDe, retenidoPorLey,
 } from '../src/services/inventarioDatos.js';
 
@@ -13,7 +13,15 @@ const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 // lib/dbCorredor.js), pero la Ley 21.719 no distingue por base de datos:
 // dejar el producto nuevo fuera del inventario sería exactamente la deriva
 // que este archivo existe para impedir.
-const MIGRACIONES = [join(RAIZ, 'migrations'), join(RAIZ, 'migrations-corredor')];
+// Cada directorio con la base a la que corresponde: el escáner tiene que
+// poder distinguirlas. `puntos_corredor` existe en las DOS —migración 093
+// en la principal, 002 en la del Corredor— y mientras el escáner las
+// aplanó en un solo Map, las dos tablas se leyeron como una sola. La misma
+// ceguera que tenía el inventario.
+const MIGRACIONES = [
+  { dir: join(RAIZ, 'migrations'), bd: 'principal' },
+  { dir: join(RAIZ, 'migrations-corredor'), bd: 'corredor' },
+];
 
 // Nombres de columna que delatan un dato de persona. Deliberadamente
 // amplio: prefiere marcar de más y obligar a decidir, antes que dejar
@@ -34,27 +42,30 @@ function escanearMigraciones() {
   // declarar una columna real pero que el patrón no reconoce —`datos`,
   // `archivo_original`— se leyera como "ausente en la base". El síntoma se
   // había tapado con una excepción a mano para `datos`; la causa era esta.
-  const marcar = (t, c) => {
-    if (!tablas.has(t)) tablas.set(t, { todas: new Set(), personales: new Set() });
+  // La llave lleva la base, para que las dos `puntos_corredor` no se
+  // fundan en una.
+  const marcar = (bd, t, c) => {
+    const llave = `${bd}:${t}`;
+    if (!tablas.has(llave)) tablas.set(llave, { tabla: t, bd, todas: new Set(), personales: new Set() });
     if (!c) return;
-    tablas.get(t).todas.add(c);
-    if (COLUMNA_PERSONAL.test(c)) tablas.get(t).personales.add(c);
+    tablas.get(llave).todas.add(c);
+    if (COLUMNA_PERSONAL.test(c)) tablas.get(llave).personales.add(c);
   };
 
-  const archivos = MIGRACIONES.flatMap((dir) =>
-    readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => join(dir, f)));
-  for (const ruta of archivos) {
+  const archivos = MIGRACIONES.flatMap(({ dir, bd }) =>
+    readdirSync(dir).filter((f) => f.endsWith('.sql')).sort().map((f) => ({ ruta: join(dir, f), bd })));
+  for (const { ruta, bd } of archivos) {
     const sql = readFileSync(ruta, 'utf8');
     for (const [, tabla, cuerpo] of sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)\s*\(([\s\S]*?)\n\);/g)) {
-      marcar(tabla, null);
+      marcar(bd, tabla, null);
       for (const linea of cuerpo.split('\n')) {
         const col = linea.trim().match(TIPO);
-        if (col) marcar(tabla, col[1]);
+        if (col) marcar(bd, tabla, col[1]);
       }
     }
     for (const [, tabla, col] of sql.matchAll(/ALTER TABLE (\w+)\s+ADD COLUMN IF NOT EXISTS (\w+)/gi)) {
-      marcar(tabla, null);
-      marcar(tabla, col);
+      marcar(bd, tabla, null);
+      marcar(bd, tabla, col);
     }
   }
   return tablas;
@@ -63,8 +74,8 @@ function escanearMigraciones() {
 test('el escáner encuentra las migraciones y tablas conocidas', () => {
   const tablas = escanearMigraciones();
   assert.ok(tablas.size > 30, `esperaba >30 tablas, encontré ${tablas.size} — ¿cambió el formato de las migraciones?`);
-  assert.ok(tablas.has('clientes') && tablas.has('facturas'));
-  assert.ok(tablas.get('clientes').personales.has('contacto_email'));
+  assert.ok(tablas.has('principal:clientes') && tablas.has('principal:facturas'));
+  assert.ok(tablas.get('principal:clientes').personales.has('contacto_email'));
 });
 
 test('el escáner también mira la base del Corredor', () => {
@@ -72,17 +83,24 @@ test('el escáner también mira la base del Corredor', () => {
   // inventario pero no la vigilaría nadie: se podría agregar una columna
   // con datos de persona y el test seguiría verde.
   const tablas = escanearMigraciones();
-  assert.ok(tablas.has('exportadores'), 'no encontró las migraciones del Corredor');
-  assert.ok(tablas.has('parcelas'));
-  assert.ok(tablas.get('usuarios_corredor').personales.has('email'));
+  assert.ok(tablas.has('corredor:exportadores'), 'no encontró las migraciones del Corredor');
+  assert.ok(tablas.has('corredor:parcelas'));
+  assert.ok(tablas.get('corredor:usuarios_corredor').personales.has('email'));
+  // `puntos_corredor` está en las DOS bases y son tablas distintas. Que el
+  // escáner vea las dos es lo que impide volver a fundirlas.
+  assert.ok(tablas.has('principal:puntos_corredor'), 'perdió la puntos_corredor de la base principal');
+  assert.ok(tablas.has('corredor:puntos_corredor'), 'perdió la puntos_corredor del Corredor');
 });
 
 // ---------- el test que evita la deriva ----------
 
+// El inventario de cada base, elegido por la base de la tabla.
+const inventarioDe = (bd) => (bd === 'corredor' ? INVENTARIO_CORREDOR : INVENTARIO);
+
 test('toda tabla con columnas de persona está clasificada en el inventario', () => {
-  const sinClasificar = [...escanearMigraciones()]
-    .filter(([tabla, cols]) => cols.personales.size > 0 && !INVENTARIO[tabla])
-    .map(([tabla, cols]) => `${tabla} (${[...cols.personales].join(', ')})`);
+  const sinClasificar = [...escanearMigraciones().values()]
+    .filter((t) => t.personales.size > 0 && !inventarioDe(t.bd)[t.tabla])
+    .map((t) => `${t.bd}:${t.tabla} (${[...t.personales].join(', ')})`);
 
   assert.deepEqual(sinClasificar, [],
     'Hay tablas con columnas de dato personal que no están en INVENTARIO de '
@@ -91,7 +109,8 @@ test('toda tabla con columnas de persona está clasificada en el inventario', ()
 });
 
 test('cada entrada del inventario declara lo que la ley pide', () => {
-  for (const [tabla, e] of Object.entries(INVENTARIO)) {
+  // Las dos bases: el Corredor no queda exento de declarar finalidad.
+  for (const [tabla, e] of [...Object.entries(INVENTARIO), ...Object.entries(INVENTARIO_CORREDOR)]) {
     assert.ok([PERSONAL, NO_PERSONAL].includes(e.clasificacion), `${tabla}: clasificación inválida`);
     assert.ok(typeof e.finalidad === 'string' && e.finalidad.length > 0, `${tabla}: sin finalidad`);
     assert.ok('cadena' in e, `${tabla}: no declara si está encadenada`);
@@ -105,7 +124,7 @@ test('cada entrada del inventario declara lo que la ley pide', () => {
 });
 
 test('lo que no se purga dice por qué', () => {
-  for (const [tabla, e] of Object.entries(INVENTARIO)) {
+  for (const [tabla, e] of [...Object.entries(INVENTARIO), ...Object.entries(INVENTARIO_CORREDOR)]) {
     if (e.retencion === null) {
       assert.ok(e.motivoSinPurga, `${tabla}: no se purga y no explica el motivo`);
     }
@@ -114,9 +133,13 @@ test('lo que no se purga dice por qué', () => {
 
 test('las columnas declaradas existen de verdad en las migraciones', () => {
   const tablas = escanearMigraciones();
-  for (const [tabla, e] of Object.entries(INVENTARIO)) {
-    const reales = tablas.get(tabla);
-    assert.ok(reales, `${tabla}: está en el inventario pero no existe en las migraciones`);
+  const pares = [
+    ...Object.entries(INVENTARIO).map(([t, e]) => ['principal', t, e]),
+    ...Object.entries(INVENTARIO_CORREDOR).map(([t, e]) => ['corredor', t, e]),
+  ];
+  for (const [bd, tabla, e] of pares) {
+    const reales = tablas.get(`${bd}:${tabla}`);
+    assert.ok(reales, `${bd}:${tabla}: está en el inventario pero no existe en las migraciones`);
     for (const col of e.columnas) {
       // Se contrasta contra TODAS las columnas de la tabla, no solo contra
       // las que el patrón reconoce como personales: el inventario declara
@@ -161,8 +184,29 @@ test('tablasConDatosDe distingue buscar por correo de buscar por RUT', () => {
 });
 
 test('tablasConDatosDe nunca devuelve una tabla clasificada como no personal', () => {
-  const todas = [...tablasConDatosDe('a@b.cl'), ...tablasConDatosDe('1-9')].map((t) => t.tabla);
-  for (const t of todas) assert.equal(INVENTARIO[t].clasificacion, PERSONAL);
+  const todas = [...tablasConDatosDe('a@b.cl'), ...tablasConDatosDe('1-9')];
+  for (const t of todas) {
+    const e = inventarioDe(t.bd)[t.tabla];
+    assert.ok(e, `${t.bd}:${t.tabla}: devuelta para buscar y ausente de su inventario`);
+    assert.equal(e.clasificacion, PERSONAL, `${t.bd}:${t.tabla}`);
+  }
+});
+
+test('tablasConDatosDe alcanza la base del Corredor', () => {
+  // Este es EL test del hallazgo. Hasta el 20-08-2026 tablasConDatosDe
+  // solo recorría INVENTARIO, así que exportadores, usuarios_corredor y
+  // actividad_corredor —las tres con datos personales— no aparecían jamás
+  // en la respuesta a un derecho de acceso. La ruta las buscaba con el
+  // pool equivocado, no las encontraba y las saltaba sin decir nada: el
+  // titular recibía un paquete incompleto con cara de completo.
+  const porCorreo = tablasConDatosDe('a@b.cl');
+  const delCorredor = porCorreo.filter((t) => t.bd === 'corredor').map((t) => t.tabla);
+  for (const esperada of ['exportadores', 'usuarios_corredor', 'actividad_corredor']) {
+    assert.ok(delCorredor.includes(esperada), `falta ${esperada}: el Corredor volvió a quedar fuera del acceso`);
+  }
+  // Y toda tabla devuelta declara en qué base vive: sin eso, quien
+  // consulta no puede elegir pool y vuelve el salto mudo.
+  for (const t of porCorreo) assert.ok(t.bd, `${t.tabla} no declara base`);
 });
 
 test('retenidoPorLey explica cada cosa que no se puede borrar', () => {

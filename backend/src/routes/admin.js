@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
+import { queryCorredor, corredorDisponible } from '../lib/dbCorredor.js';
 import { requireAuth, requireRole, requireHomePanel, requireSuperadmin, requireSeccion, requireNivelOperador, logActividad } from '../middleware/auth.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { generarPasswordTemporal, crearCuentaEntidad, enviarActivacion, ENTIDAD_POR_PANEL as ENTIDAD_CUENTA_POR_PANEL } from '../services/cuentas.js';
@@ -29,7 +30,7 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
 import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
 import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
-import { INVENTARIO, retenidoPorLey } from '../services/inventarioDatos.js';
+import { INVENTARIO, retenidoPorLey, BD_CORREDOR } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiterAdmin } from '../middleware/rateLimit.js';
 import { generarSerialLlave, generarToken, generarPin, hashToken } from '../services/llaveArchivo.js';
@@ -1622,24 +1623,54 @@ router.get('/arcop/:id/datos', requireSeccion('datos_personales'), async (req, r
     if (!sol) return res.status(404).json({ error: 'Solicitud no encontrada' });
 
     const hallazgos = [];
+    // Lo que NO se pudo revisar. Va en la respuesta: un paquete al que le
+    // falta una base entera y no lo dice es peor que uno que se declara
+    // incompleto, porque el titular no tiene cómo saberlo.
+    const sinRevisar = [];
+
     for (const destino of dondeBuscar(sol)) {
+      // Cada tabla se consulta en SU base. Hasta el 20-08-2026 todas se
+      // buscaban en la principal; las del Corredor no existen ahí, la
+      // validación de columnas devolvía vacío y el bucle las saltaba en
+      // silencio. exportadores, usuarios_corredor y actividad_corredor
+      // —las tres con datos personales— nunca salían en la respuesta.
+      const esCorredor = destino.bd === BD_CORREDOR;
+      if (esCorredor && !corredorDisponible()) {
+        sinRevisar.push({
+          tabla: destino.tabla, bd: destino.bd,
+          motivo: 'La base del Corredor no está configurada en este servidor.',
+        });
+        continue;
+      }
+      const consultar = esCorredor ? queryCorredor : query;
+
       // Nombres de tabla y columna vienen del inventario, que es código
       // del repositorio, no de la petición: no hay inyección posible por
       // acá. Aun así se validan contra el catálogo real de Postgres.
-      const { rows: cols } = await query(
+      const { rows: cols } = await consultar(
         `SELECT column_name FROM information_schema.columns
           WHERE table_schema = 'public' AND table_name = $1 AND column_name = ANY($2)`,
         [destino.tabla, destino.columnas]
       );
       const columnas = cols.map((c) => c.column_name);
-      if (!columnas.length) continue;
+      if (!columnas.length) {
+        // El inventario declara esta tabla y la base no la tiene. Antes
+        // esto era un `continue` mudo; ahora se dice. Suele significar que
+        // faltó correr una migración, y callarlo convierte un despliegue a
+        // medias en una respuesta legal incompleta.
+        sinRevisar.push({
+          tabla: destino.tabla, bd: destino.bd,
+          motivo: 'El inventario la declara, pero no está en la base. ¿Falta una migración?',
+        });
+        continue;
+      }
 
       const where = columnas.map((c, i) => `${c} = $${i + 1}`).join(' OR ');
       const valores = columnas.map((c) => (/email|correo/i.test(c) ? sol.email : sol.rut));
-      const { rows: filas } = await query(
+      const { rows: filas } = await consultar(
         `SELECT * FROM ${destino.tabla} WHERE ${where} LIMIT 500`, valores
       );
-      hallazgos.push({ tabla: destino.tabla, filas });
+      hallazgos.push({ tabla: destino.tabla, bd: destino.bd, filas });
     }
 
     await logActividad({
@@ -1650,6 +1681,7 @@ router.get('/arcop/:id/datos', requireSeccion('datos_personales'), async (req, r
     res.json(armarPaquete({
       titular: { rut: sol.rut, email: sol.email, nombre: sol.nombre },
       hallazgos,
+      sinRevisar,
       generadoAt: new Date().toISOString(),
     }));
   } catch (err) { next(err); }

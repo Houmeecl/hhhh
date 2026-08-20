@@ -17,7 +17,10 @@
 // ============================================================
 
 import { rutValido } from './dte.js';
-import { INVENTARIO, PERSONAL, CADENA, tablasConDatosDe, retenidoPorLey } from './inventarioDatos.js';
+import {
+  INVENTARIO, INVENTARIO_CORREDOR, PERSONAL, CADENA, tablasConDatosDe, retenidoPorLey,
+  BD_PRINCIPAL, BD_CORREDOR,
+} from './inventarioDatos.js';
 
 export const DERECHOS = ['acceso', 'rectificacion', 'supresion', 'oposicion', 'portabilidad'];
 
@@ -91,17 +94,27 @@ export function validarSolicitud(entrada) {
  * Dónde buscar los datos de este titular. Sale del inventario, así que
  * agregar mañana una tabla con datos personales la incorpora sola —
  * siempre que se clasifique, cosa que el test obliga.
+ *
+ * Cada destino trae la BASE en la que vive (`bd`). No es un detalle de
+ * implementación que quien consulta pueda ignorar: las tablas del Corredor
+ * están en otra base y Postgres no permite consultarlas con el pool
+ * equivocado. Hasta el 20-08-2026 esto no se declaraba, la ruta las
+ * buscaba todas en la base principal y las del Corredor se saltaban en
+ * silencio; el titular recibía un paquete incompleto con cara de completo.
  */
 export function dondeBuscar({ rut, email }) {
   const destinos = new Map();
   for (const id of [rut, email].filter(Boolean)) {
     for (const d of tablasConDatosDe(id)) {
-      const previo = destinos.get(d.tabla) || { tabla: d.tabla, columnas: new Set() };
+      // La llave lleva la base: `puntos_corredor` existe en las dos y
+      // agrupar solo por nombre volvería a fundir dos tablas distintas.
+      const llave = `${d.bd}:${d.tabla}`;
+      const previo = destinos.get(llave) || { tabla: d.tabla, bd: d.bd, columnas: new Set() };
       d.columnas.forEach((c) => previo.columnas.add(c));
-      destinos.set(d.tabla, previo);
+      destinos.set(llave, previo);
     }
   }
-  return [...destinos.values()].map((d) => ({ tabla: d.tabla, columnas: [...d.columnas] }));
+  return [...destinos.values()].map((d) => ({ tabla: d.tabla, bd: d.bd, columnas: [...d.columnas] }));
 }
 
 /**
@@ -149,16 +162,39 @@ export const fueraDePlazo = (creada, ahora = new Date()) =>
  * Sirve igual para acceso (mostrarlo) y para portabilidad (descargarlo):
  * es el mismo contenido, cambia el envase.
  */
-export function armarPaquete({ titular, hallazgos = [], generadoAt = null }) {
+export function armarPaquete({ titular, hallazgos = [], sinRevisar = [], generadoAt = null }) {
+  // La ficha de la tabla sale del inventario de SU base. Buscarla siempre
+  // en INVENTARIO dejaba a las del Corredor sin finalidad ni base de
+  // licitud: aparecían los datos, pero sin decir para qué se tratan, que
+  // es justamente lo que el derecho de acceso obliga a informar.
+  const ficha = (h) => (h.bd === BD_CORREDOR ? INVENTARIO_CORREDOR : INVENTARIO)[h.tabla] || {};
+
   const secciones = hallazgos
     .filter((h) => h.filas?.length)
     .map((h) => ({
       tabla: h.tabla,
-      finalidad: INVENTARIO[h.tabla]?.finalidad || null,
-      base_licitud: INVENTARIO[h.tabla]?.base || null,
-      encadenada: (INVENTARIO[h.tabla]?.cadena ?? CADENA.NINGUNA) !== CADENA.NINGUNA,
+      base_datos: h.bd || BD_PRINCIPAL,
+      finalidad: ficha(h).finalidad || null,
+      base_licitud: ficha(h).base || null,
+      encadenada: (ficha(h).cadena ?? CADENA.NINGUNA) !== CADENA.NINGUNA,
       registros: h.filas,
     }));
+
+  const notas = [];
+  if (!secciones.length) {
+    notas.push('No se encontraron registros asociados a ese identificador en las tablas consultadas.');
+  }
+  // Lo no revisado se declara SIEMPRE, haya o no hallazgos. Un paquete al
+  // que le falta una base entera y no lo dice es peor que uno incompleto
+  // que se reconoce como tal: el titular no tiene cómo enterarse.
+  if (sinRevisar.length) {
+    const cuales = sinRevisar.map((t) => t.tabla).join(', ');
+    notas.push(
+      `ATENCIÓN — esta respuesta está INCOMPLETA: no se pudieron revisar ${sinRevisar.length} `
+      + `tabla(s) (${cuales}). Antes de entregarla al titular hay que resolver el motivo y volver `
+      + 'a generarla.'
+    );
+  }
 
   return {
     titular,
@@ -166,10 +202,10 @@ export function armarPaquete({ titular, hallazgos = [], generadoAt = null }) {
     responsable: 'sicr3p',
     total_registros: secciones.reduce((n, s) => n + s.registros.length, 0),
     secciones,
+    completa: sinRevisar.length === 0,
+    sin_revisar: sinRevisar,
     // Sin datos no se afirma que no existan en ninguna parte: se dice
     // exactamente lo que se buscó.
-    nota: secciones.length
-      ? null
-      : 'No se encontraron registros asociados a ese identificador en las tablas consultadas.',
+    nota: notas.length ? notas.join(' ') : null,
   };
 }

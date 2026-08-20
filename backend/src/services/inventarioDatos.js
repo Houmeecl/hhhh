@@ -752,6 +752,28 @@ export const INVENTARIO = {
     retencion: 'Un admin la revoca cuando el pendrive se pierde; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
   },
 
+};
+
+// ============================================================
+// Inventario de la base del CORREDOR (sicr3p_corredor).
+//
+// POR QUÉ ESTÁ SEPARADO Y NO MEZCLADO CON EL DE ARRIBA. Son dos bases
+// distintas (ver lib/dbCorredor.js) y Postgres no permite consultarlas
+// juntas. Mientras las dos listas fueron un solo objeto, dos cosas
+// pasaron sin que nadie se enterara:
+//
+//   1. `puntos_corredor` existe DE VERDAD en las dos bases —migración 093
+//      acá, 002 allá— y como un objeto literal no admite dos veces la
+//      misma llave, la segunda pisaba a la primera en silencio. La
+//      clasificación de una de las dos tablas era código muerto.
+//   2. La respuesta al derecho de acceso recorría estas tablas con el pool
+//      de la base principal, donde no existen, y las SALTABA sin avisar.
+//      El titular recibía un paquete que parecía completo.
+//
+// Separarlas hace imposible lo primero y obliga a elegir pool para lo
+// segundo. La Ley 21.719 no distingue por base de datos.
+// ============================================================
+export const INVENTARIO_CORREDOR = {
   // ---------- Corredor Bioceánico (base sicr3p_corredor) ----------
   // Estas tablas viven en OTRA BASE (ver lib/dbCorredor.js). Se inventarían
   // igual: la Ley 21.719 no distingue por base de datos, y dejar el
@@ -838,15 +860,6 @@ export const INVENTARIO = {
     retencion: null,
     motivoSinPurga: 'Borrarla dejaría la cadena sin origen: los eslabones ya emitidos no se podrían verificar.',
   },
-  documentos_por_tramo: {
-    clasificacion: NO_PERSONAL, columnas: [],
-    nota: 'Catálogo: qué documento pide cada cruce de frontera. No tiene datos de nadie; es la regla '
-      + 'contra la que se mide el expediente de una carga.',
-    finalidad: 'Decidir qué evidencia se le pide a cada tramo.',
-    base: BASE.LEY, cadena: CADENA.NINGUNA,
-    retencion: null,
-    motivoSinPurga: 'Catálogo de configuración, sin datos personales que purgar.',
-  },
   carga_pasos: {
     clasificacion: NO_PERSONAL, columnas: [],
     nota: 'DELIBERADAMENTE SIN POSICIÓN. Registra que la carga pasó por un punto de control conocido '
@@ -885,6 +898,14 @@ export const INVENTARIO = {
     base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
     retencion: 'Permanente.',
   },
+  cruces_corredor: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: 'Qué pares de países tienen su documentación definida y cuáles siguen en estudio. '
+      + 'Son estados del PROYECTO, no de ninguna persona ni de ninguna carga.',
+    finalidad: 'Saber si un cruce ya se puede exigir o todavía está en definición.',
+    base: BASE.LEGITIMO, cadena: CADENA.NINGUNA,
+    retencion: 'Permanente: un pasaporte viejo se lee con las reglas que regían entonces.',
+  },
 };
 
 // Las tablas donde hay que buscar cuando alguien ejerce su derecho de
@@ -897,14 +918,24 @@ export const INVENTARIO = {
 // conductor y jamás habría sido encontrado. Por eso una entrada puede
 // declarar explícitamente qué columnas suyas son de cada tipo, y esa
 // declaración se suma a la deducción por nombre.
+// Nombres de las dos bases. Se exportan porque quien consulte tiene que
+// elegir pool con ellos, y un string suelto escrito a mano en cada llamada
+// es como se vuelve a perder una base entera.
+export const BD_PRINCIPAL = 'principal';
+export const BD_CORREDOR = 'corredor';
+
 export const tablasConDatosDe = (identificador) => {
   const porCorreo = String(identificador || '').includes('@');
   const campo = porCorreo ? /email|correo/i : /rut/i;
   const declaradas = (e) => (porCorreo ? e.columnasEmail : e.columnasRut) || [];
   const buscables = (e) => [...new Set([...e.columnas.filter((c) => campo.test(c)), ...declaradas(e)])];
-  return Object.entries(INVENTARIO)
+  // Las DOS bases. Antes solo se recorría INVENTARIO, así que el Corredor
+  // —con exportadores, usuarios_corredor y actividad_corredor, todas
+  // personales— no aparecía nunca en la respuesta a un derecho de acceso.
+  const de = (inventario, bd) => Object.entries(inventario)
     .filter(([, e]) => e.clasificacion === PERSONAL && buscables(e).length > 0)
-    .map(([tabla, e]) => ({ tabla, columnas: buscables(e) }));
+    .map(([tabla, e]) => ({ tabla, bd, columnas: buscables(e) }));
+  return [...de(INVENTARIO, BD_PRINCIPAL), ...de(INVENTARIO_CORREDOR, BD_CORREDOR)];
 };
 
 // Lo que NO se puede borrar aunque el titular lo pida, con su fundamento.
