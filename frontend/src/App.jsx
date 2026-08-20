@@ -1,6 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
+import Lanzamiento from './pages/Lanzamiento.jsx';
+import { yaLanzo } from './lib/cuentaRegresiva.js';
 import Cargar from './pages/Cargar.jsx';
 import Resultado from './pages/Resultado.jsx';
 import Verificar from './pages/Verificar.jsx';
@@ -71,12 +73,31 @@ const ES_SUBDOMINIO_INSTITUTO = window.location.hostname.startsWith('instituto.'
 // base, otro login, otra marca.
 const ES_SUBDOMINIO_CORREDOR = window.location.hostname.startsWith('corredor.');
 
+// Hasta la hora del lanzamiento la portada de sicr3p.cl es la cuenta
+// regresiva; después es la landing de siempre. El cambio NO necesita un
+// despliegue: lo decide `yaLanzo()` comparando fechas, y esa función tiene
+// tests propios porque es lo único que separa "se ve la cuenta regresiva"
+// de "se ve el sitio".
+//
+// Se evalúa acá, al cargar el módulo, y no en cada render: una pestaña que
+// quedó abierta desde antes no cambia sola de portada a mitad de lectura.
+// Quien recargue después de las 16:00 entra al sitio.
+//
+// Los subdominios del Instituto y del Corredor NO se tapan: son otros
+// productos, con su propio calendario.
+//
+// `?ver=landing` salta la cuenta regresiva. Es para revisar la portada
+// real antes de la hora sin bajar la página, no un secreto: quien la
+// descubra ve la landing, que igual va a ser pública en unas horas.
+const VER_LANDING = new URLSearchParams(window.location.search).get('ver') === 'landing';
+const EN_CUENTA_REGRESIVA = !VER_LANDING && !yaLanzo(Date.now());
+
 export default function App() {
   return (
     <Suspense fallback={<CargandoModulo />}>
     <Routes>
       {/* Flujo público (sin login) */}
-      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : <Landing />} />
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : EN_CUENTA_REGRESIVA ? <Lanzamiento /> : <Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
