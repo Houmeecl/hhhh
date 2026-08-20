@@ -4,6 +4,7 @@ import PublicLayout from '../components/PublicLayout.jsx';
 import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
 import IlustracionCorredor from '../components/IlustracionCorredor.jsx';
+import DocumentosPorFrontera from '../components/DocumentosPorFrontera.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { useSeo } from '../lib/seo.js';
 
@@ -167,6 +168,10 @@ export default function CorredorLanding() {
           </div>
         </div>
       </section>
+
+      {/* Qué agrega cada frontera. Es la primera pregunta de todo
+          exportador y la landing no la respondía. */}
+      <DocumentosPorFrontera t={t} />
 
       {/* La credencial: captura real de la Tarjeta de Viaje */}
       <section className="sec-pad">
