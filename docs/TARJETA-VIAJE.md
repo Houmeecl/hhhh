@@ -25,20 +25,34 @@ aplican de forma más general) pero omiten la tarjeta OECD por honestidad.
 ## Cómo funciona
 
 1. **Emitir** (panel admin → Pasaporte de Origen → lote → Tarjetas de viaje):
-   el sistema genera el serial `TV-XXXX`, la **clave del portador** (visible
-   UNA sola vez — se entrega por separado, nunca va impresa en la credencial)
-   y la **credencial PDF** tamaño tarjeta con el QR.
+   el sistema genera el serial, la **clave del portador** (visible UNA sola
+   vez — se entrega por separado, nunca va impresa en la credencial) y la
+   **credencial PDF** tamaño tarjeta con el QR.
+
+   El serial es `TV-` más 16 hexadecimales (8 bytes). **Era de 4** hasta el
+   20-08-2026, y ese es el único dato que protege `/api/v/:serial`, que es
+   público: con 65.536 combinaciones y 300 peticiones cada 15 minutos por
+   IP, barrer el espacio entero era cosa de un fin de semana. Ahora son
+   2^64 y la enumeración deja de ser un ataque. Las `TV-XXXX` ya impresas
+   siguen siendo válidas —un camión en ruta no se puede quedar sin poder
+   registrar un paso— y se agotan por rotación.
 2. **Entregar**: envía la credencial al transportista por WhatsApp/correo, o
    imprímela y pégala en la documentación de la carga. La clave viaja aparte.
 3. **En ruta**:
    - Cualquiera que escanee el QR (de la credencial impresa O de la pantalla
-     del teléfono del portador — la página `/v/TV-XXXX` muestra su propio QR)
+     del teléfono del portador — la página `/v/<serial>` muestra su propio QR)
      abre el **pasaporte público del lote**: cadena de custodia, emisiones,
      alineación normativa. **Ninguna lectura anónima queda registrada.**
    - **El portador** toca "Soy el portador — registrar paso", ingresa su
      clave, el punto de control (báscula, paso fronterizo, puerto) y el país.
      El paso queda **sellado como eslabón de transporte** en la cadena de
      hash del lote, con fecha y hora del servidor.
+   - **La instrucción de la torre** (cambio de destino: "puerto seco",
+     "puerto") aparece recién al ingresar la clave, y desde ahí se refresca
+     sola cada 10 s con el token del portador. Hasta el 20-08-2026 venía en
+     la respuesta pública: sumada a un serial adivinable, cualquiera podía
+     enumerar a dónde va cada carga viva. Vive en
+     `GET /api/tarjeta/instruccion`, detrás de la clave.
    - **La ruta es la secuencia de pasos**: puntos conocidos + timestamps
      sellados con hash. Sin GPS, y ningún paso se puede borrar ni editar
      (append-only).
@@ -54,7 +68,7 @@ aplican de forma más general) pero omiten la tarjeta OECD por honestidad.
 - **Pase Apple Wallet / Google Wallet nativo**: requiere cuenta Apple
   Developer (US$99/año) + certificados de firma, y la API de Google Wallet.
   Se puede agregar después sin tocar el modelo (el pase apuntaría a la misma
-  URL `/v/TV-XXXX`).
+  URL `/v/<serial>`).
 - **Chip NFC físico (NTAG213, ~CLP $300–800 c/u)**: solo si algún cliente lo
   exige; se graba la misma URL con la app "NFC Tools" y se registra el UID
   de fábrica en el campo "UID físico" (anti-clonación). El sistema ya lo
