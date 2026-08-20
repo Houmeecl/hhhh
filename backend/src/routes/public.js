@@ -1735,26 +1735,25 @@ router.get('/lote/:codigo', async (req, res, next) => {
 // la lea llega aquí y es dirigido al pasaporte del lote (SOLO lectura;
 // por decisión de diseño no se registra ninguna lectura anónima).
 // Registrar un paso exige la clave del portador (/api/tarjeta).
+//
+// LO QUE ESTA RESPUESTA NO TRAE, Y POR QUÉ. Hasta el 20-08-2026 acá venía
+// también la instrucción vigente de la torre: destino, zona, nota y
+// emisor. Sin clave. Sumado a un serial de 65.536 combinaciones, eso
+// permitía enumerar a dónde va cada carga viva sin credencial alguna —
+// exactamente el riesgo que sostiene la regla de no rastrear vehículos,
+// entrando por otra puerta. La instrucción se movió detrás de la clave del
+// portador: GET /api/tarjeta/instruccion. Acá queda solo la identidad del
+// lote, que es lo que el pasaporte público ya muestra de todos modos.
 router.get('/v/:serial', async (req, res, next) => {
   try {
     const { rows } = await query(
-      `SELECT t.serial, t.portador, l.codigo
+      `SELECT t.serial, l.codigo
        FROM tarjetas_viaje t JOIN lotes_minerales l ON l.id = t.lote_id
        WHERE t.serial = $1 AND t.activo = true`,
       [String(req.params.serial || '').trim().toUpperCase()]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
-    // Instrucción vigente de la torre de control (migración 024): la ve
-    // quien porta la credencial, sin clave — leerla no escribe nada.
-    const { rows: mRows } = await query(
-      `SELECT m.destino, m.zona, m.nota, m.emisor, m.creado
-       FROM torre_mensajes m
-       JOIN tarjetas_viaje t ON t.lote_id = m.lote_id
-       WHERE t.serial = $1
-       ORDER BY m.creado DESC LIMIT 1`,
-      [rows[0].serial]
-    );
-    res.json({ serial: rows[0].serial, codigo: rows[0].codigo, instruccion: mRows[0] || null });
+    res.json({ serial: rows[0].serial, codigo: rows[0].codigo });
   } catch (err) { next(err); }
 });
 

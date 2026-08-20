@@ -21,6 +21,12 @@ export default function TarjetaViaje() {
   useCatalogoCorredor(); // el select de puntos refleja el catálogo vivo (re-render vía version)
   const [info, setInfo] = useState(null);
   const [error, setError] = useState('');
+  // La instrucción de la torre ya NO viene en /v/:serial: ahí el destino
+  // de cada carga quedaba a la vista de cualquiera que probara seriales.
+  // Se pide con el token que devuelve la clave del portador, y se guarda
+  // solo en memoria — nada de localStorage: es una credencial.
+  const [token, setToken] = useState(null);
+  const [instruccion, setInstruccion] = useState(null);
   // Formulario del portador
   const [abierto, setAbierto] = useState(false);
   const [clave, setClave] = useState('');
@@ -40,17 +46,28 @@ export default function TarjetaViaje() {
   const claveRef = useRef(clave);
   useEffect(() => { claveRef.current = clave; }, [clave]);
 
-  // La credencial se refresca sola: así el portador ve la instrucción de
-  // la torre ("puerto seco" / "puerto") apenas la envían, sin recargar.
+  // Identidad del lote: pública, se lee una vez.
   useEffect(() => {
+    api.tarjetaResolver(serial).then(setInfo).catch((e) => setError(e.message));
+  }, [serial]);
+
+  // La instrucción se refresca sola mientras haya token: así el portador
+  // ve un cambio de destino ("puerto seco" / "puerto") apenas lo envían,
+  // sin recargar. Si el token vence, se limpia y la pantalla vuelve a
+  // pedir la clave en vez de dejar a la vista una instrucción vieja.
+  useEffect(() => {
+    if (!token) return undefined;
+    let vivo = true;
     const cargar = () => {
       if (document.hidden) return;
-      api.tarjetaResolver(serial).then(setInfo).catch((e) => setError(e.message));
+      api.tarjetaInstruccion(token)
+        .then((r) => { if (vivo) setInstruccion(r.instruccion); })
+        .catch(() => { if (vivo) { setToken(null); setInstruccion(null); } });
     };
     cargar();
     const timer = setInterval(cargar, 10000);
-    return () => clearInterval(timer);
-  }, [serial]);
+    return () => { vivo = false; clearInterval(timer); };
+  }, [token]);
 
   const elegirPunto = (id) => {
     setPuntoId(id);
@@ -101,8 +118,10 @@ export default function TarjetaViaje() {
   async function reintentarPendientesAhora() {
     if (!clave.trim()) { setErrPaso(t('tv.falta_clave')); return; }
     try {
-      const { token } = await api.tarjetaAuth({ serial, clave: clave.trim() });
-      await flushPendientes(token);
+      const r = await api.tarjetaAuth({ serial, clave: clave.trim() });
+      setToken(r.token);
+      setInstruccion(r.instruccion || null);
+      await flushPendientes(r.token);
     } catch (e) { setErrPaso(e.message); }
   }
 
@@ -130,9 +149,11 @@ export default function TarjetaViaje() {
       ...(viaQr ? { via_qr: true } : {}),
     };
     try {
-      const { token } = await api.tarjetaAuth({ serial, clave: clave.trim() });
-      await flushPendientes(token); // conexión + clave OK: aprovecha para vaciar la cola
-      const r = await api.tarjetaPaso(token, entrada);
+      const auth = await api.tarjetaAuth({ serial, clave: clave.trim() });
+      setToken(auth.token);
+      setInstruccion(auth.instruccion || null);
+      await flushPendientes(auth.token); // conexión + clave OK: aprovecha para vaciar la cola
+      const r = await api.tarjetaPaso(auth.token, entrada);
       setResultado(r.eslabon);
       setClave('');
       setPunto('');
@@ -171,20 +192,26 @@ export default function TarjetaViaje() {
               {t('tv.serial')}: <span className="mono">{info.serial}</span>
             </p>
 
-            {/* Instrucción vigente de la torre de control (se refresca sola). */}
-            {info.instruccion && (
+            {/* Instrucción vigente de la torre: exige la clave del portador
+                y desde ahí se refresca sola. */}
+            {instruccion && (
               <div className="torre-banner" style={{ textAlign: 'left', marginBottom: 14 }}>
                 <span className="torre-banner-icono">📢</span>
                 <div>
                   <div className="torre-banner-titulo">
-                    {t('tv.instr_torre')}: {etiquetaInstruccion(info.instruccion, t)}
+                    {t('tv.instr_torre')}: {etiquetaInstruccion(instruccion, t)}
                   </div>
                   <div className="muted" style={{ fontSize: 11 }}>
-                    {info.instruccion.nota ? `${info.instruccion.nota} · ` : ''}
-                    {info.instruccion.emisor} · {new Date(info.instruccion.creado).toLocaleString('es-CL')}
+                    {instruccion.nota ? `${instruccion.nota} · ` : ''}
+                    {instruccion.emisor} · {new Date(instruccion.creado).toLocaleString('es-CL')}
                   </div>
                 </div>
               </div>
+            )}
+            {!token && (
+              <p className="muted" style={{ fontSize: 11, marginBottom: 14 }}>
+                {t('tv.instr_tras_clave')}
+              </p>
             )}
 
             {/* Pasos sin señal, guardados en este teléfono — se vacía sola

@@ -1214,8 +1214,39 @@ tarjetaRouter.post('/auth', loginLimiter, async (req, res, next) => {
     await logActividad({ accion: 'tarjeta_login', entidad: 'tarjeta_viaje', entidadId: tarjeta.id, ip: req.ip });
     res.json({
       tarjeta: { serial: tarjeta.serial, portador: tarjeta.portador, lote_codigo: tarjeta.lote_codigo },
+      instruccion: await instruccionVigente(tarjeta.lote_id),
       token: signAccess({ id: tarjeta.id, rol: 'tarjeta', email: null }),
     });
+  } catch (err) { next(err); }
+});
+
+// La instrucción vigente de la torre para un lote (migración 024).
+// Vive detrás de la clave: hasta el 20-08-2026 se servía en el endpoint
+// público /api/v/:serial, donde el destino de cada carga quedaba a la
+// vista de cualquiera que probara seriales.
+async function instruccionVigente(loteId) {
+  if (!loteId) return null;
+  const { rows } = await query(
+    `SELECT destino, zona, nota, emisor, creado
+     FROM torre_mensajes WHERE lote_id = $1
+     ORDER BY creado DESC LIMIT 1`,
+    [loteId]
+  );
+  return rows[0] || null;
+}
+
+// GET /api/tarjeta/instruccion — la instrucción vigente, para el portador
+// autenticado. La credencial la relee cada pocos segundos con el token que
+// obtuvo al ingresar su clave, así sigue enterándose de un cambio de
+// destino sin recargar, pero ya no sin identificarse.
+tarjetaRouter.get('/instruccion', requireAuth, requireRole('tarjeta'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT lote_id FROM tarjetas_viaje WHERE id = $1 AND activo = true`,
+      [req.user.sub]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Tarjeta no encontrada o inactiva' });
+    res.json({ instruccion: await instruccionVigente(rows[0].lote_id) });
   } catch (err) { next(err); }
 });
 

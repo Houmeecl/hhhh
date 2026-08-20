@@ -241,7 +241,7 @@ test('ROLES es el superset de los roles de los 3 tipos, sin duplicados', () => {
 
 // ---------- Tarjeta de Viaje ----------
 
-test('generarSerialTarjeta produce TV-XXXX válidos y variados', async () => {
+test('generarSerialTarjeta produce seriales válidos y variados', async () => {
   const { generarSerialTarjeta, serialTarjetaValido } = await import('../src/services/pasaporteOrigen.js');
   const muestras = new Set();
   for (let i = 0; i < 60; i++) {
@@ -253,6 +253,35 @@ test('generarSerialTarjeta produce TV-XXXX válidos y variados', async () => {
   assert.equal(serialTarjetaValido('AV-1234'), false);
   assert.equal(serialTarjetaValido('TV-12G4'), false);
   assert.equal(serialTarjetaValido(''), false);
+});
+
+// El serial de la Tarjeta de Viaje es la ÚNICA credencial de
+// GET /api/v/:serial, que es público. Mientras fue `randomBytes(2)` había
+// 65.536 combinaciones: con el límite de 300 peticiones cada 15 minutos
+// por IP, barrer el espacio completo tomaba un fin de semana desde un
+// solo IP. Este test es el que impide que alguien lo vuelva a acortar
+// "porque es más cómodo de tipear".
+test('el serial nuevo es largo: 8 bytes, no 2', async () => {
+  const { generarSerialTarjeta, generarSerialCredencialProveedor } = await import('../src/services/pasaporteOrigen.js');
+  for (const gen of [generarSerialTarjeta, generarSerialCredencialProveedor]) {
+    const hex = gen().split('-')[1];
+    assert.equal(hex.length, 16, `${gen().slice(0, 3)} tiene ${hex.length} hex; con menos de 16 el serial se puede enumerar`);
+  }
+});
+
+// Las tarjetas TV-XXXX impresas y grabadas siguen circulando. Invalidarlas
+// de golpe dejaría camiones en ruta sin poder registrar un paso — peor que
+// el riesgo que se está cerrando. Se agotan por rotación.
+test('los seriales cortos ya emitidos siguen siendo válidos', async () => {
+  const { serialTarjetaValido, serialTarjetaHeredado, serialCredencialProveedorValido } =
+    await import('../src/services/pasaporteOrigen.js');
+  assert.equal(serialTarjetaValido('TV-04A2'), true);
+  assert.equal(serialCredencialProveedorValido('FP-04A2'), true);
+  // Y se pueden distinguir, para saber cuáles faltan por rotar.
+  assert.equal(serialTarjetaHeredado('TV-04A2'), true);
+  assert.equal(serialTarjetaHeredado('TV-E7DB268FE171BF03'), false);
+  // Un largo intermedio no es ninguno de los dos formatos: no se acepta.
+  assert.equal(serialTarjetaValido('TV-04A2BB'), false);
 });
 
 // ---------- Anclaje en la cadena global ----------
@@ -462,7 +491,7 @@ test('hashDocumentoLote: determinista y sensible a cada campo', async () => {
 // NO es firma electrónica con validez legal (Ley N° 19.799) — ver el
 // disclaimer en la propia migración y en pdf.js/generateCredencialProveedor.
 
-test('generarSerialCredencialProveedor produce FP-XXXX válidos y variados', async () => {
+test('generarSerialCredencialProveedor produce seriales válidos y variados', async () => {
   const { generarSerialCredencialProveedor, serialCredencialProveedorValido } = await import('../src/services/pasaporteOrigen.js');
   const vistos = new Set();
   for (let i = 0; i < 50; i++) {

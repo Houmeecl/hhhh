@@ -171,6 +171,15 @@ export const api = {
   // --- Tarjeta de viaje (pública / portador) ---
   tarjetaResolver: (serial) => request(`/v/${serial}`),
   tarjetaAuth: (b) => request('/tarjeta/auth', { method: 'POST', body: b }),
+  // La instrucción de la torre exige el token del portador: dejó de venir
+  // en /v/:serial el 20-08-2026 porque ahí el destino de cada carga
+  // quedaba visible sin credencial.
+  tarjetaInstruccion: async (token) => {
+    const res = await fetch('/api/tarjeta/instruccion', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'No se pudo leer la instrucción');
+    return data;
+  },
   // --- Firma del proveedor (pública / firmante) — atestación, NO firma
   // electrónica legal (Ley N° 19.799). Ver origen.js/firmaProveedorRouter. ---
   firmaResolver: (serial) => request(`/f/${serial}`),

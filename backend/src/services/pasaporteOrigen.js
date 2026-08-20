@@ -393,13 +393,39 @@ export function generarCodigoLote(anio, correlativo) {
 }
 
 // ---------- Tarjeta de Viaje (NFC/RFID que acompaña a la carga) ----------
-// Serial corto imprimible/grabable en el NDEF de la tarjeta: TV-XXXX.
-// Mismo espíritu que generarSerial() de posTerminal.js (AV-XXXX).
+// Serial grabado en el NDEF de la tarjeta e impreso en ella: TV- + 16
+// hexadecimales.
+//
+// POR QUÉ 8 BYTES Y NO 2. Hasta el 20-08-2026 esto eran `randomBytes(2)`,
+// o sea 65.536 seriales posibles. El serial es la ÚNICA credencial para
+// GET /api/v/:serial, que es público: con 65 mil combinaciones y 300
+// peticiones cada 15 minutos por IP, barrer el espacio entero es cosa de
+// un fin de semana desde un solo IP, o de minutos repartiendo IPs. Quien
+// lo hiciera obtenía el código de lote de cada carga viva. Un identificador
+// que es a la vez público y adivinable no es un identificador: es una
+// contraseña de cuatro caracteres.
+//
+// Con 8 bytes el espacio pasa a 2^64 y la enumeración deja de existir como
+// ataque. El precio es un serial más largo de tipear a mano, y se paga:
+// el camino normal es escanear el QR o acercar la tarjeta, no transcribirlo.
+const BYTES_SERIAL = 8;
+
 export function generarSerialTarjeta() {
-  return `TV-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+  return `TV-${crypto.randomBytes(BYTES_SERIAL).toString('hex').toUpperCase()}`;
 }
 
+// Acepta los TV-XXXX ya emitidos ADEMÁS del formato nuevo. Las tarjetas
+// impresas y grabadas siguen circulando: invalidarlas de golpe dejaría a
+// camiones en ruta sin poder registrar un paso, que es peor que el riesgo
+// que se está cerrando. Las viejas se agotan por rotación, no por decreto.
 export function serialTarjetaValido(s) {
+  return /^TV-([0-9A-F]{4}|[0-9A-F]{16})$/.test(String(s || ''));
+}
+
+// ¿Este serial es de los cortos, los que se pueden adivinar? Sirve para
+// que la operación sepa cuáles faltan por rotar sin tener que mirar la BD
+// a ojo.
+export function serialTarjetaHeredado(s) {
   return /^TV-[0-9A-F]{4}$/.test(String(s || ''));
 }
 
@@ -407,13 +433,17 @@ export function serialTarjetaValido(s) {
 // NO es firma electrónica con validez legal (Ley N° 19.799) — es una
 // atestación sellada por hash. La identidad (rut_empresa/nombre_empresa)
 // la fija el EMISOR de la credencial al crearla; el firmante nunca la
-// declara. Mismo espíritu de serial corto que generarSerialTarjeta.
+// declara.
+// Mismo cambio y por la misma razón que la Tarjeta de Viaje: GET /api/f/:serial
+// es público y devuelve el nombre de la empresa. Con 65.536 seriales, eso
+// era un listado enumerable de qué empresa provee qué lote — justo lo que
+// no se comparte entre clientes.
 export function generarSerialCredencialProveedor() {
-  return `FP-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+  return `FP-${crypto.randomBytes(BYTES_SERIAL).toString('hex').toUpperCase()}`;
 }
 
 export function serialCredencialProveedorValido(s) {
-  return /^FP-[0-9A-F]{4}$/.test(String(s || ''));
+  return /^FP-([0-9A-F]{4}|[0-9A-F]{16})$/.test(String(s || ''));
 }
 
 // Identidad que el ADMIN fija al emitir la credencial — se valida acá,
