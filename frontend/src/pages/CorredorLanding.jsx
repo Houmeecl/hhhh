@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import PublicLayout from '../components/PublicLayout.jsx';
 import LeadCta from '../components/LeadForm.jsx';
 import { Icon } from '../components/icons.jsx';
+import IlustracionCorredor from '../components/IlustracionCorredor.jsx';
 import { useIdioma } from '../lib/i18n.js';
 import { useSeo } from '../lib/seo.js';
 
@@ -87,6 +88,15 @@ export default function CorredorLanding() {
               <CorPasaportePreview />
             </div>
           </section>
+
+          {/* La ruta completa, a lo ancho y antes de cualquier explicación:
+              quien llega acá tiene que entender de qué corredor hablamos
+              sin leer un párrafo. Se dibuja desde el mismo catálogo de
+              puntos que alimenta la torre de control, así que el trazado
+              es el real y no un adorno. */}
+          <div className="av2-reveal" style={{ marginTop: 28 }}>
+            <IlustracionCorredor />
+          </div>
         </div>
       </div>
 
@@ -104,7 +114,7 @@ export default function CorredorLanding() {
               <p>{t('cor.bento_1d')}</p>
             </div>
             <div className="av2-bento-card av2-reveal">
-              <div className="av2-bento-ico"><span style={{ fontSize: 22, lineHeight: 1 }}>🗼</span></div>
+              <div className="av2-bento-ico"><Icon.Target size={24} /></div>
               <h3>{t('cor.bento_2t')}</h3>
               <p>{t('cor.bento_2d')}</p>
             </div>
@@ -140,7 +150,7 @@ export default function CorredorLanding() {
               <span>{t('cor.paso2_d')}</span>
             </div>
             <div className="av-flow-node">
-              <div className="av-ico"><span style={{ fontSize: 18, lineHeight: 1 }}>🗼</span></div>
+              <div className="av-ico"><Icon.Target size={20} /></div>
               <b>{t('cor.paso3_t')}</b>
               <span>{t('cor.paso3_d')}</span>
             </div>
@@ -207,7 +217,7 @@ export default function CorredorLanding() {
               <p>{t('cor.firma_prov_d')}</p>
             </div>
             <div className="av2-bento-card av2-reveal">
-              <div className="av2-bento-ico"><span style={{ fontSize: 22, lineHeight: 1 }}>⚓</span></div>
+              <div className="av2-bento-ico"><Icon.Truck size={24} /></div>
               <h3>{t('cor.firma_puerto_t')}</h3>
               <p>{t('cor.firma_puerto_d')}</p>
             </div>

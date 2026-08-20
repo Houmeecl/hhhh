@@ -3,13 +3,33 @@ import { Link } from 'react-router-dom';
 import Logo from './Logo.jsx';
 import { IDIOMAS, useIdioma } from '../lib/i18n.js';
 
-// Nombre legible de cada idioma/variante para el aria-label de los botones
-// (las banderas no son accesibles por sí solas para lectores de pantalla).
-const NOMBRE_IDIOMA = { es: 'Español (Chile)', en: 'English', pt: 'Português', pe: 'Español (Perú)' };
-// 'pe' no es un idioma nuevo: mismo español, con RUC y soles en vez de RUT y
-// pesos. Los factores siguen siendo los chilenos y la variante lo dice así
-// (ver el comentario del bloque `pe` en lib/i18n.js).
-const BANDERA_IDIOMA = { es: '🇨🇱', en: '🇺🇸', pt: '🇧🇷', pe: '🇵🇪' };
+// UNA BANDERA NO ES UN IDIOMA, y acá el error se paga caro.
+//
+// El selector mostraba 🇨🇱 para "español", 🇺🇸 para "inglés" y 🇵🇪 para la
+// variante peruana. El español no es de Chile: es también de Argentina,
+// de Paraguay, de Perú y de otros dieciséis países. Un exportador
+// argentino o paraguayo entraba a la landing del Corredor Bioceánico
+// —que trata justamente de sus países— y para leer en su propio idioma
+// tenía que apretar una bandera extranjera.
+//
+// Además mezclaba dos ejes distintos: 'pe' NO es otro idioma, es el mismo
+// español con RUC y soles en vez de RUT y pesos (ver el bloque `pe` en
+// lib/i18n.js). Una bandera al lado de otras banderas lo hacía parecer un
+// cuarto idioma.
+//
+// Ahora se rotula por CÓDIGO DE IDIOMA, que es lo que se está eligiendo.
+// De paso deja de violar la regla de marca que prohíbe emoji como ícono
+// de UI (.claude/agents/diseno.md): una bandera es un emoji.
+const NOMBRE_IDIOMA = {
+  es: 'Español',
+  en: 'English',
+  pt: 'Português',
+  pe: 'Español — formato Perú (RUC, soles)',
+};
+// El rótulo visible. 'pe' lleva el sufijo del país porque ahí el país SÍ
+// es lo que cambia: no el idioma, sino el identificador tributario y la
+// moneda.
+const CODIGO_IDIOMA = { es: 'ES', en: 'EN', pt: 'PT', pe: 'ES-PE' };
 
 // Selector de banderas clicables. Se usa en este layout y en el layout
 // propio del canal presencial; jamás aparece en /admin.
@@ -27,7 +47,7 @@ export function SelectorIdioma() {
           title={NOMBRE_IDIOMA[l]}
           onClick={() => setIdioma(l)}
         >
-          <span aria-hidden="true">{BANDERA_IDIOMA[l]}</span>
+          <span aria-hidden="true">{CODIGO_IDIOMA[l]}</span>
         </button>
       ))}
     </span>

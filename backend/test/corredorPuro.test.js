@@ -5,6 +5,7 @@ import {
   latValida, lngValida, anilloDe, validarPoligono, areaHa, contrastarArea,
   validarParcela, nivelConfianzaParcela, resumenParcela, puntoDe,
   EXIGE_POLIGONO_HA, TOLERANCIA_AREA_PCT, ORIGENES_COORDENADA, NOMBRE_NIVEL_PARCELA,
+  normalizarEori,
 } from '../src/services/corredor.js';
 
 // ============================================================
@@ -283,4 +284,24 @@ test('el umbral de 4 ha del EUDR es el mismo en los dos lados', () => {
   // rechazaría con un 400 después de que la persona llenó todo el
   // formulario.
   assert.equal(EXIGE_POLIGONO_HA, 4);
+});
+
+// ---------- El EORI del operador ----------
+
+test('el EORI se guarda pegado y en mayúsculas, como lo espera la aduana', () => {
+  assert.deepEqual(normalizarEori('br 1234567890'), { ok: true, eori: 'BR1234567890' });
+  assert.deepEqual(normalizarEori('CL-12345'), { ok: true, eori: 'CL12345' });
+});
+
+test('no tener EORI todavía no es un error de formato', () => {
+  // Es un dato que falta, y eso ya lo dice el semáforo. Rechazar el vacío
+  // impediría guardar la dirección de una empresa que aún no lo tramita.
+  assert.deepEqual(normalizarEori(null), { ok: true, eori: null });
+  assert.deepEqual(normalizarEori('   '), { ok: true, eori: null });
+});
+
+test('un EORI que no tiene forma de EORI se rechaza en vez de guardarse', () => {
+  for (const malo of ['1234567890', 'B1', '¿?', 'BR' + 'X'.repeat(16)]) {
+    assert.equal(normalizarEori(malo).ok, false, `${malo} no debería pasar`);
+  }
 });

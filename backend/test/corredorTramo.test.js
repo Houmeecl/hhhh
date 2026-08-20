@@ -166,3 +166,42 @@ test('un tipo que no está en el mapa se muestra legible, no vacío', () => {
   assert.equal(etiquetaDocumento('certificado_inventado'), 'Certificado inventado');
   assert.equal(etiquetaDocumento(null), '—');
 });
+
+// ---------- El orden del catálogo: null no es 0, y puede repetirse ----------
+
+test('un punto sin orden no se cuela en el tramo como si fuera el primero', () => {
+  // `Number(null)` es 0, así que un punto sin orden se colaba al comienzo
+  // del corredor y, si además está en otro país, INVENTABA un cruce de
+  // frontera — y con él documentos que esta carga no tiene por qué
+  // conseguir. Mismo error que `Number(null) === 0` con una coordenada:
+  // un dato que parece bueno porque se le perdió el contexto.
+  const conNulo = [...PUNTOS, { id: 'sin-orden', pais: 'CL', orden: null }];
+  const t = puntosDelTramo(conNulo, 'campo-grande', 'loma-plata');
+  assert.deepEqual(t.map((p) => p.id), ['campo-grande', 'ponta-pora', 'loma-plata']);
+  assert.deepEqual(crucesDelTramo(t).map((c) => `${c.pais_desde}${c.pais_hasta}`), ['BRPY']);
+});
+
+test('un punto sin orden tampoco puede ser el origen: no se sabe dónde va', () => {
+  const conNulo = [...PUNTOS, { id: 'sin-orden', pais: 'CL', orden: null }];
+  assert.deepEqual(puntosDelTramo(conNulo, 'sin-orden', 'calama'), []);
+  assert.deepEqual(puntosDelTramo([...PUNTOS, { id: 'raro', pais: 'CL', orden: 'ocho' }], 'raro', 'calama'), []);
+});
+
+test('con dos puntos del mismo orden, el tramo igual empieza en el origen', () => {
+  // El orden no es único en la tabla. Con un empate, el tramo se ordenaba
+  // como viniera la lista y podía devolver el DESTINO primero: los cruces
+  // salían al revés y el semáforo pedía los documentos del sentido
+  // contrario.
+  const dup = [...PUNTOS, { id: 'calama-anexo', pais: 'CL', orden: 10 }];
+  const t = puntosDelTramo(dup, 'calama-anexo', 'calama');
+  assert.equal(t[0].id, 'calama-anexo');
+  assert.equal(t[t.length - 1].id, 'calama');
+});
+
+test('un empate de orden no rompe el tramo largo: sigue empezando y terminando donde debe', () => {
+  const dup = [...PUNTOS, { id: 'tartagal-anexo', pais: 'AR', orden: 5 }];
+  const t = puntosDelTramo(dup, 'campo-grande', 'calama');
+  assert.equal(t[0].id, 'campo-grande');
+  assert.equal(t[t.length - 1].id, 'calama');
+  assert.deepEqual(crucesDelTramo(t).map((c) => `${c.pais_desde}${c.pais_hasta}`), ['BRPY', 'PYAR', 'ARCL']);
+});

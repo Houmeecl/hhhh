@@ -99,6 +99,38 @@ export function eudrAplicable(codigoNc) {
   return commodityEudr(codigoNc) !== null;
 }
 
+// El código arancelario tal como lo escribe quien llena el formulario.
+//
+// POR QUÉ NO SE GUARDA COMO VIENE. El arancel se publica con puntos
+// —"1201.90.00"— y así se copia. `validarNc` exige 4, 6 u 8 dígitos
+// pelados, así que ese texto quedaba guardado tal cual y `regimenesDe`
+// respondía «sin el código arancelario declarado no se puede saber qué
+// régimen aplica» con el código a la vista en la misma pantalla. Es el
+// peor mensaje posible: dice que falta algo que está, y no dice qué
+// corregir. Peor todavía con soya, que sí es EUDR.
+//
+// LO QUE SE NORMALIZA ES EL FORMATO, NO EL DATO. Se sacan puntos, espacios
+// y guiones; nada más. Un código que después de eso no es un código se
+// RECHAZA, no se adivina — sin código no se opina, pero un código
+// inventado sí hace opinar, y en el sentido equivocado.
+//
+// Devuelve `{ ok: true, nc: null }` cuando no se declaró nada: no
+// declararlo es válido y es el gris, no un error de validación.
+export function normalizarNc(valor) {
+  if (valor == null) return { ok: true, nc: null };
+  const bruto = String(valor).trim();
+  if (!bruto) return { ok: true, nc: null };
+  const limpio = bruto.replace(/[.\s-]/g, '');
+  if (!validarNc(limpio)) {
+    return {
+      ok: false,
+      nc: null,
+      error: 'El código arancelario va en 4, 6 u 8 dígitos, con o sin puntos (1201, 1201.90 o 12019000).',
+    };
+  }
+  return { ok: true, nc: limpio };
+}
+
 // Cada requisito dice QUÉ falta y —lo que hace que la lista sirva— QUIÉN
 // lo aporta. Un exportador que lee "faltan las emisiones indirectas" sin
 // saber que eso se le pide a la generadora eléctrica se queda igual de
@@ -188,6 +220,19 @@ function coordenadaValida(v, max) {
 function presente(lote, campo) {
   switch (campo) {
     case 'codigo_nc': return validarNc(lote?.codigo_nc);
+    // UN REQUISITO, DOS COLUMNAS. La instalación que exige CBAM se llama
+    // `faena_origen` en `lotes_minerales` (producto minero) e
+    // `instalacion` en `cargas` (base del Corredor) — son dos bases
+    // distintas que nunca se van a poder unificar por FK. Mirar solo el
+    // primer nombre hacía que el panel del Corredor pidiera la
+    // instalación, la guardara y siguiera diciendo que faltaba: una
+    // brecha que no se puede cerrar completando el dato no es una brecha,
+    // es un error. El campo del requisito sigue siendo uno solo para que
+    // la pantalla y el PDF no tengan que saber de qué base salió la fila.
+    case 'faena_origen': {
+      const v = lote?.faena_origen ?? lote?.instalacion;
+      return v != null && String(v).trim() !== '';
+    }
     case 'metodo_emisiones': return METODOS_EMISIONES.includes(lote?.metodo_emisiones);
     case 'composicion': return Boolean(lote?.composicion && Object.keys(lote.composicion).length);
     case 'actores': return Number(lote?.n_eslabones ?? 0) > 0;

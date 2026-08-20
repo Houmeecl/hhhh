@@ -432,9 +432,14 @@ a:hover { text-decoration: underline; }
    Sin bordes: no compite con los CTA y no desborda a 375px (el header ya
    hace wrap en móvil). Opacidad marca cuál está activa sin depender de color. */
 .lang-switch { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+/* Códigos de idioma, no banderas (ver el comentario de NOMBRE_IDIOMA en
+   PublicLayout.jsx). El tamaño baja de 17px —que era el de un emoji— al
+   de una etiqueta de texto, y se le da peso para que se lea a ese cuerpo. */
 .lang-switch button {
-  background: none; border: none; padding: 2px 4px; cursor: pointer;
-  font-size: 17px; line-height: 1; border-radius: 6px; opacity: 0.45;
+  background: none; border: none; padding: 3px 7px; cursor: pointer;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em;
+  line-height: 1; border-radius: 6px; opacity: 0.5;
+  color: inherit; font-family: inherit;
 }
 .lang-switch button:hover { opacity: 0.75; }
 .lang-switch button.on { opacity: 1; background: var(--bg); }
@@ -1435,6 +1440,41 @@ a.stat { cursor: pointer; }
    Landing del Corredor Bioceánico (/corredor) — captura real de la
    Torre de Control en el hero, y de la Tarjeta de Viaje más abajo.
    ============================================================ */
+/* ---------- Ilustración del Corredor ----------
+   SVG dibujado desde las coordenadas reales del catálogo
+   (components/IlustracionCorredor.jsx). Los colores de país y de ruta
+   van en el propio SVG porque salen de datos; acá vive solo la
+   tipografía y el grosor de trazo, que son decisiones visuales. */
+.cor-ilu { margin: 0; width: 100%; }
+.cor-ilu svg { display: block; width: 100%; height: auto; overflow: visible; }
+.cor-ilu-linea { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.cor-ilu-halo { fill: none; stroke: rgba(40, 167, 69, 0.35); stroke-width: 9; stroke-linecap: round; }
+.cor-ilu-punto { fill: #ffffff; stroke-width: 2.5; }
+.cor-ilu-frontera { fill: #ffffff; stroke-width: 2.5; }
+.cor-ilu-guia { stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.5; }
+.cor-ilu-pais {
+  font-size: 13px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; opacity: 0.75;
+}
+.cor-ilu-cruce { font-size: 11.5px; font-weight: 700; letter-spacing: 0.4px; }
+.cor-ilu-extremo { font-size: 12.5px; font-weight: 700; fill: #0f1f2e; }
+.cor-ilu-pie { font-size: 11px; font-weight: 600; fill: #64748b; }
+
+/* Sobre el fondo navy del hero la tipografía oscura desaparece. */
+.av2-hero .cor-ilu-extremo { fill: #e2e8f0; }
+.av2-hero .cor-ilu-pie { fill: #94a3b8; }
+.av2-hero .cor-ilu-punto,
+.av2-hero .cor-ilu-frontera { fill: #0f1f2e; }
+
+/* En el celular el diagrama se aplasta: se le da altura mínima y se
+   permite el desplazamiento lateral en vez de encoger los rótulos hasta
+   volverlos ilegibles. */
+/* Variante vertical (pantallas angostas): una fila por punto, sin scroll
+   lateral. Ver el comentario de useVertical() en el componente. */
+.cor-ilu-v svg { max-width: 340px; margin: 0 auto; }
+.cor-ilu-fila { font-size: 12.5px; font-weight: 600; fill: #0f1f2e; }
+.av2-hero .cor-ilu-fila { fill: #cbd5e1; }
+.cor-ilu-v .cor-ilu-pais { font-size: 10.5px; letter-spacing: 1.2px; }
+
 .cor-shot {
   border-radius: 14px;
   overflow: hidden;

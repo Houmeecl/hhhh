@@ -4,7 +4,7 @@ import {
   regimenesDe, listoParaExportar, semaforoExportacion, glosaExportacion, urgenciaExportacion,
   commodityEudr, eudrAplicable,
   REQUISITOS_CBAM, REQUISITOS_EUDR, REQUISITOS_EXPORTACION,
-  COMMODITIES_EUDR, METODOS_EMISIONES, CORTE_DEFORESTACION, CONSECUENCIA,
+  COMMODITIES_EUDR, METODOS_EMISIONES, CORTE_DEFORESTACION, CONSECUENCIA, normalizarNc,
 } from '../src/services/exportacion.js';
 import { CAPITULOS_NC_CBAM } from '../src/services/pasaporteOrigen.js';
 
@@ -238,4 +238,71 @@ test('si UNA de varias parcelas no está ubicada, no se da por cumplido', () => 
     parcelas: [{ lat: -12.5, lng: -55.7 }, { nombre: 'sin ubicar' }],
   };
   assert.ok(listoParaExportar(mixto).bloques[0].faltantes.includes('geolocalizacion'));
+});
+
+// ---------- La instalación se llama distinto en cada producto ----------
+
+test('la instalación de una carga del Corredor cuenta aunque la columna se llame `instalacion`', () => {
+  // El requisito es UNO —la instalación que exige CBAM—, pero vive en dos
+  // columnas con nombres distintos: `lotes_minerales.faena_origen` en el
+  // producto minero y `cargas.instalacion` en la base del Corredor. Con
+  // solo el primer nombre, el panel del Corredor pedía la instalación,
+  // la guardaba, y seguía diciendo que faltaba. Una brecha que no se puede
+  // cerrar aunque se complete el dato no es una brecha: es un error.
+  const carga = {
+    codigo_nc: '7601', instalacion: 'Fundición del Corredor',
+    emisiones_directas_tco2e_t: 8.1, emisiones_indirectas_tco2e_t: 2.4,
+    metodo_emisiones: 'valores_reales',
+  };
+  const estado = listoParaExportar(carga);
+  assert.deepEqual(estado.bloques[0].faltantes, []);
+  assert.equal(estado.listo, true);
+});
+
+test('lo mismo en el régimen de exportación, que también pide la instalación', () => {
+  const carga = {
+    codigo_nc: '7403', pais_origen: 'CL', instalacion: 'Mina del Corredor',
+    composicion: { cu: 99.99 }, n_eslabones: 3, emisiones_directas_tco2e_t: 1.2,
+  };
+  assert.equal(listoParaExportar(carga).listo, true);
+});
+
+test('una instalación en blanco no cuenta, se llame como se llame', () => {
+  assert.ok(listoParaExportar({ ...cbamCompleto, faena_origen: null, instalacion: '   ' })
+    .bloques[0].faltantes.includes('faena_origen'));
+});
+
+// ---------- El código arancelario tal como lo escribe la gente ----------
+
+test('el código arancelario con puntos es el mismo código', () => {
+  // El arancel se publica con puntos ("1201.90.00") y así lo copia quien
+  // llena el formulario. Guardarlo tal cual dejaba una carga con su código
+  // declarado a la vista y el semáforo diciendo «falta declarar el código
+  // arancelario»: el peor de los mensajes, porque no dice qué corregir.
+  assert.deepEqual(normalizarNc('1201.90.00'), { ok: true, nc: '12019000' });
+  assert.deepEqual(normalizarNc(' 12 01 '), { ok: true, nc: '1201' });
+  assert.deepEqual(normalizarNc('7601'), { ok: true, nc: '7601' });
+});
+
+test('no declarar el código NO es un error: es el gris', () => {
+  // Sin código no se opina, y eso es válido. Lo que no es válido es un
+  // código que no existe.
+  assert.deepEqual(normalizarNc(null), { ok: true, nc: null });
+  assert.deepEqual(normalizarNc(''), { ok: true, nc: null });
+  assert.deepEqual(normalizarNc('   '), { ok: true, nc: null });
+});
+
+test('un código que no es un código se rechaza y se dice cómo se escribe', () => {
+  for (const malo of ['soja', '12', '123', '120199000', '12a1']) {
+    const r = normalizarNc(malo);
+    assert.equal(r.ok, false, `${malo} no debería pasar`);
+    assert.match(r.error, /4, 6 u 8 d[íi]gitos/);
+  }
+});
+
+test('el código normalizado sí decide el régimen', () => {
+  // La prueba que importa: "1201.00" es soya, y la soya es EUDR.
+  const { nc } = normalizarNc('1201.00');
+  assert.deepEqual(regimenesDe({ codigo_nc: nc }).regimenes, ['eudr']);
+  assert.deepEqual(regimenesDe({ codigo_nc: '1201.00' }).regimenes, []);
 });

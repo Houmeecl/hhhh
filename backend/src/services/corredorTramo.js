@@ -47,23 +47,46 @@ export function etiquetaDocumento(slug) {
   return ETIQUETA_DOCUMENTO[s] || (s ? s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) : '—');
 }
 
-// Los puntos del tramo, en orden, entre origen y destino inclusive.
-// Devuelve [] si falta alguno de los dos o si no están en el catálogo:
-// inventar un tramo parcial sería peor que no mostrar ninguno.
-export function puntosDelTramo(puntos, origenId, destinoId) {
-  const catalogo = (puntos || []).filter((p) => p && p.id != null);
-  const origen = catalogo.find((p) => p.id === origenId);
-  const destino = catalogo.find((p) => p.id === destinoId);
-  if (!origen || !destino) return [];
+// La posición de un punto en el corredor, o nada.
+//
+// `Number(null)` es 0 y `Number.isFinite(0)` es true, así que un punto sin
+// orden se colaba al COMIENZO del corredor: entraba en cualquier tramo que
+// empezara en 0 y, si estaba en otro país, inventaba un cruce de frontera
+// —y con él documentos que esa carga no tiene por qué conseguir—. Es el
+// mismo `null ≠ 0` que defiende `coordenadaValida` con la longitud.
+function ordenDe(p) {
+  const v = p?.orden;
+  if (v == null || v === '' || typeof v === 'boolean') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
-  const desde = Math.min(Number(origen.orden), Number(destino.orden));
-  const hasta = Math.max(Number(origen.orden), Number(destino.orden));
-  const tramo = catalogo
-    .filter((p) => Number(p.orden) >= desde && Number(p.orden) <= hasta)
-    .sort((a, b) => Number(a.orden) - Number(b.orden));
+// Los puntos del tramo, en orden, entre origen y destino inclusive.
+// Devuelve [] si falta alguno de los dos, si no están en el catálogo o si
+// alguno no tiene posición en el corredor: inventar un tramo parcial sería
+// peor que no mostrar ninguno.
+export function puntosDelTramo(puntos, origenId, destinoId) {
+  // Se recorta POR POSICIÓN EN LA LISTA ORDENADA y no por rango de
+  // `orden`, porque `orden` no es único en la tabla. Con dos puntos
+  // empatados, comparar los números dejaba el tramo a merced del orden en
+  // que la base devolvió las filas: podía devolver el destino primero, los
+  // cruces salían invertidos y el semáforo pedía los documentos del
+  // sentido contrario. Con índices, el tramo siempre empieza en el origen
+  // y termina en el destino.
+  const ordenados = (puntos || [])
+    .filter((p) => p && p.id != null && ordenDe(p) !== null)
+    // El id desempata para que dos puntos del mismo orden queden siempre
+    // en la misma secuencia, corrida tras corrida.
+    .sort((a, b) => (ordenDe(a) - ordenDe(b)) || String(a.id).localeCompare(String(b.id)));
+
+  const i = ordenados.findIndex((p) => p.id === origenId);
+  const j = ordenados.findIndex((p) => p.id === destinoId);
+  if (i < 0 || j < 0) return [];
+
+  const tramo = ordenados.slice(Math.min(i, j), Math.max(i, j) + 1);
   // Si el destino va antes que el origen, la carga va al revés: el orden
   // del catálogo es el del corredor, no el de esta carga.
-  return Number(origen.orden) <= Number(destino.orden) ? tramo : tramo.reverse();
+  return i <= j ? tramo : tramo.reverse();
 }
 
 // Los cruces de frontera del tramo: pares (desde, hasta) donde cambia el

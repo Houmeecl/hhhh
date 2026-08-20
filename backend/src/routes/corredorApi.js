@@ -11,9 +11,12 @@ import {
 } from '../middleware/authCorredor.js';
 import {
   generarCodigoCarga, validarParcela, nivelConfianzaParcela, resumenParcela, puntoDe,
-  EXIGE_POLIGONO_HA, TOLERANCIA_AREA_PCT, NOMBRE_NIVEL_PARCELA,
+  normalizarEori, EXIGE_POLIGONO_HA, TOLERANCIA_AREA_PCT, NOMBRE_NIVEL_PARCELA,
 } from '../services/corredor.js';
-import { listoParaExportar, semaforoExportacion, glosaExportacion, urgenciaExportacion } from '../services/exportacion.js';
+import {
+  listoParaExportar, semaforoExportacion, glosaExportacion, urgenciaExportacion,
+  normalizarNc, METODOS_EMISIONES,
+} from '../services/exportacion.js';
 import {
   puntosDelTramo, crucesDelTramo, exigenciasDelTramo,
   estadoDocumentalTramo, semaforoTramo, glosaTramo,
@@ -141,6 +144,18 @@ router.post('/auth/cambiar-password', requireAuthCorredor, async (req, res, next
 
 // ---------- Alta de exportadores (administración del Corredor) ----------
 
+// Alfabeto sin caracteres ambiguos (sin 0/O, 1/l/I): esta clave se dicta
+// por teléfono cuando el correo no llega. Vive acá y no dentro del alta
+// porque también la necesita la reemisión: dos generadores distintos para
+// la misma clave terminan con uno de los dos peor.
+function claveTemporal() {
+  const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const bytes = crypto.randomBytes(12);
+  let clave = '';
+  for (let i = 0; i < 12; i++) clave += ALFABETO[bytes[i] % ALFABETO.length];
+  return clave;
+}
+
 router.post('/exportadores', requireAuthCorredor, requireClaveDefinida, requireAdminCorredor, async (req, res, next) => {
   try {
     const b = req.body || {};
@@ -151,12 +166,9 @@ router.post('/exportadores', requireAuthCorredor, requireClaveDefinida, requireA
     if (!rut) return res.status(400).json({ error: 'El identificador tributario es obligatorio.' });
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ error: 'Ingresa un correo válido.' });
 
-    // Alfabeto sin caracteres ambiguos (sin 0/O, 1/l/I): esta clave se
-    // dicta por teléfono cuando el correo no llega.
-    const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-    const bytes = crypto.randomBytes(12);
-    let temporal = '';
-    for (let i = 0; i < 12; i++) temporal += ALFABETO[bytes[i] % ALFABETO.length];
+    const temporal = claveTemporal();
+    const eori = normalizarEori(b.eori);
+    if (!eori.ok) return res.status(400).json({ error: eori.error, codigo: 'eori_invalido' });
 
     const salida = await withTxCorredor(async (client) => {
       const { rows: ex } = await client.query(
@@ -164,7 +176,7 @@ router.post('/exportadores', requireAuthCorredor, requireClaveDefinida, requireA
          VALUES ($1,$2,$3,$4,$5,$6)
          ON CONFLICT (rut) DO NOTHING
          RETURNING *`,
-        [nombre, rut, String(b.pais || 'CL').toUpperCase(), b.eori || null, email, b.contacto_nombre || null]
+        [nombre, rut, String(b.pais || 'CL').toUpperCase(), eori.eori, email, b.contacto_nombre || null]
       );
       if (!ex[0]) { const e = new Error('Ya existe un exportador con ese identificador.'); e.status = 409; throw e; }
       const hash = await bcrypt.hash(temporal, config.bcryptRounds);
@@ -199,6 +211,72 @@ router.post('/exportadores', requireAuthCorredor, requireClaveDefinida, requireA
 // Los conteos van en la misma consulta: sin ellos la lista no dice lo
 // único que importa mirar, que es si la empresa ya empezó a cargar o
 // sigue esperando que alguien la ayude a entrar.
+// La empresa completa SUS PROPIOS datos.
+//
+// El EORI identifica al operador ante la aduana de la UE. Hasta acá solo
+// lo podía escribir el admin del Corredor, en el alta, adivinándolo — la
+// empresa, que es la única que lo tiene, no tenía dónde ponerlo.
+//
+// La razón social y el identificador tributario NO se editan desde el
+// panel: son la identidad con la que se enroló y con la que se emitieron
+// sus credenciales. Cambiarlas por autoservicio es cambiar de empresa sin
+// que nadie lo revise.
+const CAMPOS_MI_EMPRESA = ['eori', 'direccion', 'contacto_nombre', 'contacto_email'];
+
+router.put('/mi-empresa', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const exportador = exportadorDeLaSesion(req);
+    if (!exportador) return res.status(404).json({ error: 'Tu cuenta no tiene una empresa asociada.' });
+
+    const b = req.body || {};
+    const intentados = Object.keys(b);
+    const prohibidos = intentados.filter((k) => !CAMPOS_MI_EMPRESA.includes(k));
+    if (prohibidos.length) {
+      return res.status(400).json({
+        error: `Estos datos no se cambian desde el panel: ${prohibidos.join(', ')}. `
+          + 'Son la identidad con la que se enroló la empresa; para corregirlos, escríbele a sicr3p.',
+        codigo: 'campo_no_editable',
+      });
+    }
+
+    const eori = normalizarEori(b.eori);
+    if (!eori.ok) return res.status(400).json({ error: eori.error, codigo: 'eori_invalido' });
+
+    const { rows } = await queryCorredor(
+      `UPDATE exportadores SET
+         eori = COALESCE($2, eori),
+         direccion = COALESCE($3, direccion),
+         contacto_nombre = COALESCE($4, contacto_nombre),
+         contacto_email = COALESCE($5, contacto_email)
+       WHERE id = $1 RETURNING *`,
+      [exportador, eori.eori, b.direccion || null, b.contacto_nombre || null, b.contacto_email || null]
+    );
+    const e = rows[0];
+    if (!e) return res.status(404).json({ error: 'Empresa no encontrada.' });
+
+    // El onboarding se cierra SOLO cuando los datos están, no cuando
+    // alguien aprieta un botón que diga "listo". `onboarding_completado_at`
+    // existía desde la primera migración y no lo escribía nadie: toda
+    // empresa figuraba "sin completar" para siempre.
+    let completo = e;
+    const completa = Boolean(e.eori && e.direccion && e.contacto_email);
+    if (completa && !e.onboarding_completado_at) {
+      const { rows: c } = await queryCorredor(
+        'UPDATE exportadores SET onboarding_completado_at = now() WHERE id = $1 RETURNING *', [e.id]
+      );
+      completo = c[0];
+    }
+
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'completar_empresa',
+      entidad: 'exportador', entidadId: e.id,
+      detalle: { campos: intentados, onboarding_completado: completo.onboarding_completado_at != null },
+      ip: req.ip,
+    });
+    res.json({ exportador: completo });
+  } catch (err) { next(err); }
+});
+
 router.get('/exportadores', requireAuthCorredor, requireClaveDefinida, requireAdminCorredor, async (req, res, next) => {
   try {
     const { rows } = await queryCorredor(
@@ -216,6 +294,40 @@ router.get('/exportadores', requireAuthCorredor, requireClaveDefinida, requireAd
     res.json({ exportadores: rows });
   } catch (err) { next(err); }
 });
+
+// Volver a emitir la clave temporal de una empresa.
+//
+// Sin esto, un exportador que olvidaba su contraseña quedaba afuera y no
+// había cómo devolverlo: no hay correo de recuperación en este producto
+// —`tokens_password_corredor` existe en el esquema y todavía no la usa
+// nadie— y volver a crear la empresa choca contra el identificador
+// tributario único. El admin quedaba mirando una cuenta que no podía
+// ayudar.
+//
+// No es una capacidad nueva del admin: la clave del alta ya la ve él. Lo
+// que sí es nuevo es que quede en la bitácora cada vez que la emite. La
+// clave viaja UNA vez, en este response, y nunca al detalle del registro.
+router.post('/exportadores/:id/clave-temporal', requireAuthCorredor, requireClaveDefinida, requireAdminCorredor,
+  async (req, res, next) => {
+    try {
+      if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Empresa no encontrada.' });
+      const temporal = claveTemporal();
+      const hash = await bcrypt.hash(temporal, config.bcryptRounds);
+      // must_reset_password = true otra vez: con la clave dictada solo se
+      // puede cambiarla, nunca operar.
+      const { rows } = await queryCorredor(
+        `UPDATE usuarios_corredor SET password_hash = $2, must_reset_password = true
+          WHERE exportador_id = $1 RETURNING id, email`,
+        [req.params.id, hash]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Esa empresa no tiene una cuenta a la que emitirle clave.' });
+      await logCorredor({
+        usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'reemitir_clave_temporal',
+        entidad: 'exportador', entidadId: req.params.id, detalle: { usuario: rows[0].email }, ip: req.ip,
+      });
+      res.json({ usuario: rows[0], password_temporal: temporal });
+    } catch (err) { next(err); }
+  });
 
 // ---------- Parcelas ----------
 
@@ -297,6 +409,73 @@ const conEstado = (carga, parcelas, produccion) => {
   };
 };
 
+// El estado de una carga con TODO lo que la respalda. Va contra la base
+// porque el semáforo de una carga no depende solo de su fila: si cada
+// ruta arma su propia evaluación, dos pantallas del mismo producto
+// terminan diciendo cosas distintas de la misma carga (ya pasó una vez
+// entre el listado y el detalle).
+async function estadoDeLaCarga(carga) {
+  const [{ rows: parcelas }, { rows: produccion }] = await Promise.all([
+    queryCorredor(
+      `SELECT p.*, cp.aporte_pct FROM carga_parcelas cp
+         JOIN parcelas p ON p.id = cp.parcela_id
+        WHERE cp.carga_id = $1`, [carga.id]),
+    queryCorredor('SELECT * FROM carga_produccion WHERE carga_id = $1', [carga.id]),
+  ]);
+  return conEstado(carga, parcelas, produccion[0] || null);
+}
+
+// ---------- Qué se puede tocar y cuándo ----------
+//
+// `cargas.estado` existía en el esquema desde la primera migración y no lo
+// escribía nadie: toda carga quedaba 'abierta' para siempre, incluida la
+// que se creó por error y la que ya salió con su expediente terminado.
+//
+//   abierta → se completa, se sella y se corrige.
+//   cerrada → el expediente quedó cerrado. No admite cambios, y se puede
+//             REABRIR: una corrección tardía existe, y esconderla sería
+//             peor que dejarla constar en la bitácora.
+//   anulada → la carga no existió (se creó por error). Es terminal:
+//             «desanular» borraría el hecho de que se anuló, y el código
+//             CB- ya se gastó — el correlativo no se recicla.
+//
+// Cerrar NO exige semáforo verde. La brecha es parte del producto: una
+// carga se puede cerrar declarando lo que no se consiguió, y el pasaporte
+// lo muestra. Exigir verde para cerrar empujaría a declarar de más.
+const ESTADOS_SIGUIENTES = { abierta: ['cerrada', 'anulada'], cerrada: ['abierta'], anulada: [] };
+
+const BLOQUEO_POR_ESTADO = {
+  cerrada: { codigo: 'carga_cerrada', error: 'Esta carga está cerrada. Reábrela para modificarla.' },
+  anulada: { codigo: 'carga_anulada', error: 'Esta carga está anulada: no admite cambios.' },
+};
+
+// La carga de la sesión, o el motivo por el que no. Devuelve el error ya
+// armado en vez de lanzarlo para que cada ruta lo responda igual: "no
+// existe" cubre también "no es tuya", porque decir "existe pero no es
+// tuya" ya confirma que existe.
+async function cargaDeLaSesion(req) {
+  const noEsta = { status: 404, body: { error: 'Carga no encontrada.' } };
+  if (!UUID_RE.test(req.params.id)) return { error: noEsta };
+  const { rows } = await queryCorredor(
+    'SELECT id, codigo, estado FROM cargas WHERE id = $1 AND exportador_id = $2',
+    [req.params.id, exportadorDeLaSesion(req)]
+  );
+  return rows[0] ? { carga: rows[0] } : { error: noEsta };
+}
+
+// Lo mismo, pero para las rutas que MODIFICAN. Leer una carga cerrada
+// tiene que seguir funcionando —el pasaporte de una carga que ya salió es
+// justo el que se manda al comprador—; escribirla, no.
+async function cargaParaEditar(req, { permiteCerrada = false } = {}) {
+  const r = await cargaDeLaSesion(req);
+  if (r.error) return r;
+  const bloqueo = BLOQUEO_POR_ESTADO[r.carga.estado];
+  if (bloqueo && !(permiteCerrada && r.carga.estado === 'cerrada')) {
+    return { error: { status: 409, body: bloqueo } };
+  }
+  return r;
+}
+
 router.get('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
     const exportador = exportadorDeLaSesion(req);
@@ -354,6 +533,15 @@ router.post('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, re
       return res.status(400).json({ error: 'El país de origen va en ISO-2.' });
     }
 
+    // El código arancelario decide el régimen, así que no puede entrar sin
+    // mirar. "1201.90.00" se guardaba tal cual y `validarNc` lo rechazaba
+    // después en silencio: la carga quedaba con su código a la vista y el
+    // semáforo diciendo «falta declarar el código arancelario». No
+    // declararlo sigue siendo válido —es el gris—; lo que no vale es un
+    // código que no es un código.
+    const nc = normalizarNc(b.codigo_nc);
+    if (!nc.ok) return res.status(400).json({ error: nc.error, codigo: 'nc_invalido' });
+
     const carga = await withTxCorredor(async (client) => {
       await client.query('SAVEPOINT antes_de_insertar');
       const anio = new Date().getFullYear();
@@ -375,7 +563,7 @@ router.post('/cargas', requireAuthCorredor, requireClaveDefinida, async (req, re
                (codigo, exportador_id, codigo_nc, descripcion, cantidad, unidad, pais_origen,
                 region_origen, instalacion, emisiones_directas_tco2e_t, emisiones_indirectas_tco2e_t, metodo_emisiones)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-            [generarCodigoCarga(anio, n[0].n), exportador, b.codigo_nc || null, descripcion, cantidad,
+            [generarCodigoCarga(anio, n[0].n), exportador, nc.nc, descripcion, cantidad,
              b.unidad || 't', String(b.pais_origen).toUpperCase(), b.region_origen || null,
              b.instalacion || null, b.emisiones_directas_tco2e_t ?? null,
              b.emisiones_indirectas_tco2e_t ?? null, b.metodo_emisiones || null]
@@ -447,6 +635,152 @@ router.get('/cargas/:id', requireAuthCorredor, requireClaveDefinida, async (req,
   } catch (err) { next(err); }
 });
 
+// ---------- Completar la carga ----------
+//
+// EL FLUJO 4 DEL PLAN, que era el único que no tenía por dónde ocurrir.
+// Todo este panel existe para decir «esto es lo que te falta» — y lo que
+// faltaba solo se podía declarar en el alta: los cuatro datos de CBAM
+// (instalación, directas, indirectas y método) y el código arancelario
+// entraban una vez y quedaban así. Una pantalla que enumera brechas y no
+// deja cerrarlas deja al exportador sin salida: tenía que crear otra carga,
+// gastando otro correlativo, para arreglar un dato.
+//
+// QUÉ NO SE PUEDE CAMBIAR. El código de la carga y su empresa. El código
+// está sellado dentro de `hash_documento` de cada eslabón de
+// `carga_documentos` —se calcula con él— y además viaja en los enlaces del
+// pasaporte: reescribirlo rompería la verificación de la cadena. Los
+// campos que no se pueden editar se RECHAZAN con su nombre en vez de
+// ignorarse en silencio; ignorarlos deja creyendo que el cambio se hizo.
+//
+// Y lo que cambió queda en la bitácora con su valor anterior. No es lo
+// mismo que «el desacuerdo se registra, no se corrige» —eso rige entre dos
+// fuentes que se contradicen, como el área del polígono contra la
+// declarada—: acá el exportador corrige su propia declaración, que es
+// legítimo. Lo que no puede pasar es que la corrección no deje rastro.
+const CAMPOS_EDITABLES = [
+  'codigo_nc', 'descripcion', 'cantidad', 'unidad', 'pais_origen', 'region_origen',
+  'instalacion', 'emisiones_directas_tco2e_t', 'emisiones_indirectas_tco2e_t', 'metodo_emisiones',
+];
+
+function valorEditado(campo, bruto) {
+  const texto = () => (bruto == null ? null : String(bruto).trim() || null);
+  switch (campo) {
+    case 'codigo_nc': {
+      const nc = normalizarNc(bruto);
+      return nc.ok ? { ok: true, valor: nc.nc } : { ok: false, error: nc.error, codigo: 'nc_invalido' };
+    }
+    case 'descripcion': {
+      const v = texto();
+      return v ? { ok: true, valor: v } : { ok: false, error: 'La carga necesita una descripción.' };
+    }
+    case 'cantidad': {
+      const n = Number(bruto);
+      return Number.isFinite(n) && n > 0
+        ? { ok: true, valor: n }
+        : { ok: false, error: 'La cantidad tiene que ser mayor que 0.' };
+    }
+    case 'unidad':
+      return ['t', 'kg'].includes(bruto)
+        ? { ok: true, valor: bruto }
+        : { ok: false, error: 'La unidad de la carga es t o kg.' };
+    case 'pais_origen': {
+      const v = String(bruto || '').toUpperCase();
+      return /^[A-Z]{2}$/.test(v) ? { ok: true, valor: v } : { ok: false, error: 'El país de origen va en ISO-2.' };
+    }
+    case 'emisiones_directas_tco2e_t':
+    case 'emisiones_indirectas_tco2e_t': {
+      // Vaciar el dato es legítimo (se declaró de más y no había con qué
+      // respaldarlo). Pero el CERO es un valor declarado, no un vacío: un
+      // `|| null` lo habría borrado, que es justo al revés.
+      if (bruto == null || bruto === '') return { ok: true, valor: null };
+      const n = Number(bruto);
+      return Number.isFinite(n) && n >= 0
+        ? { ok: true, valor: n }
+        : { ok: false, error: 'Las emisiones van en toneladas de CO₂e por tonelada y no pueden ser negativas.' };
+    }
+    case 'metodo_emisiones': {
+      const v = texto();
+      if (v == null) return { ok: true, valor: null };
+      return METODOS_EMISIONES.includes(v)
+        ? { ok: true, valor: v }
+        : { ok: false, error: `El método de determinación es uno de: ${METODOS_EMISIONES.join(', ')}.` };
+    }
+    default: return { ok: true, valor: texto() };
+  }
+}
+
+router.patch('/cargas/:id', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const claves = Object.keys(b);
+    const ajenas = claves.filter((k) => k !== 'estado' && !CAMPOS_EDITABLES.includes(k));
+    if (ajenas.length) {
+      return res.status(400).json({
+        error: `Estos datos de la carga no se pueden cambiar: ${ajenas.join(', ')}. `
+          + 'El código y la empresa quedan fijos: el código está sellado en los documentos ya encadenados.',
+        codigo: 'campo_no_editable',
+      });
+    }
+    if (!claves.length) return res.status(400).json({ error: 'No viene ningún cambio.' });
+
+    // Un cambio de estado se admite aunque la carga esté cerrada —para eso
+    // está reabrir—; los datos, no.
+    const soloEstado = claves.length === 1 && claves[0] === 'estado';
+    const guardia = await cargaParaEditar(req, { permiteCerrada: soloEstado });
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
+
+    const { rows: previas } = await queryCorredor('SELECT * FROM cargas WHERE id = $1', [guardia.carga.id]);
+    const antes = previas[0];
+
+    const set = [];
+    const valores = [antes.id];
+    const cambios = {};
+    for (const campo of CAMPOS_EDITABLES) {
+      if (!(campo in b)) continue;
+      const v = valorEditado(campo, b[campo]);
+      if (!v.ok) return res.status(400).json({ error: v.error, ...(v.codigo ? { codigo: v.codigo } : {}) });
+      // Comparado como texto: la base devuelve los NUMERIC como string y
+      // un `!==` contra el número marcaría cambios que no ocurrieron.
+      const igual = String(antes[campo] ?? '') === String(v.valor ?? '');
+      if (igual) continue;
+      valores.push(v.valor);
+      set.push(`${campo} = $${valores.length}`);
+      cambios[campo] = { antes: antes[campo] ?? null, despues: v.valor };
+    }
+
+    if (b.estado !== undefined) {
+      const destino = String(b.estado || '');
+      if (destino !== antes.estado) {
+        if (!(ESTADOS_SIGUIENTES[antes.estado] || []).includes(destino)) {
+          return res.status(409).json({
+            error: antes.estado === 'anulada'
+              ? 'Una carga anulada no se puede reabrir: el hecho de que se anuló tiene que constar.'
+              : `Una carga ${antes.estado} no puede pasar a "${destino}".`,
+            codigo: 'transicion_no_valida',
+          });
+        }
+        valores.push(destino);
+        set.push(`estado = $${valores.length}`);
+        cambios.estado = { antes: antes.estado, despues: destino };
+      }
+    }
+
+    if (set.length) {
+      await queryCorredor(
+        `UPDATE cargas SET ${set.join(', ')}, updated_at = now() WHERE id = $1`, valores
+      );
+      await logCorredor({
+        usuarioId: req.usuario.sub, email: req.usuario.email,
+        accion: cambios.estado && Object.keys(cambios).length === 1 ? 'cambiar_estado_carga' : 'editar_carga',
+        entidad: 'carga', entidadId: antes.id, detalle: { codigo: antes.codigo, cambios }, ip: req.ip,
+      });
+    }
+
+    const { rows } = await queryCorredor('SELECT * FROM cargas WHERE id = $1', [antes.id]);
+    res.json({ carga: rows[0], cambios, exportacion: await estadoDeLaCarga(rows[0]) });
+  } catch (err) { next(err); }
+});
+
 // ---------- Enlazar predios a una carga ----------
 //
 // Sin esto, `carga_parcelas` era una tabla que solo se leía: el exportador
@@ -470,11 +804,11 @@ router.post('/cargas/:id/parcelas', requireAuthCorredor, requireClaveDefinida, a
     // Las DOS puntas se verifican contra el exportador de la sesión. Sin
     // el chequeo del predio, alguien enlazaría el de otra empresa y su
     // carga quedaría "geolocalizada" con coordenadas ajenas.
-    const [{ rows: c }, { rows: p }] = await Promise.all([
-      queryCorredor('SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]),
+    const [guardia, { rows: p }] = await Promise.all([
+      cargaParaEditar(req),
       queryCorredor('SELECT id FROM parcelas WHERE id = $1 AND exportador_id = $2', [parcelaId, exportador]),
     ]);
-    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
     if (!p[0]) return res.status(400).json({ error: 'Ese predio no existe entre los tuyos.' });
 
     await queryCorredor(
@@ -496,6 +830,8 @@ router.delete('/cargas/:id/parcelas/:parcelaId', requireAuthCorredor, requireCla
     if (!UUID_RE.test(req.params.id) || !UUID_RE.test(req.params.parcelaId)) {
       return res.status(404).json({ error: 'No encontrado.' });
     }
+    const guardia = await cargaParaEditar(req);
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
     const { rowCount } = await queryCorredor(
       `DELETE FROM carga_parcelas cp USING cargas c
         WHERE cp.carga_id = c.id AND c.exportador_id = $3
@@ -510,12 +846,8 @@ router.delete('/cargas/:id/parcelas/:parcelaId', requireAuthCorredor, requireCla
 // ---------- Datos de producción (los otros requisitos del EUDR) ----------
 router.put('/cargas/:id/produccion', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
-    const exportador = exportadorDeLaSesion(req);
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
-    const { rows: c } = await queryCorredor(
-      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
-    );
-    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const guardia = await cargaParaEditar(req);
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
 
     const b = req.body || {};
     const fecha = (v) => (v ? String(v).slice(0, 10) : null);
@@ -636,12 +968,8 @@ router.get('/tramos/documentos', requireAuthCorredor, requireClaveDefinida, asyn
 
 router.put('/cargas/:id/tramo', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
-    const exportador = exportadorDeLaSesion(req);
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
-    const { rows: c } = await queryCorredor(
-      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
-    );
-    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const guardia = await cargaParaEditar(req);
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
 
     const b = req.body || {};
     const origen = String(b.punto_origen || '').trim();
@@ -676,12 +1004,8 @@ router.put('/cargas/:id/tramo', requireAuthCorredor, requireClaveDefinida, async
 
 router.get('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
   try {
-    const exportador = exportadorDeLaSesion(req);
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
-    const { rows: c } = await queryCorredor(
-      'SELECT id FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
-    );
-    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const guardia = await cargaDeLaSesion(req);
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
     res.json(await documentalDe(req.params.id));
   } catch (err) { next(err); }
 });
@@ -697,12 +1021,8 @@ router.get('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida, 
 // no calzan, se rechaza.
 router.post('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida, subirDocumento, async (req, res, next) => {
   try {
-    const exportador = exportadorDeLaSesion(req);
-    if (!UUID_RE.test(req.params.id)) return res.status(404).json({ error: 'Carga no encontrada.' });
-    const { rows: c } = await queryCorredor(
-      'SELECT id, codigo FROM cargas WHERE id = $1 AND exportador_id = $2', [req.params.id, exportador]
-    );
-    if (!c[0]) return res.status(404).json({ error: 'Carga no encontrada.' });
+    const guardia = await cargaParaEditar(req);
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
 
     const b = req.body || {};
     const tipo = String(b.tipo_documento || '').trim();
@@ -738,7 +1058,7 @@ router.post('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida,
       // El hash del documento es lo que se puede volver a calcular después
       // con el archivo en la mano: carga, tipo, nombre y sha256.
       const hashDoc = crypto.createHash('sha256')
-        .update([c[0].codigo, tipo, nombre, sha].join('|')).digest('hex');
+        .update([guardia.carga.codigo, tipo, nombre, sha].join('|')).digest('hex');
       const hashEnc = hashCadena(estado.ultimo_hash, hashDoc);
       const eslabon = Number(estado.n_eslabones) + 1;
 
@@ -772,6 +1092,96 @@ router.post('/cargas/:id/documentos', requireAuthCorredor, requireClaveDefinida,
     }
     next(err);
   }
+});
+
+// ---------- El hito del viaje ----------
+//
+// SE REGISTRA EL PASO POR UN PUNTO DE CONTROL, NO EL MÓVIL. Es la regla
+// dura del producto y no se negocia: la carga cruza cuatro países con
+// niveles de seguridad muy distintos, y un rastro en vivo de dónde va una
+// carga valiosa es exactamente el mapa que necesita quien la quiera
+// interceptar. Lo que se guarda es «pasó por Ponta Porã, a tal hora»; las
+// coordenadas del hito son las del PUNTO, que están en `puntos_corredor`,
+// son fijas y son públicas. `carga_pasos` no tiene columna de posición y
+// hay un test de esquema que falla si alguien se la agrega; esta ruta
+// además RECHAZA el intento en el borde, porque una app que encola pasos
+// sin señal es justo la que podría adjuntar de más sin querer.
+//
+// Antes de esto, `carga_pasos` era una tabla que solo se leía: el detalle
+// de la carga mostraba el viaje y el viaje siempre estaba vacío.
+const CAMPOS_DE_POSICION = ['lat', 'lng', 'latitud', 'longitud', 'posicion', 'coords', 'coordenadas', 'accuracy', 'precision'];
+
+router.post('/cargas/:id/pasos', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const cuela = CAMPOS_DE_POSICION.filter((k) => k in b);
+    if (cuela.length) {
+      return res.status(400).json({
+        error: 'El paso se registra en un punto de control, no con la posición del vehículo. '
+          + `Saca ${cuela.join(', ')} y manda solo el punto por el que pasó.`,
+        codigo: 'sin_posicion',
+      });
+    }
+
+    // Una carga anulada no admite el hito; una CERRADA sí. El hito no es
+    // una declaración del exportador sobre su carga: es un hecho observado
+    // en un punto de control, y perderlo porque el expediente ya se cerró
+    // sería borrar algo que ocurrió.
+    const guardia = await cargaParaEditar(req, { permiteCerrada: true });
+    if (guardia.error) return res.status(guardia.error.status).json(guardia.error.body);
+
+    const puntoId = String(b.punto_id || '').trim();
+    const puntos = await catalogoPuntos();
+    const punto = puntos.find((p) => p.id === puntoId);
+    if (!punto) {
+      return res.status(400).json({ error: 'Ese punto no está en el catálogo del corredor.', codigo: 'punto_desconocido' });
+    }
+
+    let capturado = null;
+    if (b.capturado_at != null && b.capturado_at !== '') {
+      const t = new Date(b.capturado_at);
+      if (Number.isNaN(t.getTime())) return res.status(400).json({ error: 'La hora de captura no se entiende.' });
+      capturado = t.toISOString();
+    }
+
+    // La cola sin señal reintenta: los pasos fronterizos son justo donde
+    // peor se conecta. Reintentar no puede inventar dos cruces, así que el
+    // mismo punto con la misma hora de captura devuelve el que ya estaba.
+    if (capturado) {
+      const { rows: ya } = await queryCorredor(
+        'SELECT * FROM carga_pasos WHERE carga_id = $1 AND punto_id = $2 AND capturado_at = $3',
+        [guardia.carga.id, puntoId, capturado]
+      );
+      if (ya[0]) return res.json({ paso: ya[0], duplicado: true, fuera_del_tramo: null });
+    }
+
+    // ¿Pasó por donde dijo que iba a pasar? Se avisa, no se corrige ni se
+    // rechaza: el hecho vale más que la declaración y ninguna de las dos se
+    // pisa — misma regla que el desacuerdo de área de una parcela. Con el
+    // tramo sin definir no hay contra qué comparar: null, que es el gris.
+    const { rows: tramoRows } = await queryCorredor('SELECT * FROM carga_tramo WHERE carga_id = $1', [guardia.carga.id]);
+    const tramo = tramoRows[0];
+    const enTramo = tramo?.punto_origen && tramo?.punto_destino
+      ? puntosDelTramo(puntos, tramo.punto_origen, tramo.punto_destino)
+      : null;
+    const fueraDelTramo = enTramo ? !enTramo.some((p) => p.id === puntoId) : null;
+
+    const { rows } = await queryCorredor(
+      `INSERT INTO carga_pasos (carga_id, punto_id, capturado_at, via_qr, nota)
+       VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+      [guardia.carga.id, puntoId, capturado, b.via_qr === true, String(b.nota || '').trim() || null]
+    );
+    await logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email, accion: 'registrar_paso',
+      entidad: 'carga', entidadId: guardia.carga.id,
+      detalle: { punto_id: puntoId, via_qr: b.via_qr === true, fuera_del_tramo: fueraDelTramo }, ip: req.ip,
+    });
+    res.status(201).json({
+      paso: { ...rows[0], punto_nombre: punto.nombre, punto_pais: punto.pais },
+      duplicado: false,
+      fuera_del_tramo: fueraDelTramo,
+    });
+  } catch (err) { next(err); }
 });
 
 // ---------- El pasaporte en PDF ----------

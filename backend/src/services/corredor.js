@@ -269,3 +269,34 @@ export function resumenParcela(p) {
       : null,
   };
 }
+
+// ---------- El EORI del operador ----------
+
+// El número con el que la aduana de la UE identifica a quien pone el
+// producto en el mercado. El EUDR lo pide en la declaración de diligencia
+// debida, así que no es un campo administrativo: sin él la declaración no
+// se presenta.
+//
+// Se escribe pegado y en mayúsculas —dos letras de país y hasta 15
+// caracteres— pero se dicta y se copia con espacios. Igual que con el
+// código arancelario: se normaliza el FORMATO, y lo que después no tiene
+// forma de EORI se rechaza en vez de guardarse. Un identificador
+// inventado que se ve bien es peor que ninguno, porque nadie lo revisa
+// hasta que la declaración se cae.
+//
+// No se valida contra el registro de la UE: eso sería una consulta a una
+// fuente externa, y mientras no se haga, decir "válido" sería declarar una
+// comprobación que nadie hizo.
+export function normalizarEori(valor) {
+  if (valor == null) return { ok: true, eori: null };
+  const limpio = String(valor).replace(/[\s-]/g, '').toUpperCase();
+  if (!limpio) return { ok: true, eori: null };
+  if (!/^[A-Z]{2}[A-Z0-9]{1,15}$/.test(limpio)) {
+    return {
+      ok: false,
+      eori: null,
+      error: 'El EORI empieza con el código de país de dos letras y sigue con hasta 15 caracteres (por ejemplo BR1234567890).',
+    };
+  }
+  return { ok: true, eori: limpio };
+}

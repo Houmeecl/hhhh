@@ -47,6 +47,10 @@ export const apiCorredor = {
   me: () => pedir('/me'),
   cambiarPassword: (password) => pedir('/auth/cambiar-password', { metodo: 'POST', body: { password } }),
 
+  // Los datos de la propia empresa. El EORI lo tiene ella, no sicr3p:
+  // sin él la declaración de diligencia debida no se presenta.
+  miEmpresa: (b) => pedir('/mi-empresa', { metodo: 'PUT', body: b }),
+
   parcelas: () => pedir('/parcelas'),
   crearParcela: (b) => pedir('/parcelas', { metodo: 'POST', body: b }),
 

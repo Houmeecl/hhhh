@@ -372,3 +372,280 @@ test('la otra empresa no puede soltar un predio de una carga ajena',
     const det = await pedir('GET', `/api/corredor/cargas/${carga.d.carga.id}`, tkA);
     assert.equal(det.d.parcelas.length, 1); // sigue enlazado
   });
+
+// ---------- 6. El código arancelario, tal como lo escribe la gente ----------
+
+test('el código arancelario con puntos se guarda como código y decide el régimen',
+  { skip: SIN_CORREDOR }, async () => {
+    // El arancel se publica "1201.90.00" y así se copia. Guardado tal cual,
+    // `validarNc` lo rechazaba en silencio: la carga quedaba con su código
+    // a la vista y el semáforo decía «falta declarar el código
+    // arancelario». Y la soya sin código se ve en regla justo donde no lo
+    // está, que es el error caro de este producto.
+    const r = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201.90.00', descripcion: 'Soya con puntos', cantidad: 100, pais_origen: 'BR' });
+    assert.equal(r.status, 201);
+    assert.equal(r.d.carga.codigo_nc, '12019000');
+    assert.deepEqual(r.d.exportacion.regimenes, ['eudr']);
+  });
+
+test('un código arancelario que no existe se rechaza en vez de guardarse',
+  { skip: SIN_CORREDOR }, async () => {
+    const r = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: 'soja', descripcion: 'Código inventado', cantidad: 10, pais_origen: 'BR' });
+    assert.equal(r.status, 400);
+    assert.equal(r.d.codigo, 'nc_invalido');
+  });
+
+// ---------- 7. La brecha se puede cerrar (flujo 4 del plan) ----------
+
+test('lo que faltaba al crear la carga se puede completar después',
+  { skip: SIN_CORREDOR }, async () => {
+    // Sin esto, la carga nacía con lo que se supiera ese día y no había
+    // forma de agregarle nada: los cuatro datos de CBAM —instalación,
+    // emisiones directas, indirectas y método— solo entraban en el alta.
+    // Un panel cuyo producto es «acá está lo que te falta» que no deja
+    // completarlo no tiene salida.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '7601', descripcion: 'Aluminio incompleto', cantidad: 20, pais_origen: 'BR' });
+    assert.equal(alta.status, 201);
+    assert.deepEqual(alta.d.exportacion.regimenes, ['cbam']);
+    assert.equal(alta.d.exportacion.listo, false);
+
+    const r = await pedir('PATCH', `/api/corredor/cargas/${alta.d.carga.id}`, tkA, {
+      instalacion: 'Fundición Ejemplo',
+      emisiones_directas_tco2e_t: 8.1,
+      emisiones_indirectas_tco2e_t: 0,
+      metodo_emisiones: 'valores_reales',
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.d.exportacion.listo, true);
+    assert.equal(r.d.exportacion.semaforo, 'verde');
+    // El cero declarado es un valor, no una ausencia.
+    assert.equal(Number(r.d.carga.emisiones_indirectas_tco2e_t), 0);
+  });
+
+test('completar la carga deja constancia de lo que cambió',
+  { skip: SIN_CORREDOR }, async () => {
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Con bitácora', cantidad: 5, pais_origen: 'BR' });
+    await pedir('PATCH', `/api/corredor/cargas/${alta.d.carga.id}`, tkA, { codigo_nc: '1201' });
+    const { rows } = await queryCorredor(
+      `SELECT detalle FROM actividad_corredor WHERE entidad_id = $1 AND accion = 'editar_carga'`,
+      [alta.d.carga.id]);
+    assert.equal(rows.length, 1);
+    assert.deepEqual(rows[0].detalle.cambios.codigo_nc, { antes: null, despues: '1201' });
+  });
+
+test('la carga de otra empresa no se puede editar',
+  { skip: SIN_CORREDOR }, async () => {
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Ajena para editar', cantidad: 5, pais_origen: 'BR' });
+    const intento = await pedir('PATCH', `/api/corredor/cargas/${alta.d.carga.id}`, tkB,
+      { instalacion: 'Metida de mano' });
+    assert.equal(intento.status, 404);
+  });
+
+test('el código de la carga y su empresa no se pueden cambiar: están sellados',
+  { skip: SIN_CORREDOR }, async () => {
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Código sellado', cantidad: 5, pais_origen: 'BR' });
+    const r = await pedir('PATCH', `/api/corredor/cargas/${alta.d.carga.id}`, tkA,
+      { codigo: 'CB-2000-000001', exportador_id: empresaB.alta.d.exportador.id });
+    assert.equal(r.status, 400);
+    const det = await pedir('GET', `/api/corredor/cargas/${alta.d.carga.id}`, tkA);
+    assert.equal(det.d.carga.codigo, alta.d.carga.codigo);
+  });
+
+// ---------- 8. Cerrar y anular: los estados que el esquema ya define ----------
+
+test('una carga cerrada no admite cambios, y reabrirla los vuelve a permitir',
+  { skip: SIN_CORREDOR }, async () => {
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Para cerrar', cantidad: 5, pais_origen: 'BR' });
+    const id = alta.d.carga.id;
+    assert.equal(alta.d.carga.estado, 'abierta');
+
+    const cierre = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { estado: 'cerrada' });
+    assert.equal(cierre.status, 200);
+    assert.equal(cierre.d.carga.estado, 'cerrada');
+
+    const bloqueado = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { instalacion: 'Tarde' });
+    assert.equal(bloqueado.status, 409);
+    assert.equal(bloqueado.d.codigo, 'carga_cerrada');
+
+    const doc = await pedir('POST', `/api/corredor/cargas/${id}/produccion`, tkA, { desde: '2026-01-01' });
+    assert.equal(doc.status, 404); // POST no existe; el PUT sí y también queda bloqueado
+    const prod = await pedir('PUT', `/api/corredor/cargas/${id}/produccion`, tkA, { desde: '2026-01-01' });
+    assert.equal(prod.status, 409);
+
+    const reapertura = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { estado: 'abierta' });
+    assert.equal(reapertura.status, 200);
+    const ahora = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { instalacion: 'A tiempo' });
+    assert.equal(ahora.status, 200);
+    assert.equal(ahora.d.carga.instalacion, 'A tiempo');
+  });
+
+test('anular es definitivo: una carga anulada no se reabre',
+  { skip: SIN_CORREDOR }, async () => {
+    // Se anula la que se creó por error. Que se pudiera «desanular» haría
+    // desaparecer el hecho de que se anuló, y el código ya se gastó.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Creada por error', cantidad: 5, pais_origen: 'BR' });
+    const id = alta.d.carga.id;
+    const anula = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { estado: 'anulada' });
+    assert.equal(anula.status, 200);
+    const intento = await pedir('PATCH', `/api/corredor/cargas/${id}`, tkA, { estado: 'abierta' });
+    assert.equal(intento.status, 409);
+  });
+
+// ---------- 9. El hito del viaje: se registra el paso, no el móvil ----------
+
+test('registrar el paso por un punto de control queda en la carga',
+  { skip: SIN_CORREDOR }, async () => {
+    // `carga_pasos` se leía en el detalle y no la escribía nadie: el viaje
+    // de una carga siempre salía vacío.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { codigo_nc: '1201', descripcion: 'Soya en viaje', cantidad: 30, pais_origen: 'BR' });
+    const id = alta.d.carga.id;
+    await pedir('PUT', `/api/corredor/cargas/${id}/tramo`, tkA,
+      { punto_origen: 'campo-grande', punto_destino: 'puerto-antofagasta' });
+
+    const r = await pedir('POST', `/api/corredor/cargas/${id}/pasos`, tkA,
+      { punto_id: 'ponta-pora', capturado_at: '2026-03-02T14:20:00Z', via_qr: true });
+    assert.equal(r.status, 201);
+    assert.equal(r.d.paso.punto_id, 'ponta-pora');
+    assert.equal(r.d.fuera_del_tramo, false);
+
+    const det = await pedir('GET', `/api/corredor/cargas/${id}`, tkA);
+    assert.equal(det.d.pasos.length, 1);
+    assert.equal(det.d.pasos[0].punto_nombre, 'Ponta Porã (frontera BR/PY)');
+  });
+
+test('el hito NO acepta la posición del vehículo, aunque se la manden',
+  { skip: SIN_CORREDOR }, async () => {
+    // Regla dura del producto: se registra el paso por un punto de control
+    // fijo y público, nunca dónde está la carga. La tabla no tiene columna
+    // y la ruta tampoco la recibe: un rastro en vivo de una carga valiosa
+    // que cruza cuatro países es el mapa que necesita quien la intercepte.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Sin GPS', cantidad: 5, pais_origen: 'BR' });
+    const r = await pedir('POST', `/api/corredor/cargas/${alta.d.carga.id}/pasos`, tkA,
+      { punto_id: 'ponta-pora', lat: -22.5, lng: -55.7 });
+    assert.equal(r.status, 400);
+    assert.equal(r.d.codigo, 'sin_posicion');
+  });
+
+test('el mismo hito reintentado desde la cola no se duplica',
+  { skip: SIN_CORREDOR }, async () => {
+    // Los pasos fronterizos son justo donde no hay señal: el registro se
+    // encola y se reintenta. Reintentar no puede inventar dos cruces.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Cola sin señal', cantidad: 5, pais_origen: 'BR' });
+    const id = alta.d.carga.id;
+    const cuerpo = { punto_id: 'pozo-hondo', capturado_at: '2026-03-04T09:00:00Z' };
+    const uno = await pedir('POST', `/api/corredor/cargas/${id}/pasos`, tkA, cuerpo);
+    const dos = await pedir('POST', `/api/corredor/cargas/${id}/pasos`, tkA, cuerpo);
+    assert.equal(uno.status, 201);
+    assert.equal(dos.status, 200);
+    assert.equal(dos.d.duplicado, true);
+    const det = await pedir('GET', `/api/corredor/cargas/${id}`, tkA);
+    assert.equal(det.d.pasos.length, 1);
+  });
+
+test('un hito fuera del tramo declarado se registra igual, y se dice',
+  { skip: SIN_CORREDOR }, async () => {
+    // El desacuerdo se registra, no se corrige: si la carga pasó por donde
+    // no dijo que iba a pasar, el hecho vale más que la declaración, y
+    // ninguna de las dos se pisa.
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Se desvió', cantidad: 5, pais_origen: 'BR' });
+    const id = alta.d.carga.id;
+    await pedir('PUT', `/api/corredor/cargas/${id}/tramo`, tkA,
+      { punto_origen: 'campo-grande', punto_destino: 'loma-plata' });
+    const r = await pedir('POST', `/api/corredor/cargas/${id}/pasos`, tkA, { punto_id: 'calama' });
+    assert.equal(r.status, 201);
+    assert.equal(r.d.fuera_del_tramo, true);
+  });
+
+test('un punto que no está en el catálogo no es un hito',
+  { skip: SIN_CORREDOR }, async () => {
+    const alta = await pedir('POST', '/api/corredor/cargas', tkA,
+      { descripcion: 'Punto inventado', cantidad: 5, pais_origen: 'BR' });
+    const r = await pedir('POST', `/api/corredor/cargas/${alta.d.carga.id}/pasos`, tkA,
+      { punto_id: 'la-esquina-de-mi-casa' });
+    assert.equal(r.status, 400);
+  });
+
+// ---------- 10. La empresa completa sus propios datos ----------
+
+test('el exportador completa su EORI y su dirección: nadie más los tiene',
+  { skip: SIN_CORREDOR }, async () => {
+    // El EORI es lo que identifica al operador ante la aduana de la UE y
+    // sin él la declaración de diligencia debida no se presenta. Solo lo
+    // podía escribir el admin del Corredor, en el alta, adivinándolo — la
+    // empresa no tenía dónde ponerlo.
+    const antes = await pedir('GET', '/api/corredor/me', tkA);
+    assert.equal(antes.d.usuario.onboarding_completado, false);
+
+    const r = await pedir('PUT', '/api/corredor/mi-empresa', tkA,
+      { eori: 'br 1234567890', direccion: 'Av. Afonso Pena 1000, Campo Grande' });
+    assert.equal(r.status, 200);
+    assert.equal(r.d.exportador.eori, 'BR1234567890');
+
+    // Y con los datos completos, el onboarding se da por cerrado SOLO. Es
+    // una columna que existía desde la primera migración y no escribía
+    // nadie: la empresa quedaba "sin datos" para siempre.
+    const despues = await pedir('GET', '/api/corredor/me', tkA);
+    assert.equal(despues.d.usuario.onboarding_completado, true);
+  });
+
+test('el EORI no se inventa: un identificador que no tiene forma de EORI se rechaza',
+  { skip: SIN_CORREDOR }, async () => {
+    const r = await pedir('PUT', '/api/corredor/mi-empresa', tkA, { eori: '¿?' });
+    assert.equal(r.status, 400);
+  });
+
+test('la razón social y el identificador tributario no se cambian desde el panel',
+  { skip: SIN_CORREDOR }, async () => {
+    const r = await pedir('PUT', '/api/corredor/mi-empresa', tkA, { rut: '111111111' });
+    assert.equal(r.status, 400);
+    assert.equal(r.d.codigo, 'campo_no_editable');
+  });
+
+// ---------- 11. Una empresa que perdió su clave no queda afuera ----------
+
+test('el admin puede volver a emitir la clave temporal de una empresa',
+  { skip: SIN_CORREDOR }, async () => {
+    // Sin esto, un exportador que olvidaba su contraseña quedaba fuera para
+    // siempre: no hay correo de recuperación, y volver a crear la empresa
+    // choca contra el identificador tributario único.
+    const alta = await pedir('POST', '/api/corredor/exportadores', tkAdmin, {
+      nombre_empresa: `Empresa Olvidadiza ${suf}`, rut: `96${suf}444`,
+      contacto_email: `d-rutas-${suf}@ejemplo.cl`,
+    });
+    const id = alta.d.exportador.id;
+    const primera = alta.d.password_temporal;
+
+    const nueva = await pedir('POST', `/api/corredor/exportadores/${id}/clave-temporal`, tkAdmin);
+    assert.equal(nueva.status, 200);
+    assert.equal(nueva.d.password_temporal.length, 12);
+    assert.notEqual(nueva.d.password_temporal, primera);
+
+    const vieja = await pedir('POST', '/api/corredor/auth/login', null,
+      { email: `d-rutas-${suf}@ejemplo.cl`, password: primera });
+    assert.equal(vieja.status, 401);
+
+    const entra = await pedir('POST', '/api/corredor/auth/login', null,
+      { email: `d-rutas-${suf}@ejemplo.cl`, password: nueva.d.password_temporal });
+    assert.equal(entra.status, 200);
+    // Y nace obligada a cambiarse: una clave dictada por teléfono que queda
+    // operando indefinidamente es una cuenta compartida.
+    assert.equal(entra.d.usuario.must_reset_password, true);
+  });
+
+test('un operador no puede emitirle una clave a nadie',
+  { skip: SIN_CORREDOR }, async () => {
+    const r = await pedir('POST', `/api/corredor/exportadores/${empresaB.alta.d.exportador.id}/clave-temporal`, tkA);
+    assert.equal(r.status, 403);
+  });
