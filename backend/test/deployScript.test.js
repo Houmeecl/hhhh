@@ -141,3 +141,55 @@ test('el lock se cierra en los subshells que lanzan procesos pesados', () => {
   assert.deepEqual(sinCerrar, [],
     'estos comandos heredan el descriptor del lock; agrégales `9>&-`');
 });
+
+// ============================================================
+// El diagnóstico cuando `git pull --ff-only` falla.
+//
+// EL INCIDENTE QUE ESTOS CASOS IMPIDEN QUE SE REPITA. El 19-08-2026 el
+// deploy se frenó porque en /opt/sicr3p había un `deploy/encender-corredor.sh`
+// SIN TRACKEAR que el commit nuevo también traía. git lo dijo con todas sus
+// letras ("untracked working tree files would be overwritten"), pero el
+// script lo tradujo a "la historia local divergió" —la única causa que
+// contemplaba— y mandó a revisar `git log`, donde no había nada raro.
+//
+// Un diagnóstico que nombra la causa equivocada cuesta más que no dar
+// ninguno: manda a buscar al lugar donde no está.
+// ============================================================
+
+test('el fallo del pull se diagnostica por causa, no con una frase única', () => {
+  // Las tres ramas: archivo sin trackear · historia divergida · otra cosa.
+  assert.match(fuente, /untracked working tree files would be overwritten/,
+    'hay que reconocer el mensaje literal de git, que es estable');
+  assert.match(fuente, /LA HISTORIA NO DIVERGIÓ/,
+    'y decirlo explícito: es justo lo que el mensaje viejo afirmaba al revés');
+  assert.match(fuente, /la historia local divergió de origin\/\$RAMA/);
+  assert.match(fuente, /no fue ni historia divergida ni archivos sin trackear/,
+    'y una tercera rama honesta para lo que no se reconoce');
+});
+
+test('la salida del pull se captura para poder leerla, no solo se vuelca al log', () => {
+  // Con `>> "$LOG" 2>&1` el script no podía inspeccionar POR QUÉ falló.
+  assert.match(fuente, /SALIDA_PULL="\$\(mktemp\)"/);
+  assert.match(fuente, /git pull --ff-only --quiet origin "\$RAMA" > "\$SALIDA_PULL" 2>&1/);
+  assert.match(fuente, /cat "\$SALIDA_PULL" >> "\$LOG"/,
+    'igual tiene que quedar en el log: el detalle de git es lo que se lee después');
+  assert.ok(
+    (fuente.match(/rm -f "\$SALIDA_PULL"/g) || []).length >= 2,
+    'el temporal se borra en los dos caminos, el que falla y el que sigue'
+  );
+});
+
+test('el diagnóstico nombra los archivos que estorban y el remedio exacto', () => {
+  // "revisar a mano" no es un remedio. El log tiene que traer los comandos.
+  assert.match(fuente, /ESTORBAN=/);
+  assert.match(fuente, /mkdir -p \/root\/sicr3p-estorbo/);
+  assert.match(fuente, /--reintentar/);
+});
+
+test('el orden importa: la cuarentena se anota antes de salir', () => {
+  // Si no se anotara, el cron repetiría el pg_dump + el fallo cada 30 min.
+  const iCuarentena = fuente.indexOf('anotar_cuarentena\n    if grep -q');
+  const iExit = fuente.indexOf('rm -f "$SALIDA_PULL"\n    exit 1');
+  assert.ok(iCuarentena > 0 && iExit > iCuarentena,
+    'anotar_cuarentena va antes del exit del bloque de pull');
+});

@@ -350,13 +350,41 @@ if [ -z "${SICR3P_REEXEC_COMMIT:-}" ]; then
 
   # ---------- 5. Pull (solo fast-forward: jamás merge ni force) ----------
   HASH_SCRIPT_ANTES="$(sha256sum "$SCRIPT_DIR/actualizar.sh" 2>/dev/null | awk '{print $1}')"
-  if ! git pull --ff-only --quiet origin "$RAMA" >> "$LOG" 2>&1; then
-    # También va a cuarentena: sin esto, una historia divergida repetía este
-    # mismo camino cada 30 min, y el pg_dump de más arriba ya se había hecho.
+  # La salida del pull se captura APARTE (además de ir al log) para poder
+  # leer POR QUÉ falló. Antes cualquier fallo se reportaba como "la historia
+  # local divergió", que es solo una de las causas: pasó el 19-08-2026 con un
+  # archivo sin trackear estorbando, y el mensaje mandó a mirar `git log`,
+  # donde no había nada raro. Un diagnóstico que nombra la causa equivocada
+  # cuesta más que no dar ninguno.
+  SALIDA_PULL="$(mktemp)"
+  if ! git pull --ff-only --quiet origin "$RAMA" > "$SALIDA_PULL" 2>&1; then
+    cat "$SALIDA_PULL" >> "$LOG"
+    # También va a cuarentena: sin esto, el mismo fallo repetía este camino
+    # cada 30 min, y el pg_dump de más arriba ya se había hecho. Ojo: la
+    # cuarentena no dice que el commit sea malo — acá suele estar malo el
+    # working tree, así que después de corregirlo hay que levantarla con
+    # `bash deploy/actualizar.sh --reintentar`.
     anotar_cuarentena
-    log "ERROR: git pull --ff-only falló — la historia local divergió de origin/$RAMA. No se hace merge ni push forzado: revisar a mano en $REPO_DIR (git status / git log --oneline -5)."
+    if grep -q 'untracked working tree files would be overwritten' "$SALIDA_PULL"; then
+      # git los lista indentados entre las dos frases; se extraen para
+      # nombrarlos en el log y no obligar a nadie a leer la salida cruda.
+      ESTORBAN="$(sed -n '/would be overwritten/,/Please move or remove/p' "$SALIDA_PULL" \
+        | grep -E '^[[:space:]]+[^[:space:]]' | sed 's/^[[:space:]]*//' | tr '\n' ' ')"
+      log "ERROR: el pull no puede avanzar porque en $REPO_DIR hay archivos SIN TRACKEAR que el commit nuevo también trae: ${ESTORBAN:-(ver el detalle arriba)}"
+      log "       LA HISTORIA NO DIVERGIÓ. Se resuelve moviéndolos y reintentando:"
+      log "         mkdir -p /root/sicr3p-estorbo && mv <archivo> /root/sicr3p-estorbo/"
+      log "         bash $SCRIPT_DIR/actualizar.sh --reintentar && bash $SCRIPT_DIR/actualizar.sh"
+      avisar "el deploy está frenado por archivos sin trackear en $REPO_DIR" \
+        "El commit ${COMMIT_REMOTO:0:7} trae archivos que ya existen en el servidor sin estar en git: ${ESTORBAN:-ver el log}. La historia NO divergió. Moverlos a un lado y correr --reintentar."
+    elif [ "$(git rev-list --count "origin/$RAMA..HEAD" 2>/dev/null || echo 0)" -gt 0 ]; then
+      log "ERROR: la historia local divergió de origin/$RAMA — hay commits hechos en este servidor. No se hace merge ni push forzado: revisar a mano en $REPO_DIR (git log origin/$RAMA..HEAD --oneline)."
+    else
+      log "ERROR: git pull --ff-only falló y no fue ni historia divergida ni archivos sin trackear. El detalle de git está arriba en $LOG; revisar con: cd $REPO_DIR && git status"
+    fi
+    rm -f "$SALIDA_PULL"
     exit 1
   fi
+  rm -f "$SALIDA_PULL"
   HASH_SCRIPT_DESPUES="$(sha256sum "$SCRIPT_DIR/actualizar.sh" 2>/dev/null | awk '{print $1}')"
   if [ "$HASH_SCRIPT_ANTES" != "$HASH_SCRIPT_DESPUES" ]; then
     # El pull cambió este mismo archivo mientras bash ya lo tenía leído en
