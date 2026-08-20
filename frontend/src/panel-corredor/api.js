@@ -88,5 +88,8 @@ export const apiCorredor = {
     URL.revokeObjectURL(url);
   },
 
+  // Solo para el admin del Corredor (el backend lo gatea con
+  // requireAdminCorredor; acá la pestaña ni se muestra).
+  exportadores: () => pedir('/exportadores'),
   crearExportador: (b) => pedir('/exportadores', { metodo: 'POST', body: b }),
 };

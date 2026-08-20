@@ -190,6 +190,33 @@ router.post('/exportadores', requireAuthCorredor, requireClaveDefinida, requireA
   }
 });
 
+// La lista de empresas. Es lo ÚNICO que hace un admin del Corredor, y
+// hasta ahora no existía: `POST /exportadores` estaba escrito y no había
+// forma de ver el resultado ni de saber qué empresas ya estaban. Un admin
+// entraba al panel y veía dos pestañas —Cargas y Predios— que para él
+// siempre están vacías, porque no tiene exportador_id.
+//
+// Los conteos van en la misma consulta: sin ellos la lista no dice lo
+// único que importa mirar, que es si la empresa ya empezó a cargar o
+// sigue esperando que alguien la ayude a entrar.
+router.get('/exportadores', requireAuthCorredor, requireClaveDefinida, requireAdminCorredor, async (req, res, next) => {
+  try {
+    const { rows } = await queryCorredor(
+      `SELECT e.*,
+              (SELECT count(*)::int FROM cargas c WHERE c.exportador_id = e.id)   AS n_cargas,
+              (SELECT count(*)::int FROM parcelas p WHERE p.exportador_id = e.id) AS n_parcelas,
+              u.email AS usuario_email,
+              u.must_reset_password,
+              u.ultimo_acceso
+         FROM exportadores e
+         LEFT JOIN usuarios_corredor u ON u.exportador_id = e.id
+        ORDER BY e.created_at DESC
+        LIMIT 300`
+    );
+    res.json({ exportadores: rows });
+  } catch (err) { next(err); }
+});
+
 // ---------- Parcelas ----------
 
 router.get('/parcelas', requireAuthCorredor, requireClaveDefinida, async (req, res, next) => {

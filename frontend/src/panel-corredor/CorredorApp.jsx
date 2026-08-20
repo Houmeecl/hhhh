@@ -4,15 +4,26 @@ import Logo from '../components/Logo.jsx';
 import { apiCorredor, authCorredor } from './api.js';
 import Parcelas from './Parcelas.jsx';
 import Cargas from './Cargas.jsx';
+import Empresas from './Empresas.jsx';
 
 // Shell del Corredor. Mismo patrón de navegación que los otros siete
 // paneles —cada pestaña es una ruta real, con NavLink y <Routes>
 // anidadas, no useState('tab')— para que atrás/adelante del navegador
 // funcionen. Ver docs/REGLAS-DE-NAVEGACION.md.
-const TABS = [
+//
+// LAS PESTAÑAS DEPENDEN DEL ROL, y no es cosmético. Cargas y Predios se
+// filtran por `exportador_id`, que un admin del Corredor no tiene: le
+// mostraban dos pantallas estructuralmente vacías y ninguna forma de
+// hacer lo único que hace un admin, que es enrolar empresas. Pasó en
+// producción — entró y no había nada.
+const TABS_OPERADOR = [
   { to: '/panel-corredor', end: true, label: 'Cargas' },
   { to: '/panel-corredor/predios', label: 'Predios' },
 ];
+const TABS_ADMIN = [
+  { to: '/panel-corredor', end: true, label: 'Empresas' },
+];
+const tabsDe = (usuario) => (usuario?.rol === 'admin' ? TABS_ADMIN : TABS_OPERADOR);
 
 export default function CorredorApp() {
   const nav = useNavigate();
@@ -70,7 +81,14 @@ export default function CorredorApp() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{usuario?.nombre_empresa || usuario?.nombre}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {usuario?.nombre_empresa || usuario?.nombre}
+              {usuario?.rol === 'admin' && (
+                <span className="badge badge-gray" style={{ marginLeft: 8, fontSize: 10, padding: '1px 6px' }}>
+                  administración
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: '#9aa8bd' }}>{usuario?.email}</div>
           </div>
           <button className="btn btn-outline btn-sm" onClick={salir}>Cerrar sesión</button>
@@ -79,7 +97,7 @@ export default function CorredorApp() {
 
       <div className="corredor-tabs">
         <div className="corredor-tabs-inner">
-          {TABS.map((t) => (
+          {tabsDe(usuario).map((t) => (
             <NavLink key={t.to} to={t.to} end={t.end}
               className={({ isActive }) => `corredor-tab ${isActive ? 'active' : ''}`}>
               {t.label}
@@ -90,8 +108,16 @@ export default function CorredorApp() {
 
       <main className="corredor-main">
         <Routes>
-          <Route index element={<Cargas />} />
-          <Route path="predios" element={<Parcelas />} />
+          {/* El admin no comparte ninguna ruta con el operador: las suyas
+              consultarían por una empresa que no tiene. */}
+          {usuario?.rol === 'admin' ? (
+            <Route index element={<Empresas />} />
+          ) : (
+            <>
+              <Route index element={<Cargas />} />
+              <Route path="predios" element={<Parcelas />} />
+            </>
+          )}
           <Route path="*" element={<Navigate to="/panel-corredor" replace />} />
         </Routes>
       </main>

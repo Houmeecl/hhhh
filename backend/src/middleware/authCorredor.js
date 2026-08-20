@@ -108,7 +108,22 @@ export function requireAdminCorredor(req, res, next) {
 // en la URL.
 export function exportadorDeLaSesion(req) {
   if (req.usuario?.rol === 'admin' && req.query?.exportador_id) {
-    return String(req.query.exportador_id);
+    const otro = String(req.query.exportador_id);
+    // QUEDA REGISTRADO. Mirar los datos de una empresa que no es la propia
+    // es un cruce, y en sicr3p los cruces se auditan (routes/buscar.js,
+    // routes/mandante.js): un permiso que no deja rastro es indistinguible
+    // de uno que nadie usó. Va acá dentro y no en cada ruta a propósito —
+    // en las rutas se olvida al agregar la siguiente; acá es imposible
+    // ejercer la capacidad sin dejar la traza.
+    //
+    // Sin await: la bitácora no puede demorar ni hacer fallar la consulta
+    // que audita. `logCorredor` ya traga sus propios errores.
+    logCorredor({
+      usuarioId: req.usuario.sub, email: req.usuario.email,
+      accion: 'mirar_como_exportador', entidad: 'exportador', entidadId: otro,
+      detalle: { ruta: req.originalUrl || req.url }, ip: req.ip,
+    });
+    return otro;
   }
   return req.usuario?.exportador_id || null;
 }
