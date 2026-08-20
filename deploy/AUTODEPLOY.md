@@ -131,7 +131,22 @@ bash /opt/sicr3p/deploy/actualizar.sh --desinstalar-cron
 ## ADVERTENCIA (leer antes de activar)
 
 Con el auto-deploy activo, **todo push a la rama de producción
-(`claude/sicr3p-etapa-1-complete-caqhpl`) llega a producción en ≤ 30 minutos**.
+(`main`) llega a producción en ≤ 30 minutos**.
+
+> **Cambio de rama (20-08-2026).** Producción seguía una rama de trabajo
+> mientras se construía el Corredor. Ese trabajo ya está fusionado en `main`
+> y el script apunta ahí. Un VPS instalado antes de esta fecha tiene el
+> checkout en la rama vieja y **no va a recibir nada** hasta moverlo una vez:
+>
+> ```bash
+> cd /opt/sicr3p
+> git fetch origin main
+> git checkout main
+> bash deploy/actualizar.sh
+> ```
+>
+> Es silencioso si no se hace: el cron sigue corriendo y diciendo "sin
+> cambios", porque para la rama vieja es verdad.
 La rama debe recibir **solo trabajo verificado** (tests + E2E en verde, como es
 la práctica de esta sesión). El rollback protege contra builds rotos y backends
 que no levantan, pero no contra bugs lógicos que pasan el health check.

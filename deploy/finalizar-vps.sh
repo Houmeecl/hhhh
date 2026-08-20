@@ -24,7 +24,7 @@
 set -euo pipefail
 
 DIR="${SICR3P_DIR:-/opt/sicr3p}"
-RAMA="${SICR3P_RAMA:-claude/sicr3p-etapa-1-complete-caqhpl}"
+RAMA="${SICR3P_RAMA:-main}"
 PM2_APP="sicr3p-backend"
 
 paso() { echo; echo "==> $*"; }

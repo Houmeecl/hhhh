@@ -25,7 +25,13 @@
 set -euo pipefail
 
 REPO_DIR="${SICR3P_DIR:-/opt/sicr3p}"
-RAMA="${SICR3P_RAMA:-claude/sicr3p-etapa-1-complete-caqhpl}"
+# La rama de producción es `main`. Estuvo en una rama de trabajo
+# (`claude/sicr3p-etapa-1-complete-caqhpl`) mientras el Corredor se
+# construía; ese trabajo ya está fusionado. Si el VPS todavía tiene el
+# checkout apuntando a la rama vieja, hay que moverlo UNA vez a mano:
+#   cd /opt/sicr3p && git fetch origin main && git checkout main
+# Ver deploy/AUTODEPLOY.md.
+RAMA="${SICR3P_RAMA:-main}"
 LOG="${SICR3P_LOG:-/var/log/sicr3p-actualizar.log}"
 PM2_APP="sicr3p-backend"
 HEALTH_URL="${SICR3P_HEALTH_URL:-http://localhost:4000/api/health}"
