@@ -108,6 +108,54 @@ test('hay una escotilla para ver la landing antes de la hora', () => {
   assert.match(app, /ver.*===\s*'landing'/, 'desapareció ?ver=landing');
 });
 
+test('la portada de lanzamiento NO ofrece ingresar', () => {
+  // Hasta el lanzamiento la única acción es dejar el correo. Un enlace a
+  // /ingresar invita a probar puertas que todavía no queremos que se
+  // toquen, y además contradice el mensaje: si ya se puede entrar, la
+  // cuenta regresiva no cuenta nada.
+  const src = fs.readFileSync(new URL('../../frontend/src/pages/Lanzamiento.jsx', import.meta.url), 'utf8');
+  const visible = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(!/\/ingresar/.test(visible), 'volvió un enlace a /ingresar');
+  assert.ok(!/Ingresar/.test(visible), 'volvió un botón de Ingresar');
+  assert.ok(/LeadCta/.test(visible), 'desapareció el formulario de lista de espera');
+  assert.ok(/origen="lanzamiento"/.test(visible), 'el lead perdió su origen y caería en "otro"');
+});
+
+test('"lanzamiento" es un origen de lead reconocido, no cae en "otro"', async () => {
+  const { ORIGENES, ORIGEN_LABEL } = await import('../src/services/interesados.js');
+  assert.ok(ORIGENES.includes('lanzamiento'));
+  assert.ok(ORIGEN_LABEL.lanzamiento, 'sin etiqueta, el panel y el correo lo muestran feo');
+});
+
+test('el CHECK de la base conoce los mismos orígenes que el código', async () => {
+  // ESTE TEST NACE DE UN 500 REAL. El catálogo ORIGENES aceptaba
+  // 'lanzamiento' y la tabla, no: cada inscripción de la lista de espera
+  // respondía "Error interno del servidor". Los tests en JS pasaban porque
+  // miraban solo el catálogo; el error únicamente aparecía contra la base.
+  //
+  // Se comparan los dos textos, no se consulta Postgres: así el test corre
+  // igual en producción, donde no se toca la base real.
+  const { ORIGENES } = await import('../src/services/interesados.js');
+  const sql = fs.readFileSync(new URL('../migrations/107_lead_lanzamiento.sql', import.meta.url), 'utf8');
+  const bloque = sql.slice(sql.lastIndexOf('CHECK (origen IN ('));
+  const enSql = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  assert.deepEqual(
+    [...ORIGENES].sort(),
+    [...enSql].sort(),
+    'el catálogo de services/interesados.js y el CHECK de la migración 107 se separaron'
+  );
+});
+
+test('la portada no llama blockchain a lo que no lo es', () => {
+  // La propia página /cadena del producto dice "no es una red blockchain
+  // pública". Ponerlo en la portada sería contradecir al producto en su
+  // propia web, y prometer garantías de una red distribuida que acá no hay.
+  const src = fs.readFileSync(new URL('../../frontend/src/pages/Lanzamiento.jsx', import.meta.url), 'utf8');
+  const visible = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  assert.ok(!/blockchain/i.test(visible), 'la portada dice blockchain');
+  assert.ok(!/inalterable/i.test(visible), 'la cadena DETECTA el cambio; no lo impide');
+});
+
 test('la portada de lanzamiento no promete nada que no se pueda demostrar', () => {
   const src = fs.readFileSync(new URL('../../frontend/src/pages/Lanzamiento.jsx', import.meta.url), 'utf8');
   const visible = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

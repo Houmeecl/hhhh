@@ -10,7 +10,7 @@
 
 import { config } from '../config.js';
 
-export const ORIGENES = ['calculadora', 'corredor', 'instituto', 'prueba', 'magic_sin_historial', 'otro'];
+export const ORIGENES = ['calculadora', 'corredor', 'instituto', 'prueba', 'lanzamiento', 'magic_sin_historial', 'otro'];
 export const MAX_MENSAJE = 2000;
 
 const texto = (v, max) => String(v ?? '').trim().slice(0, max);
@@ -75,6 +75,7 @@ export const ORIGEN_LABEL = {
   corredor: 'Landing Corredor Bioceánico',
   instituto: 'Landing Instituto',
   prueba: 'Página de códigos de prueba',
+  lanzamiento: 'Lista de espera del lanzamiento',
   magic_sin_historial: 'Acceso sin historial',
   otro: 'Sitio web',
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
+import LeadCta from '../components/LeadForm.jsx';
 import {
   LANZAMIENTO, msHasta, desglose, dosDigitos, fechaLegible, horaLegible, desfaseConServidor,
 } from '../lib/cuentaRegresiva.js';
@@ -60,6 +60,44 @@ function CadenaSellada() {
         <Eslabon key={i} x={p.x} y={p.y} r={14} i={i} activo={i < puntos.length - 1} />
       ))}
     </svg>
+  );
+}
+
+// Lo que hace el producto, en cuatro frases. Cada una es comprobable en
+// el código: el sellado por hash (services/cadenaHash.js), las 15
+// categorías de Alcance 3 (services/alcanceGhg.js), la verificación de la
+// cadena y los tres regímenes (services/exportacion.js).
+const PUNTOS = [
+  {
+    titulo: 'Evidencia, no declaraciones',
+    texto: 'Cada documento queda sellado con su hash, su fecha y quién lo aportó. '
+      + 'Lo que no se puede contrastar se muestra como pendiente, nunca en verde.',
+  },
+  {
+    titulo: 'Emisiones con Alcance 3',
+    texto: 'Alcance 1, 2 y 3 con las 15 categorías del GHG Protocol, cada cifra '
+      + 'enlazada al documento que la respalda.',
+  },
+  {
+    titulo: 'La cadena delata el cambio',
+    texto: 'Cada registro toma el hash del anterior. Si alguien altera un documento, '
+      + 'la verificación deja de calzar y se ve cuál fue. No es una red pública: '
+      + 'es una cadena interna, sellada y solo de agregar.',
+  },
+  {
+    titulo: 'En Chile se cierra',
+    texto: 'Destino del corredor: acá se reúne la documentación aduanera del cruce '
+      + 'y se emite el informe que pide Europa, EUDR o CBAM según el código '
+      + 'arancelario. Sin código, el régimen queda sin determinar y se dice.',
+  },
+];
+
+function Punto({ titulo, texto }) {
+  return (
+    <li style={{ margin: '0 0 18px', paddingLeft: 16, borderLeft: '2px solid #1e3a52' }}>
+      <div style={{ color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 4 }}>{titulo}</div>
+      <div style={{ color: '#94a3b8', fontSize: 14, lineHeight: 1.55 }}>{texto}</div>
+    </li>
   );
 }
 
@@ -165,26 +203,30 @@ export default function Lanzamiento() {
           Abrimos el <b style={{ color: '#fff' }}>{fechaLegible(LANZAMIENTO)}</b>
           {' '}a las <b style={{ color: '#fff' }}>{horaLegible(LANZAMIENTO)}</b>.
         </p>
-        <p style={{ marginTop: 4, color: '#64748b', fontSize: 12 }}>
-          Hora de Chile continental. sicr3p registra hitos, no es autoridad aduanera.
-        </p>
 
-        <div style={{ marginTop: 'clamp(18px, 3.5vh, 30px)' }}>
-          <Link
-            to="/corredor"
-            style={{
-              display: 'inline-block', padding: '12px 26px', borderRadius: 8,
-              border: '1px solid #334155', color: '#e2e8f0',
-              textDecoration: 'none', fontWeight: 600, fontSize: 15,
-            }}
-          >
-            Conocer el pasaporte
-          </Link>
+        <ul
+          style={{
+            listStyle: 'none', padding: 0, textAlign: 'left',
+            maxWidth: 560, margin: 'clamp(28px, 5vh, 48px) auto 0',
+          }}
+        >
+          {PUNTOS.map((p) => <Punto key={p.titulo} {...p} />)}
+        </ul>
+
+        {/* Sin ingreso: hasta el lanzamiento la única acción es dejar el
+            correo. Un enlace a /ingresar acá invitaría a probar puertas que
+            todavía no queremos que se toquen. */}
+        <div style={{ marginTop: 'clamp(22px, 4vh, 36px)' }}>
+          <LeadCta
+            origen="lanzamiento"
+            etiqueta="Anótate en la lista"
+            className="btn btn-primary"
+          />
         </div>
 
-        <p style={{ marginTop: 'clamp(20px, 4vh, 40px)', color: '#475569', fontSize: 12 }}>
-          ¿Ya tienes cuenta?{' '}
-          <Link to="/ingresar" style={{ color: '#94a3b8' }}>Ingresar</Link>
+        <p style={{ marginTop: 'clamp(24px, 4vh, 40px)', color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
+          Hora de Chile continental. sicr3p registra hitos, no es autoridad aduanera
+          ni certificadora, y no rastrea vehículos.
         </p>
       </div>
     </main>
