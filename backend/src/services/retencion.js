@@ -27,6 +27,7 @@
 // ============================================================
 
 import { query } from '../lib/db.js';
+import { queryCorredor, corredorDisponible } from '../lib/dbCorredor.js';
 
 const dias = (envVar, porDefecto) => {
   const v = Number(process.env[envVar]);
@@ -103,6 +104,13 @@ export function resumirPurga(tareas = []) {
 //
 // Cada una devuelve cuántas filas tocó. `accion` queda en la bitácora
 // para que se pueda auditar qué se hizo, no solo cuánto.
+
+// `bd` dice en qué base corre cada tarea. Sin declararlo, todas usaban el
+// pool de la base principal y las del Corredor —que vive en
+// sicr3p_corredor— simplemente no existían: el inventario prometía
+// purgarlas y no había una sola sentencia que lo hiciera.
+const PRINCIPAL = 'principal';
+const CORREDOR = 'corredor';
 
 const TAREAS = [
   {
@@ -222,10 +230,39 @@ const TAREAS = [
     sql: `DELETE FROM entregas
            WHERE created_at < now() - ($1 || ' days')::interval`,
   },
+
+  // ---------- base del Corredor (sicr3p_corredor) ----------
+  //
+  // El inventario declaraba para estas dos exactamente lo que hacen sus
+  // gemelas de la base principal —"el token caduca en 48 h" y "se purga
+  // con el mismo criterio que la bitácora de sicr3p"— y no había ninguna
+  // tarea detrás. Una política de retención escrita que nadie ejecuta es
+  // peor que no tenerla: se responde a una fiscalización citándola.
+  {
+    nombre: 'tokens_password_corredor',
+    accion: 'borrar',
+    bd: CORREDOR,
+    plazo: () => PLAZOS.tokens,
+    sql: `DELETE FROM tokens_password_corredor
+           WHERE (usado = true OR expira_at < now())
+             AND created_at < now() - ($1 || ' days')::interval`,
+  },
+  {
+    nombre: 'actividad_corredor.ip',
+    accion: 'anonimizar',
+    bd: CORREDOR,
+    plazo: () => PLAZOS.actividad_ip,
+    // Se suelta la IP y se conserva el resto del registro: quién hizo qué
+    // tiene que constar aunque ya no se sepa desde dónde.
+    sql: `UPDATE actividad_corredor SET ip = NULL
+           WHERE ip IS NOT NULL AND created_at < now() - ($1 || ' days')::interval`,
+  },
 ];
 
 /** Los nombres de las tareas, para poder listarlas sin correrlas. */
-export const nombresDeTareas = () => TAREAS.map((t) => ({ nombre: t.nombre, accion: t.accion, dias: t.plazo() }));
+export const nombresDeTareas = () => TAREAS.map((t) => ({
+  nombre: t.nombre, accion: t.accion, dias: t.plazo(), bd: t.bd || PRINCIPAL,
+}));
 
 /**
  * Corre la purga completa y deja constancia en `purgas`.
@@ -240,9 +277,21 @@ export async function purgar({ origen = 'automatica', usuarioId = null } = {}) {
   const tareas = [];
   const errores = [];
 
+  // Tareas que no se pudieron correr, con el motivo. Van aparte de los
+  // errores: que el Corredor no esté instalado en este servidor no es una
+  // falla, pero tampoco es una purga hecha, y anotarla como 0 filas la
+  // haría indistinguible de "no había nada que purgar".
+  const omitidas = [];
+
   for (const t of TAREAS) {
+    const bd = t.bd || PRINCIPAL;
+    if (bd === CORREDOR && !corredorDisponible()) {
+      omitidas.push({ nombre: t.nombre, motivo: 'La base del Corredor no está configurada en este servidor.' });
+      continue;
+    }
+    const consultar = bd === CORREDOR ? queryCorredor : query;
     try {
-      const { rowCount } = await query(t.sql, [String(t.plazo())]);
+      const { rowCount } = await consultar(t.sql, [String(t.plazo())]);
       tareas.push({ nombre: t.nombre, accion: t.accion, filas: rowCount || 0 });
     } catch (e) {
       errores.push(`${t.nombre}: ${e.message}`);
@@ -258,7 +307,11 @@ export async function purgar({ origen = 'automatica', usuarioId = null } = {}) {
     await query(
       `INSERT INTO purgas (origen, usuario_id, resultado, filas, duracion_ms, error)
        VALUES ($1,$2,$3::jsonb,$4,$5,$6)`,
-      [origen, usuarioId, JSON.stringify(resumen.resultado), resumen.filas, duracion, error]
+      [
+        origen, usuarioId,
+        JSON.stringify(omitidas.length ? { ...resumen.resultado, _omitidas: omitidas } : resumen.resultado),
+        resumen.filas, duracion, error,
+      ]
     );
   } catch (e) {
     // La bitácora es la prueba, pero no vale la pena perder la purga por
@@ -266,7 +319,7 @@ export async function purgar({ origen = 'automatica', usuarioId = null } = {}) {
     console.warn('[retencion] no se pudo registrar la purga:', e.message);
   }
 
-  return { ...resumen, duracion_ms: duracion, error };
+  return { ...resumen, omitidas, duracion_ms: duracion, error };
 }
 
 // ---------- arranque ----------
