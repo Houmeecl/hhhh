@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
+import Icon from '../components/icons.jsx';
 import { apiCorredor, authCorredor } from './api.js';
 
 // Login propio del Corredor. No reusa components/PanelLogin.jsx porque
@@ -32,33 +33,36 @@ export default function LoginCorredor() {
   }
 
   return (
-    <div className="login-wrap">
-      <form className="card card-pad login-card" onSubmit={entrar}>
-        <div style={{ textAlign: 'center', marginBottom: 18 }}>
+    <div className="login-wrap theme-corredor">
+      <form className="card card-pad login-card cor-form" onSubmit={entrar}>
+        <div className="cor-login-marca">
           <Logo size={28} />
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--corredor-accent, #28A745)', marginTop: 6, letterSpacing: '.04em' }}>
-            CORREDOR BIOCEÁNICO
-          </div>
+          <div className="corredor-kicker">CORREDOR BIOCEÁNICO</div>
         </div>
         <h1 style={{ fontSize: 20, margin: '0 0 6px', textAlign: 'center' }}>Panel del exportador</h1>
-        <p className="muted" style={{ fontSize: 13, textAlign: 'center', marginTop: 0 }}>
+        <p className="muted" style={{ fontSize: 13, textAlign: 'center', margin: '0 0 18px' }}>
           La evidencia que tu carga necesita para entrar a su mercado de destino.
         </p>
 
         <div className="field">
-          <label>Correo</label>
-          <input type="email" value={email} autoComplete="username"
+          <label htmlFor="cor-email">Correo</label>
+          <input id="cor-email" type="email" value={email} autoComplete="username"
             onChange={(e) => { setEmail(e.target.value); setError(''); }} placeholder="contacto@empresa.com" />
         </div>
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label>Contraseña</label>
-          <input type="password" value={password} autoComplete="current-password"
+        <div className="field">
+          <label htmlFor="cor-pass">Contraseña</label>
+          <input id="cor-pass" type="password" value={password} autoComplete="current-password"
             onChange={(e) => { setPassword(e.target.value); setError(''); }} />
         </div>
 
-        {error && <div className="badge badge-red" style={{ display: 'block', padding: 10, marginBottom: 12 }}>{error}</div>}
+        {error && (
+          <div className="cor-aviso cor-aviso-alto" role="alert">
+            <Icon.Alert size={16} />
+            <div>{error}</div>
+          </div>
+        )}
 
-        <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={cargando || !email || !password}>
+        <button className="btn btn-primary" type="submit" style={{ width: '100%', marginTop: 4 }} disabled={cargando || !email || !password}>
           {cargando ? <span className="spinner" /> : 'Entrar'}
         </button>
       </form>

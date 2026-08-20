@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import Logo from '../components/Logo.jsx';
+import Icon from '../components/icons.jsx';
 import { apiCorredor, authCorredor } from './api.js';
 import Parcelas from './Parcelas.jsx';
 import Cargas from './Cargas.jsx';
@@ -53,11 +54,11 @@ export default function CorredorApp() {
 
   if (noHabilitado) {
     return (
-      <main style={{ maxWidth: 520, margin: '0 auto', padding: '60px 20px' }}>
-        <div className="card card-pad" style={{ textAlign: 'center' }}>
-          <span className="badge badge-amber" style={{ marginBottom: 12 }}>Corredor no habilitado</span>
-          <h2 style={{ margin: '0 0 10px' }}>Todavía no está encendido en este servidor</h2>
-          <p className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>
+      <main className="narrow-page theme-corredor">
+        <div className="card card-pad cor-vacio">
+          <span className="badge badge-amber badge-sem" style={{ marginBottom: 12 }}>Corredor no habilitado</span>
+          <h2 style={{ margin: '0 0 10px', fontSize: 19 }}>Todavía no está encendido en este servidor</h2>
+          <p className="cor-nota" style={{ margin: 0 }}>
             El equipo de sicr3p tiene que configurar {noHabilitado.join(' y ')} antes de que el panel
             del Corredor funcione. El resto de la plataforma sigue operando normalmente.
           </p>
@@ -75,21 +76,19 @@ export default function CorredorApp() {
   return (
     <div className="corredor-shell theme-corredor">
       <div className="corredor-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="corredor-marca">
           <Logo size={22} light />
           <div className="corredor-kicker">CORREDOR BIOCEÁNICO</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
+        <div className="corredor-header-der">
+          <div className="corredor-usuario">
+            <b>
               {usuario?.nombre_empresa || usuario?.nombre}
               {usuario?.rol === 'admin' && (
-                <span className="badge badge-gray" style={{ marginLeft: 8, fontSize: 10, padding: '1px 6px' }}>
-                  administración
-                </span>
+                <span className="corredor-rol">Administración</span>
               )}
-            </div>
-            <div style={{ fontSize: 11, color: '#9aa8bd' }}>{usuario?.email}</div>
+            </b>
+            <span>{usuario?.email}</span>
           </div>
           <button className="btn btn-outline btn-sm" onClick={salir}>Cerrar sesión</button>
         </div>
@@ -144,19 +143,24 @@ function DefinirClave({ onLista }) {
   }
 
   return (
-    <div className="login-wrap">
-      <form className="card card-pad login-card" onSubmit={guardar}>
+    <div className="login-wrap theme-corredor">
+      <form className="card card-pad login-card cor-form" onSubmit={guardar}>
         <h1 style={{ fontSize: 20, marginTop: 0 }}>Define tu contraseña</h1>
-        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+        <p className="muted" style={{ fontSize: 13, margin: '0 0 18px' }}>
           Entraste con una clave temporal. Elige la tuya para continuar.
         </p>
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label>Contraseña nueva (mínimo 8 caracteres)</label>
-          <input type="password" value={password} autoComplete="new-password"
+        <div className="field">
+          <label htmlFor="cor-nueva">Contraseña nueva (mínimo 8 caracteres)</label>
+          <input id="cor-nueva" type="password" value={password} autoComplete="new-password"
             onChange={(e) => { setPassword(e.target.value); setError(''); }} />
         </div>
-        {error && <div className="badge badge-red" style={{ display: 'block', padding: 10, marginBottom: 12 }}>{error}</div>}
-        <button className="btn btn-primary" type="submit" style={{ width: '100%' }} disabled={guardando || password.length < 8}>
+        {error && (
+          <div className="cor-aviso cor-aviso-alto" role="alert">
+            <Icon.Alert size={16} />
+            <div>{error}</div>
+          </div>
+        )}
+        <button className="btn btn-primary" type="submit" style={{ width: '100%', marginTop: 4 }} disabled={guardando || password.length < 8}>
           {guardando ? <span className="spinner" /> : 'Guardar y entrar'}
         </button>
       </form>

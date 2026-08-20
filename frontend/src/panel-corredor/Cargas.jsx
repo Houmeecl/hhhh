@@ -1,8 +1,29 @@
 import { useEffect, useState } from 'react';
+import Icon from '../components/icons.jsx';
+import Semaforo from './Semaforo.jsx';
 import { apiCorredor } from './api.js';
 
-const SEMAFORO = { verde: 'badge-green', amarillo: 'badge-amber', rojo: 'badge-red', gris: 'badge-gray' };
 const NOMBRE_REGIMEN = { eudr: 'EUDR', cbam: 'CBAM', exportacion: 'Exportación' };
+
+// Cómo se nombra y cuánto pesa cada consecuencia. El `orden` no es
+// cosmético: decide qué bloque se muestra primero y cuál se lleva la
+// tarjeta grande. Una prohibición de entrada gana a un sobrecosto.
+const CONSECUENCIA = {
+  prohibicion: { orden: 0, clase: 'prohibicion', kicker: 'Prohibición de entrada' },
+  sobrecosto: { orden: 1, clase: 'sobrecosto', kicker: 'Sobrecosto' },
+  comercial: { orden: 2, clase: 'comercial', kicker: 'Lo pide el comprador' },
+};
+const pesoDe = (b) => CONSECUENCIA[b?.consecuencia?.tipo]?.orden ?? 3;
+
+// Dónde, dentro de esta misma pantalla, se completa cada requisito que
+// falta. Solo los que de verdad se pueden completar acá: prometer un lugar
+// que no existe es peor que no decir nada.
+const DONDE_SE_COMPLETA = {
+  geolocalizacion: 'Predios de origen',
+  fecha_produccion: 'Producción',
+  libre_deforestacion: 'Producción',
+  legalidad: 'Producción',
+};
 
 const VACIO = {
   codigo_nc: '', descripcion: '', cantidad: '', unidad: 't', pais_origen: 'BR', region_origen: '',
@@ -54,21 +75,27 @@ export default function Cargas() {
 
   return (
     <div>
-      <h1 style={{ marginTop: 0 }}>Cargas</h1>
+      <div className="cor-head">
+        <h1>Cargas</h1>
+        <p>
+          Cada carga se evalúa contra el régimen que le corresponde según su código arancelario, y
+          muestra qué evidencia falta antes de que salga.
+        </p>
+      </div>
 
-      <div className="card card-pad" style={{ maxWidth: 660, marginBottom: 22 }}>
+      <div className="card card-pad cor-card cor-form">
         <h3 style={{ marginTop: 0 }}>Nueva carga</h3>
 
         <div className="field">
-          <label>Código arancelario</label>
-          <input value={form.codigo_nc} onChange={set('codigo_nc')} placeholder="1201" maxLength={8} />
-          <div className="muted" style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>
+          <label htmlFor="nc">Código arancelario</label>
+          <input id="nc" value={form.codigo_nc} onChange={set('codigo_nc')} placeholder="1201" maxLength={8} />
+          <p className="cor-nota">
             Es lo primero por una razón: decide qué régimen le aplica a esta carga y, con eso, qué
             evidencia se le va a exigir. Sin él no se puede saber.
-          </div>
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+        <div className="cor-grid">
           <div className="field"><label>Descripción</label>
             <input value={form.descripcion} onChange={set('descripcion')} placeholder="Soya a granel" /></div>
           <div className="field"><label>Cantidad</label>
@@ -85,16 +112,16 @@ export default function Cargas() {
             Mostrarlos siempre haría que un exportador de soya buscara
             emisiones incorporadas que su régimen no le pide. */}
         {pareceCbam && (
-          <div style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, marginTop: 4 }}>
-            <div className="badge badge-amber" style={{ marginBottom: 10 }}>Este código está en el anexo de CBAM</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+          <div className="cor-sec">
+            <div className="cor-tag cor-tag-sobrecosto" style={{ marginBottom: 10 }}>Este código está en el anexo de CBAM</div>
+            <div className="cor-grid">
               <div className="field"><label>Instalación de origen</label>
                 <input value={form.instalacion} onChange={set('instalacion')} placeholder="Fundición Ejemplo" /></div>
               <div className="field"><label>Emisiones directas (t CO₂e/t)</label>
                 <input inputMode="decimal" value={form.emisiones_directas_tco2e_t} onChange={set('emisiones_directas_tco2e_t')} /></div>
               <div className="field"><label>Emisiones indirectas (t CO₂e/t)</label>
                 <input inputMode="decimal" value={form.emisiones_indirectas_tco2e_t} onChange={set('emisiones_indirectas_tco2e_t')} />
-                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Este dato lo tiene tu proveedor de electricidad, no tu contabilidad.</div>
+                <p className="cor-nota">Este dato lo tiene tu proveedor de electricidad, no tu contabilidad.</p>
               </div>
               <div className="field"><label>Método</label>
                 <select value={form.metodo_emisiones} onChange={set('metodo_emisiones')}>
@@ -107,32 +134,33 @@ export default function Cargas() {
           </div>
         )}
 
-        <button className="btn btn-primary" style={{ width: '100%', marginTop: 8 }}
+        <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }}
           onClick={crear} disabled={creando || !form.descripcion || !form.cantidad}>
           {creando ? <span className="spinner" /> : 'Crear carga'}
         </button>
       </div>
 
-      {!cargas ? <div className="muted"><span className="spinner" /> Cargando…</div> : (
+      {!cargas ? <div className="muted"><span className="spinner dark" /> Cargando…</div> : (
         <div className="card">
           <div className="table-scroll">
             <table className="data">
-              <thead><tr><th>Carga</th><th>Régimen</th><th>Estado</th><th></th></tr></thead>
+              <thead><tr><th>Carga</th><th>Régimen</th><th>Estado</th><th /></tr></thead>
               <tbody>
                 {cargas.map((c) => (
                   <tr key={c.id}>
                     <td>
-                      <b style={{ fontFamily: 'monospace' }}>{c.codigo}</b>
+                      <b className="mono">{c.codigo}</b>
                       <div className="muted" style={{ fontSize: 12 }}>{c.descripcion} · {Number(c.cantidad)} {c.unidad} · {c.pais_origen}</div>
                     </td>
+                    {/* Chip rectangular, no píldora: el régimen y el semáforo
+                        viven en la misma fila y antes eran los dos una
+                        píldora gris. */}
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {c.exportacion.regimenes.length
-                        ? c.exportacion.regimenes.map((r) => <span key={r} className="badge badge-gray" style={{ marginRight: 4 }}>{NOMBRE_REGIMEN[r]}</span>)
-                        : <span className="badge badge-gray">Sin determinar</span>}
+                        ? c.exportacion.regimenes.map((r) => <span key={r} className="cor-regimen">{NOMBRE_REGIMEN[r]}</span>)
+                        : <span className="cor-regimen cor-regimen-indef">Sin determinar</span>}
                     </td>
-                    <td>
-                      <span className={`badge ${SEMAFORO[c.exportacion.semaforo]}`}>{c.exportacion.glosa}</span>
-                    </td>
+                    <td><Semaforo estado={c.exportacion.semaforo}>{c.exportacion.glosa}</Semaforo></td>
                     <td>
                       <button className="btn btn-outline btn-sm"
                         onClick={() => apiCorredor.carga(c.id).then(setDetalle).catch((e) => flash(e.message, true))}>
@@ -142,9 +170,7 @@ export default function Cargas() {
                   </tr>
                 ))}
                 {cargas.length === 0 && (
-                  <tr><td colSpan={4} className="muted" style={{ textAlign: 'center', padding: 28 }}>
-                    Todavía no hay cargas.
-                  </td></tr>
+                  <tr><td colSpan={4} className="muted cor-vacio">Todavía no hay cargas.</td></tr>
                 )}
               </tbody>
             </table>
@@ -165,13 +191,111 @@ export default function Cargas() {
   );
 }
 
+// ---------- Lo primero que se ve al abrir una carga ----------
+//
+// Una sola tarjeta, la de la consecuencia más grave que sigue pendiente.
+// Prohibición y sobrecosto no se muestran con el mismo peso: "no vas a
+// poder vender" y "te va a salir más caro" no se atienden igual, y hasta
+// ahora los dos eran la misma caja con distinto color de fondo.
+function Consecuencia({ e }) {
+  if (e.listo) {
+    return (
+      <div className="cor-consec cor-consec-listo">
+        <div className="cor-consec-kicker"><Icon.CheckCircle size={14} /> Sin pendientes</div>
+        <div className="cor-consec-titulo">{e.glosa}</div>
+        <p>Descarga el pasaporte: es la evidencia con la que esta carga llega a su destino.</p>
+      </div>
+    );
+  }
+  if (e.listo === null) {
+    return (
+      <div className="cor-consec cor-consec-indef">
+        <div className="cor-consec-kicker"><Icon.Info size={14} /> Sin determinar</div>
+        <div className="cor-consec-titulo">Falta declarar el código arancelario</div>
+        <p>{e.por_que}</p>
+      </div>
+    );
+  }
+  const u = e.urgencia;
+  if (!u) return null;
+  const cfg = CONSECUENCIA[u.consecuencia?.tipo] || CONSECUENCIA.comercial;
+  const n = u.faltantes.length;
+  return (
+    <div className={`cor-consec cor-consec-${cfg.clase}`}>
+      <div className="cor-consec-kicker">
+        {cfg.clase === 'prohibicion' ? <Icon.Alert size={14} /> : <Icon.Info size={14} />} {cfg.kicker}
+      </div>
+      <div className="cor-consec-titulo">
+        Falta{n === 1 ? '' : 'n'} {n} {n === 1 ? 'dato' : 'datos'} de {NOMBRE_REGIMEN[u.regimen] || 'esta carga'}
+      </div>
+      <p>{u.consecuencia?.texto}</p>
+    </div>
+  );
+}
+
+function Requisito({ r, severidad }) {
+  const donde = !r.cumplido && DONDE_SE_COMPLETA[r.campo];
+  return (
+    <li>
+      <span className={`cor-req-ico cor-req-ico-${severidad}`}>
+        {severidad === 'ok' ? <Icon.Check size={13} /> : <Icon.Alert size={13} />}
+      </span>
+      <div className="cor-req-cuerpo">
+        <b>{r.etiqueta}</b>
+        <small>{r.como_se_obtiene}</small>
+        <div className="cor-req-meta">
+          <span>Lo aporta: {r.quien}</span>
+          {donde && <span className="cor-req-donde">Se completa abajo, en «{donde}»</span>}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+// Un régimen y sus requisitos. Lo que FALTA va desplegado; lo que ya está
+// se pliega — nadie abre esta pantalla para releer lo que ya entregó.
+function Bloque({ b }) {
+  const cfg = CONSECUENCIA[b.consecuencia?.tipo];
+  const faltan = b.requisitos.filter((r) => !r.cumplido);
+  const cumplidos = b.requisitos.filter((r) => r.cumplido);
+  const severidad = cfg?.clase === 'prohibicion' ? 'alto' : 'medio';
+
+  return (
+    <div className="cor-bloque">
+      <div className="cor-bloque-head">
+        <h4>{NOMBRE_REGIMEN[b.regimen] || 'Régimen sin determinar'}</h4>
+        {b.listo
+          ? <span className="cor-tag cor-tag-ok"><Icon.Check size={12} /> Completo</span>
+          : cfg && <span className={`cor-tag cor-tag-${cfg.clase}`}>{cfg.kicker}</span>}
+        <span className="cor-bloque-cuenta">{b.cumplidos} de {b.total}</span>
+      </div>
+      {faltan.length > 0 && (
+        <ul className="cor-req">
+          {faltan.map((r) => <Requisito key={r.campo} r={r} severidad={severidad} />)}
+        </ul>
+      )}
+      {cumplidos.length > 0 && (
+        <details className="cor-plegable">
+          <summary>
+            {cumplidos.length === 1 ? 'Ver el dato que ya está' : `Ver los ${cumplidos.length} datos que ya están`}
+          </summary>
+          <ul className="cor-req">
+            {cumplidos.map((r) => <Requisito key={r.campo} r={r} severidad="ok" />)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
 // Qué falta, quién lo aporta y qué pasa si no llega — y desde acá se
 // completa. Antes solo mostraba: los predios y la producción se leían pero
 // no había forma de cargarlos, así que el EUDR no se podía cumplir desde el
 // producto por más que la pantalla dijera qué faltaba.
 //
 // Lo urgente se ordena por CONSECUENCIA y no por cantidad: una prohibición
-// de entrada (EUDR) pesa más que un sobrecosto (CBAM).
+// de entrada (EUDR) pesa más que un sobrecosto (CBAM). Ese orden ahora es
+// literal — los bloques se ordenan así en pantalla.
 function Detalle({ d, flash, onCambio, onClose }) {
   const e = d.exportacion;
   const [disponibles, setDisponibles] = useState([]);
@@ -185,6 +309,7 @@ function Detalle({ d, flash, onCambio, onClose }) {
 
   const yaEnlazadas = new Set(d.parcelas.map((p) => p.id));
   const porEnlazar = disponibles.filter((p) => !yaEnlazadas.has(p.id));
+  const bloques = [...e.bloques].sort((a, b) => (a.listo === b.listo ? pesoDe(a) - pesoDe(b) : (a.listo ? 1 : -1)));
 
   async function enlazar() {
     setOcupado(true);
@@ -202,101 +327,84 @@ function Detalle({ d, flash, onCambio, onClose }) {
 
   return (
     <div className="modal-bg" onClick={(ev) => ev.target.className === 'modal-bg' && onClose()}>
-      <div className="modal" style={{ maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
-        <h2 style={{ marginTop: 0, fontFamily: 'monospace' }}>{d.carga.codigo}</h2>
-        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>{e.por_que}</p>
+      <div className="modal cor-modal">
+        <div className="cor-modal-head">
+          <div>
+            <h2 className="mono">{d.carga.codigo}</h2>
+            <p className="cor-nota" style={{ marginTop: 4 }}>{e.por_que}</p>
+          </div>
+          <Semaforo estado={e.semaforo}>{e.glosa}</Semaforo>
+        </div>
 
-        {e.urgencia && (
-          <div className={`badge ${e.urgencia.consecuencia.tipo === 'prohibicion' ? 'badge-red' : 'badge-amber'}`}
-            style={{ display: 'block', padding: 12, margin: '10px 0', fontSize: 13, lineHeight: 1.5 }}>
-            {e.urgencia.consecuencia.texto}
-          </div>
-        )}
-        {e.listo && (
-          <div className="badge badge-green" style={{ display: 'block', padding: 12, margin: '10px 0', fontSize: 13 }}>
-            {e.glosa}
-          </div>
-        )}
+        <Consecuencia e={e} />
 
-        {e.bloques.map((b) => (
-          <div key={b.regimen || 'sin'} style={{ marginBottom: 16 }}>
-            <h3 style={{ fontSize: 15, margin: '0 0 8px' }}>
-              {NOMBRE_REGIMEN[b.regimen] || 'Falta declarar el código'} — {b.cumplidos} de {b.total}
-            </h3>
-            <div className="table-scroll">
-              <table className="data">
-                <tbody>
-                  {b.requisitos.map((r) => (
-                    <tr key={r.campo}>
-                      <td style={{ width: 26 }}>
-                        <span className={`badge ${r.cumplido ? 'badge-green' : 'badge-red'}`} style={{ padding: '2px 7px' }}>
-                          {r.cumplido ? '·' : '!'}
-                        </span>
-                      </td>
-                      <td>
-                        <b style={{ fontSize: 13.5 }}>{r.etiqueta}</b>
-                        <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{r.como_se_obtiene}</div>
-                      </td>
-                      <td className="muted" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{r.quien}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ))}
+        <h3 className="cor-sec-h"><Icon.List size={17} /> Qué exige esta carga</h3>
+        <p className="cor-sec-sub">
+          Primero el régimen que castiga más fuerte. Cada dato dice quién lo aporta.
+        </p>
+        {bloques.map((b) => <Bloque key={b.regimen || 'sin'} b={b} />)}
 
         {/* ---------- Predios de origen ---------- */}
-        <h3 style={{ fontSize: 15, margin: '18px 0 8px' }}>Predios de origen</h3>
-        {d.parcelas.length === 0
-          ? <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Ninguno enlazado todavía.</p>
-          : (
-            <div className="table-scroll">
-              <table className="data">
-                <tbody>
-                  {d.parcelas.map((p) => (
-                    <tr key={p.id}>
-                      <td><b style={{ fontSize: 13.5 }}>{p.nombre}</b>
-                        <div className="muted" style={{ fontSize: 12 }}>{p.pais}{p.region ? ` · ${p.region}` : ''} · nivel {p.nivel_confianza} {p.nombre_nivel}</div></td>
-                      <td style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{Number(p.aporte_pct)}%</td>
-                      <td><button className="btn btn-outline btn-sm" onClick={() => soltar(p.id)}>Soltar</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+        <div className="cor-sec">
+          <h3 className="cor-sec-h"><Icon.Leaf size={17} /> Predios de origen</h3>
+          <p className="cor-sec-sub">
+            Dónde se produjo la carga. Es el requisito del EUDR que no se resuelve con papeles.
+          </p>
+
+          {d.parcelas.length === 0
+            ? <p className="cor-nota" style={{ marginTop: 0 }}>Ninguno enlazado todavía.</p>
+            : (
+              <div className="table-scroll">
+                <table className="data">
+                  <tbody>
+                    {d.parcelas.map((p) => (
+                      <tr key={p.id}>
+                        <td><b style={{ fontSize: 13.5 }}>{p.nombre}</b>
+                          <div className="muted" style={{ fontSize: 12 }}>{p.pais}{p.region ? ` · ${p.region}` : ''} · nivel {p.nivel_confianza} {p.nombre_nivel}</div></td>
+                        <td className="num" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{Number(p.aporte_pct)}%</td>
+                        <td><button className="btn btn-outline btn-sm" onClick={() => soltar(p.id)}>Soltar</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+          {porEnlazar.length > 0 && (
+            <div className="cor-fila" style={{ marginTop: 12 }}>
+              <div className="field cor-fila-crece">
+                <label>Enlazar un predio</label>
+                <select value={elegida} onChange={(ev) => setElegida(ev.target.value)}>
+                  <option value="">Elige un predio…</option>
+                  {porEnlazar.map((p) => <option key={p.id} value={p.id}>{p.nombre} — nivel {p.nivel_confianza}</option>)}
+                </select>
+              </div>
+              <div className="field" style={{ width: 110 }}>
+                <label>Aporte %</label>
+                <input inputMode="decimal" value={aporte} onChange={(ev) => setAporte(ev.target.value)} />
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={enlazar} disabled={ocupado || !elegida}>Enlazar</button>
             </div>
           )}
-
-        {porEnlazar.length > 0 && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 10, flexWrap: 'wrap' }}>
-            <div className="field" style={{ flex: '1 1 200px', marginBottom: 0 }}>
-              <label>Enlazar un predio</label>
-              <select value={elegida} onChange={(ev) => setElegida(ev.target.value)}>
-                <option value="">Elige un predio…</option>
-                {porEnlazar.map((p) => <option key={p.id} value={p.id}>{p.nombre} — nivel {p.nivel_confianza}</option>)}
-              </select>
+          {porEnlazar.length === 0 && d.parcelas.length === 0 && (
+            <div className="cor-aviso cor-aviso-neutro">
+              <Icon.Info size={16} />
+              <div>
+                Todavía no tienes predios registrados. Ve a la pestaña <b>Predios</b> e importa el
+                archivo del catastro.
+              </div>
             </div>
-            <div className="field" style={{ width: 110, marginBottom: 0 }}>
-              <label>Aporte %</label>
-              <input inputMode="decimal" value={aporte} onChange={(ev) => setAporte(ev.target.value)} />
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={enlazar} disabled={ocupado || !elegida}>Enlazar</button>
-          </div>
-        )}
-        {porEnlazar.length === 0 && d.parcelas.length === 0 && (
-          <p className="muted" style={{ fontSize: 13 }}>
-            Todavía no tienes predios registrados. Ve a la pestaña <b>Predios</b> e importa el archivo del catastro.
-          </p>
-        )}
+          )}
+        </div>
 
         <Tramo d={d} flash={flash} onCambio={onCambio} />
 
         <Produccion d={d} flash={flash} onCambio={onCambio} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 18 }}>
+        <div className="cor-modal-pie">
           <button className="btn btn-outline"
             onClick={() => apiCorredor.pasaporte(d.carga.id, d.carga.codigo).catch((err) => flash(err.message, true))}>
-            Descargar pasaporte (PDF)
+            <Icon.Download size={16} /> Descargar pasaporte (PDF)
           </button>
           <button className="btn btn-outline" onClick={onClose}>Cerrar</button>
         </div>
@@ -349,24 +457,28 @@ function Tramo({ d, flash, onCambio }) {
     setSubiendo(tipo);
     try {
       await apiCorredor.sellarDocumento(d.carga.id, { tipo_documento: tipo, archivo });
-      flash('Documento sellado. Se guardó su huella digital, no el archivo.');
+      flash('Documento sellado. Se guardó su sello digital, no el archivo.');
       onCambio();
     } catch (err) { flash(err.message, true); } finally { setSubiendo(null); }
   }
 
   return (
-    <>
-      <h3 style={{ fontSize: 15, margin: '18px 0 8px' }}>Tramo y documentos</h3>
+    <div className="cor-sec">
+      <h3 className="cor-sec-h"><Icon.Truck size={17} /> Tramo y documentos</h3>
+      <p className="cor-sec-sub">
+        Son los puntos por donde va a pasar, no dónde está: sicr3p no registra la posición de ningún
+        vehículo. De los cruces de frontera sale qué papeles pide este viaje.
+      </p>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
+      <div className="cor-fila">
+        <div className="field cor-fila-crece">
           <label>Sale de</label>
           <select value={origen} onChange={(ev) => setOrigen(ev.target.value)}>
             <option value="">Elige un punto…</option>
             {puntos.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
         </div>
-        <div className="field" style={{ flex: '1 1 180px', marginBottom: 0 }}>
+        <div className="field cor-fila-crece">
           <label>Llega a</label>
           <select value={destino} onChange={(ev) => setDestino(ev.target.value)}>
             <option value="">Elige un punto…</option>
@@ -377,60 +489,55 @@ function Tramo({ d, flash, onCambio }) {
           {d.tramo ? 'Actualizar tramo' : 'Definir tramo'}
         </button>
       </div>
-      <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>
-        Son los puntos por donde va a pasar, no dónde está. sicr3p no registra la posición de ningún vehículo.
-      </p>
 
       {d.tramo?.cruces?.length > 0 && (
-        <p style={{ fontSize: 13, margin: '10px 0 0' }}>
+        <p style={{ fontSize: 13, margin: '12px 0 0' }}>
           Cruza {d.tramo.cruces.length} {d.tramo.cruces.length === 1 ? 'frontera' : 'fronteras'}:{' '}
           {d.tramo.cruces.map((c) => `${c.pais_desde}→${c.pais_hasta}`).join(', ')}.
         </p>
       )}
 
-      <div className={`badge ${SEMAFORO[doc.semaforo]}`}
-        style={{ display: 'block', padding: 10, margin: '10px 0', fontSize: 13, lineHeight: 1.5 }}>
-        {doc.glosa}
+      <div className={`cor-aviso ${doc.semaforo === 'verde' ? 'cor-aviso-ok'
+        : doc.semaforo === 'rojo' ? 'cor-aviso-alto'
+          : doc.semaforo === 'amarillo' ? 'cor-aviso-atencion' : 'cor-aviso-neutro'}`}>
+        {doc.semaforo === 'verde' ? <Icon.CheckCircle size={16} />
+          : doc.semaforo === 'gris' ? <Icon.Info size={16} /> : <Icon.Alert size={16} />}
+        <div>{doc.glosa}</div>
       </div>
 
       {doc.items.length > 0 && (
-        <div className="table-scroll">
-          <table className="data">
-            <tbody>
-              {doc.items.map((i) => (
-                <tr key={i.tipo_documento}>
-                  <td style={{ width: 26 }}>
-                    <span className={`badge ${i.cumplido ? 'badge-green' : (i.obligatorio ? 'badge-red' : 'badge-gray')}`}
-                      style={{ padding: '2px 7px' }}>
-                      {i.cumplido ? '·' : '!'}
-                    </span>
-                  </td>
-                  <td>
-                    <b style={{ fontSize: 13.5 }}>{i.etiqueta}</b>
-                    {!i.obligatorio && <span className="muted" style={{ fontSize: 12 }}> · opcional</span>}
-                    <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{i.nota}</div>
-                    <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>Lo pide: {i.por.join(', ')}</div>
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    {!i.cumplido && (
-                      <label className="btn btn-outline btn-sm" style={{ cursor: 'pointer' }}>
-                        {subiendo === i.tipo_documento ? 'Sellando…' : 'Sellar'}
-                        <input type="file" style={{ display: 'none' }} disabled={subiendo === i.tipo_documento}
-                          onChange={(ev) => sellar(i.tipo_documento, ev.target.files?.[0])} />
-                      </label>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="cor-req cor-caja">
+          {doc.items.map((i) => (
+            <li key={i.tipo_documento}>
+              {/* Un documento opcional que falta NO es un pendiente: gris. */}
+              <span className={`cor-req-ico ${i.cumplido ? 'cor-req-ico-ok' : (i.obligatorio ? 'cor-req-ico-alto' : 'cor-req-ico-neutro')}`}>
+                {i.cumplido ? <Icon.Check size={13} /> : i.obligatorio ? <Icon.Alert size={13} /> : <Icon.Info size={13} />}
+              </span>
+              <div className="cor-req-cuerpo">
+                <b>{i.etiqueta}</b>
+                <small>{i.nota}</small>
+                <div className="cor-req-meta">
+                  <span>Lo pide: {i.por.join(', ')}</span>
+                  {!i.obligatorio && <span>Opcional</span>}
+                </div>
+              </div>
+              {!i.cumplido && (
+                <label className="btn btn-outline btn-sm cor-file" style={{ marginLeft: 'auto', flex: 'none' }}>
+                  {subiendo === i.tipo_documento ? 'Sellando…' : 'Sellar'}
+                  <input type="file" disabled={subiendo === i.tipo_documento}
+                    aria-label={`Sellar ${i.etiqueta}`}
+                    onChange={(ev) => sellar(i.tipo_documento, ev.target.files?.[0])} />
+                </label>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {d.documentos?.length > 0 && (
         <>
-          <p className="muted" style={{ fontSize: 12, margin: '10px 0 4px' }}>
-            De cada documento se guarda su huella digital (SHA-256) y queda encadenada. El archivo se
+          <p className="cor-nota" style={{ margin: '14px 0 4px' }}>
+            De cada documento se guarda su sello digital (SHA-256) y queda encadenado. El archivo se
             queda contigo: sicr3p no conserva una copia.
           </p>
           <div className="table-scroll">
@@ -440,7 +547,7 @@ function Tramo({ d, flash, onCambio }) {
                   <tr key={x.id}>
                     <td><b style={{ fontSize: 13 }}>{etiquetaDeSubido(x.tipo_documento, d.documental)}</b>
                       <div className="muted" style={{ fontSize: 12 }}>{x.archivo_original}</div></td>
-                    <td className="muted" style={{ fontSize: 11.5, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                    <td className="muted mono" style={{ fontSize: 11.5, whiteSpace: 'nowrap' }}>
                       #{x.eslabon} · {String(x.sha256 || '').slice(0, 12)}…
                     </td>
                   </tr>
@@ -450,7 +557,7 @@ function Tramo({ d, flash, onCambio }) {
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }
 
@@ -488,28 +595,32 @@ function Produccion({ d, flash, onCambio }) {
   const faltaEmisor = f.libre_deforestacion_declarado && !f.determinacion_emisor.trim();
 
   return (
-    <>
-      <h3 style={{ fontSize: 15, margin: '18px 0 8px' }}>Producción</h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+    <div className="cor-sec">
+      <h3 className="cor-sec-h"><Icon.Calendar size={17} /> Producción</h3>
+      <p className="cor-sec-sub">
+        Cuándo se produjo y bajo qué condiciones. El EUDR contrasta estas fechas con su fecha de corte.
+      </p>
+
+      <div className="cor-grid" style={{ marginBottom: 14 }}>
         <div className="field"><label>Producción desde</label>
           <input type="date" value={f.desde} onChange={set('desde')} /></div>
         <div className="field"><label>hasta</label>
           <input type="date" value={f.hasta} onChange={set('hasta')} /></div>
       </div>
 
-      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 10, cursor: 'pointer' }}>
-        <input type="checkbox" checked={f.libre_deforestacion_declarado} style={{ marginTop: 3 }}
+      <label className="cor-check">
+        <input type="checkbox" checked={f.libre_deforestacion_declarado}
           onChange={(ev) => setF((x) => ({ ...x, libre_deforestacion_declarado: ev.target.checked }))} />
         <span>Libre de deforestación posterior al 31-12-2020</span>
       </label>
 
       {f.libre_deforestacion_declarado && (
-        <div style={{ borderLeft: '3px solid var(--corredor-accent, #28A745)', paddingLeft: 12, marginBottom: 12 }}>
-          <p className="muted" style={{ fontSize: 12.5, margin: '0 0 8px', lineHeight: 1.5 }}>
+        <div className="cor-sub">
+          <p className="cor-nota" style={{ margin: '0 0 8px' }}>
             sicr3p no analiza imágenes satelitales. Registra la determinación que hizo otro: por eso
             hay que decir quién la emitió y contra qué línea base.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
+          <div className="cor-grid">
             <div className="field"><label>Quién la emitió</label>
               <input value={f.determinacion_emisor} onChange={set('determinacion_emisor')} placeholder="Consultora Ejemplo" /></div>
             <div className="field"><label>Línea base</label>
@@ -520,20 +631,18 @@ function Produccion({ d, flash, onCambio }) {
         </div>
       )}
 
-      <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 12, cursor: 'pointer' }}>
-        <input type="checkbox" checked={f.legalidad_declarada} style={{ marginTop: 3 }}
+      <label className="cor-check">
+        <input type="checkbox" checked={f.legalidad_declarada}
           onChange={(ev) => setF((x) => ({ ...x, legalidad_declarada: ev.target.checked }))} />
         <span>Producción conforme a la legislación del país (tenencia de la tierra, ambiental, laboral, tributaria)</span>
       </label>
 
-      <button className="btn btn-primary btn-sm" onClick={guardar} disabled={guardando || faltaEmisor}>
+      <button className="btn btn-primary btn-sm" style={{ marginTop: 4 }} onClick={guardar} disabled={guardando || faltaEmisor}>
         {guardando ? <span className="spinner" /> : 'Guardar producción'}
       </button>
       {faltaEmisor && (
-        <div className="muted" style={{ fontSize: 12.5, marginTop: 6 }}>
-          Falta decir quién hizo la determinación de deforestación.
-        </div>
+        <p className="cor-nota">Falta decir quién hizo la determinación de deforestación.</p>
       )}
-    </>
+    </div>
   );
 }

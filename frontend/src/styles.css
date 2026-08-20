@@ -67,7 +67,7 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
   border-bottom: 3px solid var(--proveedor-accent);
 }
 .proveedor-kicker { font-size: 12px; font-weight: 700; color: var(--proveedor-accent); }
-.proveedor-tabs { background: #fff; border-bottom: 1px solid var(--line); }
+.proveedor-tabs { background: #fff; border-bottom: 1px solid var(--border); }
 .proveedor-tabs-inner { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
 .proveedor-tab {
   background: none; border: none; cursor: pointer; padding: 14px 16px;
@@ -91,7 +91,9 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
   border-bottom: 3px solid var(--corredor-accent);
 }
 .corredor-kicker { font-size: 12px; font-weight: 700; color: var(--corredor-accent); letter-spacing: .04em; }
-.corredor-tabs { background: #fff; border-bottom: 1px solid var(--line); }
+/* --border, no --line: esa variable no existe en :root y la declaración
+   entera se caía, así que la barra de pestañas quedaba sin su línea. */
+.corredor-tabs { background: #fff; border-bottom: 1px solid var(--border); }
 .corredor-tabs-inner { max-width: 1000px; margin: 0 auto; padding: 0 20px; display: flex; gap: 4px; flex-wrap: wrap; }
 .corredor-tab {
   background: none; border: none; cursor: pointer; padding: 14px 16px;
@@ -100,7 +102,233 @@ h1, h2, h3, .logo { font-family: var(--font-head); }
 }
 .corredor-tab:hover { text-decoration: none; color: var(--navy); }
 .corredor-tab.active { color: var(--navy); border-bottom-color: var(--corredor-accent); }
-.corredor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+.corredor-main { max-width: 1000px; margin: 0 auto; padding: 28px 20px; min-width: 0; }
+.corredor-marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.corredor-header-der { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.corredor-usuario { text-align: right; line-height: 1.35; min-width: 0; }
+.corredor-usuario b { display: block; font-size: 13px; font-weight: 600; }
+/* Chip de rol sobre el navy del header: un .badge-gray acá era una mancha
+   blanca. */
+.corredor-rol {
+  display: inline-block; margin-left: 8px; padding: 2px 7px; border-radius: 6px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #cbd5e1; background: rgba(255, 255, 255, 0.13);
+}
+/* `> span` y no `span`: el chip de rol vive dentro del <b> y con el
+   selector suelto heredaba el gris y el display:block del correo. */
+.corredor-usuario > span { display: block; font-size: 11px; color: #9aa8bd; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------
+   Corredor — piezas del panel (.cor-*)
+   Todo esto vivía como style={{...}} repetido en cinco archivos: los
+   mismos 13px, los mismos grid-template-columns, el mismo verde escrito a
+   mano. Acá se cambia en un lugar.
+   ------------------------------------------------------------ */
+
+/* ---- Semáforo ----
+   El color NO es el único canal. Cada estado lleva además su propia forma
+   de punto, porque la doctrina del proyecto separa tres cosas que a un
+   metro de distancia —o sin distinguir rojo de verde— se veían iguales:
+   gris es «no hay con qué comparar», y no un verde apagado ni un rojo
+   suave. Por eso el gris es un punto HUECO: la ausencia de relleno dice lo
+   mismo que el color. */
+/* .badge.badge-sem y no .badge-sem a secas: .badge se declara más abajo en
+   esta misma hoja con display:inline-block y, a igual especificidad, ganaba
+   por orden — el punto quedaba sin ancho ni alto. */
+.badge.badge-sem { display: inline-flex; align-items: center; gap: 7px; text-align: left; }
+.badge.badge-sem::before {
+  content: ''; width: 9px; height: 9px; border-radius: 50%;
+  background: currentColor; flex: none;
+}
+/* El refuerzo del gris se aplica SOLO cuando es semáforo: .badge-gray
+   suelto sigue siendo el chip neutro del resto del producto. */
+.badge-gray.badge-sem { background: #eceff3; color: #55637a; box-shadow: inset 0 0 0 1px rgba(85, 99, 122, 0.34); }
+.badge-gray.badge-sem::before { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
+
+/* Chip de régimen: rectangular y neutro a propósito. Antes era un
+   .badge-gray, o sea la misma píldora gris del semáforo, y en la misma
+   fila: dos cosas distintas que se leían como la misma. */
+.cor-regimen {
+  display: inline-block; margin: 0 4px 3px 0; padding: 3px 8px; border-radius: 7px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--navy-700); background: #fff; border: 1px solid var(--gray-300);
+}
+.cor-regimen-indef { border-style: dashed; color: var(--gray); }
+
+/* Etiqueta de consecuencia (encabezado de bloque y tablas). */
+.cor-tag {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 6px; padding: 2px 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap;
+}
+.cor-tag-prohibicion { background: #fee2e2; color: #b91c1c; }
+.cor-tag-sobrecosto { background: #fef3c7; color: #b45309; }
+.cor-tag-comercial { background: var(--bg); color: var(--gray); box-shadow: inset 0 0 0 1px var(--border); }
+.cor-tag-ok { background: var(--green-50); color: var(--green-600); }
+
+/* ---- Aviso en bloque ----
+   Reemplaza el .badge con display:block + padding inline: una píldora
+   estirada a 600px de ancho no es una píldora. */
+.cor-aviso {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px; border-radius: 12px; margin: 10px 0;
+  font-size: 13px; line-height: 1.55; border: 1px solid var(--border); background: #fff;
+}
+.cor-aviso svg { flex: none; margin-top: 1px; }
+.cor-aviso > div { min-width: 0; }
+.cor-aviso-ok { background: var(--green-50); border-color: var(--green-100); color: #17612c; }
+.cor-aviso-ok svg { color: var(--green-600); }
+.cor-aviso-atencion { background: #fffbeb; border-color: #f2d9a5; color: #7c4a06; }
+.cor-aviso-atencion svg { color: #b45309; }
+.cor-aviso-alto { background: #fef2f2; border-color: #fecaca; color: #8f1d1d; }
+.cor-aviso-alto svg { color: #b91c1c; }
+.cor-aviso-neutro { background: var(--bg); color: var(--navy-700); }
+.cor-aviso-neutro svg { color: var(--gray); }
+
+/* ---- Consecuencia ----
+   Una prohibición de entrada y un sobrecosto NO pueden verse con el mismo
+   peso: «no vas a poder vender» y «te va a salir más caro» no se atienden
+   igual. La prohibición se lleva una tarjeta con barra roja y titular
+   grande; el sobrecosto, la misma tarjeta en ámbar y un titular chico. */
+.cor-consec { border-radius: 12px; padding: 14px 16px; margin: 12px 0 18px; border: 1px solid var(--border); }
+.cor-consec-kicker {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.cor-consec-titulo { font-family: var(--font-head); font-size: 15px; margin: 6px 0 4px; line-height: 1.28; }
+.cor-consec p { margin: 0; font-size: 13px; line-height: 1.55; }
+.cor-consec-prohibicion { background: #fef2f2; border-color: #fecaca; border-left: 5px solid #dc2626; }
+.cor-consec-prohibicion .cor-consec-kicker, .cor-consec-prohibicion .cor-consec-titulo { color: #b91c1c; }
+.cor-consec-prohibicion .cor-consec-titulo { font-size: 20px; }
+.cor-consec-prohibicion p { color: #7f1d1d; }
+.cor-consec-sobrecosto { background: #fffbeb; border-color: #f2d9a5; border-left: 5px solid #d97706; }
+.cor-consec-sobrecosto .cor-consec-kicker, .cor-consec-sobrecosto .cor-consec-titulo { color: #b45309; }
+.cor-consec-sobrecosto p { color: #7c4a06; }
+.cor-consec-comercial { background: var(--bg); border-left: 5px solid var(--gray-300); }
+.cor-consec-comercial .cor-consec-kicker { color: var(--gray); }
+.cor-consec-comercial .cor-consec-titulo { color: var(--navy); }
+.cor-consec-comercial p { color: var(--navy-700); }
+.cor-consec-indef { background: #eceff3; border-color: #d7dde5; border-left: 5px solid #8794a8; }
+.cor-consec-indef .cor-consec-kicker { color: #55637a; }
+.cor-consec-indef .cor-consec-titulo { color: var(--navy); }
+.cor-consec-indef p { color: var(--navy-700); }
+.cor-consec-listo { background: var(--green-50); border-color: var(--green-100); border-left: 5px solid var(--green); }
+.cor-consec-listo .cor-consec-kicker, .cor-consec-listo .cor-consec-titulo { color: var(--green-600); }
+.cor-consec-listo .cor-consec-titulo { font-size: 17px; }
+.cor-consec-listo p { color: #17612c; }
+
+/* ---- Bloque de requisitos ----
+   Lista, no tabla: en un teléfono en terreno una tabla de tres columnas se
+   va de lado y el texto queda en una columna de 60px. */
+.cor-bloque { border: 1px solid var(--border); border-radius: 12px; background: #fff; margin-bottom: 12px; overflow: hidden; }
+.cor-bloque-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 14px; background: var(--bg); border-bottom: 1px solid var(--border);
+}
+.cor-bloque-head h4 { margin: 0; font-family: var(--font-head); font-size: 14px; }
+.cor-bloque-cuenta { margin-left: auto; font-size: 12px; color: var(--gray); font-variant-numeric: tabular-nums; }
+.cor-req { list-style: none; margin: 0; padding: 0; }
+.cor-req li { display: flex; gap: 10px; align-items: flex-start; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+.cor-req li:last-child { border-bottom: none; }
+.cor-req-ico { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; margin-top: 1px; }
+.cor-req-ico-alto { background: #fee2e2; color: #b91c1c; }
+.cor-req-ico-medio { background: #fef3c7; color: #b45309; }
+.cor-req-ico-ok { background: var(--green-50); color: var(--green-600); }
+/* Falta, pero es opcional: gris, no ámbar. Un documento que nadie exige
+   no puede pintarse como un pendiente. */
+.cor-req-ico-neutro { background: #eceff3; color: #55637a; }
+.cor-req-cuerpo { min-width: 0; }
+.cor-req-cuerpo b { display: block; font-size: 13.5px; line-height: 1.4; }
+.cor-req-cuerpo small { display: block; font-size: 12px; color: var(--gray); line-height: 1.5; margin-top: 3px; }
+.cor-req-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cor-req-meta span {
+  font-size: 11px; font-weight: 600; color: var(--navy-700);
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px;
+}
+.cor-req-meta .cor-req-donde { color: var(--green-600); background: var(--green-50); border-color: var(--green-100); }
+/* Misma lista, pero suelta (documentos del tramo): la caja la pone ella. */
+.cor-caja { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; margin: 12px 0; }
+/* Los ya cumplidos se pliegan: lo que se busca acá es lo que FALTA. */
+.cor-plegable > summary {
+  cursor: pointer; padding: 10px 14px; font-size: 12.5px; font-weight: 600;
+  color: var(--gray); list-style: none;
+}
+.cor-plegable > summary::-webkit-details-marker { display: none; }
+.cor-plegable > summary:hover { color: var(--navy); background: var(--bg); }
+.cor-plegable[open] > summary { border-bottom: 1px solid var(--border); }
+
+/* ---- Secciones del detalle ---- */
+.cor-sec { margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+.cor-sec-h { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font-family: var(--font-head); font-size: 15px; }
+.cor-sec-h svg { color: var(--green-600); flex: none; }
+.cor-sec-sub { margin: 0 0 12px; font-size: 12.5px; color: var(--gray); line-height: 1.55; }
+.cor-nota { font-size: 12px; color: var(--gray); line-height: 1.5; margin: 6px 0 0; }
+
+/* ---- Formularios ---- */
+.cor-form .field { margin-bottom: 14px; }
+.cor-form .field:last-child { margin-bottom: 0; }
+.cor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.cor-grid-ancho { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.cor-grid > *, .cor-fila > * { min-width: 0; }
+.cor-fila { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.cor-fila-crece { flex: 1 1 180px; }
+.cor-grid .field, .cor-fila .field, .cor-form .cor-grid .field, .cor-form .cor-fila .field { margin-bottom: 0; }
+.cor-sub { border-left: 3px solid var(--corredor-accent, var(--green)); padding-left: 12px; margin-bottom: 14px; }
+/* Casilla como fila clicable: 44px de alto real, no 18px de checkbox. */
+.cor-check {
+  display: flex; gap: 10px; align-items: flex-start; cursor: pointer; margin-bottom: 10px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: #fff;
+  font-size: 13.5px; line-height: 1.5;
+}
+.cor-check:hover { border-color: var(--gray-300); }
+.cor-check input[type="checkbox"] { width: auto; flex: none; margin: 2px 0 0; accent-color: var(--green); }
+.cor-check:has(input:checked) { background: var(--green-50); border-color: var(--green-100); }
+
+/* ---- Detalle de carga (modal) ----
+   .modal.cor-modal: .modal se declara más abajo y a igual especificidad
+   ganaba por orden. */
+.modal.cor-modal { max-width: 680px; }
+.cor-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cor-modal-head > div { min-width: 0; }
+.cor-modal-head h2 { margin: 0; font-size: 21px; }
+.cor-modal-pie { display: flex; justify-content: space-between; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
+.cor-modal-pie .btn { flex: 0 0 auto; }
+
+/* Botón "Sellar": el <input type=file> queda invisible pero FOCUSABLE.
+   Con display:none salía del orden de tabulación y el botón dejaba de
+   existir para quien navega con teclado. */
+.cor-file { position: relative; overflow: hidden; }
+.cor-file input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.cor-file:has(input:focus-visible) { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ---- Tarjeta de credencial recién creada ----
+   .card.cor-cred: .card trae `border` en forma corta y se declara después. */
+.card.cor-cred { border-color: var(--green); background: var(--green-50); margin-bottom: 18px; }
+.cor-cred h3 { margin: 0 0 6px; font-size: 16px; }
+.cor-cred .data td { border-bottom-color: var(--green-100); }
+.cor-cred .data tr:hover td { background: transparent; }
+
+/* ---- Encabezado de página del panel ---- */
+.cor-head { margin-bottom: 18px; }
+.cor-head h1 { margin: 0; font-size: 24px; }
+.cor-head p { margin: 5px 0 0; font-size: 13.5px; color: var(--gray); line-height: 1.6; max-width: 680px; }
+.cor-head-fila { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cor-head-fila > * { min-width: 0; }
+.cor-card { max-width: 660px; margin-bottom: 22px; }
+.cor-vacio { text-align: center; padding: 28px 16px; }
+/* En una celda hay que ganarle a `table.data td`, que es más específico. */
+table.data td.cor-vacio { padding: 32px 16px; }
+.cor-login-marca { text-align: center; margin-bottom: 18px; }
+.cor-login-marca .corredor-kicker { margin-top: 6px; }
+
+@media (max-width: 640px) {
+  .corredor-header { padding: 12px 14px; }
+  .corredor-tabs-inner { padding: 0 14px; }
+  .corredor-main { padding: 18px 14px; }
+  .modal.cor-modal { padding: 18px; }
+  .cor-modal-pie .btn { width: 100%; flex: 1 1 100%; }
+  .cor-head h1 { font-size: 21px; }
+  .cor-consec-prohibicion .cor-consec-titulo { font-size: 18px; }
+}
 
 /* "Sube y Suma" (/suma) — app-shell propia con bottom-nav (uso desde el
    celular en terreno, no un panel de escritorio): NO reusa .admin-shell.
@@ -290,6 +518,10 @@ table.data td { padding: 11px 12px; border-bottom: 1px solid var(--border); }
 table.data tbody tr { transition: background 0.12s var(--ease); }
 table.data tr:hover td { background: #f3f8f5; }
 .num { font-variant-numeric: tabular-nums; text-align: right; }
+/* `table.data th` fija text-align:left y le gana a .num por especificidad:
+   sin esta línea el encabezado de una columna numérica quedaba a la
+   izquierda y las cifras a la derecha. */
+table.data th.num { text-align: right; }
 
 .badge {
   display: inline-block; padding: 4px 11px; border-radius: 999px;
