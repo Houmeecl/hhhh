@@ -146,6 +146,23 @@ test('el CHECK de la base conoce los mismos orígenes que el código', async () 
   );
 });
 
+test('el título del navegador y la vista previa al compartir no dicen "carbono"', () => {
+  // Decisión de marca del 20-08-2026: el eje del sitio es el pasaporte
+  // documental del Corredor, no la contabilidad de carbono. El <title> de
+  // index.html es lo que se ve en la pestaña ANTES de que monte React, y
+  // og:title es lo que aparece al pegar el enlace en WhatsApp o LinkedIn:
+  // si se quedaban con el texto viejo, el titular del sitio decía una cosa
+  // y la pestaña otra.
+  const html = fs.readFileSync(new URL('../../frontend/index.html', import.meta.url), 'utf8');
+  const titulo = html.match(/<title>([^<]*)<\/title>/)?.[1] || '';
+  assert.ok(titulo, 'index.html se quedó sin <title>');
+  assert.ok(!/carbono/i.test(titulo), `el <title> volvió a decir carbono: "${titulo}"`);
+  for (const prop of ['og:title', 'og:description', 'twitter:title', 'twitter:description', 'description']) {
+    const m = html.match(new RegExp(`(?:property|name)="${prop}" content="([^"]*)"`));
+    if (m) assert.ok(!/carbono/i.test(m[1]), `${prop} volvió a decir carbono`);
+  }
+});
+
 test('la portada no llama blockchain a lo que no lo es', () => {
   // La propia página /cadena del producto dice "no es una red blockchain
   // pública". Ponerlo en la portada sería contradecir al producto en su

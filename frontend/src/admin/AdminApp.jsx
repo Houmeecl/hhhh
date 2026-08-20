@@ -75,7 +75,7 @@ export default function AdminApp() {
 
   useManifestAdmin();
 
-  useEffect(() => { document.title = 'sicrep — Panel'; }, []);
+  useEffect(() => { document.title = 'sicr3p — Panel'; }, []);
 
   useEffect(() => {
     if (!auth.access) { nav('/admin/login'); return; }
