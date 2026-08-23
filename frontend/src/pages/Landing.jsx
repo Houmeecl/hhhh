@@ -330,31 +330,15 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Corredor Bioceánico: la línea transfronteriza, con landing propia */}
-      <section className="sec-pad sec-alt">
-        <div className="container">
-          <div className="land-corr av2-reveal">
-            <div>
-              <span className="land-corr-kicker"><Icon.Package size={16} /> {t('landing.corr_kicker')}</span>
-              <h3 className="land-corr-titulo">{t('landing.corr_titulo')}<span style={{ color: 'var(--green)' }}>.</span></h3>
-              <p className="land-corr-sub">{t('landing.corr_sub')}</p>
-            </div>
-            <div className="land-corr-lado">
-              <div className="land-corr-chips">
-                <span>{t('landing.corr_chip1')}</span>
-                <span>{t('landing.corr_chip2')}</span>
-                <span>{t('landing.corr_chip3')}</span>
-              </div>
-              <Link to="/corredor" className="btn btn-primary">
-                {t('landing.corr_cta')} <Icon.ArrowRight size={16} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* El Corredor Bioceánico salió de la portada el 23-08-2026: la
+          landing habla de aseguramiento y una línea transfronteriza en el
+          medio partía el mensaje en dos ofertas distintas.
+          NO se borró el producto — /corredor sigue en pie, con su propia
+          landing, su panel y su base. Lo que se quitó es el bloque que lo
+          promocionaba acá. */}
 
       {/* Instituto sicr3p: la línea de formación, con landing propia */}
-      <section className="sec-pad">
+      <section className="sec-pad sec-alt">
         <div className="container">
           <div className="land-corr av2-reveal">
             <div>
