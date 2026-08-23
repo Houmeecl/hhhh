@@ -146,6 +146,32 @@ test('el CHECK de la base conoce los mismos orígenes que el código', async () 
   );
 });
 
+// La landing no puede prometer lo que el producto no hace. El README del
+// panel de aseguramiento (repo Houmeecl/asg) nombra estrés hídrico bajo
+// TNFD, detección de greenwashing e integración con SICEP y The Copper
+// Mark; ninguna de las tres tiene tabla, endpoint ni servicio que la
+// respalde. Verificado el 20-08-2026 contra server/db.js y server/index.js:
+// hay 5 tablas y 6 endpoints, y ninguno cubre eso.
+//
+// Anunciarlo en la portada sería el mismo verde falso que este producto
+// existe para no emitir, apuntando al cliente en vez de al auditor. Este
+// test lo impide.
+test('la portada no promete lo que el producto todavía no hace', () => {
+  const src = fs.readFileSync(new URL('../../frontend/src/pages/Lanzamiento.jsx', import.meta.url), 'utf8');
+  // Sin comentarios: el bloque que EXPLICA la exclusión nombra estas cosas
+  // a propósito, y leerlo como si fuera copy haría fallar el test por su
+  // propia advertencia.
+  const copy = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  for (const promesa of ['TNFD', 'greenwash', 'Copper Mark', 'SICEP', 'NIIF']) {
+    assert.ok(
+      !new RegExp(promesa, 'i').test(copy),
+      `la portada anuncia "${promesa}" y no hay código que lo respalde`
+    );
+  }
+  // Y no se declara auditor acreditado ni se promete opinión de auditoría.
+  assert.ok(/no es autoridad/i.test(copy), 'desapareció la aclaración de que sicr3p no es autoridad');
+});
+
 test('el título del navegador y la vista previa al compartir no dicen "carbono"', () => {
   // Decisión de marca del 20-08-2026: el eje del sitio es el pasaporte
   // documental del Corredor, no la contabilidad de carbono. El <title> de

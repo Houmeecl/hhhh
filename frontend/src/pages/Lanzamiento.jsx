@@ -64,31 +64,37 @@ function CadenaSellada() {
 }
 
 // Lo que hace el producto, en cuatro frases. Cada una es comprobable en
-// el código: el sellado por hash (services/cadenaHash.js), las 15
-// categorías de Alcance 3 (services/alcanceGhg.js), la verificación de la
-// cadena y los tres regímenes (services/exportacion.js).
+// código, y ninguna promete lo que todavía no existe.
+//
+// LO QUE SE DEJÓ FUERA A PROPÓSITO. El README del panel de aseguramiento
+// también nombra estrés hídrico bajo TNFD, detección de greenwashing e
+// integración con SICEP y The Copper Mark. Nada de eso está construido: no
+// hay tabla, endpoint ni servicio que lo respalde. Una landing que lo
+// anuncie es el mismo verde falso que este producto existe para no emitir,
+// solo que apuntando al cliente en vez de al auditor.
 const PUNTOS = [
   {
-    titulo: 'Evidencia, no declaraciones',
-    texto: 'Cada documento queda sellado con su hash, su fecha y quién lo aportó. '
-      + 'Lo que no se puede contrastar se muestra como pendiente, nunca en verde.',
+    titulo: 'Evidencia sellada, no declaraciones',
+    texto: 'Cada archivo que entra al expediente queda con su SHA-256, su fecha y quién lo '
+      + 'aportó. Si el archivo cambia, el sello deja de calzar y se ve cuál fue.',
+  },
+  {
+    titulo: 'Tres áreas de práctica',
+    texto: 'Aseguramiento de sostenibilidad, forense e investigaciones, y cumplimiento del '
+      + 'Modelo de Prevención de Delitos de la Ley 21.595. El expediente se abre por área '
+      + 'y por período fiscal.',
+  },
+  {
+    titulo: 'Los datos no salen del equipo',
+    texto: 'La base es un archivo local y el análisis de documentos corre con un modelo que '
+      + 'se ejecuta en la misma máquina. La información financiera del proveedor no viaja '
+      + 'a una nube pública.',
   },
   {
     titulo: 'Emisiones con Alcance 3',
-    texto: 'Alcance 1, 2 y 3 con las 15 categorías del GHG Protocol, cada cifra '
-      + 'enlazada al documento que la respalda.',
-  },
-  {
-    titulo: 'La cadena delata el cambio',
-    texto: 'Cada registro toma el hash del anterior. Si alguien altera un documento, '
-      + 'la verificación deja de calzar y se ve cuál fue. No es una red pública: '
-      + 'es una cadena interna, sellada y solo de agregar.',
-  },
-  {
-    titulo: 'En Chile se cierra',
-    texto: 'Destino del corredor: acá se reúne la documentación aduanera del cruce '
-      + 'y se emite el informe que pide Europa, EUDR o CBAM según el código '
-      + 'arancelario. Sin código, el régimen queda sin determinar y se dice.',
+    texto: 'Alcance 1, 2 y 3 con las 15 categorías del GHG Protocol, cada cifra enlazada al '
+      + 'documento que la respalda. Lo que no se puede contrastar se muestra como '
+      + 'pendiente, nunca en verde.',
   },
 ];
 
@@ -139,7 +145,7 @@ export default function Lanzamiento() {
   // pegado cuando la portada pase a ser la landing.
   useEffect(() => {
     const previo = document.title;
-    document.title = 'sicr3p — Pasaporte de carga del Corredor Bioceánico';
+    document.title = 'sicr3p — Aseguramiento, forense y cumplimiento';
     return () => { document.title = previo; };
   }, []);
 
@@ -172,17 +178,17 @@ export default function Lanzamiento() {
             letterSpacing: '.22em', textTransform: 'uppercase', color: 'var(--green)',
           }}
         >
-          Pasaporte de carga
+          Aseguramiento independiente
         </p>
 
         <h1 style={{ fontSize: 'clamp(24px, 6vw, 42px)', margin: '0 0 12px', color: '#fff', lineHeight: 1.15 }}>
-          Cuatro países, un solo pasaporte de carga
+          La evidencia que su mandante va a pedirle
         </h1>
 
         <p style={{ margin: '0 auto clamp(20px, 4vh, 38px)', maxWidth: 520, color: '#94a3b8', fontSize: 'clamp(14px, 3.6vw, 16px)', lineHeight: 1.55 }}>
-          El Corredor Bioceánico cruza Brasil, Paraguay, Argentina y Chile. Cada frontera
-          suma documentos sellados al mismo pasaporte; en Chile se emite el informe que pide
-          Europa: EUDR o CBAM según el código arancelario.
+          Aseguramiento, contabilidad forense y cumplimiento para proveedores de la industria
+          y la minería. Cada documento entra a un expediente y queda sellado con su hash: lo
+          que se puede demostrar se demuestra, y lo que no, se dice.
         </p>
 
         <div
@@ -225,8 +231,8 @@ export default function Lanzamiento() {
         </div>
 
         <p style={{ marginTop: 'clamp(24px, 4vh, 40px)', color: '#475569', fontSize: 12, lineHeight: 1.6 }}>
-          Hora de Chile continental. sicr3p registra hitos, no es autoridad aduanera
-          ni certificadora, y no rastrea vehículos.
+          Hora de Chile continental. sicr3p estructura y sella evidencia; no es autoridad,
+          certificadora ni auditor acreditado, y no emite opinión de auditoría.
         </p>
       </div>
     </main>
