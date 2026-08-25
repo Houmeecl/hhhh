@@ -1,6 +1,6 @@
 # Pendientes de sicr3p
 
-Estado al **20-08-2026**. Cada punto trae dónde mirarlo y cómo se comprueba,
+Estado al **25-08-2026**. Cada punto trae dónde mirarlo y cómo se comprueba,
 para que no haya que creerle a este archivo: se verifica.
 
 Orden por gravedad, no por esfuerzo. Arriba está lo que puede hacer daño
@@ -123,6 +123,27 @@ usuario sin ninguna de las dos vías.
 cuenta por enlace ni aviso de documento recibido. Lo que se cerró es la
 recuperación de clave, que era lo que dejaba gente afuera.
 
+### 2.4 — El adhesivo no se puede imprimir
+
+| | |
+|---|---|
+| **Comprobar** | `grep -rn "generateAdhesivoActivo" backend/src/` → solo su propia definición |
+| **Impacto** | Alto: el piloto no puede pegar un adhesivo en ninguna camioneta |
+
+El generador existe y produce el PDF correcto en los tres estados —está
+verificado rasterizando, y las muestras 16, 17 y 18 salen de él—, pero
+**ninguna ruta lo llama**. Tampoco hay pantalla para dar de alta un activo:
+la tabla `activos` se llena a mano por SQL.
+
+La página pública `/activo/:codigo` sí existe y funciona; lo que falta es
+todo lo que ocurre antes de que haya un código que escanear.
+
+**Cerrar así:** alta de activos en el panel, un endpoint que emita el PDF
+—uno y en tanda, porque una flota se imprime junta— y la pantalla. El
+generador ya devuelve Buffer como el resto, así que engancharlo es directo.
+
+---
+
 ---
 
 ## 3 · Alcance declarado y no cubierto
@@ -199,6 +220,10 @@ están escritos como están.
 | La purga no alcanzaba las tablas del Corredor que el inventario prometía purgar | `e615c2f` |
 | Título del navegador y vista previa al compartir | `9595c3a` |
 | Portada del Programa Norte 2026-2030, con la regla de «solo confirmados» | `2f24be4` |
+| Recuperación de clave y primer correo del Corredor | `f7e8bae` |
+| Adhesivo del activo: tres estados, sin rojo, símbolo dibujado y no escrito | `01db7c3` |
+| La muestra pública del informe llevaba una página de atraso | `e20c03a` |
+| Las quince muestras de `docs/muestras/` estaban viejas: el reporte CBAM salía sin sus límites | `325a0d1` |
 
 Los dos del medio comparten causa: el inventario no sabía decir en qué base
 vivía cada tabla, y `puntos_corredor` existe de verdad en las dos. Un objeto
