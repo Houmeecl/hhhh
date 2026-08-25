@@ -258,5 +258,29 @@ guardar('15-export-cbam.csv', Buffer.from('﻿' + filasACsv(headersCbam, [
   { codigo: 'LM-2026-000402', pais_origen: 'CL', material: 'Cátodos de cobre', codigo_nc: '7403', cbam_aplicable: 'si', metodo_emisiones: 'motor propio', emisiones_directas_tco2e_t: '55.1000', emisiones_indirectas_tco2e_t: '20.9000', cbam_listo: 'no', cbam_faltantes: 'instalación de origen' },
 ]), 'utf8'));
 
+// ---------- Adhesivo del activo, en sus TRES estados ----------
+//
+// Van los tres a propósito. El adhesivo es la pieza más expuesta del
+// producto —la ve gente que no entró a ninguna pantalla, a tres metros y
+// con sol de frente— y el error caro no es que el verde salga feo: es que
+// el gris se lea como rojo. Solo se ven juntos si se generan juntos.
+//
+// El estado NO se escribe a mano acá: sale de `estadoActivo()` sobre
+// coberturas de ejemplo, que es la misma función que usa la página
+// pública. Si mañana cambia la regla del color, estas tres muestras
+// cambian con ella en vez de quedarse mintiendo.
+const { activoPublico } = await import(`${B}/services/activo.js`);
+
+const ACTIVOS_MUESTRA = [
+  ['16-adhesivo-contrastado.pdf',   { codigo: 'AC-7F3D9B21C40E8A16', nombre: 'Camioneta 4x4',    tipo: 'vehiculo',   contrato: 'Contrato A' }, [100]],
+  ['17-adhesivo-falta-evidencia.pdf', { codigo: 'AC-2E88C104BB57D390', nombre: 'Grua horquilla 3T', tipo: 'maquinaria', contrato: 'Contrato B' }, [100, 62]],
+  ['18-adhesivo-sin-comparacion.pdf', { codigo: 'AC-91B0FA5721D6C4E8', nombre: 'Camion mediano',    tipo: 'vehiculo',   contrato: 'Contrato C' }, []],
+];
+
+for (const [nombre, fila, coberturas] of ACTIVOS_MUESTRA) {
+  const activo = activoPublico(fila, coberturas);
+  guardar(nombre, await pdf.generateAdhesivoActivo({ activo }));
+}
+
 console.log('\nListo.');
 process.exit(0);

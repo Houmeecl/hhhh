@@ -41,6 +41,14 @@ en una columna.
 | `05-contrato-asesoria.pdf` | Contrato emitido desde el paquete legal, con los puntos pendientes marcados. |
 | `06-constancia-curso.pdf` | Constancia de capacitación interna con serial verificable. |
 | `12-sello.svg` | Sello embebible en el sitio del cliente. |
+| `16-adhesivo-contrastado.pdf` | Adhesivo del activo — verde. |
+| `17-adhesivo-falta-evidencia.pdf` | Adhesivo del activo — ámbar. |
+| `18-adhesivo-sin-comparacion.pdf` | Adhesivo del activo — gris. |
+
+Los tres adhesivos van juntos a propósito. Es la pieza más expuesta del
+producto —la ve gente que no entró a ninguna pantalla, a tres metros y con
+sol de frente— y el error caro no es que el verde salga feo: es que el gris
+se lea como rojo. Eso solo se ve comparándolos.
 
 ## Regenerar
 
@@ -53,6 +61,14 @@ El script siembra la sesión pasando por los mismos helpers que el flujo real
 (`hashDocumento`, `hashCadena`, `cadena_estado`), así que el sello de
 integridad del informe dice **íntegra** porque de verdad lo es. Si sale
 «ALTERADA», la semilla se saltó el cierre de la cadena global.
+
+**Correr esto después de tocar `pdf.js` no es opcional.** Estas muestras no
+se regeneran solas: quedan congeladas en el commit que las creó y envejecen
+en silencio. Al 25-08 llevaban atrás lo suficiente como para que el reporte
+CBAM saliera **sin su bloque de límites y sin el descargo de ISO 14064-3**, y
+el Estado de Capital Natural sin el descargo — cosas que el producto sí
+imprime hoy. Una muestra vieja es peor que no tenerla: se lee como si fuera
+lo que el sistema emite.
 
 ## Lo que estas muestras no son
 

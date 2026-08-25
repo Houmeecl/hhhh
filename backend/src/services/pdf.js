@@ -1121,8 +1121,11 @@ export async function generateAdhesivoActivo({ activo }) {
         + 'Este adhesivo no es un documento oficial.',
       12, H - 17, { width: W - 24 });
 
-  doc.end();
-  return doc;
+  // Mismo contrato que los otros diecisiete generadores: devuelve el Buffer
+  // ya cerrado. Antes hacía `doc.end(); return doc;`, que entrega un stream
+  // recién terminado y obliga a quien llame a saber que este uno es
+  // distinto. No lo notó nadie porque todavía no hay quien lo llame.
+  return bufferDoc(doc);
 }
 
 export async function generateCredencialTarjeta({ tarjeta, lote }) {
