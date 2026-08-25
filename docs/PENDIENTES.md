@@ -87,30 +87,41 @@ rechazado.
 ¿nadie, y el estado sobra?— y después construirlo. Si la respuesta es que
 nadie revisa, lo correcto es **quitar la columna**, no dejarla mintiendo.
 
-### 2.2 — No hay recuperación de contraseña en el Corredor
+### ~~2.2 — Recuperación de contraseña en el Corredor~~ · CERRADO 23-08
 
-| | |
-|---|---|
-| **Comprobar** | `grep -rn "INSERT INTO tokens_password_corredor" backend/src/` → sin resultados |
-| **Impacto** | Alto en operación: si un exportador pierde su clave, no hay camino de vuelta |
+Un exportador que perdía su clave quedaba afuera; la única salida era que
+un admin le emitiera una temporal y se la dictara. Ahora hay
+`POST /auth/olvide-clave` y `POST /auth/restablecer`.
 
-La tabla existe, tiene su índice, se inventaría y **desde hoy se purga**.
-Nadie inserta: la única mención en las rutas es un comentario en
-`corredorApi.js:302` que dice justamente que todavía no se usa. La única
-forma de entrar es la clave temporal que crea un admin a mano.
+Dos decisiones que conviene no deshacer:
 
-**Depende de 2.3**: un enlace de un solo uso no sirve sin correo que lo
-lleve.
+- **La respuesta es idéntica exista o no el correo**, y el trabajo se hace
+  dentro del `if` para no delatar por latencia. Decir "ese correo no está
+  registrado" permitiría averiguar qué empresas operan en el Corredor
+  probando direcciones, y en un corredor minero eso ya es información.
+- **Enlace inexistente, vencido y ya usado dan el mismo mensaje.** Los tres
+  significan lo mismo para quien lo tiene en la mano; distinguirlos solo le
+  sirve a quien prueba enlaces ajenos.
 
-### 2.3 — El Corredor no manda correos
+El token va hasheado con SHA-256, 32 bytes de entropía, un solo uso, 48 h,
+y el canje es transaccional con `FOR UPDATE` para que dos peticiones
+simultáneas no cambien la clave dos veces.
 
-| | |
-|---|---|
-| **Comprobar** | `grep -rn "mailer\|enviarCorreo" backend/src/routes/corredorApi.js` → sin resultados |
+### ~~2.3 — El Corredor no manda correos~~ · CERRADO 23-08
 
-El resto de la plataforma tiene `mailer` y bitácora de envíos. El Corredor
-no. Sin esto no hay activación de cuenta, ni recuperación de clave, ni aviso
-de que un documento llegó.
+`resetCorredorEmail` en `services/mailer.js`, con su propia plantilla: el
+Corredor es otro producto y quien lo recibe puede no saber qué es sicr3p
+más allá de su panel de cargas. El plazo viaja como parámetro desde
+`HORAS_TOKEN_CORREDOR` para que el texto no lo repita por su cuenta y se
+desincronice.
+
+Si el envío falla, la petición NO se cae: el token ya quedó creado y el
+admin todavía puede emitir una clave temporal. Reventar ahí dejaría al
+usuario sin ninguna de las dos vías.
+
+**Queda pendiente el resto del correo del Corredor**: no hay activación de
+cuenta por enlace ni aviso de documento recibido. Lo que se cerró es la
+recuperación de clave, que era lo que dejaba gente afuera.
 
 ---
 
@@ -187,6 +198,7 @@ están escritos como están.
 | El derecho de acceso ARCOP omitía la base del Corredor **en silencio** | `4ec3406` |
 | La purga no alcanzaba las tablas del Corredor que el inventario prometía purgar | `e615c2f` |
 | Título del navegador y vista previa al compartir | `9595c3a` |
+| Portada del Programa Norte 2026-2030, con la regla de «solo confirmados» | `2f24be4` |
 
 Los dos del medio comparten causa: el inventario no sabía decir en qué base
 vivía cada tabla, y `puntos_corredor` existe de verdad en las dos. Un objeto

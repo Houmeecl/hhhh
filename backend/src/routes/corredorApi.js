@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { queryCorredor, withTxCorredor } from '../lib/dbCorredor.js';
 import { loginLimiter } from '../middleware/rateLimit.js';
+import { sendMail, resetCorredorEmail } from '../services/mailer.js';
 import {
   requireCorredorActivo, requireAuthCorredor, requireClaveDefinida,
   requireAdminCorredor, exportadorDeLaSesion, firmarTokenCorredor, logCorredor,
@@ -139,6 +140,110 @@ router.post('/auth/cambiar-password', requireAuthCorredor, async (req, res, next
     // bloqueando todo lo demás hasta que expire.
     const { rows } = await queryCorredor('SELECT * FROM usuarios_corredor WHERE id = $1', [req.usuario.sub]);
     res.json({ ok: true, access: firmarTokenCorredor(rows[0]) });
+  } catch (err) { next(err); }
+});
+
+// ---------- Recuperación de contraseña ----------
+//
+// Hasta hoy, un exportador que perdía su clave quedaba afuera: la única
+// salida era que un admin le emitiera una temporal y se la dictara. La
+// tabla `tokens_password_corredor` existía desde la migración 001 y no la
+// usaba nadie.
+//
+// El plazo vive acá y viaja al correo, para que el texto no lo repita por
+// su cuenta y se desincronice.
+const HORAS_TOKEN_CORREDOR = 48;
+
+// POST /auth/olvide-clave — pide el enlace.
+//
+// LA RESPUESTA ES SIEMPRE LA MISMA, exista o no el correo. Si dijera "ese
+// correo no está registrado", cualquiera podría averiguar qué empresas
+// operan en el Corredor probando direcciones — y en un corredor minero
+// saber quién exporta ya es información. Por el mismo motivo el trabajo se
+// hace DENTRO del `if`: contestar antes de tiempo en el caso negativo
+// también lo delataría, por diferencia de latencia.
+router.post('/auth/olvide-clave', loginLimiter, async (req, res, next) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const { rows } = await queryCorredor(
+      'SELECT * FROM usuarios_corredor WHERE email = $1', [email]
+    );
+    const u = rows[0];
+
+    if (u && u.estado === 'activo') {
+      const crudo = crypto.randomBytes(32).toString('hex');
+      const expira = new Date(Date.now() + HORAS_TOKEN_CORREDOR * 60 * 60 * 1000);
+      await queryCorredor(
+        `INSERT INTO tokens_password_corredor (usuario_id, token_hash, tipo, expira_at)
+         VALUES ($1,$2,'reset',$3)`,
+        [u.id, crypto.createHash('sha256').update(crudo).digest('hex'), expira]
+      );
+      const link = `${config.publicAppUrl}/panel-corredor/restablecer?token=${crudo}`;
+      const mail = resetCorredorEmail({ nombre: u.nombre, link, horas: HORAS_TOKEN_CORREDOR });
+      // El envío no puede tumbar la petición: si el correo falla, el token
+      // igual quedó creado y el admin todavía puede emitir una clave
+      // temporal. Revelar el fallo tampoco ayudaría a quien lo pidió.
+      try {
+        await sendMail({ to: u.email, area: 'Corredor', ...mail });
+      } catch (e) {
+        console.warn('[corredor] no se pudo enviar el correo de reset:', e.message);
+      }
+      await logCorredor({ usuarioId: u.id, email: u.email, accion: 'solicitar_reset', ip: req.ip });
+    }
+
+    res.json({ ok: true, mensaje: 'Si el correo existe, enviamos instrucciones.' });
+  } catch (err) { next(err); }
+});
+
+// POST /auth/restablecer — canjea el enlace por una contraseña nueva.
+//
+// El token se guarda hasheado: si alguien lee la tabla, no puede usarla
+// para entrar. Se marca usado en la misma transacción que cambia la clave,
+// porque si se marcara después, dos peticiones simultáneas con el mismo
+// enlace cambiarían la contraseña dos veces.
+router.post('/auth/restablecer', loginLimiter, async (req, res, next) => {
+  try {
+    const token = String(req.body?.token || '');
+    const nueva = String(req.body?.password || '');
+    if (nueva.length < 8) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres.' });
+    }
+    const th = crypto.createHash('sha256').update(token).digest('hex');
+
+    const resultado = await withTxCorredor(async (cx) => {
+      const { rows } = await cx.query(
+        `SELECT * FROM tokens_password_corredor
+          WHERE token_hash = $1 AND usado = false AND expira_at > now()
+          FOR UPDATE`,
+        [th]
+      );
+      const tok = rows[0];
+      if (!tok) return null;
+
+      const hash = await bcrypt.hash(nueva, config.bcryptRounds);
+      await cx.query(
+        `UPDATE usuarios_corredor
+            SET password_hash = $2, must_reset_password = false
+          WHERE id = $1`,
+        [tok.usuario_id, hash]
+      );
+      await cx.query('UPDATE tokens_password_corredor SET usado = true WHERE id = $1', [tok.id]);
+
+      const { rows: uRows } = await cx.query(
+        'SELECT * FROM usuarios_corredor WHERE id = $1', [tok.usuario_id]
+      );
+      return uRows[0];
+    });
+
+    // Mensaje idéntico para enlace inexistente, vencido y ya usado: los tres
+    // significan lo mismo para quien lo tiene en la mano, y distinguirlos
+    // solo le sirve a quien esté probando enlaces ajenos.
+    if (!resultado) return res.status(400).json({ error: 'Enlace inválido o expirado' });
+
+    await logCorredor({
+      usuarioId: resultado.id, email: resultado.email, accion: 'restablecer_password', ip: req.ip,
+    });
+    res.json({ ok: true, access: firmarTokenCorredor(resultado) });
   } catch (err) { next(err); }
 });
 

@@ -240,6 +240,36 @@ const esc = (s) => String(s ?? '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
+// ---------- Corredor Bioceánico ----------
+
+// Recuperación de contraseña del panel del exportador.
+//
+// POR QUÉ NO REUSA `resetEmail`. El Corredor es otro producto: otra base,
+// otro login, otra ruta de restablecimiento, y quien lo recibe puede no
+// tener idea de qué es sicr3p más allá de su panel de cargas. El texto
+// nombra el panel del que se trata para que un exportador que además es
+// proveedor no confunda dos correos casi idénticos.
+//
+// El plazo dice 48 horas porque es el que la tabla declara, no un número
+// escrito de nuevo acá: si mañana cambia, cambia en un lugar y este texto
+// queda mintiendo. Por eso se recibe como parámetro.
+export function resetCorredorEmail({ nombre, link, horas = 48 }) {
+  return {
+    subject: 'Restablece tu contraseña — Corredor · sicr3p',
+    html: `
+      <div style="font-family:system-ui,Arial,sans-serif;color:#0f1f2e;max-width:520px">
+        <h2 style="color:#0f1f2e">Restablecer contraseña</h2>
+        <p>Hola ${esc(nombre)}, recibimos una solicitud para restablecer la contraseña
+           de tu panel del <b>Corredor Bioceánico</b>.</p>
+        <p><a href="${esc(link)}" style="background:#28a745;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;display:inline-block">Definir nueva contraseña</a></p>
+        <p style="color:#64748b;font-size:13px">El enlace sirve UNA vez y expira en ${Number(horas)} horas.</p>
+        <p style="color:#64748b;font-size:13px">Si no pediste esto, puedes ignorar este correo:
+           tu contraseña actual sigue funcionando.</p>
+      </div>`,
+  };
+}
+
+
 // El ASUNTO es una cabecera, no HTML: un salto de línea ahí permite
 // inyectar cabeceras nuevas (un Bcc, otro From). Tanto el nombre de la
 // campaña como la razón social vienen de texto que escribe una persona,
