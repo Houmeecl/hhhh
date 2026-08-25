@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
+import { participantesPublicos, estadoCupos, eventosProximos } from '../services/programa.js';
 import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso, fetchAlcancesGHG } from '../services/pdf.js';
 import { agregarPorAlcance, filasDesdeFacturas } from '../services/alcanceGhg.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl, constanciaJuegoUrl } from '../services/qr.js';
@@ -1985,6 +1986,71 @@ router.get('/lote/:codigo/qr.png', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ---------- Programa SICR3P Norte 2026-2030 ----------
+//
+// La portada del programa se arma con estos tres endpoints. Todos son
+// públicos y de solo lectura, y los tres comparten una regla que viene de
+// la propuesta de patrocinio: no se muestra a nadie que no haya aceptado
+// formalmente, y de quien aceptó se muestra el nombre y nada más.
+
+// GET /api/programa/participantes — quiénes acompañan el programa.
+//
+// Salen de `auspiciadores`, que es la tabla de los ACEPTADOS: una
+// postulación en `solicitudes_auspicio` no llega acá hasta que un admin la
+// resuelve. Por eso no hace falta filtrar por estado en esta consulta —
+// estar en esta tabla ES haber sido aceptado.
+//
+// El SELECT trae solo lo que se va a publicar. Podría traer la fila entera
+// y recortar después, pero entonces el dato sensible viajaría hasta acá y
+// bastaría un cambio distraído para publicarlo.
+router.get('/programa/participantes', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT nombre_empresa, activo, fecha_inicio, fecha_fin
+         FROM auspiciadores
+        ORDER BY created_at`
+    );
+    res.json({ participantes: participantesPublicos(rows) });
+  } catch (err) { next(err); }
+});
+
+// GET /api/programa/cupos/:slug — cuánto queda de un curso.
+//
+// El número sale de contar inscripciones reales. Nunca de una constante:
+// un contador escrito a mano miente el día siguiente de escribirlo.
+router.get('/programa/cupos/:slug', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT c.cupo, COUNT(i.id)::int AS inscritos
+         FROM cursos c LEFT JOIN inscripciones i ON i.curso_id = c.id
+        WHERE c.slug = $1 AND c.activo = true
+        GROUP BY c.cupo`,
+      [String(req.params.slug || '').trim()]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Curso no encontrado' });
+    res.json(estadoCupos(rows[0].cupo, rows[0].inscritos));
+  } catch (err) { next(err); }
+});
+
+// GET /api/programa/eventos — charlas y actividades que todavía no ocurren.
+//
+// El filtro por `publicado` y por fecha se hace en SQL y se vuelve a hacer
+// en `eventosProximos`. No es redundancia ociosa: la función pura es la que
+// tiene tests, y si mañana alguien toca la consulta, el segundo filtro
+// impide que un borrador se publique solo.
+router.get('/programa/eventos', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT titulo, descripcion, ciudad, lugar, inicia_at, publicado
+         FROM eventos
+        WHERE publicado = true AND inicia_at >= now()
+        ORDER BY inicia_at
+        LIMIT 50`
+    );
+    res.json({ eventos: eventosProximos(rows) });
+  } catch (err) { next(err); }
 });
 
 export default router;

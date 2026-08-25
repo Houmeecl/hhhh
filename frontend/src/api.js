@@ -169,6 +169,11 @@ export const api = {
   expedienteLoteUrl: (codigo) => `/api/lote/${codigo}/expediente.pdf`,
 
   // --- Tarjeta de viaje (pública / portador) ---
+  // --- Programa Norte 2026-2030 (público, solo lectura) ---
+  programaParticipantes: () => request('/programa/participantes'),
+  programaEventos: () => request('/programa/eventos'),
+  programaCupos: (slug) => request(`/programa/cupos/${slug}`),
+
   tarjetaResolver: (serial) => request(`/v/${serial}`),
   tarjetaAuth: (b) => request('/tarjeta/auth', { method: 'POST', body: b }),
   // La instrucción de la torre exige el token del portador: dejó de venir

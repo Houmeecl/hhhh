@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
+import Programa from './pages/Programa.jsx';
 import Lanzamiento from './pages/Lanzamiento.jsx';
 import { yaLanzo } from './lib/cuentaRegresiva.js';
 import Cargar from './pages/Cargar.jsx';
@@ -97,7 +98,12 @@ export default function App() {
     <Suspense fallback={<CargandoModulo />}>
     <Routes>
       {/* Flujo público (sin login) */}
-      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : EN_CUENTA_REGRESIVA ? <Lanzamiento /> : <Landing />} />
+      {/* La portada es el Programa Norte 2026-2030. La landing de producto
+          NO se borró: vive en /plataforma y sigue enlazada desde el
+          programa y desde el menú. Los subdominios y la cuenta regresiva
+          mandan por sobre esto, en ese orden. */}
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : EN_CUENTA_REGRESIVA ? <Lanzamiento /> : <Programa />} />
+      <Route path="/plataforma" element={<Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
       <Route path="/verificar/:id" element={<Verificar />} />
