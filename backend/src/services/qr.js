@@ -36,6 +36,12 @@ export function loteUrl(codigo) {
   return `${config.publicAppUrl}/lote/${codigo}`;
 }
 
+// URL pública del activo auditado del piloto — lo que lleva el adhesivo
+// pegado en la camioneta o la maquinaria.
+export function activoUrl(codigo) {
+  return `${config.publicAppUrl}/activo/${codigo}`;
+}
+
 // URL pública de la tarjeta de viaje (credencial virtual con QR).
 export function tarjetaUrl(serial) {
   return `${config.publicAppUrl}/v/${serial}`;

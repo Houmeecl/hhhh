@@ -1,6 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { opcionesCifrado } from './entrega.js';
-import { qrBuffer, qrBufferDe, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from './qr.js';
+import { qrBuffer, qrBufferDe, activoUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl } from './qr.js';
 import { query } from '../lib/db.js';
 import { filtrarPorVisibilidad, enmascararRut, semaforoDocumental } from './pasaporteOrigen.js';
 import { eslabonValido } from './cadenaHash.js';
@@ -1045,6 +1045,86 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
 // descarga y envía al transportista (WhatsApp o impresa). El QR apunta a
 // /v/{serial} — la credencial VIVA del lote. La clave del portador NUNCA
 // va impresa aquí: viaja aparte y se muestra una sola vez al emitir.
+// ============================================================
+// Adhesivo del activo auditado.
+//
+// Va pegado en la camioneta, la grúa o el equipo del piloto. Es la pieza
+// más expuesta del producto: la lee gente que no entró a ninguna pantalla,
+// a tres metros y con sol de frente.
+//
+// TRES DECISIONES QUE NO SON DE ESTILO:
+//
+// 1. El color NUNCA va solo. Cada banda lleva la palabra y un símbolo,
+//    porque a esa distancia, y para quien no distingue verde de ámbar, la
+//    palabra es lo único que queda.
+// 2. No hay rojo. Un adhesivo rojo en una camioneta se lee como «esta
+//    empresa está mal», y ese juicio sicr3p no lo emite.
+// 3. No imita un documento oficial. Sin escudo, sin marco de patente, sin
+//    la palabra CHILE: el pie dice, en el adhesivo mismo, que esto no es
+//    un documento oficial. Parecerse a uno sería justo lo que el producto
+//    promete no hacer.
+// ============================================================
+export async function generateAdhesivoActivo({ activo }) {
+  // 300×150 pt ≈ 10,6 × 5,3 cm impreso. El alto se subió de 130 a 150
+  // porque a 130 el contrato quedaba cortado y el descargo lo pisaba —
+  // se vio recién al rasterizar el PDF, no leyendo el código.
+  const W = 300; const H = 150;
+  const doc = new PDFDocument({ size: [W, H], margin: 0 });
+  const qr = await qrBufferDe(activoUrl(activo.codigo), 320);
+
+  doc.rect(0, 0, W, H).fill('#ffffff');
+
+  const BANDA = 32;
+  doc.rect(0, 0, W, BANDA).fill(activo.estado_color);
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
+    .text(activo.estado_palabra, 12, 11, { lineBreak: false });
+
+  // EL SÍMBOLO VA DIBUJADO, NO ESCRITO. Las fuentes base de pdfkit son
+  // WinAnsi y no tienen ✓: escrito sale un palito, que fue justo lo que
+  // apareció en la primera prueba. Dibujarlo con líneas no depende de
+  // ninguna tabla de glifos.
+  const cx = W - 20; const cy = BANDA / 2;
+  doc.lineWidth(2).strokeColor('#ffffff');
+  if (activo.estado === 'contrastado') {
+    doc.moveTo(cx - 6, cy).lineTo(cx - 2, cy + 4).lineTo(cx + 6, cy - 5).stroke();
+  } else if (activo.estado === 'falta_evidencia') {
+    doc.moveTo(cx, cy - 6).lineTo(cx, cy + 1).stroke();
+    doc.circle(cx, cy + 5, 1.2).fill('#ffffff');
+  } else {
+    doc.moveTo(cx - 6, cy).lineTo(cx + 6, cy).stroke();
+  }
+
+  drawLogo(doc, 12, BANDA + 11, 14);
+
+  const y = BANDA + 34;
+  const rot = (t, yy) => doc.font('Helvetica').fontSize(5.5).fillColor(GRAY)
+    .text(t, 12, yy, { lineBreak: false });
+  const val = (t, yy, f = 'Helvetica-Bold', sz = 9) => doc.font(f).fontSize(sz).fillColor(NAVY)
+    .text(t, 12, yy, { width: 168, lineBreak: false });
+
+  rot('ACTIVO', y);
+  val(String(activo.nombre || '').slice(0, 30), y + 8);
+  rot('CÓDIGO', y + 23);
+  val(activo.codigo, y + 31, 'Courier-Bold', 8.5);
+  if (activo.contrato) {
+    rot('CONTRATO', y + 46);
+    val(String(activo.contrato).slice(0, 26), y + 54, 'Helvetica-Bold', 8);
+  }
+
+  doc.image(qr, W - 76, BANDA + 13, { width: 62 });
+  doc.font('Helvetica').fontSize(4.6).fillColor(GRAY)
+    .text('Escanea para ver el expediente', W - 86, BANDA + 78, { width: 82, align: 'center' });
+
+  // El descargo va EN el adhesivo, no en un anexo que nadie abre.
+  doc.font('Helvetica').fontSize(4.8).fillColor(GRAY)
+    .text('sicr3p estructura y sella evidencia. No es autoridad ni certificadora. '
+        + 'Este adhesivo no es un documento oficial.',
+      12, H - 17, { width: W - 24 });
+
+  doc.end();
+  return doc;
+}
+
 export async function generateCredencialTarjeta({ tarjeta, lote }) {
   const doc = new PDFDocument({ size: [420, 260], margin: 0 });
   const qr = await qrBufferDe(tarjetaUrl(tarjeta.serial));

@@ -7,6 +7,8 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { participantesPublicos, estadoCupos, eventosProximos } from '../services/programa.js';
+import { activoPublico, codigoActivoValido } from '../services/activo.js';
+import { coberturaDocumental } from '../services/expediente.js';
 import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso, fetchAlcancesGHG } from '../services/pdf.js';
 import { agregarPorAlcance, filasDesdeFacturas } from '../services/alcanceGhg.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl, constanciaJuegoUrl } from '../services/qr.js';
@@ -2050,6 +2052,57 @@ router.get('/programa/eventos', async (req, res, next) => {
         LIMIT 50`
     );
     res.json({ eventos: eventosProximos(rows) });
+  } catch (err) { next(err); }
+});
+
+// ---------- GET /api/activo/:codigo — el expediente del activo auditado ----------
+//
+// Es lo que abre el QR del adhesivo pegado en la camioneta. Solo lectura y
+// sin registrar la visita: quien pasa y escanea no queda anotado en ningún
+// lado, igual que el pasaporte del lote.
+//
+// El estado se calcula recorriendo los expedientes del par (proveedor,
+// contrato). El activo NO guarda cobertura propia: si la guardara, el
+// adhesivo podría decir una cosa y el expediente otra.
+router.get('/activo/:codigo', async (req, res, next) => {
+  try {
+    const codigo = String(req.params.codigo || '').trim().toUpperCase();
+    // Se valida el formato ANTES de consultar: un código mal formado no
+    // merece una consulta, y responder distinto según el formato no
+    // filtra nada porque el formato es público.
+    if (!codigoActivoValido(codigo)) return res.status(404).json({ error: 'Activo no encontrado' });
+
+    const { rows } = await query(
+      `SELECT codigo, nombre, tipo, contrato, periodo_desde, periodo_hasta, proveedor_id
+         FROM activos WHERE codigo = $1 AND activo = true`,
+      [codigo]
+    );
+    const a = rows[0];
+    if (!a) return res.status(404).json({ error: 'Activo no encontrado' });
+
+    // La cobertura NO está guardada en `expedientes`: la calcula
+    // `coberturaDocumental` a partir de los documentos y del tipo. Se
+    // recalcula acá en vez de leer una columna porque una columna
+    // cacheada es exactamente como el adhesivo y el expediente terminan
+    // diciendo cosas distintas.
+    //
+    // Sin contrato no hay con qué comparar y `estadoActivo` responde
+    // gris, que es lo correcto: no se inventa una línea base.
+    let coberturas = [];
+    if (a.contrato) {
+      const { rows: exps } = await query(
+        `SELECT e.id, e.tipo,
+                COALESCE(json_agg(d.*) FILTER (WHERE d.id IS NOT NULL), '[]') AS documentos
+           FROM expedientes e
+           LEFT JOIN expediente_documentos d ON d.expediente_id = e.id
+          WHERE e.proveedor_id = $1 AND e.contrato = $2
+          GROUP BY e.id, e.tipo`,
+        [a.proveedor_id, a.contrato]
+      );
+      coberturas = exps.map((e) => coberturaDocumental(e.tipo, e.documentos));
+    }
+
+    res.json({ activo: activoPublico(a, coberturas) });
   } catch (err) { next(err); }
 });
 

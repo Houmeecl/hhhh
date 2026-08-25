@@ -752,6 +752,17 @@ export const INVENTARIO = {
     retencion: 'Un admin la revoca cuando el pendrive se pierde; se borra sola si se borra la cuenta (ON DELETE CASCADE).',
   },
 
+  activos: {
+    clasificacion: NO_PERSONAL, columnas: [],
+    nota: '`nombre` es cómo se le dice al activo en terreno —"Camioneta 4×4", "Grúa horquilla 3T"— '
+      + 'no el nombre de una persona. `identificador_interno` guarda la patente o el número de '
+      + 'flota: identifica un MÓVIL de la empresa, no a su conductor, y por eso NO sale a la '
+      + 'página pública del adhesivo. Publicarla convertiría el adhesivo pegado en la camioneta '
+      + 'en un rastreador para cualquiera que lo fotografíe.',
+    finalidad: 'Identificar el activo auditado del piloto y llevar su adhesivo con QR al expediente.',
+    base: BASE.CONTRATO, cadena: CADENA.NINGUNA,
+    retencion: 'Mientras el activo participe del piloto; se da de baja con `activo = false`.',
+  },
 };
 
 // ============================================================
