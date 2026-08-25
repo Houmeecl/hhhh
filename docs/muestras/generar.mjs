@@ -269,17 +269,20 @@ guardar('15-export-cbam.csv', Buffer.from('﻿' + filasACsv(headersCbam, [
 // coberturas de ejemplo, que es la misma función que usa la página
 // pública. Si mañana cambia la regla del color, estas tres muestras
 // cambian con ella en vez de quedarse mintiendo.
-const { activoPublico } = await import(`${B}/services/activo.js`);
+const { activoParaImpresion } = await import(`${B}/services/activo.js`);
 
+// El tercero va SIN patente ni contrato a propósito: las dos columnas son
+// opcionales en la migración 109 y el adhesivo tiene que salir bien sin
+// ellas. Una muestra donde todos los campos están llenos no prueba nada
+// sobre el caso que sí se va a dar en terreno.
 const ACTIVOS_MUESTRA = [
-  ['16-adhesivo-contrastado.pdf',   { codigo: 'AC-7F3D9B21C40E8A16', nombre: 'Camioneta 4x4',    tipo: 'vehiculo',   contrato: 'Contrato A' }, [100]],
-  ['17-adhesivo-falta-evidencia.pdf', { codigo: 'AC-2E88C104BB57D390', nombre: 'Grua horquilla 3T', tipo: 'maquinaria', contrato: 'Contrato B' }, [100, 62]],
-  ['18-adhesivo-sin-comparacion.pdf', { codigo: 'AC-91B0FA5721D6C4E8', nombre: 'Camion mediano',    tipo: 'vehiculo',   contrato: 'Contrato C' }, []],
+  ['16-adhesivo-contrastado.pdf',     { codigo: 'AC-7F3D9B21C40E8A16', nombre: 'Camioneta 4x4',     tipo: 'vehiculo',   contrato: 'Contrato A', identificador_interno: 'KXPR-42', periodo_desde: '2025-10-01', periodo_hasta: '2026-09-30' }, [100]],
+  ['17-adhesivo-falta-evidencia.pdf', { codigo: 'AC-2E88C104BB57D390', nombre: 'Grua horquilla 3T', tipo: 'maquinaria', contrato: 'Contrato B', identificador_interno: 'MAQ-118', periodo_desde: '2025-10-01', periodo_hasta: '2026-09-30' }, [100, 62]],
+  ['18-adhesivo-sin-comparacion.pdf', { codigo: 'AC-91B0FA5721D6C4E8', nombre: 'Camion mediano',    tipo: 'vehiculo' }, []],
 ];
 
 for (const [nombre, fila, coberturas] of ACTIVOS_MUESTRA) {
-  const activo = activoPublico(fila, coberturas);
-  guardar(nombre, await pdf.generateAdhesivoActivo({ activo }));
+  guardar(nombre, await pdf.generateAdhesivoActivo({ activo: activoParaImpresion(fila, coberturas) }));
 }
 
 console.log('\nListo.');

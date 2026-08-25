@@ -1,7 +1,7 @@
 import { Icon } from '../components/icons.jsx';
 
 // ============================================================
-// Metadata de las 25 secciones del panel admin — la única fuente para el
+// Metadata de las 26 secciones del panel admin — la única fuente para el
 // NAV de AdminApp.jsx y para los checkboxes de Usuarios.jsx. El slug es
 // el vocabulario de usuarios.secciones_admin (migración 092; espejo
 // backend en src/constants/seccionesAdmin.js — mantener los tres
@@ -39,6 +39,7 @@ export const SECCIONES_ADMIN_NAV = [
       { slug: 'origen', to: '/admin/origen', ico: Icon.Qr, label: 'Pasaporte de Origen' },
       { slug: 'capacitacion', to: '/admin/capacitacion', ico: Icon.Book, label: 'Capacitación' },
       { slug: 'apl', to: '/admin/apl', ico: Icon.CheckCircle, label: 'APL' },
+      { slug: 'activos', to: '/admin/activos', ico: Icon.Qr, label: 'Activos y adhesivos' },
     ],
   },
   {

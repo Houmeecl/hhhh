@@ -123,24 +123,60 @@ usuario sin ninguna de las dos vías.
 cuenta por enlace ni aviso de documento recibido. Lo que se cerró es la
 recuperación de clave, que era lo que dejaba gente afuera.
 
-### 2.4 — El adhesivo no se puede imprimir
+### ~~2.4 — El adhesivo no se puede imprimir~~ · CERRADO 25-08
+
+El generador existía y no lo llamaba nadie. Ahora hay sección propia
+(`activos`), alta en el panel, emisión de un adhesivo y de una tanda en
+ZIP. Verificado extremo a extremo contra el servidor real: la sección
+gatea (403 sin ella), el período invertido se rechaza, la baja deja el QR
+en 404, y una tanda de 3 buenos + 1 inexistente entrega 3 y **nombra** el
+que faltó en `X-Adhesivos-Omitidos`.
+
+Tres decisiones que conviene no deshacer:
+
+- **La patente se imprime y no viaja a la web.** No es contradicción: en
+  el adhesivo está pegada al lado de la placa, que ya ve cualquiera que
+  mire el móvil; en `GET /api/activo/:codigo` la leería cualquiera desde
+  cualquier parte probando códigos, y eso convierte el QR en un directorio
+  de qué móvil es de qué empresa auditada. Son dos funciones distintas
+  —`activoPublico` y `activoParaImpresion`— y no un booleano, porque un
+  booleano se pasa mal una sola vez.
+- **El adhesivo declara su período.** Sin él, un adhesivo verde impreso
+  hace dos años sigue afirmando en presente. Sin período declarado lo dice
+  con todas sus letras.
+- **El alto del PDF sale del contenido.** Un activo sin patente ni
+  contrato mide 148 pt en vez de 195: con alto fijo quedaban cinco
+  centímetros de blanco antes del descargo.
+
+---
+
+### ~~2.5 — Marcar «cobros» en el panel dejaba el servidor sin arrancar~~ · CERRADO 25-08
 
 | | |
 |---|---|
-| **Comprobar** | `grep -rn "generateAdhesivoActivo" backend/src/` → solo su propia definición |
-| **Impacto** | Alto: el piloto no puede pegar un adhesivo en ninguna camioneta |
+| **Comprobar** | `cd backend && node --test test/migracionesSecciones.test.js` |
+| **Estuvo latente desde** | la migración 100 |
 
-El generador existe y produce el PDF correcto en los tres estados —está
-verificado rasterizando, y las muestras 16, 17 y 18 salen de él—, pero
-**ninguna ruta lo llama**. Tampoco hay pantalla para dar de alta un activo:
-la tabla `activos` se llena a mano por SQL.
+Tres migraciones (092, 097, 100) hacían cada una `DROP` + `ADD` del CHECK
+de `usuarios.secciones_admin` con una foto del vocabulario de su época.
+Como `migrate.js` **no lleva registro y corre todos los `.sql` en cada
+arranque**, la 097 se volvía a ejecutar siempre — con una lista que no
+conoce `cobros`.
 
-La página pública `/activo/:codigo` sí existe y funciona; lo que falta es
-todo lo que ocurre antes de que haya un código que escanear.
+O sea: bastaba que un admin marcara la casilla «Cobros y campañas» en el
+panel para que el servidor no levantara en el siguiente despliegue, y
+`deploy/actualizar.sh` reinicia en cada despliegue. El síntoma engaña
+—`check constraint ... is violated by some row`— y parece un problema de
+datos.
 
-**Cerrar así:** alta de activos en el panel, un endpoint que emita el PDF
-—uno y en tanda, porque una flota se imprime junta— y la pantalla. El
-generador ya devuelve Buffer como el resto, así que engancharlo es directo.
+No se descubrió razonando: apareció al agregar la sección 26 y ver morir
+el arranque. Se confirmó que ya estaba roto reproduciéndolo **sin**
+`activos`, solo con `cobros`.
+
+Ahora el vocabulario se declara en **un solo lugar**: la migración más
+nueva que lo amplía. Hay un test que rompe la compilación si dos
+migraciones lo imponen sin guardia, o si la lista del SQL y la de
+`constants/seccionesAdmin.js` dejan de decir lo mismo.
 
 ---
 
@@ -224,6 +260,8 @@ están escritos como están.
 | Adhesivo del activo: tres estados, sin rojo, símbolo dibujado y no escrito | `01db7c3` |
 | La muestra pública del informe llevaba una página de atraso | `e20c03a` |
 | Las quince muestras de `docs/muestras/` estaban viejas: el reporte CBAM salía sin sus límites | `325a0d1` |
+| El adhesivo se puede imprimir: sección, alta, PDF con patente y tanda en ZIP | ver 2.4 |
+| Marcar «cobros» dejaba el servidor sin arrancar — latente desde la 100 | ver 2.5 |
 
 Los dos del medio comparten causa: el inventario no sabía decir en qué base
 vivía cada tabla, y `puntos_corredor` existe de verdad en las dos. Un objeto

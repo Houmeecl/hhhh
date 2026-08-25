@@ -392,6 +392,16 @@ export const api = {
   abrirAplInformePdf: (id) => abrirPdfAuth(`/api/admin/apl/${id}/informe.pdf`),
   aceptarAuspicio: (id, b) => request(`/admin/solicitudes-auspicio/${id}/aceptar`, { method: 'POST', body: b || {}, authed: true }),
   rechazarAuspicio: (id, motivo) => request(`/admin/solicitudes-auspicio/${id}/rechazar`, { method: 'POST', body: { motivo }, authed: true }),
+  // ---------- Activos del piloto y sus adhesivos ----------
+  activos: () => request('/admin/activos', { authed: true }),
+  activosProveedores: () => request('/admin/activos/proveedores', { authed: true }),
+  crearActivo: (b) => request('/admin/activos', { method: 'POST', body: b, authed: true }),
+  darDeBajaActivo: (id) => request(`/admin/activos/${id}`, { method: 'DELETE', authed: true }),
+  // El adhesivo se ABRE en pestaña (se mira antes de mandarlo a imprimir);
+  // la tanda se DESCARGA, porque un ZIP no se puede previsualizar.
+  abrirAdhesivo: (codigo) => abrirPdfAuth(`/api/admin/activos/${codigo}/adhesivo.pdf`),
+  descargarAdhesivos: (codigos) =>
+    descargarAuthPost('/api/admin/activos/adhesivos.zip', auth, { codigos }, 'adhesivos.zip'),
   auspiciadores: () => request('/admin/auspiciadores', { authed: true }),
   crearAuspiciador: (b) => request('/admin/auspiciadores', { method: 'POST', body: b, authed: true }),
   emitirContratoAuspicio: (id, tipo) => request(`/admin/auspiciadores/${id}/contrato`, { method: 'POST', body: { tipo }, authed: true }),
@@ -861,6 +871,36 @@ async function descargarAuthToken(url, token, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+
+// Igual que descargarAuth, pero con POST y cuerpo JSON: la tanda de
+// adhesivos manda una lista de códigos, que no cabe cómoda en una query
+// string y además no tiene por qué quedar en el log del servidor web.
+//
+// Devuelve los códigos que el servidor NO pudo emitir (cabecera
+// X-Adhesivos-Omitidos) para que la pantalla los diga. Callarlos es como
+// una tanda de nueve entrega siete y el piloto sale a terreno con dos
+// camionetas sin adhesivo.
+async function descargarAuthPost(url, store, body, filename) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${store.access}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'No se pudo generar el archivo');
+  }
+  const omitidos = (res.headers.get('X-Adhesivos-Omitidos') || '').split(',').filter(Boolean);
+  const blobUrl = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+  return { omitidos };
 }
 
 // Formato chileno de números.

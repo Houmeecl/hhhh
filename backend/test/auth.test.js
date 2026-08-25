@@ -171,7 +171,7 @@ test('seccionesValidas: acepta subconjuntos del vocabulario y rechaza slugs inve
   // sección, y subirlo acá es parte del cambio: obliga a tocar también
   // el CHECK de la migración y frontend/src/admin/secciones.js, que son
   // los otros dos espejos que no se pueden desincronizar.
-  assert.equal(SECCIONES_ADMIN.length, 25);
+  assert.equal(SECCIONES_ADMIN.length, 26);
   assert.equal(seccionesValidas(['clientes', 'sii']), true);
   assert.equal(seccionesValidas([]), true);
   assert.equal(seccionesValidas(['inventada']), false);

@@ -7,8 +7,7 @@ import { config } from '../config.js';
 import { query, withTx } from '../lib/db.js';
 import { simpleApi } from '../services/simpleApi.js';
 import { participantesPublicos, estadoCupos, eventosProximos } from '../services/programa.js';
-import { activoPublico, codigoActivoValido } from '../services/activo.js';
-import { coberturaDocumental } from '../services/expediente.js';
+import { activoPublico, codigoActivoValido, coberturasDeActivo } from '../services/activo.js';
 import { generateReport, generateLabel, generateExpedienteLote, generateCarpetaMandante, generateConstanciaCurso, fetchAlcancesGHG } from '../services/pdf.js';
 import { agregarPorAlcance, filasDesdeFacturas } from '../services/alcanceGhg.js';
 import { qrBuffer, qrBufferDe, pasaporteUrl, verifyUrl, loteUrl, tarjetaUrl, constanciaUrl, firmaProveedorUrl, constanciaJuegoUrl } from '../services/qr.js';
@@ -2088,19 +2087,7 @@ router.get('/activo/:codigo', async (req, res, next) => {
     //
     // Sin contrato no hay con qué comparar y `estadoActivo` responde
     // gris, que es lo correcto: no se inventa una línea base.
-    let coberturas = [];
-    if (a.contrato) {
-      const { rows: exps } = await query(
-        `SELECT e.id, e.tipo,
-                COALESCE(json_agg(d.*) FILTER (WHERE d.id IS NOT NULL), '[]') AS documentos
-           FROM expedientes e
-           LEFT JOIN expediente_documentos d ON d.expediente_id = e.id
-          WHERE e.proveedor_id = $1 AND e.contrato = $2
-          GROUP BY e.id, e.tipo`,
-        [a.proveedor_id, a.contrato]
-      );
-      coberturas = exps.map((e) => coberturaDocumental(e.tipo, e.documentos));
-    }
+    const coberturas = await coberturasDeActivo(query, a);
 
     res.json({ activo: activoPublico(a, coberturas) });
   } catch (err) { next(err); }

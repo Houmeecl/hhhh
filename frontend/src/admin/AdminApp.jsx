@@ -25,6 +25,7 @@ import MotorPropio from './MotorPropio.jsx';
 import Capacitacion from './Capacitacion.jsx';
 import Apl from './Apl.jsx';
 import Auspiciadores from './Auspiciadores.jsx';
+import Activos from './Activos.jsx';
 import Datos from './Datos.jsx';
 import Sii from './Sii.jsx';
 import Enrolar from './Enrolar.jsx';
@@ -223,6 +224,7 @@ export default function AdminApp() {
           <Route path="capacitacion/*" element={<RequiereSeccion user={user} slug="capacitacion"><Capacitacion /></RequiereSeccion>} />
           <Route path="apl" element={<RequiereSeccion user={user} slug="apl"><Apl /></RequiereSeccion>} />
           <Route path="auspiciadores" element={<RequiereSeccion user={user} slug="auspiciadores"><Auspiciadores rol={user?.rol} /></RequiereSeccion>} />
+          <Route path="activos" element={<RequiereSeccion user={user} slug="activos"><Activos rol={user?.rol} /></RequiereSeccion>} />
           <Route path="datos" element={<RequiereSeccion user={user} slug="datos_personales"><Datos rol={user?.rol} /></RequiereSeccion>} />
           <Route path="sii" element={<RequiereSeccion user={user} slug="sii"><Sii /></RequiereSeccion>} />
           <Route path="enrolar" element={<RequiereSeccion user={user} slug="enrolar"><Enrolar /></RequiereSeccion>} />

@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { semaforoExpediente } from './expediente.js';
+import { semaforoExpediente, coberturaDocumental } from './expediente.js';
 
 // ============================================================
 // Activos del piloto — lógica pura del adhesivo.
@@ -113,4 +113,48 @@ export function activoPublico(fila = {}, coberturas = []) {
     estado_color: e.color,
     estado_explica: e.explica,
   };
+}
+
+// Lo que sale al ADHESIVO IMPRESO. Es todo lo anterior más la patente.
+//
+// Son dos funciones y no un parámetro `incluirPatente` a propósito: un
+// booleano se pasa mal una vez y la patente termina en la respuesta
+// pública sin que nadie lo note. Dos nombres distintos obligan a elegir, y
+// quien llame desde una ruta pública tiene que escribir literalmente
+// «paraImpresion» para equivocarse.
+//
+// Por qué imprimirla no contradice ocultarla: en el adhesivo la patente
+// está pegada al lado de la placa, que ya ve cualquiera que mire el móvil.
+// En la web la leería cualquiera desde cualquier parte probando códigos, y
+// eso sí convierte el QR en un directorio de qué móvil es de qué empresa
+// auditada.
+export function activoParaImpresion(fila = {}, coberturas = []) {
+  return {
+    ...activoPublico(fila, coberturas),
+    patente: fila.identificador_interno || null,
+  };
+}
+
+// Las coberturas documentales del par (proveedor, contrato).
+//
+// Vive acá y no en la ruta porque ahora tiene DOS lectores —la página
+// pública y el PDF del adhesivo— y todo el diseño de esta pieza descansa
+// en que digan lo mismo. Si cada uno armara su consulta, el día que una
+// cambie el adhesivo pegado en la camioneta dice una cosa y la pantalla
+// otra, que es exactamente lo que la migración 109 evita al no darle
+// evidencia propia al activo.
+//
+// Sin contrato devuelve vacío, no cero: `estadoActivo` lo traduce a gris.
+export async function coberturasDeActivo(consulta, fila) {
+  if (!fila?.contrato || !fila?.proveedor_id) return [];
+  const { rows } = await consulta(
+    `SELECT e.id, e.tipo,
+            COALESCE(json_agg(d.*) FILTER (WHERE d.id IS NOT NULL), '[]') AS documentos
+       FROM expedientes e
+       LEFT JOIN expediente_documentos d ON d.expediente_id = e.id
+      WHERE e.proveedor_id = $1 AND e.contrato = $2
+      GROUP BY e.id, e.tipo`,
+    [fila.proveedor_id, fila.contrato]
+  );
+  return rows.map((e) => coberturaDocumental(e.tipo, e.documentos));
 }

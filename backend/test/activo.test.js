@@ -117,3 +117,41 @@ test('la salida pública es lista blanca: una columna nueva no se publica sola',
   }, []);
   assert.ok(!JSON.stringify(p).includes('dato que nadie revisó'));
 });
+
+// ---------- Lo que el adhesivo IMPRESO sí muestra ----------
+
+test('el adhesivo impreso lleva la patente; la página pública no', async () => {
+  // Las dos afirmaciones van en el MISMO test a propósito: son las dos
+  // mitades de una sola decisión, y separarlas dejaría que alguien borre
+  // una sin ver que rompe la otra.
+  const { activoParaImpresion } = await import('../src/services/activo.js');
+  const fila = {
+    codigo: 'AC-04A2BB19C7D3E5F1',
+    nombre: 'Camioneta 4x4',
+    identificador_interno: 'KXPR-42',
+    proveedor_id: '11111111-2222-3333-4444-555555555555',
+    contrato: 'Contrato A',
+  };
+
+  const impreso = activoParaImpresion(fila, [100]);
+  assert.equal(impreso.patente, 'KXPR-42');
+  assert.equal(impreso.estado, 'contrastado');
+
+  // Pero ni siquiera el impreso arrastra el id del proveedor: la lista
+  // blanca de activoPublico sigue mandando debajo.
+  assert.ok(!JSON.stringify(impreso).includes('11111111'), 'se filtró el proveedor_id');
+
+  assert.equal(activoPublico(fila, [100]).patente, undefined);
+  assert.ok(!JSON.stringify(activoPublico(fila, [100])).includes('KXPR-42'));
+});
+
+test('sin patente en la fila, el adhesivo no inventa una', async () => {
+  // `identificador_interno` es opcional en la migración 109: una grúa de
+  // patio no tiene patente. Debe quedar en null, no en '' ni 'undefined'
+  // —que es lo que terminaría impreso en la etiqueta.
+  const { activoParaImpresion } = await import('../src/services/activo.js');
+  for (const fila of [{ codigo: 'AC-04A2BB19C7D3E5F1', nombre: 'Grúa' },
+    { codigo: 'AC-04A2BB19C7D3E5F1', nombre: 'Grúa', identificador_interno: '' }]) {
+    assert.equal(activoParaImpresion(fila, []).patente, null);
+  }
+});

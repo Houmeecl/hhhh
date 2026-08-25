@@ -1064,17 +1064,55 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
 //    un documento oficial. Parecerse a uno sería justo lo que el producto
 //    promete no hacer.
 // ============================================================
+// El adhesivo que va pegado en el activo.
+//
+// LA PATENTE VA IMPRESA Y NO VIAJA A LA WEB, y esas dos cosas no se
+// contradicen. En el adhesivo la patente no revela nada: está pegada al
+// lado de la placa, que cualquiera que mire la camioneta ya está viendo.
+// En `GET /api/activo/:codigo` sí revelaría, porque ahí la lee cualquiera
+// desde cualquier parte del mundo probando códigos — convertiría el QR en
+// un directorio de qué móvil es de qué empresa auditada. Por eso este PDF
+// recibe la FILA INTERNA y no la salida de `activoPublico()`.
+//
+// Sirve además para lo mundano: quien pega cincuenta adhesivos necesita
+// saber cuál va en cuál sin escanear cada uno.
 export async function generateAdhesivoActivo({ activo }) {
-  // 300×150 pt ≈ 10,6 × 5,3 cm impreso. El alto se subió de 130 a 150
-  // porque a 130 el contrato quedaba cortado y el descargo lo pisaba —
-  // se vio recién al rasterizar el PDF, no leyendo el código.
-  const W = 300; const H = 150;
+  const W = 300;
+  const BANDA = 32;
+  const ANCHO = 170;          // columna izquierda, sin invadir el QR
+  const TOPE_CAMPOS = BANDA + 32;
+
+  // LOS CAMPOS SE ARMAN ANTES DE CREAR EL DOCUMENTO, porque de ellos sale
+  // el alto. `identificador_interno` y `contrato` son opcionales en la
+  // migración 109: con alto fijo, un activo sin patente ni contrato salía
+  // con cinco centímetros de blanco antes del descargo — feo en pantalla y
+  // caro en rollo de etiquetas.
+  const campos = [];
+  // La patente primero y en grande: es como se reconoce el móvil en
+  // terreno, y es lo que hace utilizable un taco de adhesivos impresos.
+  if (activo.patente) campos.push({ rotulo: 'PATENTE', valor: String(activo.patente), fuente: 'Courier-Bold', tam: 13, alto: 25 });
+  campos.push({ rotulo: 'ACTIVO', valor: String(activo.nombre || '').slice(0, 30), fuente: 'Helvetica-Bold', tam: 9, alto: 22 });
+  if (activo.contrato) campos.push({ rotulo: 'CONTRATO', valor: String(activo.contrato).slice(0, 26), fuente: 'Helvetica-Bold', tam: 8, alto: 22 });
+  campos.push({ rotulo: 'CÓDIGO', valor: String(activo.codigo || ''), fuente: 'Courier-Bold', tam: 8.5, alto: 22 });
+
+  // EL PERÍODO NO ES DECORACIÓN. El color afirma algo sobre una ventana de
+  // tiempo concreta; sin la ventana, un adhesivo verde impreso hace dos
+  // años sigue afirmando en presente, que es un verde falso pegado a una
+  // camioneta. Sin período declarado se dice eso mismo, no se deja en
+  // blanco.
+  const periodo = activo.periodo_desde && activo.periodo_hasta
+    ? `${fechaCorta(activo.periodo_desde)} a ${fechaCorta(activo.periodo_hasta)}`
+    : 'Período no declarado';
+
+  const finCampos = TOPE_CAMPOS + campos.reduce((a, c) => a + c.alto, 0) + 20;
+  const finQr = BANDA + 12 + 64 + 14;   // QR + su leyenda
+  const H = Math.round(Math.max(finCampos, finQr) + 20);   // + descargo
+
   const doc = new PDFDocument({ size: [W, H], margin: 0 });
   const qr = await qrBufferDe(activoUrl(activo.codigo), 320);
 
   doc.rect(0, 0, W, H).fill('#ffffff');
 
-  const BANDA = 32;
   doc.rect(0, 0, W, BANDA).fill(activo.estado_color);
   doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
     .text(activo.estado_palabra, 12, 11, { lineBreak: false });
@@ -1096,35 +1134,31 @@ export async function generateAdhesivoActivo({ activo }) {
 
   drawLogo(doc, 12, BANDA + 11, 14);
 
-  const y = BANDA + 34;
-  const rot = (t, yy) => doc.font('Helvetica').fontSize(5.5).fillColor(GRAY)
-    .text(t, 12, yy, { lineBreak: false });
-  const val = (t, yy, f = 'Helvetica-Bold', sz = 9) => doc.font(f).fontSize(sz).fillColor(NAVY)
-    .text(t, 12, yy, { width: 168, lineBreak: false });
+  doc.image(qr, W - 78, BANDA + 12, { width: 64 });
+  doc.font('Helvetica').fontSize(4.6).fillColor(GRAY)
+    .text('Escanea para ver el expediente', W - 88, BANDA + 79, { width: 84, align: 'center' });
 
-  rot('ACTIVO', y);
-  val(String(activo.nombre || '').slice(0, 30), y + 8);
-  rot('CÓDIGO', y + 23);
-  val(activo.codigo, y + 31, 'Courier-Bold', 8.5);
-  if (activo.contrato) {
-    rot('CONTRATO', y + 46);
-    val(String(activo.contrato).slice(0, 26), y + 54, 'Helvetica-Bold', 8);
+  let y = TOPE_CAMPOS;
+  for (const c of campos) {
+    doc.font('Helvetica').fontSize(5.5).fillColor(GRAY).text(c.rotulo, 12, y, { lineBreak: false });
+    doc.font(c.fuente).fontSize(c.tam).fillColor(NAVY)
+      .text(c.valor, 12, y + 8, { width: ANCHO, lineBreak: false });
+    y += c.alto;
   }
 
-  doc.image(qr, W - 76, BANDA + 13, { width: 62 });
-  doc.font('Helvetica').fontSize(4.6).fillColor(GRAY)
-    .text('Escanea para ver el expediente', W - 86, BANDA + 78, { width: 82, align: 'center' });
+  doc.font('Helvetica').fontSize(5.5).fillColor(GRAY)
+    .text('EVIDENCIA DEL PERÍODO', 12, y, { lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(NAVY)
+    .text(periodo, 12, y + 8, { width: W - 24, lineBreak: false });
 
   // El descargo va EN el adhesivo, no en un anexo que nadie abre.
   doc.font('Helvetica').fontSize(4.8).fillColor(GRAY)
     .text('sicr3p estructura y sella evidencia. No es autoridad ni certificadora. '
         + 'Este adhesivo no es un documento oficial.',
-      12, H - 17, { width: W - 24 });
+      12, H - 16, { width: W - 24 });
 
   // Mismo contrato que los otros diecisiete generadores: devuelve el Buffer
-  // ya cerrado. Antes hacía `doc.end(); return doc;`, que entrega un stream
-  // recién terminado y obliga a quien llame a saber que este uno es
-  // distinto. No lo notó nadie porque todavía no hay quien lo llame.
+  // ya cerrado.
   return bufferDoc(doc);
 }
 
