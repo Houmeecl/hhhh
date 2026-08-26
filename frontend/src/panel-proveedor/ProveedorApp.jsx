@@ -8,22 +8,20 @@ import AnalisisSii from './AnalisisSii.jsx';
 import Rep from './Rep.jsx';
 import Transporte from './Transporte.jsx';
 import Expedientes from './Expedientes.jsx';
+import CentroDocumental from './CentroDocumental.jsx';
 import MisDatos from './MisDatos.jsx';
 
-// Shell mínimo, sin sidebar: seis pestañas alcanzan. Cada una es una
+// Shell mínimo, sin sidebar: siete pestañas alcanzan. Cada una es una
 // ruta real (NavLink + <Routes> anidadas) — mismo patrón que los otros 7
 // shells del proyecto (admin, terreno, puerto, mandante, agencia,
 // trazador, Sube y Suma): antes eran useState('sii')+onClick, sin URL
 // propia por pestaña ni soporte de atrás/adelante del navegador.
-// Arranca en la contabilidad de carbono (SII, ruta índice) porque es lo
-// que trae acá a toda empresa enrolada; firmar lotes es un encargo
-// puntual de unas pocas, y aterrizar en "Lotes por firmar" les mostraba
-// una tabla vacía como primera pantalla.
 const TABS = [
   { to: '/panel-proveedor', end: true, label: 'Compras y ventas (SII)' },
   { to: '/panel-proveedor/rep', label: 'Ley REP' },
   { to: '/panel-proveedor/transporte', label: 'Transporte Cat. 7' },
   { to: '/panel-proveedor/expedientes', label: 'Expedientes' },
+  { to: '/panel-proveedor/documentos', label: 'Documentación' },
   { to: '/panel-proveedor/lotes', label: 'Lotes por firmar' },
   { to: '/panel-proveedor/datos', label: 'Datos de la empresa' },
 ];
@@ -32,8 +30,8 @@ export default function ProveedorApp() {
   const nav = useNavigate();
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
-  const [onboarding, setOnboarding] = useState(null); // null=sin saber, true=falta completar
-  const [contratoVigente, setContratoVigente] = useState(null); // null=sin saber; se resuelve junto con onboarding
+  const [onboarding, setOnboarding] = useState(null);
+  const [contratoVigente, setContratoVigente] = useState(null);
 
   useEffect(() => { document.title = 'sicr3p — Panel de la empresa'; }, []);
 
@@ -43,12 +41,8 @@ export default function ProveedorApp() {
     const verificar = (reintento = false) => api.meProveedor()
       .then((d) => {
         if (!vigente) return;
-        // Defensa en profundidad: el backend ya rechaza el login cruzado,
-        // pero si el JWT quedó de otro panel se cierra esta sesión en vez
-        // de mostrar datos ajenos.
         if (d.user.panel !== 'proveedor') { authProveedor.clear(); nav('/panel-proveedor/login'); return; }
         setUser(d.user); setChecking(false);
-        // Si aún no completó sus datos, se muestra el onboarding primero.
         if (!d.user.must_reset_password) {
           api.proveedorPerfil()
             .then((p) => { setOnboarding(!p.onboarding_completado); setContratoVigente(Boolean(p.contrato_vigente)); })
@@ -64,19 +58,12 @@ export default function ProveedorApp() {
     return () => { vigente = false; };
   }, []);
 
-  // El cartel de "Cuenta en revisión" promete que la cuenta se activa sola
-  // en cuanto emitamos el contrato. No era verdad: `contrato_vigente` solo
-  // se consultaba al montar, así que la empresa tenía que adivinar y
-  // recargar. Mientras la puerta esté cerrada se vuelve a preguntar cada 30
-  // s; en cuanto se abre, el intervalo se corta solo (el efecto depende de
-  // `contratoVigente`) y no queda una consulta en loop por cada empresa
-  // conectada.
   useEffect(() => {
     if (contratoVigente !== false || onboarding !== false) return undefined;
     const id = setInterval(() => {
       api.proveedorPerfil()
         .then((p) => { if (p.contrato_vigente) setContratoVigente(true); })
-        .catch(() => {}); // una caída de red no tiene por qué sacarlo de la pantalla
+        .catch(() => {});
     }, 30000);
     return () => clearInterval(id);
   }, [contratoVigente, onboarding]);
@@ -148,6 +135,7 @@ export default function ProveedorApp() {
               <Route path="rep" element={<Rep />} />
               <Route path="transporte" element={<Transporte />} />
               <Route path="expedientes" element={<Expedientes />} />
+              <Route path="documentos" element={<CentroDocumental />} />
               <Route path="lotes" element={<LotesPorFirmar />} />
               <Route path="datos" element={<MisDatos />} />
               <Route path="*" element={<Navigate to="/panel-proveedor" replace />} />
