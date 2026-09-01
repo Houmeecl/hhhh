@@ -323,8 +323,22 @@ Esto crea/corrige automáticamente el **A** de `mail.sicrep.cl` y el **MX**
 de `sicrep.cl` apuntando al servidor de correo de Ferozo.
 
 (El A/MX viejo de `mail.sicr3p.cl` → IP del VPS, del plan de Poste.io
-descartado, queda vestigial y sin uso — no hace daño dejarlo, pero se
-puede limpiar cuando se quiera: nadie escribe a `@sicr3p.cl` para correo.)
+descartado, queda vestigial — no hace daño dejarlo, pero se puede limpiar
+cuando se quiera: nadie escribe a `@sicr3p.cl` para correo.)
+
+> **Al 01-09-2026 hay algo instalado en el VPS bajo ese nombre**, fuera de
+> los caminos de este documento y sin quedar registrado en el repo. Este
+> archivo describe lo que se DECIDIÓ, no necesariamente lo que hay
+> corriendo: no se puede leer como inventario del servidor. Para saber qué
+> hay y por qué no abre, en el VPS:
+>
+> ```bash
+> bash deploy/diagnosticar-webmail.sh mail.sicr3p.cl
+> ```
+>
+> Separa las cuatro causas que desde el navegador se ven idénticas: nadie
+> escuchando, falta de vhost, choque de puertos con nginx, o certificado
+> ausente para ese nombre.
 
 ### 9.3 SPF, DKIM y DMARC — ya configurados, verificado en vivo
 
