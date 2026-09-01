@@ -39,6 +39,15 @@ const AVISO_NO_VERIFICACION =
   'Los factores de emisión se aplican como referenciales: corresponde validarlos contra la ' +
   'edición vigente de su fuente antes de un uso contractual o regulatorio.';
 
+// Variante para formatos donde la larga no cabe (la etiqueta mide
+// 420×260 pt). Dice lo mismo en menos palabras: que no es una
+// verificación acreditada y que el factor es referencial. Recortar el
+// descargo es aceptable; omitirlo no, porque la cifra de CO2e igual se
+// imprime y sin esto se lee como un dato certificado.
+const AVISO_BREVE =
+  'No es una verificación de tercera parte acreditada (ISO 14064-3). '
+  + 'Factores de emisión referenciales.';
+
 // Pie de descargo al final del contenido de un informe.
 function avisoNoVerificacion(doc, x, y, ancho) {
   doc.font('Helvetica').fontSize(7.5).fillColor(GRAY)
@@ -765,6 +774,13 @@ export async function generateLabel({ sesion, factura, declaracion }) {
     // el motor no dedujo del documento (ver categoriaPresentacion.js).
     .text(`·  ${categoriaParaMostrar(factura).detalle}  ·  ${nItems} ítems`, 150, 222, { width: 240 });
 
+  // La etiqueta imprime «RESULTADO INCORPORADO» y una cifra en t CO2e. Sin
+  // descargo eso se lee como un dato certificado, y la ficha comercial
+  // afirma que TODO informe lo dice impreso. Va la variante breve porque a
+  // 420×260 pt la larga no entra.
+  doc.font('Helvetica').fontSize(5.5).fillColor(GRAY)
+    .text(AVISO_BREVE, 36, 245, { width: 348, lineBreak: false });
+
   return bufferDoc(doc);
 }
 
@@ -1036,6 +1052,11 @@ export async function generateExpedienteLote({ lote, eslabones, declaraciones, n
     `Verificación en línea: ${loteUrl(lote.codigo)} — la cadena pública de sicr3p permite comprobar que este expediente no fue alterado.`,
     48, y, { width: W }
   );
+
+  // El expediente declara emisiones («declarado por el titular» / «trazado
+  // en la cadena»), y esa distinción dice QUIÉN afirma cada cifra pero no
+  // que ninguna esté verificada por un tercero acreditado. Eso lo dice acá.
+  avisoNoVerificacion(doc, 48, doc.page.height - 54, W);
 
   return bufferDoc(doc);
 }

@@ -291,6 +291,27 @@ plata detrás.
 
 ---
 
+### ~~2.8 — Dos PDF imprimían CO2e sin descargo~~ · CERRADO 01-09
+
+La constante `AVISO_NO_VERIFICACION` en `pdf.js` trae esta nota: *«materiales
+comerciales (ficha 01, dossier corporativo) afirman que cada informe lo dice
+de forma impresa»*. Al auditar los diecisiete generadores, **dos no lo
+decían**: la etiqueta de factura —que además imprime «RESULTADO
+INCORPORADO» junto a la cifra— y el expediente del lote. La promesa
+comercial era falsa.
+
+Cerrado agregándolo a los dos. En la etiqueta va una variante breve, porque
+a 420×260 pt la larga no entra: recortar el descargo es aceptable, omitirlo
+no. Verificado rasterizando —la primera posición pisaba el borde de la caja
+verde.
+
+`generateInformeApl` quedó fuera y **no es un olvido**: tiene su propio pie
+que dice que no acredita el cumplimiento del APL y quién sí lo otorga, más
+específico que el genérico. Por eso el test que lo guarda
+(`test/descargoPdf.test.js`) exige *algún* descargo, no un texto único.
+
+---
+
 ---
 
 ## 3 · Alcance declarado y no cubierto
