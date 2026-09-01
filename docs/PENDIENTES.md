@@ -12,36 +12,44 @@ se mueve a *Decidido que no* con la razón y la fecha.
 
 ---
 
-## 0 · Un solo disco entre todo y la nada
+## 0 · Respaldos
 
-### 0.1 — Los respaldos viven en el mismo servidor que respaldan
+### 0.1 — La única copia propia vive en el disco que respalda
 
 | | |
 |---|---|
 | **Dónde** | `deploy/respaldo.sh` → `DEST="${1:-/root/backups}"` |
 | **Comprobar** | `grep -n 'scp\|rsync\|s3\|rclone' deploy/respaldo.sh` → sin resultados |
-| **Descubierto** | 01-09-2026, con el VPS de DonWeb caído |
+| **Gravedad** | Media — **corregida a la baja el 01-09**, ver abajo |
 
 El respaldo diario y los pre-deploy escriben en `/root/backups` **del mismo
-VPS**. No hay copia fuera. Si el disco de esa máquina no vuelve, se pierden
-a la vez la base y los catorce días de respaldos que existían para
-protegerla.
+VPS**. No hay copia propia fuera de esa máquina.
 
-El código está a salvo —vive en GitHub—. Lo que no: proveedores, facturas,
-expedientes, cargas del Corredor, cuentas. Y sobre todo **la cadena de
-hash**: `cadena_estado` y los eslabones de cada documento sellado. Perder
-eso no es perder datos recuperables a mano, es que todo informe ya emitido
-deja de poder demostrar lo que afirma. Es el único activo del producto que
-no se puede reconstruir tecleando.
+**Lo que se creyó el 01-09 y era falso.** Con el nodo caído se anotó esto
+como catástrofe potencial: que si el disco no volvía se perdían juntas la
+base y los catorce días de respaldos. Faltaba un dato que estaba a la vista
+en el panel de DonWeb: **el plan incluye «Backup: Premium Diario»**, o sea
+respaldo del proveedor, independiente del disco de la instancia. El riesgo
+real es bastante menor que el declarado.
 
-Estuvo así desde el primer día. No lo encontró una revisión: lo destapó una
-caída del proveedor, que es la forma cara de enterarse.
+Queda anotado el error, no borrado: la conclusión alarmante se sacó del
+código —donde efectivamente no hay copia externa— sin mirar qué contrataba
+el plan. El código no sabe lo que hay contratado, y una revisión que solo
+lee código va a seguir concluyendo lo mismo.
 
-**Cerrar así:** una copia fuera del VPS, con destino a decidir —un bucket
-(S3/Backblaze/Wasabi), otro servidor por `scp`, o descarga programada a una
-máquina propia—. Las credenciales del destino van en env, nunca
-commiteadas. Mientras no exista, cada día que el VPS siga en pie es
-suerte, no diseño.
+**Lo que sí sigue en pie**, y por lo que el pendiente no se cierra:
+
+- Los dos respaldos —el propio y el de DonWeb— dependen del **mismo
+  proveedor**. Una baja de la cuenta, un problema de facturación o un
+  incidente que afecte a los dos se lleva ambos.
+- No está confirmado de qué fecha es el último punto de restauración ni si
+  se puede restaurar **a otro nodo**. Un respaldo que solo se pueda montar
+  en el nodo averiado no sirve para nada mientras dure la avería. Hay que
+  preguntarlo, no suponerlo.
+
+**Cerrar así:** una copia fuera de DonWeb —bucket, otro servidor, o
+descarga programada—, con las credenciales del destino en env. Y confirmar
+por ticket la fecha y la granularidad del Premium Diario.
 
 ---
 
