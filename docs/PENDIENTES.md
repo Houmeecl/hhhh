@@ -221,6 +221,34 @@ migraciones lo imponen sin guardia, o si la lista del SQL y la de
 
 ---
 
+### 2.6 — La landing ofrece tres áreas que la base no distingue
+
+| | |
+|---|---|
+| **Dónde** | `frontend/src/lib/i18n.js` (`landing.hero2_sub`), `backend/migrations/105_expedientes.sql:74` |
+| **Comprobar** | `grep -n "tipo IN" backend/migrations/105_expedientes.sql` → tipos comerciales, ninguna área |
+| **Alcance** | Ver `docs/PANEL-ASG.md` |
+
+`landing.hero2_sub`, vivo en `/plataforma`, ofrece **aseguramiento de
+sostenibilidad, contabilidad forense y cumplimiento del MPD**. De las tres,
+solo la primera está construida: de `21.595` no hay una línea en todo el
+backend.
+
+Y `expedientes.tipo` es `suministro/servicio/transporte/arriendo/otro` —el
+tipo de relación comercial—, así que no hay dónde guardar de qué área es un
+expediente.
+
+Peor: `Lanzamiento.jsx:84` afirma que «el expediente se abre por área y por
+período fiscal». Por período sí; por área no. Es una afirmación falsa sobre
+cómo funciona el producto. **Hoy no se sirve** —la cuenta regresiva venció
+y `App.jsx:105` manda a `Programa`—, así que es código muerto y no una
+mentira a la vista. Deja de serlo el día que alguien reuse ese texto.
+
+**Cerrar así:** o la base aprende de áreas (`expedientes.area`), o el copy
+deja de prometerlas. Las dos salidas son legítimas; dejarlo como está no.
+
+---
+
 ---
 
 ## 3 · Alcance declarado y no cubierto

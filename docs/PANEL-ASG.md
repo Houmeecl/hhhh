@@ -1,0 +1,203 @@
+# Panel ASG — qué es y qué no es, para sicr3p
+
+> Documento de alcance. Se escribió antes de tocar código, porque «traer el
+> repo `asg` a sicr3p» sonaba a construir un panel nuevo y resulta que un
+> tercio ya está construido con otro nombre. Mismo motivo que
+> `CORREDOR-ALCANCE.md`: fijar qué es algo antes de gastar en ello.
+>
+> Estado: **nada de esto está implementado.** Es un documento de decisión,
+> no un inventario. Ninguna afirmación de acá se puede citar como si el
+> sistema ya lo hiciera.
+
+## La definición, en una línea
+
+**El panel ASG no es un producto nuevo: es el expediente que ya existe,
+sabiendo a qué área de práctica pertenece.**
+
+`Houmeecl/asg` nombra tres áreas —aseguramiento de sostenibilidad,
+contabilidad forense y cumplimiento del Modelo de Prevención de Delitos de
+la Ley 21.595—. La estructura que las tres necesitan —abrir un expediente
+por contrato y período, meterle documentos sellados con hash, medir cuánto
+falta y no pintar de verde lo que no se puede comparar— **ya está
+construida** en `migrations/105_expedientes.sql` y `services/expediente.js`.
+
+Lo que falta no es la estructura. Es el resto de las áreas.
+
+---
+
+## 1. Las tres áreas y su estado real
+
+| Área | Qué hay hoy | Se comprueba con |
+|---|---|---|
+| **Aseguramiento de sostenibilidad** | Construido. Expedientes con cobertura documental, roles esperados por tipo, semáforo, PDF de evidencia, Alcance 1/2/3, y `activos` (109) colgando de ahí | `ls backend/src/services/expediente.js` |
+| **Contabilidad forense** | Piezas sueltas, ningún producto: cruces de `analisisSii`, rechazo de duplicados (104), cadena de hash. No existe el concepto de *caso* | `grep -rn "forense" backend/src/` → solo un comentario en `retencion.js` |
+| **Cumplimiento MPD (Ley 21.595)** | **Nada.** Ni una línea | `grep -rn "21.595" backend/` → 0 resultados |
+
+No hay que creerle a esta tabla: los tres comandos están para correrlos.
+
+---
+
+## 2. El problema que hay que resolver primero
+
+`expedientes.tipo` es `suministro / servicio / transporte / arriendo / otro`
+(105:74). Eso es **el tipo de relación comercial, no el área de práctica**.
+
+No hay columna, tabla ni servicio que sepa si un expediente es de
+aseguramiento, de forense o de cumplimiento. Y sin embargo:
+
+- `landing.hero2_sub` —**vivo hoy** en `/plataforma`, `Landing.jsx:173`—
+  ofrece las tres áreas por su nombre.
+- `Lanzamiento.jsx:84` va más lejos y dice que *«el expediente se abre por
+  área y por período fiscal»*. El expediente se abre por período, sí. Por
+  área, no: la base no tiene dónde guardarla.
+
+Eso segundo es una afirmación sobre cómo funciona el producto, y es falsa.
+**Atenuante:** `Lanzamiento.jsx` hoy no se sirve —la cuenta regresiva venció
+y `App.jsx:105` manda a `Programa`—, así que es código muerto, no una
+mentira a la vista. Deja de serlo el día que alguien reuse ese texto.
+
+La primera decisión, entonces, no es de arquitectura: es **si se agrega
+`expedientes.area`**. Sin eso, cualquier panel ASG tiene que inventarse
+dónde vive la distinción, y ahí empieza la duplicación.
+
+---
+
+## 3. La decisión de fondo: área en el expediente, no panel con base propia
+
+La tentación es traer el repo `asg` completo, con su servidor y su base.
+Eso duplicaría `expedientes` — el mismo error que la migración 109 evitó a
+propósito cuando decidió que un activo **no** tuviera evidencia propia:
+
+> *Habría sido duplicar `expedientes` y `expediente_documentos` —que ya
+> modelan contrato, período, documentos con hash y semáforo— y el día que
+> las dos copias se separaran, el adhesivo pegado en la camioneta diría una
+> cosa y la pantalla otra.*
+> — `migrations/109_activos_piloto.sql`
+
+Aplica igual, y peor: acá las dos copias no las vería un transportista, las
+vería un auditor.
+
+**El camino recomendado:** una columna `area` en `expedientes`, con su
+CHECK, y construir lo que falta *dentro* del modelo que ya existe.
+
+Consecuencia que hay que aceptar: eso **no da un panel nuevo**. Da pestañas
+nuevas en el panel del proveedor, que es donde vive `Expedientes.jsx`. Si
+lo que se quiere es una marca separada con su propia puerta de entrada, eso
+es una decisión comercial, no técnica, y se resuelve con un subdominio y un
+shell —como hizo el Corredor— sin partir la base.
+
+---
+
+## 4. Qué se reusa, con nombre y archivo
+
+| Necesidad | Ya existe |
+|---|---|
+| Expediente por contrato y período, con documentos sellados | `services/expediente.js`, `migrations/105_expedientes.sql` |
+| Sellado y verificación | `services/cadenaHash.js` |
+| Informe cifrado y entrega de su clave por canal separado | `services/entrega.js` |
+| PDF de evidencia del expediente | `services/pdf.js` → `generateExpedienteEvidencia` |
+| Permisos por sección | `middleware/auth.js` → `requireSeccion`, vocabulario en `constants/seccionesAdmin.js` (**ojo:** ver §6) |
+| Shell de panel con login propio | `frontend/src/panel-corredor/CorredorApp.jsx` |
+| Semáforo que no miente | `semaforoExpediente` — verde solo si hay con qué comparar y comparó |
+
+---
+
+## 5. Qué habría que construir de verdad
+
+Separando lo que es una columna de lo que es un producto.
+
+### Forense — es un producto, no una vista
+
+Falta el concepto de **caso**: alcance acordado, hipótesis, hallazgos con
+su evidencia, y cadena de custodia. Un caso forense no es un expediente con
+otra etiqueta:
+
+- El expediente pregunta *«¿está completa la evidencia de este contrato?»*.
+- El caso pregunta *«¿qué pasó, y con qué lo demuestro?»*.
+
+El segundo necesita registrar **quién tocó qué y cuándo**, con un rigor que
+el expediente no exige. Ese es el trabajo real, y es grande.
+
+### Cumplimiento MPD — falta todo, y además hay un límite duro
+
+No hay nada. Y antes de escribir la primera línea:
+
+**sicr3p no certifica el MPD.** El convenio del programa lo declara
+expresamente, y el resto del producto ya se sostiene sobre esa misma
+frontera (`landing.verif_sub`: *«sicr3p no certifica ni reemplaza a un
+verificador acreditado»*). Un panel de cumplimiento que muestre un semáforo
+verde junto a las palabras «Modelo de Prevención de Delitos» va a leerse
+como certificación aunque el texto chico diga lo contrario — es
+exactamente el motivo por el que el adhesivo del activo **no tiene rojo**.
+
+Si esta área se construye, su salida tiene que ser *«esta evidencia está
+reunida»*, nunca *«este modelo cumple»*.
+
+---
+
+## 6. Dos contradicciones que este documento no resuelve
+
+Se dejan planteadas, no zanjadas. Las dos son decisiones de quien manda en
+el producto.
+
+**a) «Los datos no salen del equipo».** `Lanzamiento.jsx:88` describe al
+producto `asg` con una base local y un modelo de lenguaje corriendo en la
+misma máquina. sicr3p es lo contrario: PostgreSQL en un VPS, correo
+saliente, BigQuery. **Si el panel entra a sicr3p, esa frase deja de ser
+cierta.** O se retira la promesa, o el panel se queda afuera compartiendo a
+lo más el vocabulario. No hay una tercera.
+
+**b) La sección 26 no es gratis.** Agregar `activos` (110) destapó que tres
+migraciones re-imponían el CHECK de `secciones_admin` con listas viejas, y
+que marcar una casilla en el panel podía dejar el servidor sin arrancar.
+Ya está arreglado y hay un test que lo impide, pero la lección queda: cada
+área nueva que pida su propia sección toca **tres espejos** —el backend,
+el frontend y el CHECK de la base—. Conviene decidir si las tres áreas son
+tres secciones o una sola.
+
+---
+
+## 7. Lo que NO se promete
+
+El README de `asg` nombra cosas que no existen. Ya está anotado en
+`Lanzamiento.jsx:69-74` y se repite acá para que nadie planifique sobre
+ello:
+
+- **Estrés hídrico bajo TNFD**
+- **Detección de greenwashing**
+- **Integración con SICEP**
+- **The Copper Mark** — hay un badge en `PasaporteLote.jsx:74`, pero muestra
+  un estado que alguien cargó a mano; no hay integración con nadie.
+
+No hay tabla, endpoint ni servicio detrás de ninguna. Una landing que las
+anuncie es el mismo verde falso que este producto existe para no emitir,
+solo que apuntando al cliente en vez de al auditor.
+
+---
+
+## Decidido que no
+
+- **Traer el repo `asg` con su propia base.** Duplica `expedientes` y el
+  día que las copias se separen, dos pantallas dirán cosas distintas sobre
+  la misma empresa. `01-09-2026`.
+
+- **Un panel «ASG» que sea las tres áreas juntas sin distinguirlas.** Es lo
+  que hay hoy —un expediente que no sabe de qué área es— y renombrarlo no
+  agrega nada. Si no se agrega `area`, no hay panel ASG: hay un cartel.
+  `01-09-2026`.
+
+---
+
+## Lo que sigue, si se decide avanzar
+
+En este orden, y ninguno depende de tener el repo `asg` a mano:
+
+1. Decidir si `expedientes.area` va. Es la bifurcación; todo lo demás
+   cuelga de ahí.
+2. Resolver la contradicción del §6a, que es de posicionamiento y no de
+   código.
+3. Recién entonces, diseñar el **caso** forense — que es el trabajo grande
+   y el único que justifica hablar de un producto nuevo.
+
+Mientras tanto, el desajuste del §2 conviene cerrarlo igual: o la base
+aprende de áreas, o el copy deja de prometerlas.
