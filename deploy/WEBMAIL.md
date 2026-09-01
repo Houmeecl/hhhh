@@ -333,12 +333,17 @@ cuando se quiera: nadie escribe a `@sicr3p.cl` para correo.)
 > hay y por qué no abre, en el VPS:
 >
 > ```bash
-> bash deploy/diagnosticar-webmail.sh mail.sicr3p.cl
+> bash deploy/diagnosticar.sh sicr3p.cl mail.sicr3p.cl
 > ```
 >
-> Separa las cuatro causas que desde el navegador se ven idénticas: nadie
-> escuchando, falta de vhost, choque de puertos con nginx, o certificado
-> ausente para ese nombre.
+> Separa las causas que desde el navegador se ven idénticas: nadie
+> escuchando, falta de vhost, choque de puertos con nginx, certificado
+> vencido o disco lleno.
+>
+> **Ojo con el puerto 443.** Un stack de correo autoalojado lo quiere para
+> su interfaz web, y nginx ya lo tiene. Si el sitio y el correo dejan de
+> cargar a la vez, esa colisión es la primera sospecha — no son dos
+> problemas.
 
 ### 9.3 SPF, DKIM y DMARC — ya configurados, verificado en vivo
 
