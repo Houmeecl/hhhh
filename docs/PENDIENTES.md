@@ -106,6 +106,28 @@ Mismo origen y misma condición que 1.2. El aceite de soja podría estar en el
 Anexo I sin estar en el listado que sicr3p mantiene. Si falta, esa carga se
 clasifica como exportación simple cuando debería ser EUDR.
 
+### 1.4 — El marco de corredores de seguros está sin contrastar
+
+| | |
+|---|---|
+| **Dónde** | `docs/PANEL-ASG.md` §8.3 |
+| **Comprobar** | `cd backend && npm run fuentes` → ninguna fuente de seguros todavía |
+| **Bloquea** | Cualquier material que mencione intermediación de pólizas |
+
+Al explorar la idea de seguros apareció que intermediar pólizas en Chile
+exige registro ante la CMF (marco general en el DFL 251). **Esa afirmación
+salió de conocimiento general, no del texto oficial**, así que está en la
+misma categoría que 1.2 y 1.3: una norma citada sin contrastar.
+
+No hay urgencia mientras nadie construya hacia ahí —y `PANEL-ASG.md` ya lo
+descarta explícitamente—. Pero si algún día se quiere revisar esa decisión,
+el primer paso es sellar la fuente, no razonar sobre el recuerdo.
+
+Desde este entorno no se puede: el proxy bloquea `cmfchile.cl`, mismo
+motivo que tiene detenidas a las 12 de 1.1.
+
+---
+
 ---
 
 ## 2 · Lo que promete y no hace
@@ -246,6 +268,26 @@ mentira a la vista. Deja de serlo el día que alguien reuse ese texto.
 
 **Cerrar así:** o la base aprende de áreas (`expedientes.area`), o el copy
 deja de prometerlas. Las dos salidas son legítimas; dejarlo como está no.
+
+---
+
+### 2.7 — El comodato no dice quién paga el deducible
+
+| | |
+|---|---|
+| **Dónde** | `backend/src/services/contrato.js:594` — cláusula «Seguro y siniestros» |
+| **Comprobar** | `grep -n "deducible" backend/src/services/contrato.js` |
+| **Impacto** | Alto: es un contrato que un auspiciador tiene que firmar |
+
+La cláusula existe y está redactada, pero con dos marcadores `[•]` sin
+resolver: qué póliza se exige, y **de cargo de quién es el deducible**.
+
+Traducido: no está decidido quién paga si chocan la camioneta donada. Eso
+no se resuelve programando —es una decisión comercial— pero mientras siga
+así, el comodato sale en borrador y no se puede firmar.
+
+El comodato tiene 9 marcadores de ese tipo en total; este es el que tiene
+plata detrás.
 
 ---
 

@@ -175,6 +175,75 @@ solo que apuntando al cliente en vez de al auditor.
 
 ---
 
+## 8. Seguros
+
+Se preguntó por seguros e insurtech. No estaban en el proyecto —salvo
+menciones sueltas— pero al mirar de cerca aparecen **tres hilos distintos**
+que conviene no confundir. Uno de ellos ya existe y está a medio cerrar.
+
+| Hilo | Qué es | Estado |
+|---|---|---|
+| 1 · El seguro del vehículo del auspiciador | Deuda abierta en un contrato que se firma | **Sin resolver** |
+| 2 · El seguro como destinatario de la evidencia | La idea que sí tiene fundamento | Idea |
+| 3 · sicr3p intermediando pólizas | Actividad regulada | **Descartado** — ver *Decidido que no* |
+
+### 8.1 El seguro del auspiciador: hay una decisión sin tomar
+
+`services/contrato.js:594` ya trae una cláusula **«Seguro y siniestros»** en
+el comodato:
+
+> *El vehículo mantendrá SOAP, seguro obligatorio aplicable y póliza de
+> daños, robo, responsabilidad civil y asistencia `[•]`. El deducible será
+> de cargo de `[•]`, salvo siniestro imputable a la otra Parte.*
+
+Esos `[•]` son el marcador de pendiente (`contrato.js:111`). Traducido:
+**no está decidido quién paga el deducible si chocan la camioneta donada.**
+No es una idea de producto ni algo que se resuelva programando; es una
+decisión comercial que bloquea firmar un comodato. Queda como pendiente 2.7.
+
+### 8.2 El seguro como destinatario: el puente es la forense, no el aseguramiento
+
+Un expediente sellado de un activo —con período declarado, cobertura
+documental y cadena de hash— es justo lo que una aseguradora usa para
+**tarificar una flota** o para **resolver un siniestro**. Y el adhesivo del
+activo es un identificador verificable pegado al móvil.
+
+La conexión natural **no** es con el área de aseguramiento. Es con la
+**forense**: investigar un siniestro *es* contabilidad forense, y lo que un
+peritaje necesita —quién tocó qué documento y cuándo, sin poder alterarlo
+después— es exactamente lo que `services/cadenaHash.js` ya hace. Dicho de
+otro modo: **la aseguradora es el primer cliente realista del área que hoy
+no existe** (§1), y eso refuerza el orden propuesto en §5, no lo cambia.
+
+El encuadre tampoco hay que inventarlo. El producto ya declara su límite
+frente a terceros que deciden (`prog.piloto_limite`):
+
+> *No garantiza aprobación de crédito, leasing ni clasificación sostenible
+> por un tercero. Entrega evidencia profesional para que cada tercero
+> aplique sus propios criterios.*
+
+Basta sumar el seguro a esa lista de terceros. La frase sigue siendo cierta
+y la promesa no crece.
+
+### 8.3 Intermediar pólizas: eso es una licencia, no una decisión de producto
+
+Si «corredor ASG» llegara a significar intermediar seguros, en Chile eso es
+**actividad regulada**: los corredores de seguros deben estar inscritos en
+el registro que lleva la CMF, bajo el marco del DFL 251.
+
+> **SIN VERIFICAR.** Esa afirmación normativa **no está contrastada contra
+> su texto oficial** y por lo tanto no se puede citar como si lo estuviera
+> —es exactamente el error que `PENDIENTES.md §1` existe para no repetir—.
+> Antes de que cualquier material comercial mencione intermediación, hay
+> que sellar la fuente. Estado de las fuentes:
+> `cd backend && npm run fuentes`. Queda como pendiente 1.4.
+
+Lo que sí se puede afirmar sin fuente, porque es una regla propia y no una
+norma: **sicr3p no intermedia seguros hoy, y nada en el producto debe
+insinuar que lo hace.**
+
+---
+
 ## Decidido que no
 
 - **Traer el repo `asg` con su propia base.** Duplica `expedientes` y el
@@ -185,6 +254,17 @@ solo que apuntando al cliente en vez de al auditor.
   que hay hoy —un expediente que no sabe de qué área es— y renombrarlo no
   agrega nada. Si no se agrega `area`, no hay panel ASG: hay un cartel.
   `01-09-2026`.
+
+- **sicr3p como corredor de seguros.** Intermediar pólizas exige registro
+  ante la CMF (§8.3, sin verificar). Mientras no exista ese registro, no se
+  nombra ni se insinúa en ninguna pantalla, propuesta ni landing. Es del
+  mismo tipo que «no certificamos el MPD»: un límite que se declara antes
+  de que alguien construya hacia él. `01-09-2026`.
+
+- **«Seguros» como cuarta área de práctica.** No lo es. Aseguramiento,
+  forense y cumplimiento son cosas que sicr3p **hace**; el seguro es alguien
+  que **usa** el resultado. Ponerlo como área confundiría a quien construye
+  y a quien compra. `01-09-2026`.
 
 ---
 
