@@ -1,6 +1,6 @@
 # Pendientes de sicr3p
 
-Estado al **25-08-2026**. Cada punto trae dónde mirarlo y cómo se comprueba,
+Estado al **01-09-2026**. Cada punto trae dónde mirarlo y cómo se comprueba,
 para que no haya que creerle a este archivo: se verifica.
 
 Orden por gravedad, no por esfuerzo. Arriba está lo que puede hacer daño
@@ -9,6 +9,39 @@ callado; abajo, lo que falta pero se nota solo.
 **Regla para editar este archivo:** un pendiente se borra cuando el código
 lo cierra, no cuando se decide que no importa. Si se decide que no importa,
 se mueve a *Decidido que no* con la razón y la fecha.
+
+---
+
+## 0 · Un solo disco entre todo y la nada
+
+### 0.1 — Los respaldos viven en el mismo servidor que respaldan
+
+| | |
+|---|---|
+| **Dónde** | `deploy/respaldo.sh` → `DEST="${1:-/root/backups}"` |
+| **Comprobar** | `grep -n 'scp\|rsync\|s3\|rclone' deploy/respaldo.sh` → sin resultados |
+| **Descubierto** | 01-09-2026, con el VPS de DonWeb caído |
+
+El respaldo diario y los pre-deploy escriben en `/root/backups` **del mismo
+VPS**. No hay copia fuera. Si el disco de esa máquina no vuelve, se pierden
+a la vez la base y los catorce días de respaldos que existían para
+protegerla.
+
+El código está a salvo —vive en GitHub—. Lo que no: proveedores, facturas,
+expedientes, cargas del Corredor, cuentas. Y sobre todo **la cadena de
+hash**: `cadena_estado` y los eslabones de cada documento sellado. Perder
+eso no es perder datos recuperables a mano, es que todo informe ya emitido
+deja de poder demostrar lo que afirma. Es el único activo del producto que
+no se puede reconstruir tecleando.
+
+Estuvo así desde el primer día. No lo encontró una revisión: lo destapó una
+caída del proveedor, que es la forma cara de enterarse.
+
+**Cerrar así:** una copia fuera del VPS, con destino a decidir —un bucket
+(S3/Backblaze/Wasabi), otro servidor por `scp`, o descarga programada a una
+máquina propia—. Las credenciales del destino van en env, nunca
+commiteadas. Mientras no exista, cada día que el VPS siga en pie es
+suerte, no diseño.
 
 ---
 
