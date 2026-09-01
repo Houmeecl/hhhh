@@ -338,9 +338,30 @@ No son código: son cosas que hay que ir a hacer al servidor.
 
 ## 5 · Salud del entorno
 
-**PostgreSQL se cayó tres veces** durante la jornada del 20-08. El síntoma
-engaña: aparecen doce fallas en `adminCuentas` que parecen una regresión y
-no lo son. Antes de creerle a una corrida roja:
+### La suite era inestable, y no era Postgres · RESUELTO 01-09
+
+Durante días se atribuyeron a «Postgres caído» unas fallas que no lo eran.
+Medido el 01-09: dos corridas seguidas dieron **25 y 39 fallas sin una sola
+en común**, y todas pasaban aisladas.
+
+La causa: la limpieza de los tests del Corredor hacía
+`DELETE FROM exportadores` **antes** que sus cargas, violaba la única llave
+RESTRICT del esquema, y el `.catch(() => {})` se tragaba el error. Cada
+corrida dejaba basura. Al medirlo había **366 exportadores, 1.543 cargas y
+357 usuarios** acumulados; con suficiente basura, los tests que listan o
+cuentan filas empiezan a fallar, y fallan distintos cada vez.
+
+Cerrado con `test/util/limpiarCorredor.js`: hijos antes que padres, y sin
+tragarse errores. Verificado con dos corridas completas seguidas en verde y
+comprobando que la base queda sin basura.
+
+**La lección, que sí sigue vigente:** una suite que falla distinto cada vez
+es peor que una roja. A la roja se le cree.
+
+---
+
+**PostgreSQL también se cae** en este entorno. El síntoma engaña. Antes de
+creerle a una corrida roja:
 
 ```bash
 pg_isready || service postgresql start

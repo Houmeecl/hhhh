@@ -8,6 +8,7 @@ import { runMigrationsCorredor } from '../src/lib/migrate.js';
 import { firmarTokenCorredor, corredorConfigurado } from '../src/middleware/authCorredor.js';
 import corredorApi from '../src/routes/corredorApi.js';
 import { EN_PRODUCCION } from './util/soloDev.js';
+import { limpiarCorredorPorEmpresa, limpiarUsuariosCorredor } from './util/limpiarCorredor.js';
 
 // ============================================================
 // Documentos exigidos POR TRAMO, por HTTP y contra la base del Corredor.
@@ -85,8 +86,10 @@ before(async () => {
 after(async () => {
   if (server) await new Promise((r) => server.close(r));
   if (corredorDisponible()) {
-    await queryCorredor(`DELETE FROM usuarios_corredor WHERE email LIKE $1`, [`%-tramo-${suf}@ejemplo.cl`]).catch(() => {});
-    await queryCorredor(`DELETE FROM exportadores WHERE nombre_empresa LIKE $1`, [`Tramo % ${suf}`]).catch(() => {});
+    // Las cargas ANTES que el exportador: `cargas → exportadores` es la
+    // única llave RESTRICT del Corredor. Ver test/util/limpiarCorredor.js.
+    await limpiarCorredorPorEmpresa(`Tramo % ${suf}`);
+    await limpiarUsuariosCorredor(`%-tramo-${suf}@ejemplo.cl`);
   }
   await cerrarCorredor();
 });

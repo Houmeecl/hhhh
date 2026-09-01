@@ -10,6 +10,7 @@ import { runMigrationsCorredor } from '../src/lib/migrate.js';
 import { firmarTokenCorredor, corredorConfigurado } from '../src/middleware/authCorredor.js';
 import corredorApi from '../src/routes/corredorApi.js';
 import { EN_PRODUCCION } from './util/soloDev.js';
+import { limpiarCorredorPorEmpresa, limpiarUsuariosCorredor } from './util/limpiarCorredor.js';
 
 // ============================================================
 // La pantalla del admin del Corredor.
@@ -71,9 +72,11 @@ before(async () => {
 after(async () => {
   if (server) await new Promise((r) => server.close(r));
   if (corredorDisponible()) {
-    await queryCorredor(`DELETE FROM usuarios_corredor WHERE email LIKE $1`, [`%-${suf}@ejemplo.cl`]).catch(() => {});
     await queryCorredor(`DELETE FROM actividad_corredor WHERE email LIKE $1`, [`%-${suf}@ejemplo.cl`]).catch(() => {});
-    await queryCorredor(`DELETE FROM exportadores WHERE nombre_empresa LIKE $1`, [`Empresa Emp ${suf}`]).catch(() => {});
+    // Las cargas ANTES que el exportador: `cargas → exportadores` es la
+    // única llave RESTRICT del Corredor. Ver test/util/limpiarCorredor.js.
+    await limpiarCorredorPorEmpresa(`Empresa Emp ${suf}`);
+    await limpiarUsuariosCorredor(`%-${suf}@ejemplo.cl`);
   }
   await cerrarCorredor();
 });
