@@ -77,8 +77,15 @@ propósito cuando decidió que un activo **no** tuviera evidencia propia:
 Aplica igual, y peor: acá las dos copias no las vería un transportista, las
 vería un auditor.
 
-**El camino recomendado:** una columna `area` en `expedientes`, con su
-CHECK, y construir lo que falta *dentro* del modelo que ya existe.
+> **SUPERADO EL 01-09-2026.** Lo de abajo se escribió suponiendo que el
+> panel viviría dentro de sicr3p. Se decidió que **corre local** (§6a), así
+> que la tabla `expedientes` no está donde el panel corre y una columna
+> `area` no lo resuelve. El razonamiento se deja porque sigue valiendo para
+> los expedientes de sicr3p mismo, y porque explica qué riesgo se está
+> aceptando a cambio.
+
+**El camino que se recomendaba:** una columna `area` en `expedientes`, con
+su CHECK, y construir lo que falta *dentro* del modelo que ya existe.
 
 Consecuencia que hay que aceptar: eso **no da un panel nuevo**. Da pestañas
 nuevas en el panel del proveedor, que es donde vive `Expedientes.jsx`. Si
@@ -135,17 +142,50 @@ reunida»*, nunca *«este modelo cumple»*.
 
 ---
 
-## 6. Dos contradicciones que este documento no resuelve
+## 6. La decisión de arquitectura, y lo que queda abierto
 
-Se dejan planteadas, no zanjadas. Las dos son decisiones de quien manda en
-el producto.
+**a) ES LOCAL. Decidido el 01-09-2026.**
 
-**a) «Los datos no salen del equipo».** `Lanzamiento.jsx:88` describe al
-producto `asg` con una base local y un modelo de lenguaje corriendo en la
-misma máquina. sicr3p es lo contrario: PostgreSQL en un VPS, correo
-saliente, BigQuery. **Si el panel entra a sicr3p, esa frase deja de ser
-cierta.** O se retira la promesa, o el panel se queda afuera compartiendo a
-lo más el vocabulario. No hay una tercera.
+`Lanzamiento.jsx:88` describe al producto `asg` con una base local y un
+modelo de lenguaje corriendo en la misma máquina: *«los datos no salen del
+equipo»*. sicr3p es lo contrario —PostgreSQL en un VPS, correo saliente,
+BigQuery— así que meter el panel adentro habría vuelto falsa esa frase.
+
+**Se mantiene la promesa: el panel ASG corre local.**
+
+Y hay que decir lo que eso cuesta, porque **invalida la recomendación de
+§3**. Ese apartado proponía una columna `area` en `expedientes` para no
+duplicar el modelo. Con el panel corriendo en la máquina del auditor, esa
+tabla no está ahí: son dos despliegues distintos sobre datos distintos.
+
+Lo que en §3 era duplicación accidental pasa a ser **separación
+deliberada**, y el riesgo cambia de forma. Ya no es que dos copias digan
+cosas distintas del mismo dato —no comparten datos—, sino que las dos
+implementaciones del mismo concepto se separen con el tiempo. La defensa no
+es una tabla común: es **compartir el código como biblioteca, no como
+servicio**. Los candidatos concretos, todos puros y sin base:
+
+| Se comparte | Archivo | Por qué se puede |
+|---|---|---|
+| El sellado y la verificación | `services/cadenaHash.js` | No toca la base: recibe datos, devuelve hashes |
+| La cobertura documental y el semáforo | `services/expediente.js` | Ya es puro; la consulta vive en la ruta, no acá |
+| El descargo y el formato del informe | `services/pdf.js` | Recibe todo por parámetro |
+
+Si el panel local reimplementa el semáforo por su cuenta, el día que
+cambie la regla del verde habrá dos reglas. Eso es lo que hay que vigilar,
+no la tabla.
+
+**Lo que la decisión resuelve gratis:** el panel local no depende del VPS.
+El 01-09 el nodo NOVA001 de DonWeb se cayó y con él el sitio y el correo;
+un producto que corre en la máquina del auditor no se entera. Para una
+herramienta de aseguramiento eso no es un detalle operativo, es parte de lo
+que se vende.
+
+**Lo que la decisión NO resuelve, y empeora:** `landing.hero2_sub` está
+vivo en `/plataforma` —la landing de sicr3p— ofreciendo las tres áreas. Si
+esas áreas viven en un producto local aparte, **sicr3p está vendiendo algo
+que sicr3p no hace**. El pendiente 2.6 sigue abierto y ahora pesa más: hay
+que decidir si esa landing habla de sicr3p o del conjunto de productos.
 
 **b) La sección 26 no es gratis.** Agregar `activos` (110) destapó que tres
 migraciones re-imponían el CHECK de `secciones_admin` con listas viejas, y

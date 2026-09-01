@@ -266,8 +266,17 @@ cómo funciona el producto. **Hoy no se sirve** —la cuenta regresiva venció
 y `App.jsx:105` manda a `Programa`—, así que es código muerto y no una
 mentira a la vista. Deja de serlo el día que alguien reuse ese texto.
 
-**Cerrar así:** o la base aprende de áreas (`expedientes.area`), o el copy
-deja de prometerlas. Las dos salidas son legítimas; dejarlo como está no.
+**Actualizado el 01-09:** se decidió que el panel ASG **corre local**
+(`docs/PANEL-ASG.md` §6a). Eso descarta la primera salida —la columna
+`expedientes.area` no sirve, porque esa tabla no está en la máquina donde
+el panel corre— y **agranda el problema**: si las tres áreas viven en un
+producto local aparte, la landing de sicr3p está ofreciendo algo que
+sicr3p no hace.
+
+**Cerrar así:** decidir si `/plataforma` habla de sicr3p o del conjunto de
+productos, y ajustar `landing.hero2_sub` a lo que sea. Dejarlo como está
+no es una opción: hoy promete tres áreas de las cuales el sistema que
+sirve esa página hace una.
 
 ---
 
