@@ -9,6 +9,30 @@
 > no un inventario. Ninguna afirmación de acá se puede citar como si el
 > sistema ya lo hiciera.
 
+> ## ⏸ EN PAUSA desde el 01-09-2026
+>
+> `docs/FOCO-2026-2027.md` §4 pausa **contabilidad forense**, **MPD /
+> Ley 21.595**, **seguros e insurtech** y **nuevos paneles**. Dos de las
+> tres áreas de este documento y su forma de entrega quedan, por lo tanto,
+> fuera de desarrollo durante esta etapa.
+>
+> **Pausa no es borrado**, y por eso el archivo queda intacto: el §5 del
+> rector exige identificar dependencias antes de eliminar nada, y acá no
+> hay nada que eliminar porque nunca hubo código.
+>
+> Lo que de este documento **sigue vigente y sirve al foco**:
+>
+> - El **aseguramiento de sostenibilidad** —la primera de las tres áreas—
+>   es exactamente el flujo activo nº1 del rector, y §1 de acá muestra que
+>   ya está construido sobre `expedientes`.
+> - El §8.3 descarta que sicr3p intermedie pólizas. El rector pausa lo
+>   mismo; las dos decisiones apuntan igual.
+> - El §6a —que el panel corre local— se mantiene como decisión, aunque su
+>   ejecución queda para cuando se retome.
+>
+> Lo que queda **congelado**: la columna `expedientes.area` que proponía
+> §3, el caso forense de §5, y todo el §8 salvo lo ya dicho.
+
 ## La definición, en una línea
 
 **El panel ASG no es un producto nuevo: es el expediente que ya existe,

@@ -10,6 +10,11 @@ callado; abajo, lo que falta pero se nota solo.
 lo cierra, no cuando se decide que no importa. Si se decide que no importa,
 se mueve a *Decidido que no* con la razón y la fecha.
 
+**Manda `docs/FOCO-2026-2027.md`.** Desde el 01-09 hay dos flujos activos
+—proveedor minero industrial y comercio exterior— y el resto está en pausa.
+Un pendiente que no sirva a ninguno de los dos **no se cierra programando**:
+se marca como pausado y espera. Pausa no es borrado (§5 del rector).
+
 ---
 
 ## 0 · Respaldos
@@ -266,7 +271,15 @@ cómo funciona el producto. **Hoy no se sirve** —la cuenta regresiva venció
 y `App.jsx:105` manda a `Programa`—, así que es código muerto y no una
 mentira a la vista. Deja de serlo el día que alguien reuse ese texto.
 
-**Actualizado el 01-09:** se decidió que el panel ASG **corre local**
+**PAUSADO el 01-09 por el rector.** `FOCO-2026-2027.md` §4 pausa forense y
+MPD, así que dos de las tres áreas que esta landing ofrece no se van a
+desarrollar en esta etapa. Eso **no cierra el pendiente, lo invierte**: ya
+no es que falte construir las áreas, es que `/plataforma` está ofreciendo
+algo que el foco descartó. El §4 dice que eso se quita primero de la
+superficie comercial. Es copy, así que la decisión es del dueño del copy,
+no mía.
+
+**Contexto previo:** se decidió que el panel ASG **corre local**
 (`docs/PANEL-ASG.md` §6a). Eso descarta la primera salida —la columna
 `expedientes.area` no sirve, porque esa tabla no está en la máquina donde
 el panel corre— y **agranda el problema**: si las tres áreas viven en un
