@@ -1,4 +1,5 @@
 import fs from 'fs';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { pool } from './db.js';
@@ -8,21 +9,104 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsDir = path.resolve(__dirname, '../../migrations');
 const migrationsCorredorDir = path.resolve(__dirname, '../../migrations-corredor');
 
-// Aplica todos los .sql de un directorio, en orden alfabético, contra el
-// pool que se le pase. No hay registro de migraciones aplicadas: cada
-// archivo corre en CADA arranque, así que todos tienen que ser
-// estrictamente idempotentes. Ojo con la trampa conocida:
-// `CREATE TABLE IF NOT EXISTS` NO agrega columnas a una tabla que ya
-// existe — cada columna posterior necesita su ALTER explícito.
+// ============================================================
+// Registro de migraciones aplicadas.
+//
+// POR QUÉ EXISTE. Hasta el 01-09-2026 no había registro: cada `.sql`
+// corría en CADA arranque. Eso obligaba a que todos fueran estrictamente
+// idempotentes, y una que no lo era pasó desapercibida durante meses —tres
+// migraciones re-imponían el CHECK de `secciones_admin` con listas
+// congeladas en su época, así que **marcar la casilla «Cobros» en el panel
+// dejaba el servidor sin arrancar en el siguiente despliegue**.
+//
+// `docs/FOCO-2026-2027.md` §3 pide: «No borrar ni reescribir migraciones
+// históricas que hayan podido ejecutarse. Si una estructura deja de usarse,
+// hacer una migración nueva.» Esa regla **supone un migrador con registro**:
+// sin él, una migración vieja se sigue ejecutando para siempre y no hay
+// migración nueva que la pueda corregir. Este archivo es lo que hace que la
+// regla sea cierta en vez de un pedido de buena voluntad.
+//
+// EL SHA256 NO ES DECORACIÓN. Se guarda el hash del archivo aplicado, así
+// que si alguien edita una migración ya ejecutada, el arranque lo DICE.
+// Es la misma regla del §3, ahora comprobable: el registro no solo evita
+// re-ejecutar, también delata que se reescribió historia.
+// ============================================================
+
+const TABLA = 'migraciones_aplicadas';
+
+async function asegurarRegistro(cliente) {
+  await cliente.query(`
+    CREATE TABLE IF NOT EXISTS ${TABLA} (
+      archivo     TEXT PRIMARY KEY,
+      sha256      TEXT NOT NULL,
+      aplicada_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )`);
+}
+
+const sha = (texto) => crypto.createHash('sha256').update(texto, 'utf8').digest('hex');
+
+// Aplica los .sql de un directorio en orden alfabético, UNA SOLA VEZ cada
+// uno, contra el pool que se le pase.
+//
+// Cada archivo va en su propia transacción junto con su registro: si el SQL
+// falla, no queda anotado y se reintenta en el próximo arranque. Anotar por
+// fuera de la transacción dejaría migraciones «aplicadas» que en realidad
+// reventaron a la mitad.
 async function aplicar(dir, destino, etiqueta) {
-  if (!fs.existsSync(dir)) return 0;
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-  for (const file of files) {
-    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
-    await destino.query(sql);
-    console.log(`[migrate${etiqueta}] aplicada ${file}`);
+  if (!fs.existsSync(dir)) return { aplicadas: 0, omitidas: 0, alteradas: [] };
+
+  const cliente = await destino.connect();
+  const resumen = { aplicadas: 0, omitidas: 0, alteradas: [] };
+  try {
+    await asegurarRegistro(cliente);
+    const { rows } = await cliente.query(`SELECT archivo, sha256 FROM ${TABLA}`);
+    const yaAplicadas = new Map(rows.map((r) => [r.archivo, r.sha256]));
+
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(dir, file), 'utf8');
+      const hash = sha(sql);
+      const previo = yaAplicadas.get(file);
+
+      if (previo) {
+        resumen.omitidas += 1;
+        // Se reescribió una migración ya ejecutada. NO se vuelve a correr
+        // —eso es justo lo que el registro evita— pero se avisa fuerte,
+        // porque significa que el archivo del repo y lo que hay en la base
+        // dejaron de ser la misma cosa.
+        if (previo !== hash) {
+          resumen.alteradas.push(file);
+          console.warn(
+            `[migrate${etiqueta}] AVISO: ${file} cambió después de aplicarse. `
+            + 'No se re-ejecuta. Si el cambio tiene que llegar a la base, va en una migración NUEVA '
+            + '(docs/FOCO-2026-2027.md §3).'
+          );
+        }
+        continue;
+      }
+
+      await cliente.query('BEGIN');
+      try {
+        await cliente.query(sql);
+        await cliente.query(
+          `INSERT INTO ${TABLA} (archivo, sha256) VALUES ($1, $2)`, [file, hash]
+        );
+        await cliente.query('COMMIT');
+      } catch (err) {
+        await cliente.query('ROLLBACK').catch(() => {});
+        throw err;
+      }
+      resumen.aplicadas += 1;
+      console.log(`[migrate${etiqueta}] aplicada ${file}`);
+    }
+  } finally {
+    cliente.release();
   }
-  return files.length;
+
+  if (resumen.omitidas) {
+    console.log(`[migrate${etiqueta}] ${resumen.omitidas} ya estaban aplicadas`);
+  }
+  return resumen;
 }
 
 export async function runMigrations() {
@@ -42,8 +126,8 @@ export async function runMigrationsCorredor() {
     return { estado: 'apagado', motivo: 'sin DATABASE_URL_CORREDOR' };
   }
   try {
-    const n = await aplicar(migrationsCorredorDir, poolCorredor(), ':corredor');
-    return { estado: 'ok', archivos: n };
+    const r = await aplicar(migrationsCorredorDir, poolCorredor(), ':corredor');
+    return { estado: 'ok', archivos: r.aplicadas, ...r };
   } catch (err) {
     console.error(`[migrate:corredor] FALLÓ — las rutas del Corredor van a responder 503: ${err.message}`);
     return { estado: 'error', error: err.message };
