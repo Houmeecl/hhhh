@@ -241,10 +241,25 @@ No se descubrió razonando: apareció al agregar la sección 26 y ver morir
 el arranque. Se confirmó que ya estaba roto reproduciéndolo **sin**
 `activos`, solo con `cobros`.
 
-Ahora el vocabulario se declara en **un solo lugar**: la migración más
-nueva que lo amplía. Hay un test que rompe la compilación si dos
-migraciones lo imponen sin guardia, o si la lista del SQL y la de
-`constants/seccionesAdmin.js` dejan de decir lo mismo.
+**Arreglado de raíz el 01-09.** El primer parche editó la 097 y la 100 en
+su lugar, lo que contradecía el §3 del rector —no reescribir migraciones
+históricas—. La contradicción no era mía: la regla **suponía un migrador
+con registro**, y sin él ninguna migración nueva puede corregir a una
+vieja que corre en cada arranque.
+
+Ahora `migrate.js` lleva `migraciones_aplicadas`: cada `.sql` corre una
+sola vez, en su propia transacción junto con su registro. Con eso la 097 y
+la 100 **volvieron a su texto original** y dejaron de ser peligrosas: en
+base nueva corren cuando todavía no hay filas que puedan violar el CHECK,
+y en base existente no vuelven a correr.
+
+De yapa, el registro guarda el sha256 de lo aplicado: si alguien reescribe
+una migración ya ejecutada, el arranque lo dice y cita el §3. La regla del
+foco pasó de pedido de buena voluntad a cosa comprobable.
+
+Verificado con una base creada desde cero: 110 migraciones, CHECK final con
+las 26 secciones, y una cuenta con `cobros` y `activos` entra sin
+problema.
 
 ---
 

@@ -23,9 +23,21 @@ import { SECCIONES_ADMIN } from '../src/constants/seccionesAdmin.js';
 // reinicia en cada despliegue. Estuvo latente desde la 100 y se destapó al
 // agregar 'activos' en la 110.
 //
-// La regla ahora: solo la migración MÁS NUEVA que amplía el vocabulario lo
-// declara. Las anteriores no lo re-afirman —o lo hacen guardadas por «si
-// no existe», que nunca pisa a la nueva.
+// LA PREMISA CAMBIÓ EL 01-09, y este archivo con ella. Al darle registro
+// a `migrate.js` (`migraciones_aplicadas`), cada .sql corre UNA SOLA VEZ:
+//
+//   · En base nueva corren 092, 097, 100 y 110 en orden, cuando todavía no
+//     hay ninguna fila que pueda violar el CHECK. Gana la última.
+//   · En base existente ninguna vuelve a correr.
+//
+// Con eso, que varias migraciones impongan el CHECK dejó de ser una bomba,
+// y la 097 y la 100 pudieron volver a su texto original —que es lo que el
+// §3 del foco pedía y sin registro era imposible cumplir—.
+//
+// Lo que este archivo sigue guardando es el invariante que SÍ importa: que
+// la migración más nueva declare el vocabulario COMPLETO. Si alguien agrega
+// una sección al backend y al frontend pero no a la última migración, una
+// base recién instalada la rechaza y el arranque muere.
 // ============================================================
 
 const DIR = new URL('../migrations/', import.meta.url).pathname;
@@ -42,25 +54,28 @@ function addDesnudo(sql) {
 
 const conAdd = ARCHIVOS.filter((f) => addDesnudo(readFileSync(DIR + f, 'utf8')));
 
-test('solo UNA migración impone el vocabulario sin guardia', () => {
-  // Si esto falla con dos archivos, el más viejo va a rechazar en cada
-  // arranque las secciones que el más nuevo agregó. No es un problema de
-  // estilo: es el servidor sin levantar.
-  assert.equal(conAdd.length, 1,
-    `imponen el CHECK sin guardia: ${conAdd.join(', ')} — debe ser solo la más nueva`);
+// La última que lo impone es la que manda: es la que corre al final en una
+// base nueva, y la única que se ejecuta si alguien agrega una más adelante.
+const MANDA = conAdd[conAdd.length - 1];
+
+test('al menos una migración declara el vocabulario', () => {
+  assert.ok(MANDA, 'ninguna migración impone usuarios_secciones_admin_check');
 });
 
-test('esa migración es la más nueva que menciona la restricción', () => {
+test('la que manda es la más nueva de las que tocan la restricción', () => {
+  // Si alguien agrega el CHECK en una migración intermedia, en base nueva
+  // la posterior lo pisa y el vocabulario intermedio nunca rige. No rompe
+  // nada, pero engaña a quien lo lea.
   const mencionan = ARCHIVOS.filter((f) => readFileSync(DIR + f, 'utf8').includes(RESTRICCION));
-  assert.equal(conAdd[0], mencionan[mencionan.length - 1],
-    `${conAdd[0]} impone el CHECK pero ${mencionan[mencionan.length - 1]} es posterior`);
+  assert.equal(MANDA, mencionan[mencionan.length - 1],
+    `${MANDA} impone el CHECK pero ${mencionan[mencionan.length - 1]} es posterior`);
 });
 
 test('el vocabulario del CHECK es exactamente el de seccionesAdmin.js', () => {
   // El tercer espejo. Los otros dos —constants/seccionesAdmin.js y
   // frontend/src/admin/secciones.js— ya se comparan en auth.test.js y en
   // el contador de 26; este cierra el que vive en la base.
-  const sql = readFileSync(DIR + conAdd[0], 'utf8');
+  const sql = readFileSync(DIR + MANDA, 'utf8');
   const bloque = sql.slice(sql.indexOf(`ADD CONSTRAINT ${RESTRICCION}`));
   const enSql = [...bloque.slice(0, bloque.indexOf(']::text[]')).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
 

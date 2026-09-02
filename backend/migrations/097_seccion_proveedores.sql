@@ -19,22 +19,15 @@
 -- nueva, nadie la tenía. Que empiece en 0 cuentas es lo correcto.
 -- ============================================================
 
--- ---------- POR QUÉ ACÁ YA NO SE TOCA EL CHECK ----------
---
--- Esta migración hacía DROP + ADD del CHECK con el vocabulario congelado
--- al 097. Como `migrate.js` NO lleva registro y corre TODOS los .sql en
--- cada arranque, ese ADD se volvía a ejecutar siempre — con una lista que
--- envejece. El día que una cuenta recibía una sección posterior (`cobros`,
--- de la 100), este archivo la declaraba inválida y **el servidor no
--- arrancaba**: `check constraint ... is violated by some row`, en el
--- arranque, en producción, después de un cambio hecho desde el panel.
---
--- Estuvo latente desde la 100. Se destapó al agregar 'activos' (110).
---
--- LA REGLA: el vocabulario se declara en UN SOLO lugar, la migración más
--- nueva que lo amplía. Las anteriores no lo re-afirman. Hay un test que
--- lo verifica — test/migracionesSecciones.test.js.
---
--- Lo que esta migración aporta ('proveedores' como sección propia) sigue
--- vigente: vive en la lista de la migración más nueva y en
--- src/constants/seccionesAdmin.js.
+DO $$
+BEGIN
+  ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_secciones_admin_check;
+  ALTER TABLE usuarios ADD CONSTRAINT usuarios_secciones_admin_check
+    CHECK (secciones_admin <@ ARRAY[
+      'dashboard','enrolar','clientes','sesiones','buscar','metricas','sii',
+      'capital_natural','trazabilidad','transporte','corredor','origen',
+      'capacitacion','apl','prospectos','auspiciadores','juego',
+      'accesos_externos','motor_propio','motor_externo','usuarios','actividad',
+      'datos_personales','proveedores'
+    ]::text[]);
+END $$;

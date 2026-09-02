@@ -141,12 +141,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_baja_email ON bajas_correo (lower(email));
 -- quien opera la campaña comercial mueve dinero y ve la lista completa de
 -- empresas contactadas, que es justamente lo que un admin de soporte no
 -- tiene por qué ver. Aditiva — nadie la tenía, empieza en 0 cuentas.
---
--- EL CHECK NO SE DECLARA ACÁ. Hacerlo era un arranque roto esperando:
--- `migrate.js` corre todos los .sql siempre, así que este archivo volvía a
--- imponer un vocabulario sin 'activos' y el servidor moría al arrancar.
--- Ver la nota larga en 097. El vocabulario vive en la migración más nueva
--- que lo amplía, y un test lo comprueba.
+DO $$
+BEGIN
+  ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_secciones_admin_check;
+  ALTER TABLE usuarios ADD CONSTRAINT usuarios_secciones_admin_check
+    CHECK (secciones_admin <@ ARRAY[
+      'dashboard','enrolar','clientes','sesiones','buscar','metricas','sii',
+      'capital_natural','trazabilidad','transporte','corredor','origen',
+      'capacitacion','apl','prospectos','auspiciadores','juego',
+      'accesos_externos','motor_propio','motor_externo','usuarios','actividad',
+      'datos_personales','proveedores','cobros'
+    ]::text[]);
+END $$;
 
 COMMENT ON COLUMN cobros.token IS
   'Va en el link del correo. No es una credencial: quien lo tenga solo puede pagar; el acceso se envía siempre al email de la fila.';
