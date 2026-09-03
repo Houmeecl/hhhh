@@ -533,6 +533,18 @@ export const api = {
   // Los PDF de admin requieren Authorization: se bajan como blob y se abren en una pestaña.
   abrirBalanceNaturalPdf: (qs = '') => abrirPdfAuth(`/api/admin/capital/balance.pdf${qs}`),
 
+  // Contabilidad financiera privada (separada de carbono y capital natural).
+  contabilidadClientes: () => request('/admin/contabilidad/clientes', { authed: true }),
+  contabilidadCuentas: (clienteId) => request(`/admin/contabilidad/cuentas?cliente_id=${encodeURIComponent(clienteId)}`, { authed: true }),
+  crearPlanCuentasBase: (cliente_id) => request('/admin/contabilidad/cuentas/base', { method: 'POST', body: { cliente_id }, authed: true }),
+  crearCuentaContable: (b) => request('/admin/contabilidad/cuentas', { method: 'POST', body: b, authed: true }),
+  contabilidadPeriodos: (clienteId) => request(`/admin/contabilidad/periodos?cliente_id=${encodeURIComponent(clienteId)}`, { authed: true }),
+  crearPeriodoContable: (b) => request('/admin/contabilidad/periodos', { method: 'POST', body: b, authed: true }),
+  asientosContables: (clienteId, periodoId) => request(`/admin/contabilidad/asientos?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
+  crearAsientoContable: (b) => request('/admin/contabilidad/asientos', { method: 'POST', body: b, authed: true }),
+  balanceContable: (clienteId, periodoId) => request(`/admin/contabilidad/balance?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
+  abrirBalanceContablePdf: (clienteId, periodoId) => abrirPdfAuth(`/api/admin/contabilidad/balance.pdf?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`),
+
   // Trazabilidad (Etapa 2)
   informeMensual: (qs) => request(`/admin/informes/mensual${qs}`, { authed: true }),
   abrirInformeMensualPdf: (qs) => abrirPdfAuth(`/api/admin/informes/mensual.pdf${qs}`),

@@ -28,6 +28,51 @@ const GRAY = '#64748b';
 const LIGHT = '#f1f5f9';
 const BORDER = '#e6e9ed';
 
+// Balance de comprobación financiero. Es deliberadamente independiente de
+// los informes de emisiones: las cifras son pesos contables registrados por
+// el usuario y no datos ambientales ni una opinión de auditoría externa.
+export async function generateBalanceContable({ cliente, periodo, cuentas = [] }) {
+  const doc = new PDFDocument({ size: 'A4', margin: 46, bufferPages: true });
+  const partes = [];
+  doc.on('data', (c) => partes.push(c));
+  const terminado = new Promise((resolve, reject) => { doc.on('end', () => resolve(Buffer.concat(partes))); doc.on('error', reject); });
+  const W = doc.page.width - 92;
+  let y = 46;
+  const monto = (v) => Number(v || 0).toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const encabezado = () => {
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(18).text('BALANCE DE COMPROBACIÓN', 46, y);
+    y = doc.y + 5;
+    doc.fillColor(GREEN).font('Helvetica-Bold').fontSize(9).text('sicr3p · Contabilidad financiera privada', 46, y);
+    y = doc.y + 16;
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(10).text(cliente.nombre_empresa, 46, y);
+    doc.font('Helvetica').fontSize(8.5).fillColor(GRAY).text(`RUT ${cliente.rut || '—'} · Período ${periodo.nombre} · ${periodo.desde} a ${periodo.hasta}`, 46, doc.y + 3);
+    y = doc.y + 18;
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(7.5);
+    doc.text('CUENTA', 46, y, { width: 238 }); doc.text('DÉBITO', 290, y, { width: 68, align: 'right' }); doc.text('HABER', 362, y, { width: 68, align: 'right' }); doc.text('SALDO DEUDOR', 434, y, { width: 68, align: 'right' }); doc.text('SALDO ACREEDOR', 506, y, { width: 68, align: 'right' });
+    y += 15; doc.moveTo(46, y).lineTo(46 + W, y).strokeColor(BORDER).stroke(); y += 7;
+  };
+  const pagina = () => { doc.addPage(); y = 46; encabezado(); };
+  encabezado();
+  const totales = { debito: 0, haber: 0, saldo_deudor: 0, saldo_acreedor: 0 };
+  for (const c of cuentas) {
+    if (y > 740) pagina();
+    doc.font('Helvetica').fontSize(8).fillColor(NAVY).text(`${c.codigo} · ${c.nombre}`, 46, y, { width: 238, ellipsis: true });
+    doc.fillColor(GRAY).text(monto(c.debito), 290, y, { width: 68, align: 'right' }); doc.text(monto(c.haber), 362, y, { width: 68, align: 'right' }); doc.text(monto(c.saldo_deudor), 434, y, { width: 68, align: 'right' }); doc.text(monto(c.saldo_acreedor), 506, y, { width: 68, align: 'right' });
+    totales.debito += Number(c.debito || 0); totales.haber += Number(c.haber || 0); totales.saldo_deudor += Number(c.saldo_deudor || 0); totales.saldo_acreedor += Number(c.saldo_acreedor || 0);
+    y += 16;
+  }
+  if (y > 718) pagina();
+  doc.moveTo(46, y).lineTo(46 + W, y).strokeColor(NAVY).stroke(); y += 7;
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(NAVY).text('TOTALES', 46, y, { width: 238 });
+  doc.text(monto(totales.debito), 290, y, { width: 68, align: 'right' }); doc.text(monto(totales.haber), 362, y, { width: 68, align: 'right' }); doc.text(monto(totales.saldo_deudor), 434, y, { width: 68, align: 'right' }); doc.text(monto(totales.saldo_acreedor), 506, y, { width: 68, align: 'right' });
+  y += 30;
+  doc.font('Helvetica').fontSize(7.5).fillColor(GRAY).text('Preparado a partir de asientos registrados en el libro privado de la empresa. No constituye declaración tributaria, estados financieros auditados ni una opinión de aseguramiento.', 46, y, { width: W });
+  const pages = doc.bufferedPageRange();
+  for (let i = 0; i < pages.count; i += 1) { doc.switchToPage(pages.start + i); doc.font('Helvetica').fontSize(7).fillColor(GRAY).text(`sicr3p · Emitido ${new Date().toISOString().slice(0, 10)} · Página ${i + 1} de ${pages.count}`, 46, 792, { width: W, align: 'right' }); }
+  doc.end();
+  return terminado;
+}
+
 // Descargo obligatorio en TODO informe que declare emisiones. Va impreso —
 // no basta con mostrarlo en pantalla: estos PDF se entregan a un mandante,
 // a un auditor o a una autoridad, y ahí el documento viaja solo. Los

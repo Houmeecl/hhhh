@@ -17,6 +17,7 @@ import Corredor from './Corredor.jsx';
 import Origen from './Origen.jsx';
 import CorredorQR from './CorredorQR.jsx';
 import CapitalNatural from './CapitalNatural.jsx';
+import Contabilidad from './Contabilidad.jsx';
 import Trazabilidad from './Trazabilidad.jsx';
 import Buscar from './Buscar.jsx';
 import Transporte from './Transporte.jsx';
@@ -210,6 +211,7 @@ export default function AdminApp() {
           <Route path="origen" element={<RequiereSeccion user={user} slug="origen"><Origen /></RequiereSeccion>} />
           <Route path="origen-carteles-qr" element={<RequiereSeccion user={user} slug="origen"><CorredorQR /></RequiereSeccion>} />
           <Route path="capital" element={<RequiereSeccion user={user} slug="capital_natural"><CapitalNatural /></RequiereSeccion>} />
+          <Route path="contabilidad" element={<RequiereSeccion user={user} slug="contabilidad"><Contabilidad /></RequiereSeccion>} />
           <Route path="trazabilidad" element={<RequiereSeccion user={user} slug="trazabilidad"><Trazabilidad /></RequiereSeccion>} />
           <Route path="buscar" element={<RequiereSeccion user={user} slug="buscar"><Buscar /></RequiereSeccion>} />
           <Route path="transporte" element={<RequiereSeccion user={user} slug="transporte"><Transporte /></RequiereSeccion>} />

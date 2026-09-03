@@ -32,6 +32,7 @@ export const SECCIONES_ADMIN_NAV = [
       // proveedoras (conexión SII, generar, contrato) — una cuenta con
       // solo la sección 'proveedores' también debe poder llegar acá.
       { slug: 'sii', tambien: ['proveedores'], to: '/admin/sii', ico: Icon.Doc, label: 'SII compras/ventas' },
+      { slug: 'contabilidad', to: '/admin/contabilidad', ico: Icon.Book, label: 'Contabilidad financiera' },
       { slug: 'capital_natural', to: '/admin/capital', ico: Icon.Leaf, label: 'Capital Natural' },
       { slug: 'trazabilidad', to: '/admin/trazabilidad', ico: Icon.Doc, label: 'Trazabilidad' },
       { slug: 'transporte', to: '/admin/transporte', ico: Icon.ArrowRight, label: 'Transporte Cat. 7' },
