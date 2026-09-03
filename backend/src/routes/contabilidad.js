@@ -2,7 +2,8 @@ import express from 'express';
 import { query, withTx } from '../lib/db.js';
 import { requireAuth, requireRole, requireHomePanel, requireSeccion, logActividad } from '../middleware/auth.js';
 import { generateBalanceContable } from '../services/pdf.js';
-import { CUENTAS_BASE, ROLES_BANCARIOS, TIPOS_CUENTA, hashAsiento, perfilFinanciero, validarLineas } from '../services/contabilidad.js';
+import { CUENTAS_BASE, ROLES_BANCARIOS, TIPOS_CUENTA, exposicionCbamFinanciera, hashAsiento, perfilFinanciero, validarLineas } from '../services/contabilidad.js';
+import { resumenNormativo } from '../services/pasaporteOrigen.js';
 
 const router = express.Router();
 router.use(requireAuth, requireHomePanel('sicrep'), requireSeccion('contabilidad'));
@@ -37,9 +38,81 @@ async function balance(cliente_id, periodo_id) {
   });
 }
 
+async function vinculosCbam(cliente_id) {
+  const { rows } = await query(
+    `SELECT v.id AS vinculo_id, v.cliente_id, v.lote_id, v.relacion, v.referencia_respaldo,
+            v.observaciones, v.estado, v.confirmado_at, l.codigo, l.material, l.codigo_nc,
+            l.cantidad, l.unidad, l.pais_origen, l.faena_origen,
+            l.emisiones_directas_tco2e_t, l.emisiones_indirectas_tco2e_t, l.metodo_emisiones
+       FROM cliente_cbam_vinculos v
+       JOIN lotes_minerales l ON l.id = v.lote_id
+      WHERE v.cliente_id = $1 AND v.estado = 'vigente'
+      ORDER BY v.confirmado_at DESC`, [cliente_id]
+  );
+  return rows.map((v) => ({ ...v, cbam: resumenNormativo(v, []).cbam }));
+}
+
 router.get('/clientes', async (_req, res, next) => {
   try { res.json({ clientes: (await query('SELECT id, nombre_empresa, rut FROM clientes ORDER BY nombre_empresa LIMIT 500')).rows }); }
   catch (err) { next(err); }
+});
+
+router.get('/cbam/lotes', async (req, res, next) => {
+  try {
+    const id = clienteId(req, res); if (!id) return;
+    if (!await existeCliente(id)) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    res.json({ vinculos: await vinculosCbam(id) });
+  } catch (err) { next(err); }
+});
+
+// Catálogo técnico para seleccionar manualmente el lote. La asociación no se
+// crea por coincidencia de RUT/nombre y sigue siendo exclusiva del personal
+// autorizado de SICR3P.
+router.get('/cbam/lotes-disponibles', async (_req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, codigo, material, codigo_nc, cantidad, unidad, pais_origen, faena_origen,
+              emisiones_directas_tco2e_t, emisiones_indirectas_tco2e_t, metodo_emisiones
+         FROM lotes_minerales ORDER BY updated_at DESC LIMIT 200`
+    );
+    res.json({ lotes: rows.map((l) => ({ ...l, cbam: resumenNormativo(l, []).cbam })) });
+  } catch (err) { next(err); }
+});
+
+router.post('/cbam/vinculos', puedeEditar, async (req, res, next) => {
+  try {
+    const id = clienteId(req, res); if (!id) return;
+    const { lote_id, relacion, referencia_respaldo, observaciones } = req.body || {};
+    if (!uuid.test(String(lote_id || ''))) return res.status(400).json({ error: 'Selecciona un lote válido.' });
+    if (!['titular_lote','operador_instalacion','exportador','financiado'].includes(relacion)) return res.status(400).json({ error: 'Selecciona una relación válida.' });
+    if (String(referencia_respaldo || '').trim().length < 3) return res.status(400).json({ error: 'Indica la referencia que respalda el vínculo.' });
+    if (!await existeCliente(id)) return res.status(404).json({ error: 'Empresa no encontrada.' });
+    const lote = (await query('SELECT id FROM lotes_minerales WHERE id=$1', [lote_id])).rows[0];
+    if (!lote) return res.status(404).json({ error: 'Lote no encontrado.' });
+    const { rows } = await query(
+      `INSERT INTO cliente_cbam_vinculos (cliente_id,lote_id,relacion,referencia_respaldo,observaciones,confirmado_por)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [id, lote_id, relacion, String(referencia_respaldo).trim(), observaciones ? String(observaciones).trim() : null, req.user.sub]
+    );
+    await logActividad({ usuarioId:req.user.sub, accion:'vincular_empresa_lote_cbam', entidad:'cliente_cbam_vinculo', entidadId:rows[0].id, detalle:{ cliente_id:id,lote_id,relacion }, ip:req.ip });
+    res.status(201).json({ vinculo: rows[0] });
+  } catch (err) { if (err.code === '23505') return res.status(409).json({ error: 'Ese lote ya tiene un vínculo vigente con esta empresa.' }); next(err); }
+});
+
+router.post('/cbam/vinculos/:vinculoId/revocar', puedeEditar, async (req, res, next) => {
+  try {
+    const id = clienteId(req, res); if (!id) return;
+    if (!uuid.test(String(req.params.vinculoId || ''))) return res.status(400).json({ error: 'Vínculo inválido.' });
+    const motivo = String(req.body?.motivo || '').trim();
+    if (motivo.length < 3) return res.status(400).json({ error: 'Indica el motivo de revocación.' });
+    const { rows } = await query(
+      `UPDATE cliente_cbam_vinculos SET estado='revocado', revocado_por=$3, revocado_at=now(), motivo_revocacion=$4
+        WHERE id=$1 AND cliente_id=$2 AND estado='vigente' RETURNING *`, [req.params.vinculoId, id, req.user.sub, motivo]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Vínculo vigente no encontrado.' });
+    await logActividad({ usuarioId:req.user.sub, accion:'revocar_vinculo_empresa_lote_cbam', entidad:'cliente_cbam_vinculo', entidadId:rows[0].id, detalle:{ cliente_id:id }, ip:req.ip });
+    res.json({ vinculo: rows[0] });
+  } catch (err) { next(err); }
 });
 
 router.get('/cuentas', async (req, res, next) => {
@@ -161,7 +234,7 @@ router.get('/riesgo', async (req, res, next) => {
        FROM contabilidad_asientos WHERE cliente_id=$1 AND periodo_id=$2`, [id, periodo_id]
     );
     const total = evidencia[0].total || 0;
-    res.json({ periodo, ...perfilFinanciero({ cuentas: await balance(id, periodo_id), nAsientos: total, coberturaRespaldo: total ? Number(evidencia[0].respaldados || 0) / total : 0, ultimoAsiento: evidencia[0].ultimo_asiento }) });
+    res.json({ periodo, ...perfilFinanciero({ cuentas: await balance(id, periodo_id), nAsientos: total, coberturaRespaldo: total ? Number(evidencia[0].respaldados || 0) / total : 0, ultimoAsiento: evidencia[0].ultimo_asiento }), exposicion_cbam: exposicionCbamFinanciera(await vinculosCbam(id)) });
   } catch (err) { next(err); }
 });
 

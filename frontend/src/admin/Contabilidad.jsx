@@ -15,18 +15,21 @@ export default function Contabilidad() {
   const [asientos, setAsientos] = useState([]);
   const [balance, setBalance] = useState(null);
   const [riesgo, setRiesgo] = useState(null);
+  const [vinculosCbam, setVinculosCbam] = useState([]);
+  const [lotesCbam, setLotesCbam] = useState([]);
   const [mensaje, setMensaje] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [cuenta, setCuenta] = useState({ codigo: '', nombre: '', tipo: 'activo', rol_bancario: 'otro' });
   const [periodo, setPeriodo] = useState({ nombre: new Date().getFullYear().toString(), desde: `${new Date().getFullYear()}-01-01`, hasta: `${new Date().getFullYear()}-12-31` });
   const [asiento, setAsiento] = useState({ fecha: hoy, glosa: '', referencia: '', lineas: [lineaVacia(), lineaVacia()] });
+  const [vinculoCbam, setVinculoCbam] = useState({ lote_id: '', relacion: 'titular_lote', referencia_respaldo: '', observaciones: '' });
 
   const avisar = (texto, error = false) => setMensaje({ texto, error });
   const cargarBase = async (id) => {
-    if (!id) { setCuentas([]); setPeriodos([]); setPeriodoId(''); return; }
+    if (!id) { setCuentas([]); setPeriodos([]); setPeriodoId(''); setVinculosCbam([]); return; }
     try {
-      const [c, p] = await Promise.all([api.contabilidadCuentas(id), api.contabilidadPeriodos(id)]);
-      setCuentas(c.cuentas || []); setPeriodos(p.periodos || []); setPeriodoId((actual) => p.periodos?.some((x) => x.id === actual) ? actual : (p.periodos?.[0]?.id || ''));
+      const [c, p, v, l] = await Promise.all([api.contabilidadCuentas(id), api.contabilidadPeriodos(id), api.contabilidadLotesCbam(id), api.lotesCbamDisponibles()]);
+      setCuentas(c.cuentas || []); setPeriodos(p.periodos || []); setVinculosCbam(v.vinculos || []); setLotesCbam(l.lotes || []); setPeriodoId((actual) => p.periodos?.some((x) => x.id === actual) ? actual : (p.periodos?.[0]?.id || ''));
     } catch (e) { avisar(e.message, true); }
   };
   const cargarPeriodo = async () => {
@@ -57,6 +60,23 @@ export default function Contabilidad() {
   async function registrarAsiento(e) {
     e.preventDefault(); if (!cuadrado) return avisar('El asiento debe cuadrar antes de registrarlo.', true);
     setCargando(true); try { await api.crearAsientoContable({ cliente_id: clienteId, periodo_id: periodoId, ...asiento }); setAsiento({ fecha: hoy, glosa: '', referencia: '', lineas: [lineaVacia(), lineaVacia()] }); avisar('Asiento registrado e inmovilizado.'); await cargarPeriodo(); } catch (err) { avisar(err.message, true); } finally { setCargando(false); }
+  }
+  async function crearVinculoCbam(e) {
+    e.preventDefault();
+    if (!clienteId || !vinculoCbam.lote_id) return avisar('Selecciona un lote y registra su referencia de respaldo.', true);
+    setCargando(true);
+    try {
+      await api.vincularLoteCbam({ cliente_id: clienteId, ...vinculoCbam });
+      setVinculoCbam({ lote_id: '', relacion: 'titular_lote', referencia_respaldo: '', observaciones: '' });
+      avisar('Vínculo CBAM registrado con su respaldo.'); await cargarBase(clienteId); await cargarPeriodo();
+    } catch (err) { avisar(err.message, true); } finally { setCargando(false); }
+  }
+  async function revocarVinculoCbam(vinculo) {
+    const motivo = window.prompt(`Motivo para revocar el vínculo ${vinculo.codigo}:`);
+    if (!motivo) return;
+    setCargando(true);
+    try { await api.revocarVinculoLoteCbam(clienteId, vinculo.vinculo_id, motivo); avisar('Vínculo revocado conservando su trazabilidad.'); await cargarBase(clienteId); await cargarPeriodo(); }
+    catch (err) { avisar(err.message, true); } finally { setCargando(false); }
   }
 
   return <div>
@@ -97,8 +117,22 @@ export default function Contabilidad() {
         {!riesgo ? <p className="muted">Selecciona un período para calcular el perfil.</p> : <>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}><span className={`badge ${riesgo.estado === 'informacion_estructurada' ? 'badge-green' : riesgo.estado === 'requiere_revision' ? 'badge-red' : 'badge-gray'}`}>{riesgo.estado.replaceAll('_', ' ')}</span><span className="badge badge-gray">Respaldo {fmt((riesgo.metricas.cobertura_respaldo || 0) * 100, 1)}%</span><span className="badge badge-gray">{riesgo.metricas.n_asientos} asientos</span></div>
           <div className="table-scroll"><table className="data"><tbody><tr><td>Activos corrientes registrados</td><td className="num">{fmt(riesgo.metricas.activos_corrientes, 2)}</td></tr><tr><td>Pasivos corrientes registrados</td><td className="num">{fmt(riesgo.metricas.pasivos_corrientes, 2)}</td></tr><tr><td>Razón de liquidez</td><td className="num">{riesgo.metricas.razon_liquidez == null ? 'Sin base suficiente' : fmt(riesgo.metricas.razon_liquidez, 2)}</td></tr><tr><td>Deuda financiera / patrimonio</td><td className="num">{riesgo.metricas.deuda_patrimonio == null ? 'Sin base suficiente' : fmt(riesgo.metricas.deuda_patrimonio, 2)}</td></tr><tr><td>Resultado del período registrado</td><td className="num">{fmt(riesgo.metricas.resultado_periodo, 2)}</td></tr></tbody></table></div>
+          <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--border,#ddd)' }}><h3 style={{ margin: '0 0 6px' }}>Exposición CBAM vinculada</h3><p className="muted" style={{ marginTop: 0 }}>{riesgo.exposicion_cbam?.mensaje}</p><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><span className={`badge ${riesgo.exposicion_cbam?.estado === 'informacion_estructurada' ? 'badge-green' : riesgo.exposicion_cbam?.estado === 'requiere_revision' ? 'badge-red' : 'badge-gray'}`}>{riesgo.exposicion_cbam?.estado?.replaceAll('_', ' ')}</span><span className="badge badge-gray">{riesgo.exposicion_cbam?.metricas?.lotes_cbam_aplicables || 0} lotes aplicables</span><span className="badge badge-gray">{riesgo.exposicion_cbam?.metricas?.lotes_cbam_pendientes || 0} pendientes</span></div>{riesgo.exposicion_cbam?.faltantes?.length ? <p className="muted">Campos pendientes: {riesgo.exposicion_cbam.faltantes.join(', ')}.</p> : null}<p className="muted" style={{ fontSize: 12 }}>{riesgo.exposicion_cbam?.limitacion}</p></div>
           {riesgo.alertas.length ? <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{riesgo.alertas.map((a) => <div key={a.codigo} className={`badge ${a.nivel === 'alto' ? 'badge-red' : 'badge-gray'}`} style={{ display: 'block', padding: 10 }}><b>{a.codigo.replaceAll('_', ' ')}</b> · {a.texto}</div>)}</div> : <p className="badge badge-green" style={{ display: 'inline-block', marginTop: 14 }}>Sin alertas automáticas bajo las reglas configuradas.</p>}
         </>}
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Vínculos empresa–lote CBAM</h2>
+        <p className="muted">Asocia solo un lote cuya relación con esta empresa fue revisada por SICR3P. El vínculo conserva la referencia utilizada; no modifica el lote ni transforma datos declarados en una certificación.</p>
+        <form onSubmit={crearVinculoCbam} style={{ display: 'grid', gridTemplateColumns: 'minmax(260px,2fr) minmax(160px,1fr) minmax(220px,1fr) auto', gap: 12, alignItems: 'end' }}>
+          <div className="field"><label>Lote de origen</label><select required value={vinculoCbam.lote_id} onChange={(e) => setVinculoCbam({ ...vinculoCbam, lote_id: e.target.value })}><option value="">Selecciona un lote…</option>{lotesCbam.map((l) => <option key={l.id} value={l.id}>{l.codigo} · {l.material} · NC {l.codigo_nc || 'pendiente'} · {l.cbam?.aplicable ? (l.cbam?.listo ? 'CBAM documentado' : 'CBAM pendiente') : 'fuera del alcance configurado'}</option>)}</select></div>
+          <div className="field"><label>Relación confirmada</label><select value={vinculoCbam.relacion} onChange={(e) => setVinculoCbam({ ...vinculoCbam, relacion: e.target.value })}><option value="titular_lote">Titular del lote</option><option value="operador_instalacion">Operador instalación</option><option value="exportador">Exportador</option><option value="financiado">Empresa financiada</option></select></div>
+          <div className="field"><label>Referencia de respaldo</label><input required minLength="3" value={vinculoCbam.referencia_respaldo} onChange={(e) => setVinculoCbam({ ...vinculoCbam, referencia_respaldo: e.target.value })} placeholder="Contrato, OC o expediente" /></div>
+          <button className="btn btn-primary" disabled={cargando}>Vincular</button>
+        </form>
+        <div className="field" style={{ marginTop: 10 }}><label>Observación opcional</label><input value={vinculoCbam.observaciones} onChange={(e) => setVinculoCbam({ ...vinculoCbam, observaciones: e.target.value })} placeholder="Alcance del vínculo revisado" /></div>
+        {!vinculosCbam.length ? <p className="muted">Aún no hay lotes vinculados a esta empresa.</p> : <div className="table-scroll"><table className="data"><thead><tr><th>Lote</th><th>Relación</th><th>Estado CBAM</th><th>Respaldo</th><th /></tr></thead><tbody>{vinculosCbam.map((v) => <tr key={v.vinculo_id}><td><b>{v.codigo}</b><div className="muted">NC {v.codigo_nc || 'pendiente'} · {v.faena_origen || 'instalación pendiente'}</div></td><td>{v.relacion.replaceAll('_', ' ')}</td><td><span className={`badge ${v.cbam?.listo ? 'badge-green' : 'badge-gray'}`}>{v.cbam?.aplicable ? (v.cbam?.listo ? 'documentado' : `pendiente: ${v.cbam?.faltantes?.join(', ')}`) : 'no aplicable configurado'}</span></td><td>{v.referencia_respaldo}</td><td><button type="button" className="btn btn-outline btn-sm" disabled={cargando} onClick={() => revocarVinculoCbam(v)}>Revocar</button></td></tr>)}</tbody></table></div>}
       </div>
 
       <div className="card card-pad" style={{ marginTop: 16 }}><h2 style={{ marginTop: 0 }}>Asientos del período</h2>{!asientos.length ? <p className="muted">Aún no hay asientos registrados.</p> : <div className="table-scroll"><table className="data"><thead><tr><th>N°</th><th>Fecha</th><th>Glosa</th><th>Referencia</th><th>Integridad</th></tr></thead><tbody>{asientos.map((a) => <tr key={a.id}><td>{a.numero}</td><td>{fmtFecha(a.fecha)}</td><td>{a.glosa}<div className="muted" style={{ fontSize: 12 }}>{a.lineas?.map((l) => `${l.cuenta_codigo}: ${Number(l.debito) ? `D ${fmt(l.debito, 2)}` : `H ${fmt(l.haber, 2)}`}`).join(' · ')}</div></td><td>{a.referencia || '—'}</td><td><code title={a.hash_asiento}>{String(a.hash_asiento).slice(0, 12)}…</code></td></tr>)}</tbody></table></div>}</div>

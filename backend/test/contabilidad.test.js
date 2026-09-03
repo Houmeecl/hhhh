@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hashAsiento, perfilFinanciero, validarLineas } from '../src/services/contabilidad.js';
+import { exposicionCbamFinanciera, hashAsiento, perfilFinanciero, validarLineas } from '../src/services/contabilidad.js';
 
 test('validarLineas acepta una partida doble cuadrada', () => {
   const r = validarLineas([
@@ -34,4 +34,18 @@ test('perfil financiero informa ratios y no los presenta como decisión de créd
   assert.equal(r.metricas.razon_liquidez, 0.5);
   assert.equal(r.estado, 'requiere_revision');
   assert.ok(r.alertas.some((a) => a.codigo === 'LIQUIDEZ_BAJA'));
+});
+
+test('exposición CBAM sólo resume lotes vinculados y no calcula certificados', () => {
+  const r = exposicionCbamFinanciera([
+    { estado: 'vigente', cbam: { aplicable: true, listo: true, faltantes: [] } },
+    { estado: 'vigente', cbam: { aplicable: true, listo: false, faltantes: ['instalacion'] } },
+    { estado: 'revocado', cbam: { aplicable: true, listo: true, faltantes: [] } },
+  ]);
+  assert.equal(r.estado, 'requiere_revision');
+  assert.equal(r.metricas.lotes_vinculados, 2);
+  assert.equal(r.metricas.lotes_cbam_aplicables, 2);
+  assert.equal(r.metricas.lotes_cbam_listos, 1);
+  assert.deepEqual(r.faltantes, ['instalacion']);
+  assert.match(r.limitacion, /No es declaración CBAM/);
 });

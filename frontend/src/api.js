@@ -544,6 +544,10 @@ export const api = {
   crearAsientoContable: (b) => request('/admin/contabilidad/asientos', { method: 'POST', body: b, authed: true }),
   balanceContable: (clienteId, periodoId) => request(`/admin/contabilidad/balance?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
   riesgoFinanciero: (clienteId, periodoId) => request(`/admin/contabilidad/riesgo?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
+  contabilidadLotesCbam: (clienteId) => request(`/admin/contabilidad/cbam/lotes?cliente_id=${encodeURIComponent(clienteId)}`, { authed: true }),
+  lotesCbamDisponibles: () => request('/admin/contabilidad/cbam/lotes-disponibles', { authed: true }),
+  vincularLoteCbam: (b) => request('/admin/contabilidad/cbam/vinculos', { method: 'POST', body: b, authed: true }),
+  revocarVinculoLoteCbam: (clienteId, vinculoId, motivo) => request(`/admin/contabilidad/cbam/vinculos/${encodeURIComponent(vinculoId)}/revocar?cliente_id=${encodeURIComponent(clienteId)}`, { method: 'POST', body: { motivo }, authed: true }),
   abrirBalanceContablePdf: (clienteId, periodoId) => abrirPdfAuth(`/api/admin/contabilidad/balance.pdf?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`),
 
   // Trazabilidad (Etapa 2)

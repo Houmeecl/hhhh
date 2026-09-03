@@ -70,3 +70,38 @@ export function perfilFinanciero({ cuentas = [], nAsientos = 0, coberturaRespald
     estado, alertas, metricas: { activos_corrientes: activosCorrientes, pasivos_corrientes: pasivosCorrientes, razon_liquidez: razonLiquidez, deuda_financiera: deudaFinanciera, patrimonio, deuda_patrimonio: deudaPatrimonio, ingresos, egresos, resultado_periodo: ingresos - egresos, n_asientos: nAsientos, cobertura_respaldo: coberturaRespaldo, ultimo_asiento: ultimoAsiento, dias_sin_movimiento: diasSinMovimiento },
   };
 }
+
+// Muestra la preparación documental CBAM de lotes que fueron vinculados de
+// forma expresa con la empresa. No calcula certificados, precio CBAM ni una
+// obligación del importador UE: esos datos exigen alcance, normativa y fuentes
+// vigentes que pertenecen a un expediente regulatorio separado.
+export function exposicionCbamFinanciera(vinculos = []) {
+  const vigentes = vinculos.filter((v) => v.estado === 'vigente');
+  const aplicables = vigentes.filter((v) => v.cbam?.aplicable);
+  const listos = aplicables.filter((v) => v.cbam?.listo);
+  const faltantes = [...new Set(aplicables.flatMap((v) => v.cbam?.faltantes || []))];
+
+  let estado = 'sin_vinculos';
+  if (vigentes.length && !aplicables.length) estado = 'sin_exposicion_identificada';
+  if (aplicables.length && listos.length < aplicables.length) estado = 'requiere_revision';
+  if (aplicables.length && listos.length === aplicables.length) estado = 'informacion_estructurada';
+
+  return {
+    estado,
+    mensaje: estado === 'sin_vinculos'
+      ? 'No hay lotes vinculados expresamente a esta empresa.'
+      : estado === 'sin_exposicion_identificada'
+        ? 'Los lotes vinculados no aparecen en el alcance CBAM configurado.'
+        : estado === 'requiere_revision'
+          ? 'Hay lotes CBAM vinculados con datos documentales pendientes.'
+          : 'Los lotes CBAM vinculados contienen los campos documentales configurados.',
+    metricas: {
+      lotes_vinculados: vigentes.length,
+      lotes_cbam_aplicables: aplicables.length,
+      lotes_cbam_listos: listos.length,
+      lotes_cbam_pendientes: aplicables.length - listos.length,
+    },
+    faltantes,
+    limitacion: 'Esta sección estructura evidencia declarada por lote. No es declaración CBAM, verificación acreditada, cálculo de certificados ni decisión de financiamiento.',
+  };
+}
