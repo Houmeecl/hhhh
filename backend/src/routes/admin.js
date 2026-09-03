@@ -30,6 +30,9 @@ import { cargarCuentas, registrarMovimientos } from '../services/capitalNatural.
 import { SQL_CATEGORIA_ATRIBUIBLE } from '../services/categoriaPresentacion.js';
 import { hashDocumento, siguienteEslabon } from '../services/cadenaHash.js';
 import { PLAZOS, purgar, nombresDeTareas } from '../services/retencion.js';
+import {
+  PLAZO_RESPUESTA_DIAS, ETIQUETA_DERECHO, diasEsperando, fueraDePlazo, dondeBuscar,
+} from '../services/arcop.js';
 import { INVENTARIO, retenidoPorLey, BD_CORREDOR } from '../services/inventarioDatos.js';
 import { consultarRut } from '../services/baseapi.js';
 import { siiLimiterAdmin } from '../middleware/rateLimit.js';
