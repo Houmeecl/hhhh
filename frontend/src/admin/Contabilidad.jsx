@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, fmt, fmtFecha } from '../api.js';
 
 const TIPOS = ['activo', 'pasivo', 'patrimonio', 'ingreso', 'costo', 'gasto'];
+const ROLES_BANCARIOS = ['caja','cuentas_cobrar','inventario','activo_corriente','activo_no_corriente','pasivo_corriente','deuda_financiera','patrimonio','ingreso','costo','gasto','otro'];
 const hoy = new Date().toISOString().slice(0, 10);
 const lineaVacia = () => ({ cuenta_id: '', debito: '', haber: '', glosa: '' });
 
@@ -13,9 +14,10 @@ export default function Contabilidad() {
   const [periodoId, setPeriodoId] = useState('');
   const [asientos, setAsientos] = useState([]);
   const [balance, setBalance] = useState(null);
+  const [riesgo, setRiesgo] = useState(null);
   const [mensaje, setMensaje] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [cuenta, setCuenta] = useState({ codigo: '', nombre: '', tipo: 'activo' });
+  const [cuenta, setCuenta] = useState({ codigo: '', nombre: '', tipo: 'activo', rol_bancario: 'otro' });
   const [periodo, setPeriodo] = useState({ nombre: new Date().getFullYear().toString(), desde: `${new Date().getFullYear()}-01-01`, hasta: `${new Date().getFullYear()}-12-31` });
   const [asiento, setAsiento] = useState({ fecha: hoy, glosa: '', referencia: '', lineas: [lineaVacia(), lineaVacia()] });
 
@@ -28,10 +30,10 @@ export default function Contabilidad() {
     } catch (e) { avisar(e.message, true); }
   };
   const cargarPeriodo = async () => {
-    if (!clienteId || !periodoId) { setAsientos([]); setBalance(null); return; }
+    if (!clienteId || !periodoId) { setAsientos([]); setBalance(null); setRiesgo(null); return; }
     try {
-      const [a, b] = await Promise.all([api.asientosContables(clienteId, periodoId), api.balanceContable(clienteId, periodoId)]);
-      setAsientos(a.asientos || []); setBalance(b);
+      const [a, b, r] = await Promise.all([api.asientosContables(clienteId, periodoId), api.balanceContable(clienteId, periodoId), api.riesgoFinanciero(clienteId, periodoId)]);
+      setAsientos(a.asientos || []); setBalance(b); setRiesgo(r);
     } catch (e) { avisar(e.message, true); }
   };
   useEffect(() => { api.contabilidadClientes().then((r) => setClientes(r.clientes || [])).catch((e) => avisar(e.message, true)); }, []);
@@ -47,7 +49,7 @@ export default function Contabilidad() {
     setCargando(true); try { const r = await api.crearPlanCuentasBase(clienteId); avisar(`${r.creadas?.length || 0} cuentas base incorporadas.`); await cargarBase(clienteId); } catch (e) { avisar(e.message, true); } finally { setCargando(false); }
   }
   async function crearCuenta(e) {
-    e.preventDefault(); setCargando(true); try { await api.crearCuentaContable({ cliente_id: clienteId, ...cuenta }); setCuenta({ codigo: '', nombre: '', tipo: 'activo' }); avisar('Cuenta creada.'); await cargarBase(clienteId); } catch (err) { avisar(err.message, true); } finally { setCargando(false); }
+    e.preventDefault(); setCargando(true); try { await api.crearCuentaContable({ cliente_id: clienteId, ...cuenta }); setCuenta({ codigo: '', nombre: '', tipo: 'activo', rol_bancario: 'otro' }); avisar('Cuenta creada.'); await cargarBase(clienteId); } catch (err) { avisar(err.message, true); } finally { setCargando(false); }
   }
   async function crearPeriodo(e) {
     e.preventDefault(); setCargando(true); try { const r = await api.crearPeriodoContable({ cliente_id: clienteId, ...periodo }); avisar('Período abierto.'); await cargarBase(clienteId); setPeriodoId(r.periodo.id); } catch (err) { avisar(err.message, true); } finally { setCargando(false); }
@@ -70,7 +72,7 @@ export default function Contabilidad() {
     {clienteId && <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16, marginTop: 16 }}>
         <div className="card card-pad"><h2 style={{ marginTop: 0 }}>1. Plan de cuentas</h2><p className="muted">Usa un plan base como punto de partida o agrega tus cuentas.</p><button className="btn btn-outline" disabled={cargando} onClick={crearPlanBase}>Incorporar plan base</button>
-          <form onSubmit={crearCuenta} style={{ marginTop: 14 }}><div className="field"><label>Código</label><input required value={cuenta.codigo} onChange={(e) => setCuenta({ ...cuenta, codigo: e.target.value })} placeholder="Ej. 1103" /></div><div className="field"><label>Nombre</label><input required value={cuenta.nombre} onChange={(e) => setCuenta({ ...cuenta, nombre: e.target.value })} placeholder="Ej. Anticipos" /></div><div className="field"><label>Tipo</label><select value={cuenta.tipo} onChange={(e) => setCuenta({ ...cuenta, tipo: e.target.value })}>{TIPOS.map((t) => <option key={t}>{t}</option>)}</select></div><button className="btn btn-primary" disabled={cargando}>Agregar cuenta</button></form>
+          <form onSubmit={crearCuenta} style={{ marginTop: 14 }}><div className="field"><label>Código</label><input required value={cuenta.codigo} onChange={(e) => setCuenta({ ...cuenta, codigo: e.target.value })} placeholder="Ej. 1103" /></div><div className="field"><label>Nombre</label><input required value={cuenta.nombre} onChange={(e) => setCuenta({ ...cuenta, nombre: e.target.value })} placeholder="Ej. Anticipos" /></div><div className="field"><label>Tipo</label><select value={cuenta.tipo} onChange={(e) => setCuenta({ ...cuenta, tipo: e.target.value })}>{TIPOS.map((t) => <option key={t}>{t}</option>)}</select></div><div className="field"><label>Rol para ficha financiera</label><select value={cuenta.rol_bancario} onChange={(e) => setCuenta({ ...cuenta, rol_bancario: e.target.value })}>{ROLES_BANCARIOS.map((t) => <option key={t}>{t.replaceAll('_', ' ')}</option>)}</select></div><button className="btn btn-primary" disabled={cargando}>Agregar cuenta</button></form>
         </div>
         <div className="card card-pad"><h2 style={{ marginTop: 0 }}>2. Período contable</h2><form onSubmit={crearPeriodo}><div className="field"><label>Nombre</label><input required value={periodo.nombre} onChange={(e) => setPeriodo({ ...periodo, nombre: e.target.value })} placeholder="2026" /></div><div className="field"><label>Desde</label><input required type="date" value={periodo.desde} onChange={(e) => setPeriodo({ ...periodo, desde: e.target.value })} /></div><div className="field"><label>Hasta</label><input required type="date" value={periodo.hasta} onChange={(e) => setPeriodo({ ...periodo, hasta: e.target.value })} /></div><button className="btn btn-primary" disabled={cargando}>Abrir período</button></form>
           <div className="field" style={{ marginTop: 18 }}><label>Período activo</label><select value={periodoId} onChange={(e) => setPeriodoId(e.target.value)}><option value="">Selecciona un período…</option>{periodos.map((p) => <option key={p.id} value={p.id}>{p.nombre} · {p.estado}</option>)}</select></div>
@@ -87,6 +89,16 @@ export default function Contabilidad() {
 
       <div className="card card-pad" style={{ marginTop: 16 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}><div><h2 style={{ margin: 0 }}>Balance de comprobación</h2><p className="muted" style={{ marginBottom: 0 }}>Saldos construidos únicamente desde los asientos del período seleccionado.</p></div>{balance && <button className="btn btn-outline" onClick={() => api.abrirBalanceContablePdf(clienteId, periodoId)}>Descargar PDF</button>}</div>
         {!balance ? <p className="muted">Selecciona un período para ver el balance.</p> : <div className="table-scroll"><table className="data" style={{ marginTop: 14 }}><thead><tr><th>Cuenta</th><th>Tipo</th><th className="num">Débito</th><th className="num">Haber</th><th className="num">Saldo deudor</th><th className="num">Saldo acreedor</th></tr></thead><tbody>{balance.cuentas.map((c) => <tr key={c.id}><td><b>{c.codigo}</b> · {c.nombre}</td><td><span className="badge badge-gray">{c.tipo}</span></td><td className="num">{fmt(c.debito, 2)}</td><td className="num">{fmt(c.haber, 2)}</td><td className="num">{fmt(c.saldo_deudor, 2)}</td><td className="num">{fmt(c.saldo_acreedor, 2)}</td></tr>)}<tr><td colSpan={2}><b>Totales</b></td><td className="num"><b>{fmt(balance.totales.debito, 2)}</b></td><td className="num"><b>{fmt(balance.totales.haber, 2)}</b></td><td className="num"><b>{fmt(balance.totales.saldo_deudor, 2)}</b></td><td className="num"><b>{fmt(balance.totales.saldo_acreedor, 2)}</b></td></tr></tbody></table></div>}
+      </div>
+
+      <div className="card card-pad" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Perfil para analista financiero</h2>
+        <p className="muted">Indicadores automáticos desde el mismo libro y sus referencias. Es una ficha de información para evaluación; no es una aprobación, clasificación de riesgo ni decisión de crédito.</p>
+        {!riesgo ? <p className="muted">Selecciona un período para calcular el perfil.</p> : <>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}><span className={`badge ${riesgo.estado === 'informacion_estructurada' ? 'badge-green' : riesgo.estado === 'requiere_revision' ? 'badge-red' : 'badge-gray'}`}>{riesgo.estado.replaceAll('_', ' ')}</span><span className="badge badge-gray">Respaldo {fmt((riesgo.metricas.cobertura_respaldo || 0) * 100, 1)}%</span><span className="badge badge-gray">{riesgo.metricas.n_asientos} asientos</span></div>
+          <div className="table-scroll"><table className="data"><tbody><tr><td>Activos corrientes registrados</td><td className="num">{fmt(riesgo.metricas.activos_corrientes, 2)}</td></tr><tr><td>Pasivos corrientes registrados</td><td className="num">{fmt(riesgo.metricas.pasivos_corrientes, 2)}</td></tr><tr><td>Razón de liquidez</td><td className="num">{riesgo.metricas.razon_liquidez == null ? 'Sin base suficiente' : fmt(riesgo.metricas.razon_liquidez, 2)}</td></tr><tr><td>Deuda financiera / patrimonio</td><td className="num">{riesgo.metricas.deuda_patrimonio == null ? 'Sin base suficiente' : fmt(riesgo.metricas.deuda_patrimonio, 2)}</td></tr><tr><td>Resultado del período registrado</td><td className="num">{fmt(riesgo.metricas.resultado_periodo, 2)}</td></tr></tbody></table></div>
+          {riesgo.alertas.length ? <div style={{ display: 'grid', gap: 8, marginTop: 14 }}>{riesgo.alertas.map((a) => <div key={a.codigo} className={`badge ${a.nivel === 'alto' ? 'badge-red' : 'badge-gray'}`} style={{ display: 'block', padding: 10 }}><b>{a.codigo.replaceAll('_', ' ')}</b> · {a.texto}</div>)}</div> : <p className="badge badge-green" style={{ display: 'inline-block', marginTop: 14 }}>Sin alertas automáticas bajo las reglas configuradas.</p>}
+        </>}
       </div>
 
       <div className="card card-pad" style={{ marginTop: 16 }}><h2 style={{ marginTop: 0 }}>Asientos del período</h2>{!asientos.length ? <p className="muted">Aún no hay asientos registrados.</p> : <div className="table-scroll"><table className="data"><thead><tr><th>N°</th><th>Fecha</th><th>Glosa</th><th>Referencia</th><th>Integridad</th></tr></thead><tbody>{asientos.map((a) => <tr key={a.id}><td>{a.numero}</td><td>{fmtFecha(a.fecha)}</td><td>{a.glosa}<div className="muted" style={{ fontSize: 12 }}>{a.lineas?.map((l) => `${l.cuenta_codigo}: ${Number(l.debito) ? `D ${fmt(l.debito, 2)}` : `H ${fmt(l.haber, 2)}`}`).join(' · ')}</div></td><td>{a.referencia || '—'}</td><td><code title={a.hash_asiento}>{String(a.hash_asiento).slice(0, 12)}…</code></td></tr>)}</tbody></table></div>}</div>

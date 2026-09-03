@@ -543,6 +543,7 @@ export const api = {
   asientosContables: (clienteId, periodoId) => request(`/admin/contabilidad/asientos?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
   crearAsientoContable: (b) => request('/admin/contabilidad/asientos', { method: 'POST', body: b, authed: true }),
   balanceContable: (clienteId, periodoId) => request(`/admin/contabilidad/balance?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
+  riesgoFinanciero: (clienteId, periodoId) => request(`/admin/contabilidad/riesgo?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`, { authed: true }),
   abrirBalanceContablePdf: (clienteId, periodoId) => abrirPdfAuth(`/api/admin/contabilidad/balance.pdf?cliente_id=${encodeURIComponent(clienteId)}&periodo_id=${encodeURIComponent(periodoId)}`),
 
   // Trazabilidad (Etapa 2)
