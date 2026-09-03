@@ -665,6 +665,8 @@ export const api = {
   solicitarMagic: (email) => request('/auth/magic', { method: 'POST', body: { email } }),
   verificarMagic: (token) => request('/auth/magic/verificar', { method: 'POST', body: { token } }),
   misSesiones: () => request('/mis-sesiones', { cliente: true }),
+  descargarMiContrato: () =>
+    descargarAuthToken('/api/mi-contrato.pdf', clienteAuth.token, 'contrato-sicr3p.pdf'),
   descargarFacturaOriginal: (id, nombre) =>
     descargarAuthToken(`/api/mis-facturas/${id}/archivo-original`, clienteAuth.token, nombre || 'factura'),
 

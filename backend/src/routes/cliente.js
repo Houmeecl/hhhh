@@ -3,6 +3,10 @@ import { gunzipSync } from 'zlib';
 import { query } from '../lib/db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { categoriaParaMostrar } from '../services/categoriaPresentacion.js';
+import { generateContrato } from '../services/pdf.js';
+import {
+  PUNTOS_PENDIENTES, TIPOS, TIPO_POR_DEFECTO, clausulas, clausulasPendientes,
+} from '../services/contrato.js';
 
 // ============================================================
 // Portal del cliente (acceso vía magic link, rol 'cliente').
@@ -13,6 +17,41 @@ const router = express.Router();
 // El guard va POR RUTA (no router.use): este router se monta en /api y un
 // middleware global respondería 403 a todas las rutas montadas después.
 const soloCliente = [requireAuth, requireRole('cliente')];
+
+function pdfDeContrato(contrato) {
+  const meta = TIPOS[contrato.tipo] || TIPOS[TIPO_POR_DEFECTO];
+  return generateContrato({
+    contrato,
+    titulo: meta.titulo.toUpperCase(),
+    codigo: meta.codigo,
+    clausulas: clausulas(contrato.datos, contrato.tipo),
+    pendientes: clausulasPendientes(contrato.datos, contrato.tipo).length ? PUNTOS_PENDIENTES : [],
+  });
+}
+
+// ---------- GET /api/mi-contrato.pdf ----------
+// El contrato se busca únicamente a partir del cliente incluido en el JWT.
+// No se recibe un ID por URL: así una cuenta cliente no puede probar IDs de
+// otras empresas para descargar condiciones que no le pertenecen.
+router.get('/mi-contrato.pdf', soloCliente, async (req, res, next) => {
+  try {
+    if (!req.user.cliente_id) {
+      return res.status(404).json({ error: 'Esta cuenta no tiene un contrato asociado.' });
+    }
+    const { rows } = await query(
+      `SELECT * FROM contratos
+       WHERE cliente_id = $1 AND estado <> 'anulado'
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.user.cliente_id]
+    );
+    const contrato = rows[0];
+    if (!contrato) return res.status(404).json({ error: 'No hay un contrato disponible para esta cuenta.' });
+    const pdf = await pdfDeContrato(contrato);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="contrato-${contrato.numero}.pdf"`);
+    res.send(pdf);
+  } catch (err) { next(err); }
+});
 
 // ---------- GET /api/mis-sesiones ----------
 router.get('/mis-sesiones', soloCliente, async (req, res, next) => {

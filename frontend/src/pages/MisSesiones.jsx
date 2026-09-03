@@ -9,12 +9,20 @@ export default function MisSesiones() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [descargando, setDescargando] = useState(null);
+  const [descargandoContrato, setDescargandoContrato] = useState(false);
 
   async function descargarOriginal(f) {
     setDescargando(f.id);
     try { await api.descargarFacturaOriginal(f.id, f.archivo_original); }
     catch (e) { alert(e.message); }
     finally { setDescargando(null); }
+  }
+
+  async function descargarContrato() {
+    setDescargandoContrato(true);
+    try { await api.descargarMiContrato(); }
+    catch (e) { alert(e.message); }
+    finally { setDescargandoContrato(false); }
   }
 
   useEffect(() => {
@@ -52,6 +60,9 @@ export default function MisSesiones() {
             <p className="muted" style={{ margin: '4px 0 0', fontSize: 14 }}>{data?.email}</p>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-outline btn-sm" onClick={descargarContrato} disabled={descargandoContrato}>
+              {descargandoContrato ? <span className="spinner" /> : 'Mi contrato'}
+            </button>
             <Link to="/cargar" className="btn btn-primary btn-sm">+ Nueva carga</Link>
             <button className="btn btn-outline btn-sm" onClick={salir}>Salir</button>
           </div>
