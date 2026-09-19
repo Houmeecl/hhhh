@@ -1,0 +1,10 @@
+{
+  "name": "proveedor-regional",
+  "version": "1.0.0",
+  "description": "Landing interactiva de Proveedor Regional — institución territorial para el desarrollo de proveedores de la Región de Antofagasta.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": { "start": "node --no-warnings server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "express": "^4.19.2" }
+}
