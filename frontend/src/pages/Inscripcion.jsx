@@ -7,6 +7,7 @@ import { useIdioma } from '../lib/i18n.js';
 import { useSeo } from '../lib/seo.js';
 import { api } from '../api.js';
 import { validarRut } from '../lib/rut.js';
+import { trackAnalytics } from '../lib/amplitude.js';
 
 // Página especial de inscripción de empresas, con la marca al centro:
 // hero navy con el logo grande, argumentos a la izquierda y el
@@ -68,7 +69,10 @@ export default function Inscripcion() {
   async function enviar(e) {
     e.preventDefault();
     setError(null); setEnviando(true);
-    try { setListo(await api.inscribirEmpresa(f)); }
+    try {
+      setListo(await api.inscribirEmpresa(f));
+      void trackAnalytics('inscripcion_completada');
+    }
     catch (err) { setError(err.message); }
     finally { setEnviando(false); }
   }
