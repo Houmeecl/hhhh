@@ -1,0 +1,40 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "event_id": {
+        "type": "keyword"
+      },
+      "vehicle_id": {
+        "type": "keyword"
+      },
+      "source": {
+        "type": "keyword"
+      },
+      "fault_codes": {
+        "type": "keyword"
+      },
+      "terrain": {
+        "type": "keyword"
+      },
+      "timestamp": {
+        "type": "date"
+      },
+      "simulated": {
+        "type": "boolean"
+      },
+      "engine_on": {
+        "type": "boolean"
+      },
+      "speed_kmh": {
+        "type": "float"
+      },
+      "coolant_c": {
+        "type": "float"
+      },
+      "message": {
+        "type": "text"
+      }
+    }
+  }
+}

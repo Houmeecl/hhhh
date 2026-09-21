@@ -1,0 +1,86 @@
+[
+  {
+    "id": "armada",
+    "name": "Marejadas y pronóstico marítimo",
+    "url": "https://meteoarmada.directemar.cl/",
+    "notes": "Avisos, oleaje y viento; no equivalen a cierre portuario.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "directemar",
+    "name": "Estado de puertos",
+    "url": "https://sitport.directemar.cl/",
+    "notes": "Restricción por puerto, vigencia y operación afectada.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "shoa",
+    "name": "Mareas y oceanografía",
+    "url": "https://www.shoa.cl/",
+    "notes": "Mareas y boyas; verificar estación, unidades y cobertura.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "dmc",
+    "name": "Meteorología",
+    "url": "https://climatologia.meteochile.gob.cl/",
+    "notes": "Temperatura, viento, lluvia y visibilidad según estación.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "senapred",
+    "name": "Emergencias",
+    "url": "https://www.senapred.cl/",
+    "notes": "Alertas, área afectada y vigencia.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "mop",
+    "name": "Rutas",
+    "url": "https://vialidad.mop.gob.cl/",
+    "notes": "Estado de rutas y restricciones; confirmar tramo y actualización.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "sec",
+    "name": "Electricidad",
+    "url": "https://www.sec.cl/",
+    "notes": "Interrupciones y cobertura disponibles por territorio.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "siss",
+    "name": "Agua potable",
+    "url": "https://www.siss.gob.cl/",
+    "notes": "Información pública; validar disponibilidad operacional con proveedor.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "csn",
+    "name": "Sismos",
+    "url": "https://www.sismologia.cl/",
+    "notes": "Localización, magnitud y hora; no acreditan daños.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "sinca",
+    "name": "Calidad del aire",
+    "url": "https://sinca.mma.gob.cl/",
+    "notes": "Material particulado y calidad de medición por estación.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "dga",
+    "name": "Hidrología",
+    "url": "https://dga.mop.gob.cl/",
+    "notes": "Caudales y estaciones; evaluar relevancia para rutas y faenas.",
+    "status": "pendiente_integracion"
+  },
+  {
+    "id": "datos",
+    "name": "Catálogo nacional",
+    "url": "https://datos.gob.cl/",
+    "notes": "Descubrir conjuntos y verificar licencia, frecuencia y cobertura.",
+    "status": "pendiente_integracion"
+  }
+]
