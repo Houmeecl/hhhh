@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Landing from './pages/Landing.jsx';
+import Teaser from './pages/Teaser.jsx';
 import Programa from './pages/Programa.jsx';
 import Lanzamiento from './pages/Lanzamiento.jsx';
 import { yaLanzo } from './lib/cuentaRegresiva.js';
@@ -102,7 +103,7 @@ export default function App() {
           NO se borró: vive en /plataforma y sigue enlazada desde el
           programa y desde el menú. Los subdominios y la cuenta regresiva
           mandan por sobre esto, en ese orden. */}
-      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : EN_CUENTA_REGRESIVA ? <Lanzamiento /> : <Programa />} />
+      <Route path="/" element={ES_SUBDOMINIO_INSTITUTO ? <InstitutoLanding /> : ES_SUBDOMINIO_CORREDOR ? <CorredorLanding /> : <Teaser />} />
       <Route path="/plataforma" element={<Landing />} />
       <Route path="/cargar" element={<Cargar />} />
       <Route path="/resultado/:id" element={<Resultado />} />
